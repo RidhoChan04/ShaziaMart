@@ -33,3 +33,10 @@ test("halaman tak dikenal menampilkan pesan Indonesia", async () => {
     await screen.findByText("Halaman tidak ditemukan"),
   ).toBeInTheDocument();
 });
+
+test("start_url PWA /owner/ (garis miring di akhir) membuka Beranda", async () => {
+  renderApp("/owner/");
+  expect(
+    await screen.findByRole("heading", { level: 1, name: "Beranda" }),
+  ).toBeInTheDocument();
+});
