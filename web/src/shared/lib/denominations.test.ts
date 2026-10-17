@@ -12,3 +12,17 @@ test.each([
 ])("quickCashOptions(%i)", (t, want) =>
   expect(quickCashOptions(t)).toEqual(want),
 );
+
+test("quickCashOptions: total di batas bilangan bulat aman", () => {
+  expect(quickCashOptions(Number.MAX_SAFE_INTEGER)).toEqual([
+    Number.MAX_SAFE_INTEGER,
+  ]);
+});
+
+test("quickCashOptions: 49000 naik ke 50000 lalu 60000 dan 100000", () => {
+  expect(quickCashOptions(49000)).toEqual([49000, 50000, 60000, 100000]);
+});
+
+test("quickCashOptions: total non-integer ditolak", () => {
+  expect(() => quickCashOptions(12.5)).toThrow(RangeError);
+});

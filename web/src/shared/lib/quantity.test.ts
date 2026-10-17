@@ -56,6 +56,7 @@ test.each([
 ])("roundHalfUp(%i, %i) = %i", (a, b, r) => expect(roundHalfUp(a, b)).toBe(r));
 
 test("roundHalfUp menolak input tidak valid", () => {
+  expect(() => roundHalfUp(Number.MAX_SAFE_INTEGER, 1)).toThrow(RangeError);
   expect(() => roundHalfUp(-1, 2)).toThrow(RangeError);
   expect(() => roundHalfUp(1.5, 2)).toThrow(RangeError);
   expect(() => roundHalfUp(1, 0)).toThrow(RangeError);

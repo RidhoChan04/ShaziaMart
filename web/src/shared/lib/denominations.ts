@@ -4,7 +4,7 @@ const BIG_STEP = 100000;
 const MAX_OPTIONS = 3;
 
 function ceilTo(n: number, step: number): number {
-  return Math.ceil(n / step) * step;
+  return n % step === 0 ? n : n + (step - (n % step));
 }
 
 /** Uang pas, lalu maksimal 3 nominal lebih besar (naik, unik). `total <= 0` -> `[]`. */
@@ -16,13 +16,13 @@ export function quickCashOptions(total: number): number[] {
 
   const steps = total < 50000 ? SMALL_STEPS : LARGE_STEPS;
   const larger = [...new Set(steps.map((s) => ceilTo(total, s)))]
-    .filter((v) => v > total)
+    .filter((v) => v > total && Number.isSafeInteger(v))
     .sort((a, b) => a - b)
     .slice(0, MAX_OPTIONS);
 
   if (total >= 50000) {
     let next = (larger.at(-1) ?? ceilTo(total, BIG_STEP)) + BIG_STEP;
-    while (larger.length < MAX_OPTIONS) {
+    while (larger.length < MAX_OPTIONS && Number.isSafeInteger(next)) {
       larger.push(next);
       next += BIG_STEP;
     }
