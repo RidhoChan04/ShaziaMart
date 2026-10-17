@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { AppProviders, createAppQueryClient } from "./providers";
+import { AppProviders } from "./providers";
+import { createAppQueryClient } from "./query-client";
 import { createAppRouter } from "./router";
 
 export function App() {

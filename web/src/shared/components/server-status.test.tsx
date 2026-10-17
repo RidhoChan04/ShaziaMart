@@ -1,3 +1,4 @@
+import { onlineManager } from "@tanstack/react-query";
 import { screen } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import { expect, test } from "vitest";
@@ -38,4 +39,27 @@ test("ServerStatus: tidak tersambung saat 200 tetapi status bukan ok", async () 
   expect(
     await screen.findByText("● Server tidak tersambung"),
   ).toBeInTheDocument();
+});
+
+test("ServerStatus: server-mati terdeteksi walau browser melaporkan offline", async () => {
+  onlineManager.setOnline(false);
+  try {
+    setScenario("server-mati");
+    renderWithQuery(<ServerStatus />);
+    expect(
+      await screen.findByText("● Server tidak tersambung"),
+    ).toBeInTheDocument();
+  } finally {
+    onlineManager.setOnline(true);
+  }
+});
+
+test("ServerStatus: tetap tersambung saat browser offline tetapi server normal", async () => {
+  onlineManager.setOnline(false);
+  try {
+    renderWithQuery(<ServerStatus />);
+    expect(await screen.findByText("● Server tersambung")).toBeInTheDocument();
+  } finally {
+    onlineManager.setOnline(true);
+  }
 });

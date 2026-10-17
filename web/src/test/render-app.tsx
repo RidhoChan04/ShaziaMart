@@ -1,13 +1,19 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { createMemoryHistory } from "@tanstack/react-router";
 import { render } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { AppProviders } from "@/app/providers";
+import { createAppQueryClient } from "@/app/query-client";
 import { createAppRouter } from "@/app/router";
 
-/** QueryClient baru per test; tanpa retry agar kegagalan langsung terlihat. */
-export function createTestQueryClient(): QueryClient {
-  return new QueryClient({ defaultOptions: { queries: { retry: false } } });
+/** QueryClient aplikasi (networkMode asli) per test; hanya retry dimatikan agar kegagalan langsung terlihat. */
+export function createTestQueryClient() {
+  const client = createAppQueryClient();
+  client.setDefaultOptions({
+    ...client.getDefaultOptions(),
+    queries: { ...client.getDefaultOptions().queries, retry: false },
+  });
+  return client;
 }
 
 /** Render aplikasi lengkap (router + query) pada path tertentu memakai memory history. */
