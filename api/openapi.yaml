@@ -1,0 +1,78 @@
+openapi: 3.0.3
+info:
+  title: ShaziaMart API
+  version: 0.1.0
+  description: Kontrak API kasir sembako. Sumber kebenaran tunggal untuk frontend dan backend.
+tags:
+  - name: system
+  - name: auth
+  - name: shift
+  - name: catalog
+  - name: sales
+  - name: credit
+  - name: inventory
+  - name: reports
+  - name: settings
+paths:
+  /api/health:
+    get:
+      tags: [system]
+      operationId: getHealth
+      summary: Status layanan
+      responses:
+        "200":
+          description: Layanan sehat
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+        "503":
+          description: Layanan terdegradasi
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+components:
+  schemas:
+    Health:
+      type: object
+      required: [status, version, db]
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded]
+        version:
+          type: string
+        db:
+          type: string
+          enum: [ok, error]
+    ErrorCode:
+      type: string
+      enum:
+        - INTERNAL
+        - NOT_FOUND
+        - VALIDATION
+        - FORBIDDEN_ORIGIN
+        - UNAUTHORIZED
+        - PIN_REQUIRED
+        - PIN_INVALID
+        - LOCKED_OUT
+        - SHIFT_CLOSED
+        - SHIFT_ALREADY_OPEN
+        - PRICE_CHANGED
+        - CREDIT_LIMIT
+        - INVALID_QUANTITY
+    Problem:
+      type: object
+      required: [type, title, status, code]
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        code:
+          $ref: "#/components/schemas/ErrorCode"
+        detail:
+          type: string
