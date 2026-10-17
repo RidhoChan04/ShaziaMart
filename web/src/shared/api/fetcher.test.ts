@@ -1,5 +1,6 @@
-import { afterEach, expect, test, vi } from "vitest";
+import { afterEach, expect, expectTypeOf, test, vi } from "vitest";
 import { ApiError, customFetch } from "./fetcher";
+import { useGetHealth } from "./gen/system/system";
 
 function mockFetch(status: number, body: unknown, contentType: string) {
   const text = typeof body === "string" ? body : JSON.stringify(body);
@@ -95,4 +96,11 @@ test("204 tanpa body mengembalikan data undefined", async () => {
     status: 204,
     data: undefined,
   });
+});
+
+test("error hook yang dihasilkan bertipe ApiError", () => {
+  const useIt = () => useGetHealth();
+  expectTypeOf<
+    ReturnType<typeof useIt>["error"]
+  >().toEqualTypeOf<ApiError | null>();
 });

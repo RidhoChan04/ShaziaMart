@@ -91,3 +91,6 @@ export const customFetch = async <T>(
   if (!res.ok) throw toApiError(res.status, contentType, body);
   return { data: body, status: res.status, headers: res.headers } as T;
 };
+
+/** Dibaca orval: tipe error default hook yang dihasilkan. */
+export type ErrorType<_E> = ApiError;
