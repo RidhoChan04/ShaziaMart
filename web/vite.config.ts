@@ -11,6 +11,11 @@ export default defineConfig(({ command, mode }) => {
   const env = loadEnv(mode, process.cwd(), "VITE_");
   // Build mock/dev tidak menghasilkan SW maupun manifest, dan `virtual:pwa-register`
   // menjadi no-op: SW scope `/owner/` tidak boleh merebut kendali dari MSW.
+  if (command === "build" && mode === "production" && env.VITE_MOCK === "1") {
+    throw new Error(
+      "VITE_MOCK=1 tidak boleh dipakai untuk build produksi — gunakan npm run build:mock",
+    );
+  }
   const pwaEnabled = shouldRegisterPwa({
     DEV: command === "serve",
     VITE_MOCK: env.VITE_MOCK,

@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "build:mock": "cross-env VITE_MOCK=1 vite build",
+    "build:mock": "cross-env VITE_MOCK=1 vite build --mode mock",
     "e2e": "playwright test",
     "lint": "biome check",
     "preview": "vite preview",

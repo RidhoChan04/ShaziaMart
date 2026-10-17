@@ -1,8 +1,14 @@
 import "@testing-library/jest-dom/vitest";
-import { cleanup } from "@testing-library/react";
+import { cleanup, configure } from "@testing-library/react";
 import { afterAll, afterEach, beforeAll } from "vitest";
 import { __resetMockDbCacheForTests } from "@/mocks/db";
 import { server } from "@/mocks/node";
+
+// jsdom tidak mengimplementasikan scrollTo; stub agar keluaran tes bersih.
+window.scrollTo = (() => {}) as typeof window.scrollTo;
+
+// Rute lazy bisa lebih lambat dari 1 dtk default pada CI dingin.
+configure({ asyncUtilTimeout: 3000 });
 
 beforeAll(() => {
   server.listen({ onUnhandledRequest: "error" });

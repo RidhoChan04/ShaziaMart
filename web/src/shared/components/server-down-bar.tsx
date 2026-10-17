@@ -4,7 +4,7 @@ export function ServerDownBar() {
   return (
     <div
       role="alert"
-      className="flex items-center gap-2 bg-danger px-4 py-2 font-medium text-white"
+      className="flex items-center gap-2 bg-danger px-4 py-2 font-medium text-primary-foreground"
     >
       <WifiOff aria-hidden="true" />
       Server tidak tersambung — transaksi belum bisa disimpan

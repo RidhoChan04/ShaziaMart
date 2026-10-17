@@ -2,6 +2,7 @@
 @import "@fontsource-variable/inter";
 
 @theme {
+  --color-*: initial;
   --color-primary: #1f7a4d;
   --color-primary-foreground: #ffffff;
   --color-bg: #f6f7f5;
