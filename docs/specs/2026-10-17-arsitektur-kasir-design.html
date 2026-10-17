@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spec Arsitektur Kasir</title>
+<style>
+  :root {
+    --bg: #fbfaf7; --surface: #ffffff; --text: #1d1f21; --muted: #5d6368;
+    --border: #e3e0d8; --accent: #2f7a4d; --accent-soft: #e6f2ea;
+    --warn: #a3621a; --warn-soft: #fbf0e1; --code: #f2f0ea;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #151719; --surface: #1d2023; --text: #e8e6e1; --muted: #a0a6ab;
+      --border: #33383c; --accent: #6cc28f; --accent-soft: #1f3328;
+      --warn: #e2a65a; --warn-soft: #3a2d1b; --code: #262a2d;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #151719; --surface: #1d2023; --text: #e8e6e1; --muted: #a0a6ab;
+    --border: #33383c; --accent: #6cc28f; --accent-soft: #1f3328;
+    --warn: #e2a65a; --warn-soft: #3a2d1b; --code: #262a2d;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 900px; margin: 0 auto; padding: 40px 16px 80px; }
+  h1 { font-size: 2rem; line-height: 1.2; margin: 0 0 4px; }
+  .meta { color: var(--muted); font-size: .9rem; margin-bottom: 24px; }
+  h2 { font-size: 1.35rem; margin: 48px 0 12px; padding-top: 16px; border-top: 1px solid var(--border); }
+  h3 { font-size: 1.05rem; margin: 24px 0 8px; }
+  p { margin: 0 0 12px; }
+  ul, ol { padding-left: 22px; margin: 0 0 12px; }
+  li { margin-bottom: 4px; }
+  a { color: var(--accent); }
+  code { background: var(--code); padding: 1px 5px; border-radius: 4px; font-size: .88em; font-family: ui-monospace, Consolas, monospace; }
+  pre { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; overflow-x: auto; font-size: .85rem; line-height: 1.5; margin: 0 0 16px; }
+  pre code { background: none; padding: 0; }
+  nav.toc { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; margin-bottom: 8px; }
+  nav.toc ol { margin: 0; columns: 2; column-gap: 32px; }
+  nav.toc a { color: var(--text); text-decoration: none; }
+  nav.toc a:hover { color: var(--accent); }
+  .table-wrap { overflow-x: auto; margin: 0 0 16px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: .92rem; }
+  th, td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--border); }
+  th { font-weight: 600; background: var(--code); white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  .callout { background: var(--accent-soft); border-left: 3px solid var(--accent); padding: 12px 16px; border-radius: 6px; margin: 0 0 16px; }
+  .warn { background: var(--warn-soft); border-left: 3px solid var(--warn); padding: 12px 16px; border-radius: 6px; margin: 0 0 16px; }
+  .note { color: var(--muted); font-size: .9rem; }
+  @media (max-width: 600px) { nav.toc ol { columns: 1; } h1 { font-size: 1.6rem; } }
+</style>
+</head>
+<body>
+<main>
+
+<h1>Spec Arsitektur Aplikasi Kasir Sembako</h1>
+<div class="meta">Desain v1.0 · 17 Oktober 2026 · Status: menunggu review · Dasar: <a href="../PRD.html">PRD</a>, <a href="../reports/Tech%20stack%20aplikasi%20kasir%20sembako.html">laporan riset tech stack</a></div>
+
+<div class="callout">
+<strong>Keputusan inti:</strong> satu <code>kasir.exe</code> (Go) berjalan sebagai Windows service di PC kasir, menyimpan data di SQLite lokal, dan menyajikan satu aplikasi React untuk layar kasir (Edge kiosk) dan HP pemilik (lewat Cloudflare Tunnel). Data dirancang append-only dengan UUIDv7, <code>store_id</code>, dan outbox, supaya fase cloud dan multi-cabang tinggal ditambahkan tanpa menulis ulang.
+</div>
+
+<nav class="toc">
+  <ol>
+    <li><a href="#konteks">Konteks &amp; kriteria</a></li>
+    <li><a href="#arsitektur">Arsitektur</a></li>
+    <li><a href="#stack">Stack teknis</a></li>
+    <li><a href="#domain">Struktur kode</a></li>
+    <li><a href="#data">Aturan data</a></li>
+    <li><a href="#alur">Alur bayar</a></li>
+    <li><a href="#error">Penanganan error</a></li>
+    <li><a href="#hardware">Struk, scanner, laci</a></li>
+    <li><a href="#keamanan">Keamanan</a></li>
+    <li><a href="#backup">Backup &amp; restore</a></li>
+    <li><a href="#testing">Testing</a></li>
+    <li><a href="#build">Build, CI, instalasi</a></li>
+    <li><a href="#perangkat">Perangkat</a></li>
+    <li><a href="#fase">Fase berikutnya</a></li>
+    <li><a href="#validasi">Risiko &amp; validasi prototipe</a></li>
+  </ol>
+</nav>
+
+<h2 id="konteks">1. Konteks &amp; kriteria</h2>
+<h3>Yang sudah diputuskan</h3>
+<ul>
+  <li>Satu toko, 1 meja kasir, aplikasi untuk toko sendiri (bukan SaaS). Multi-cabang mungkin nanti.</li>
+  <li>Kasir memakai PC/laptop Windows; perangkat belum dibeli.</li>
+  <li>Kasir harus tetap bisa jualan tanpa internet. Pemilik memantau dari HP. Struk dicetak di printer thermal.</li>
+  <li>Struk <strong>opsional</strong> per transaksi. Laci uang <strong>manual</strong>, tidak tersambung ke printer.</li>
+  <li>Dashboard pemilik cukup bisa diakses saat PC kasir menyala (opsi A); desain siap naik ke salinan cloud (opsi B).</li>
+  <li>Tidak ada timbangan tersambung; berat curah diinput manual.</li>
+  <li>Biaya: hosting Rp0; akses jarak jauh memakai domain murah (±Rp25.000/tahun untuk <code>.my.id</code>).</li>
+</ul>
+<h3>Kriteria keberhasilan teknis</h3>
+<ol>
+  <li>Tidak ada transaksi yang hilang atau tercatat dobel, termasuk saat listrik padam.</li>
+  <li>Hasil scan muncul di keranjang &lt; 300 ms; pencarian barang di server &lt; 50 ms (p95) untuk 20.000 barang.</li>
+  <li>Biaya operasional bulanan Rp0.</li>
+  <li>Naik ke dashboard cloud dan multi-cabang tanpa migrasi skema besar.</li>
+  <li>Bisa dirawat satu developer: satu bahasa backend, satu frontend, satu file yang di-deploy.</li>
+</ol>
+
+<h2 id="arsitektur">2. Arsitektur</h2>
+<pre><code>PC Kasir (Windows 11, user "Kasir" non-admin, auto-login)
+├─ kasir.exe  — Windows service, auto-restart saat crash, listen 127.0.0.1:8080
+│   ├─ REST API (kontrak OpenAPI) + aturan bisnis
+│   ├─ SQLite (WAL, synchronous=FULL) + tabel outbox_events
+│   ├─ Penyusun ESC/POS → Windows print spooler (RAW)
+│   ├─ Backup terjadwal (VACUUM INTO → folder lokal, flashdisk, R2)
+│   └─ SPA React hasil build (go:embed)
+├─ Edge mode kiosk → http://localhost:8080/kasir
+├─ Scanner USB (mode keyboard/HID) · Printer thermal USB · Laci manual
+└─ cloudflared (service) ──► Cloudflare Tunnel + Access (email pemilik)
+                                   │
+                    HP pemilik ────┘  https://kasir.&lt;domain&gt;.my.id/owner  (PWA)</code></pre>
+<p>Satu aplikasi web dengan dua bagian: <code>/kasir</code> (dioptimalkan keyboard, layar PC) dan <code>/owner</code> (mobile-first). Bundle dipisah per bagian.</p>
+<p class="note">Alternatif yang ditolak: cloud-first PWA (storage browser bisa dihapus dan browser tetap butuh agen lokal untuk printer), sync engine pihak ketiga (belum perlu untuk 1 kasir; konflik dihindari lewat model data), shell desktop Tauri/Electron (hanya pembungkus jendela; Wails v2 jadi cadangan bila butuh jendela native), Postgres di PC kasir (beban operasional tanpa manfaat untuk satu penulis).</p>
+
+<h2 id="stack">3. Stack teknis</h2>
+<p>Versi di bawah adalah rilis aktif per Oktober 2026 menurut laporan riset; versi pasti dikunci di rencana implementasi.</p>
+<div class="table-wrap"><table>
+  <tr><th>Lapisan</th><th>Pilihan</th><th>Catatan</th></tr>
+  <tr><td>Bahasa server</td><td>Go 1.27, <code>net/http</code> bawaan, <code>log/slog</code></td><td>Satu .exe tanpa CGO; kode sama bisa dideploy ke cloud nanti</td></tr>
+  <tr><td>Windows service</td><td><code>kardianos/service</code> (di atas <code>x/sys/windows/svc</code>)</td><td>Binary bisa install/uninstall dirinya sebagai service</td></tr>
+  <tr><td>Database</td><td>SQLite via <code>modernc.org/sqlite</code> (SQLite 3.53.x)</td><td>FTS5 &amp; JSON1 aktif default; sudah melewati perbaikan bug WAL 3.51.3</td></tr>
+  <tr><td>Pragma</td><td><code>journal_mode=WAL</code>, <code>synchronous=FULL</code>, <code>busy_timeout=5000</code>, <code>foreign_keys=ON</code></td><td>Satu koneksi penulis (<code>SetMaxOpenConns(1)</code>), pool terpisah untuk baca</td></tr>
+  <tr><td>Query</td><td>sqlc untuk CRUD &amp; laporan; SQL manual untuk FTS5 dan <code>IN</code> dinamis</td><td>Dukungan SQLite di sqlc masih Beta</td></tr>
+  <tr><td>Migrasi</td><td>goose v3, migrasi di-embed</td><td>Dijalankan otomatis saat service start, setelah backup</td></tr>
+  <tr><td>Kontrak API</td><td>OpenAPI <strong>3.0.3</strong> → oapi-codegen (Go) + orval (hook TanStack Query)</td><td>3.0.3 dipilih karena dukungan 3.1 di oapi-codegen baru tahap awal</td></tr>
+  <tr><td>Frontend</td><td>React 19, TypeScript strict, Vite 8, TanStack Router, TanStack Query 5, Zustand (keranjang), React Hook Form + Zod</td><td>TanStack Router untuk params &amp; search params bertipe di mode SPA</td></tr>
+  <tr><td>UI</td><td>Tailwind 4, shadcn/ui, TanStack Table, Recharts</td><td>Komponen ada di repo, bisa diubah bebas</td></tr>
+  <tr><td>Kualitas</td><td>golangci-lint, Biome, GitHub Actions</td><td>Runner Linux + Windows</td></tr>
+  <tr><td>Akses jarak jauh</td><td>Cloudflare Tunnel + Cloudflare Access (free) + domain <code>.my.id</code></td><td>Tailscale ditolak: paket gratisnya non-komersial</td></tr>
+  <tr><td>Backup</td><td><code>VACUUM INTO</code> + enkripsi <code>age</code> → Cloudflare R2 (free 10 GB)</td><td>Litestream tidak resmi didukung di Windows</td></tr>
+</table></div>
+
+<h2 id="domain">4. Struktur kode</h2>
+<pre><code>kasir-sembako/
+├─ api/openapi.yaml          kontrak API (sumber kebenaran)
+├─ server/
+│  ├─ cmd/kasir/             main.go: wiring, perintah install/run/restore
+│  └─ internal/
+│     ├─ platform/           db, config, log, id (UUIDv7), clock, httpx, problem+json
+│     ├─ catalog/            barang, satuan &amp; konversi, harga grosir, kategori, pencarian
+│     ├─ inventory/          ledger stok, barang masuk, opname, HPP rata-rata
+│     ├─ sales/              transaksi, pembayaran, batal/retur
+│     ├─ credit/             kasbon pelanggan
+│     ├─ shift/              buka/tutup shift, kas keluar
+│     ├─ auth/               user, PIN/password, session, peran
+│     ├─ report/             read model: omzet, laba, stok menipis, kasbon
+│     ├─ printing/           penyusun ESC/POS + wrapper winspool, antrean cetak ulang
+│     ├─ outbox/             penulisan event (relay ke cloud di fase B)
+│     ├─ backup/             snapshot, enkripsi, upload, restore
+│     └─ web/                SPA hasil build (go:embed)
+├─ web/                      React + Vite (routes /kasir dan /owner)
+├─ scripts/                  install.ps1, update.ps1
+├─ docs/                     PRD, riset, spec, rencana
+└─ Taskfile.yml</code></pre>
+<p>Setiap paket fitur berisi <code>domain.go</code> (tipe dan aturan murni, tanpa DB), <code>service.go</code> (use case dan batas transaksi), <code>repo.go</code> (interface; implementasi SQLite dari sqlc) dan <code>http.go</code> (handler sesuai OpenAPI). <code>sales</code> memakai <code>catalog</code>, <code>inventory</code>, <code>credit</code>, <code>shift</code> lewat interface; <code>report</code> hanya membaca. Tidak ada dependensi melingkar. Interface repository memungkinkan implementasi Postgres untuk hub cloud tanpa menyentuh logika bisnis.</p>
+
+<h2 id="data">5. Aturan data</h2>
+<div class="table-wrap"><table>
+  <tr><th>Aturan</th><th>Detail</th></tr>
+  <tr><td>Uang</td><td><code>int64</code> rupiah. Pembulatan setengah ke atas, di level baris item.</td></tr>
+  <tr><td>Kuantitas</td><td><code>int64</code> dalam satuan dasar (pcs atau gram). Harga disimpan per satuan jual; total baris = <code>round(harga × qty_dasar ÷ isi_satuan)</code>.</td></tr>
+  <tr><td>Stok</td><td><code>stock_movements</code> append-only (jual, retur, barang masuk, opname, rusak). <code>product_stock</code> = proyeksi yang diperbarui di transaksi yang sama dan bisa dibangun ulang dari ledger.</td></tr>
+  <tr><td>Stok minus</td><td>Penjualan tetap diizinkan (default, bisa diubah pemilik); barang ditandai untuk ditinjau.</td></tr>
+  <tr><td>Penjualan</td><td>Immutable setelah tersimpan. Batal/retur = baris pembalik + mutasi stok kebalikan. <code>sale_items</code> menyalin harga jual dan HPP saat itu.</td></tr>
+  <tr><td>HPP</td><td>Rata-rata tertimbang, diperbarui pada setiap barang masuk.</td></tr>
+  <tr><td>Kasbon</td><td><code>credit_ledger</code> append-only; saldo = jumlah baris.</td></tr>
+  <tr><td>ID</td><td>UUIDv7 untuk semua entitas; nomor struk manusiawi per hari, mis. <code>20261017-0042</code>.</td></tr>
+  <tr><td>Multi-cabang</td><td>Semua tabel punya <code>store_id</code>.</td></tr>
+  <tr><td>Waktu</td><td>Disimpan UTC (ms epoch). Hari bisnis dihitung dalam zona Asia/Jakarta (WIB).</td></tr>
+  <tr><td>Outbox</td><td>Perubahan penting juga menulis <code>outbox_events</code> (id, tipe, aggregate_id, payload JSON, created_at, sent_at) di transaksi yang sama.</td></tr>
+  <tr><td>Log aktivitas</td><td>Append-only; trigger SQLite menolak <code>UPDATE</code>/<code>DELETE</code>.</td></tr>
+</table></div>
+<p>Entitas lengkap mengikuti bagian <em>Model data inti</em> di PRD.</p>
+
+<h2 id="alur">6. Alur bayar</h2>
+<pre><code>1. Keranjang dibuat     → frontend membuat sale_id (UUIDv7); keranjang disimpan di localStorage
+2. Kasir tekan Bayar    → POST /api/sales {sale_id, items, payments, print: true|false}
+3. Server, SATU transaksi DB:
+     cek shift terbuka → hitung ulang harga &amp; total dari katalog
+     → simpan sale + items + payments → stock_movements (+ credit_ledger bila kasbon)
+     → update product_stock → outbox_events → activity_log (bila ada override PIN)
+   COMMIT (synchronous=FULL)
+4. Setelah commit       → bila print=true: kirim struk ke printer
+5. Respons              → {sale, print_status: tercetak | tidak_dicetak | gagal}</code></pre>
+<ul>
+  <li><strong>Idempoten:</strong> <code>sale_id</code> yang sudah ada mengembalikan transaksi tersimpan, tidak membuat yang baru.</li>
+  <li><strong>Server otoritatif:</strong> bila harga berubah sejak keranjang dibuat, server mengembalikan <code>409 PRICE_CHANGED</code> dengan keranjang terbaru untuk dikonfirmasi kasir.</li>
+  <li><strong>Struk opsional:</strong> pengaturan pemilik "Cetak struk otomatis" menentukan default; kasir bisa mengubahnya per transaksi (satu tombol/shortcut). Struk transaksi mana pun bisa dicetak ulang dari riwayat.</li>
+  <li><strong>Cetak gagal ≠ penjualan gagal:</strong> penjualan tetap tersimpan, struk masuk antrean cetak ulang.</li>
+</ul>
+
+<h2 id="error">7. Penanganan error</h2>
+<div class="table-wrap"><table>
+  <tr><th>Kondisi</th><th>Perilaku</th></tr>
+  <tr><td>Listrik padam saat bayar</td><td>Transaksi DB atomik; keranjang pulih dari localStorage; <code>sale_id</code> sama mencegah dobel.</td></tr>
+  <tr><td>Kasbon melebihi limit</td><td>Ditolak (<code>CREDIT_LIMIT</code>), kecuali PIN pemilik; override dicatat.</td></tr>
+  <tr><td>Printer offline / kertas habis</td><td>Pesan ke kasir, struk ke antrean cetak ulang.</td></tr>
+  <tr><td>Service crash</td><td>Windows service recovery me-restart; frontend menampilkan banner "Server tidak tersambung" dan mencoba ulang.</td></tr>
+  <tr><td>Jam PC mundur</td><td>Dibandingkan dengan transaksi terakhir; peringatan ke kasir dan pemilik.</td></tr>
+  <tr><td>Internet/tunnel mati</td><td>Kasir tidak terpengaruh; dashboard hanya tidak bisa diakses dari luar.</td></tr>
+  <tr><td>Edit harga bersamaan dengan transaksi</td><td>Penulis tunggal SQLite menserialisasi; harga saat commit yang berlaku, plus <code>409</code> di atas.</td></tr>
+</table></div>
+<p>Semua error API memakai <code>application/problem+json</code> (RFC 9457) dengan kode stabil (<code>SHIFT_CLOSED</code>, <code>PRICE_CHANGED</code>, <code>CREDIT_LIMIT</code>, <code>PIN_REQUIRED</code>, …). Frontend memetakan kode ke pesan Bahasa Indonesia.</p>
+
+<h2 id="hardware">8. Struk, scanner, laci</h2>
+<ul>
+  <li><strong>Struk:</strong> penyusun ESC/POS sendiri (±200 baris: <code>ESC @</code>, <code>ESC a</code>, <code>ESC E</code>, <code>GS !</code>, <code>ESC t</code>, <code>GS V</code>) + wrapper winspool (<code>OpenPrinter</code> → <code>StartDocPrinter</code> RAW → <code>WritePrinter</code>) lewat <code>golang.org/x/sys/windows</code>. Lebar kolom dikonfigurasi (32 untuk 58 mm, 48 untuk 80 mm). Antarmuka <code>Printer</code> punya implementasi file-sink untuk test dan e2e.</li>
+  <li><strong>Scanner:</strong> mode keyboard (HID), diakhiri Enter + suffix khusus. Frontend memasang listener <code>keydown</code> global; burst dengan jeda &lt; ~30 ms yang diakhiri Enter/suffix dianggap scan.</li>
+  <li><strong>Laci:</strong> manual, tidak dikendalikan aplikasi. Kontrol kas lewat hitung uang fisik saat tutup shift dan laporan selisih. Laci otomatis bisa ditambah nanti (perintah <code>ESC p</code>) tanpa perubahan desain.</li>
+</ul>
+
+<h2 id="keamanan">9. Keamanan</h2>
+<div class="table-wrap"><table>
+  <tr><th>Aspek</th><th>Desain</th></tr>
+  <tr><td>Login kasir</td><td>PIN 6 digit (argon2id); kunci layar otomatis setelah 5 menit idle.</td></tr>
+  <tr><td>Login pemilik</td><td>Password (argon2id); di jalur jarak jauh juga dilindungi Cloudflare Access (verifikasi email).</td></tr>
+  <tr><td>Session</td><td>Server-side di SQLite; cookie <code>HttpOnly</code>, <code>Secure</code>, <code>SameSite=Strict</code>; pemilik 30 hari.</td></tr>
+  <tr><td>Brute force</td><td>Kunci 5 menit setelah 5 kali salah; dicatat di log aktivitas.</td></tr>
+  <tr><td>Otorisasi</td><td>Dicek di server per grup endpoint; HPP dan laba tidak pernah dikirim ke sesi kasir.</td></tr>
+  <tr><td>CSRF</td><td><code>SameSite=Strict</code> + validasi header <code>Origin</code> pada request yang mengubah data.</td></tr>
+  <tr><td>Paparan jaringan</td><td>Service hanya listen di <code>127.0.0.1</code>; tidak ada port router yang dibuka.</td></tr>
+  <tr><td>Rahasia</td><td>Kunci R2 dan kunci enkripsi di <code>C:\ProgramData\kasir\config</code> dengan ACL hanya SYSTEM &amp; Administrators.</td></tr>
+  <tr><td>Data pribadi</td><td>Nama &amp; no. HP pelanggan kasbon (UU PDP): disimpan seperlunya, backup terenkripsi.</td></tr>
+</table></div>
+
+<h2 id="backup">10. Backup &amp; restore</h2>
+<div class="table-wrap"><table>
+  <tr><th>Kapan</th><th>Tujuan</th><th>Retensi</th></tr>
+  <tr><td>Tiap 2 jam saat toko buka + saat tutup shift</td><td>Folder lokal</td><td>48 snapshot terakhir</td></tr>
+  <tr><td>Harian</td><td>Flashdisk (bila terpasang) + Cloudflare R2</td><td>30 harian + 12 bulanan</td></tr>
+  <tr><td>Sebelum update/migrasi</td><td>Folder lokal</td><td>Wajib; update dibatalkan bila backup gagal</td></tr>
+</table></div>
+<p>Proses: <code>VACUUM INTO</code> ke file <code>.tmp</code> → <code>PRAGMA integrity_check</code> → rename → enkripsi <code>age</code> (untuk salinan di luar PC) → upload. Restore lewat <code>kasir.exe restore &lt;file&gt;</code>; uji restore wajib dilakukan sebelum go-live.</p>
+
+<h2 id="testing">11. Testing</h2>
+<div class="table-wrap"><table>
+  <tr><th>Lapisan</th><th>Cakupan</th><th>Alat</th></tr>
+  <tr><td>Domain</td><td>Harga multi-satuan &amp; grosir, pembulatan curah, HPP, kasbon, hitung kas shift</td><td>Go table-driven, tanpa DB</td></tr>
+  <tr><td>Integrasi</td><td>Bayar atomik, idempotensi, batal/retur, proyeksi stok = ledger, migrasi dari kosong</td><td>Go + file SQLite nyata di temp dir</td></tr>
+  <tr><td>Kontrak</td><td>Request/response handler sesuai <code>openapi.yaml</code></td><td>kin-openapi</td></tr>
+  <tr><td>Struk</td><td>Byte ESC/POS = golden file</td><td>Go</td></tr>
+  <tr><td>Frontend</td><td>Logika keranjang, deteksi scan, format Rupiah</td><td>Vitest + Testing Library</td></tr>
+  <tr><td>E2E</td><td>Bayar tunai/QRIS/kasbon, struk opsional, tutup shift, server putus-sambung</td><td>Playwright ke <code>kasir.exe</code> hasil build, printer file-sink</td></tr>
+  <tr><td>Performa</td><td>20.000 barang; pencarian p95 &lt; 50 ms</td><td>Go benchmark</td></tr>
+  <tr><td>Hardware</td><td>Printer &amp; scanner asli</td><td>Checklist manual</td></tr>
+</table></div>
+<p>Pengembangan memakai TDD.</p>
+
+<h2 id="build">12. Build, CI, instalasi</h2>
+<ul>
+  <li><code>task gen</code>: oapi-codegen, orval, sqlc. Kode hasil generate di-commit; CI gagal bila ada drift.</li>
+  <li><code>task build</code>: <code>vite build</code> → embed → <code>CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build</code> dengan versi di <code>-ldflags</code>.</li>
+  <li>Dev: Vite dev server mem-proxy <code>/api</code> ke <code>go run</code>.</li>
+  <li>CI (GitHub Actions): lint, test (Linux + Windows), e2e, artefak <code>kasir.exe</code>; tag rilis membuat GitHub Release.</li>
+  <li><strong>Instalasi</strong> (<code>install.ps1</code>): exe ke <code>C:\Program Files\Kasir</code>, data ke <code>C:\ProgramData\kasir</code>; <code>kasir.exe install</code> mendaftarkan service + recovery; user Windows "Kasir" non-admin dengan auto-login dan Edge kiosk di startup; <code>cloudflared</code> sebagai service; konfigurasi nama printer &amp; lebar kertas; nonaktifkan sleep dan atur jam aktif Windows Update.</li>
+  <li><strong>Update</strong> (<code>update.ps1</code>): stop service → backup → ganti exe → start (migrasi jalan otomatis).</li>
+</ul>
+
+<h2 id="perangkat">13. Perangkat</h2>
+<div class="table-wrap"><table>
+  <tr><th>Perangkat</th><th>Spesifikasi minimal</th><th>Catatan</th></tr>
+  <tr><td>PC</td><td>Mini PC/laptop Windows 11, SSD, RAM 8 GB</td><td>SSD wajib untuk <code>synchronous=FULL</code></td></tr>
+  <tr><td>Printer</td><td>Thermal USB ESC/POS, 80 mm dengan auto-cutter (58 mm bisa untuk hemat)</td><td>Port laci tidak diperlukan</td></tr>
+  <tr><td>Scanner</td><td>USB HID, 1D/2D, bisa diatur suffix</td><td>—</td></tr>
+  <tr><td>Laci uang</td><td>Laci manual</td><td>Tidak tersambung ke sistem</td></tr>
+  <tr><td>UPS</td><td>≥ 650 VA</td><td>Wajib: PC kasir adalah satu-satunya server</td></tr>
+</table></div>
+
+<h2 id="fase">14. Fase berikutnya (di luar MVP)</h2>
+<ol>
+  <li><strong>Fase B — dashboard cloud:</strong> relay outbox (goroutine + backoff) → <code>POST /events</code> di Go pada Cloud Run, Postgres Neon Free, UNIQUE pada event id; endpoint pull ber-cursor untuk master data (harga, barang) dari pusat ke toko.</li>
+  <li><strong>Multi-cabang:</strong> setiap toko menjadi spoke dengan pola yang sama.</li>
+  <li>Installer Inno Setup, auto-update, struk WhatsApp, QRIS dinamis, laci otomatis bila dibutuhkan.</li>
+  <li>Sync engine (PowerSync) hanya dipertimbangkan bila satu toko punya beberapa terminal yang sama-sama mengedit master data.</li>
+</ol>
+
+<h2 id="validasi">15. Risiko &amp; validasi di prototipe</h2>
+<div class="warn">
+<ul>
+  <li>Domain <code>.my.id</code> bisa diarahkan ke nameserver Cloudflare dan tunnel berjalan.</li>
+  <li>Free tier Cloudflare Access masih mencakup kebutuhan (sumber resmi belum terbuka saat riset).</li>
+  <li>Printer yang dibeli: lebar kolom, code page, dan pemotong kertas sesuai perintah ESC/POS standar.</li>
+  <li>Edge kiosk + auto-login user non-admin berjalan stabil di Windows 11 setelah update.</li>
+  <li>PC kasir sebagai titik gagal tunggal: dimitigasi UPS, backup, dan prosedur restore yang sudah diuji.</li>
+  <li>Laci manual tanpa jejak buka-tutup: dimitigasi hitung kas tutup shift dan laporan selisih.</li>
+</ul>
+</div>
+
+</main>
+</body>
+</html>

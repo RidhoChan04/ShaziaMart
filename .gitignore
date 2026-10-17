@@ -1,0 +1,32 @@
+# Build output
+/bin/
+/dist/
+/server/internal/web/dist/
+/web/dist/
+*.exe
+*.test
+coverage.out
+
+# Dependencies
+node_modules/
+
+# Local data & secrets
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+.env
+.env.*
+!.env.example
+/config.local.*
+
+# Editor & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Local AI tooling
+.claude/
+CLAUDE.md
+CLAUDE.local.md
