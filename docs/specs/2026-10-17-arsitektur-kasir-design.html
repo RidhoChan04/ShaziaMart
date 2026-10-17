@@ -278,6 +278,7 @@
   <li><strong>Fase B — dashboard cloud:</strong> relay outbox (goroutine + backoff) → <code>POST /events</code> di Go pada Cloud Run, Postgres Neon Free, UNIQUE pada event id; endpoint pull ber-cursor untuk master data (harga, barang) dari pusat ke toko.</li>
   <li><strong>Multi-cabang:</strong> setiap toko menjadi spoke dengan pola yang sama.</li>
   <li>Installer Inno Setup, auto-update, struk WhatsApp, QRIS dinamis, laci otomatis bila dibutuhkan.</li>
+  <li><strong>Aplikasi owner sebagai APK:</strong> MVP memakai PWA. Bila nanti dibutuhkan APK (sideload, pemakaian pribadi), bungkus web owner yang sama dengan Capacitor (perlu penyesuaian CORS/cookie dan login Cloudflare Access). React Native hanya bila ada kebutuhan native berat (mis. printer Bluetooth dari HP).</li>
   <li>Sync engine (PowerSync) hanya dipertimbangkan bila satu toko punya beberapa terminal yang sama-sama mengedit master data.</li>
 </ol>
 
