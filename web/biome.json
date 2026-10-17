@@ -7,7 +7,7 @@
   },
   "files": {
     "ignoreUnknown": false,
-    "includes": ["**", "!src/shared/api/gen"]
+    "includes": ["**", "!src/shared/api/gen", "!public/mockServiceWorker.js"]
   },
   "formatter": {
     "enabled": true,
