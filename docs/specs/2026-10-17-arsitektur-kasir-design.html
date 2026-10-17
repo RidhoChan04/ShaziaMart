@@ -170,6 +170,8 @@
   <tr><td>HPP</td><td>Rata-rata tertimbang, diperbarui pada setiap barang masuk.</td></tr>
   <tr><td>Kasbon</td><td><code>credit_ledger</code> append-only; saldo = jumlah baris.</td></tr>
   <tr><td>ID</td><td>UUIDv7 untuk semua entitas; nomor struk manusiawi per hari, mis. <code>20261017-0042</code>.</td></tr>
+  <tr><td>Barcode</td><td>Bukan ID. Disimpan per satuan barang (satu barang bisa punya banyak barcode: pcs, pak, dus), unik per toko, bisa diganti tanpa memutus riwayat.</td></tr>
+  <tr><td>Barang tanpa barcode</td><td>Tiga cara masuk keranjang: tombol cepat + cari nama; kode toko pendek otomatis (mis. <code>1001</code>) yang diketik di kolom scan; atau barcode buatan toko EAN-13 berawalan <code>20</code> (rentang internal GS1) dengan check digit, untuk barang yang dikemas ulang. Cetak label stiker setelah MVP.</td></tr>
   <tr><td>Multi-cabang</td><td>Semua tabel punya <code>store_id</code>.</td></tr>
   <tr><td>Waktu</td><td>Disimpan UTC (ms epoch). Hari bisnis dihitung dalam zona Asia/Jakarta (WIB).</td></tr>
   <tr><td>Outbox</td><td>Perubahan penting juga menulis <code>outbox_events</code> (id, tipe, aggregate_id, payload JSON, created_at, sent_at) di transaksi yang sama.</td></tr>
