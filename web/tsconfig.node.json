@@ -22,5 +22,10 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["vite.config.ts", "pwa-assets.config.ts"]
+  "include": [
+    "vite.config.ts",
+    "pwa-assets.config.ts",
+    "playwright.config.ts",
+    "e2e"
+  ]
 }
