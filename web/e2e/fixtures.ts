@@ -6,10 +6,10 @@ type Fixtures = { externalRequestGuard: undefined };
 /** Test dasar: gagal bila ada request ke host selain server aplikasi sendiri. */
 export const test = base.extend<Fixtures>({
   externalRequestGuard: [
-    async ({ page, baseURL }, use) => {
+    async ({ context, baseURL }, use) => {
       const ownOrigin = new URL(baseURL ?? "http://localhost:4173").origin;
       const offending: string[] = [];
-      page.on("request", (request) => {
+      context.on("request", (request) => {
         const url = request.url();
         if (url.startsWith("data:") || url.startsWith("blob:")) return;
         if (new URL(url).origin !== ownOrigin) offending.push(url);
