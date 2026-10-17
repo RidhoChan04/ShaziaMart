@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spec Frontend Kasir</title>
+<style>
+  :root {
+    --bg: #fbfaf7; --surface: #ffffff; --text: #1d1f21; --muted: #5d6368;
+    --border: #e3e0d8; --accent: #2f7a4d; --accent-soft: #e6f2ea;
+    --warn: #a3621a; --warn-soft: #fbf0e1; --code: #f2f0ea;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #151719; --surface: #1d2023; --text: #e8e6e1; --muted: #a0a6ab;
+      --border: #33383c; --accent: #6cc28f; --accent-soft: #1f3328;
+      --warn: #e2a65a; --warn-soft: #3a2d1b; --code: #262a2d;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #151719; --surface: #1d2023; --text: #e8e6e1; --muted: #a0a6ab;
+    --border: #33383c; --accent: #6cc28f; --accent-soft: #1f3328;
+    --warn: #e2a65a; --warn-soft: #3a2d1b; --code: #262a2d;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 960px; margin: 0 auto; padding: 40px 16px 80px; }
+  h1 { font-size: 2rem; line-height: 1.2; margin: 0 0 4px; }
+  .meta { color: var(--muted); font-size: .9rem; margin-bottom: 24px; }
+  h2 { font-size: 1.35rem; margin: 48px 0 12px; padding-top: 16px; border-top: 1px solid var(--border); }
+  h3 { font-size: 1.05rem; margin: 24px 0 8px; }
+  p { margin: 0 0 12px; }
+  ul, ol { padding-left: 22px; margin: 0 0 12px; }
+  li { margin-bottom: 4px; }
+  a { color: var(--accent); }
+  code { background: var(--code); padding: 1px 5px; border-radius: 4px; font-size: .88em; font-family: ui-monospace, Consolas, monospace; }
+  pre { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; overflow-x: auto; font-size: .85rem; line-height: 1.5; margin: 0 0 16px; }
+  pre code { background: none; padding: 0; }
+  nav.toc { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; margin-bottom: 8px; }
+  nav.toc ol { margin: 0; columns: 2; column-gap: 32px; }
+  nav.toc a { color: var(--text); text-decoration: none; }
+  .table-wrap { overflow-x: auto; margin: 0 0 16px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: .92rem; }
+  th, td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--border); }
+  th { font-weight: 600; background: var(--code); white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  .callout { background: var(--accent-soft); border-left: 3px solid var(--accent); padding: 12px 16px; border-radius: 6px; margin: 0 0 16px; }
+  .note { color: var(--muted); font-size: .9rem; }
+  figure { margin: 8px 0 20px; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  figure .frame { overflow-x: auto; }
+  figcaption { color: var(--muted); font-size: .88rem; padding: 8px 12px; background: var(--surface); border-top: 1px solid var(--border); }
+  @media (max-width: 600px) { nav.toc ol { columns: 1; } h1 { font-size: 1.6rem; } }
+</style>
+</head>
+<body>
+<main>
+
+<h1>Spec Frontend Aplikasi Kasir Sembako</h1>
+<div class="meta">Desain v1.0 · 17 Oktober 2026 · Status: menunggu review · Melengkapi <a href="2026-10-17-arsitektur-kasir-design.html">spec arsitektur</a> dan <a href="../PRD.html">PRD</a></div>
+
+<div class="callout">
+<strong>Keputusan inti:</strong> frontend dikerjakan lebih dulu, <em>contract-first</em>: <code>api/openapi.yaml</code> ditulis lengkap, UI memakai hook hasil orval, dan backend palsu stateful (MSW) menjalankan aturan bisnis sederhana sampai backend Go siap. Satu aplikasi React, dua bagian: <code>/kasir</code> (PC, klik + tombol keyboard dasar) dan <code>/owner</code> (PWA di HP, juga nyaman di laptop). Gaya visual: <strong>Bersih &amp; Hijau</strong>.
+</div>
+
+<nav class="toc">
+  <ol>
+    <li><a href="#keputusan">Keputusan &amp; urutan kerja</a></li>
+    <li><a href="#prinsip">Prinsip</a></li>
+    <li><a href="#design">Design system</a></li>
+    <li><a href="#kasir">Layar kasir</a></li>
+    <li><a href="#bayar">Jendela bayar</a></li>
+    <li><a href="#curah">Jendela curah</a></li>
+    <li><a href="#shift">Shift, kunci layar, gangguan</a></li>
+    <li><a href="#owner">Aplikasi pemilik</a></li>
+    <li><a href="#kontrak">Kontrak API &amp; backend palsu</a></li>
+    <li><a href="#struktur">Struktur kode</a></li>
+    <li><a href="#testing">Testing</a></li>
+    <li><a href="#nanti">Di luar cakupan</a></li>
+  </ol>
+</nav>
+
+<h2 id="keputusan">1. Keputusan &amp; urutan kerja</h2>
+<div class="table-wrap"><table>
+  <tr><th>Topik</th><th>Keputusan</th></tr>
+  <tr><td>Gaya visual</td><td>A · Bersih &amp; Hijau (terang, aksen hijau). Tema gelap menyusul sebagai opsi.</td></tr>
+  <tr><td>Layout kasir</td><td>A · Scan-first: tabel keranjang di tengah, panel total &amp; bayar di kanan, strip tombol curah di bawah kolom scan.</td></tr>
+  <tr><td>Layar bayar</td><td>A · Jendela di tengah, kembalian besar, tombol nominal cepat.</td></tr>
+  <tr><td>Beranda pemilik</td><td>A · Angka dulu, tab bawah.</td></tr>
+  <tr><td>Input curah</td><td>A · Jendela kecil Berat / Nominal.</td></tr>
+  <tr><td>Pintasan</td><td>Tanpa tombol F. Hanya <code>Enter</code>, <code>Esc</code>, <code>↑</code> <code>↓</code>, <code>Delete</code>; semua aksi lain lewat tombol yang diklik.</td></tr>
+  <tr><td>Aplikasi pemilik</td><td>PWA untuk MVP; APK via Capacitor dicatat sebagai opsi.</td></tr>
+</table></div>
+<p><strong>Urutan rencana:</strong> F1 Fondasi frontend → F2 Layar kasir → F3 Aplikasi pemilik → B1… backend (Rencana 1–7 lama tanpa bagian web, mengikuti kontrak yang sudah dipakai UI).</p>
+
+<h2 id="prinsip">2. Prinsip</h2>
+<ul>
+  <li><strong>Tanpa aset dari internet.</strong> Font, ikon, dan suara dibundel; kasir harus jalan tanpa internet.</li>
+  <li><strong>Server otoritatif.</strong> Angka di layar hanya tampilan; total final datang dari server (palsu atau Go).</li>
+  <li><strong>Untuk orang awam.</strong> Label jelas berbahasa Indonesia, tombol besar, tidak ada pintasan yang harus dihafal.</li>
+  <li><strong>Kursor selalu kembali ke kolom scan</strong> setelah setiap aksi, supaya scanner selalu "mengetik" ke tempat yang benar.</li>
+  <li><strong>Kontrak adalah sumber kebenaran.</strong> UI hanya memanggil hook hasil generate dari <code>openapi.yaml</code>.</li>
+</ul>
+
+<h2 id="design">3. Design system</h2>
+<div class="table-wrap"><table>
+  <tr><th>Token / aturan</th><th>Nilai</th></tr>
+  <tr><td>Warna</td><td><code>--primary #1f7a4d</code> · <code>--bg #f6f7f5</code> · <code>--surface #ffffff</code> · <code>--text #1c2421</code> · <code>--muted #5e6b65</code> · <code>--border #e3e7e4</code> · <code>--primary-soft #e6f2ea</code> · <code>--success-soft #f0f8f3</code> · <code>--danger #b42318</code> · <code>--warning #b26b00</code> (di <code>@theme</code> Tailwind 4)</td></tr>
+  <tr><td>Font</td><td>Inter variable dari <code>@fontsource-variable/inter</code> (dibundel)</td></tr>
+  <tr><td>Angka</td><td><code>font-variant-numeric: tabular-nums</code> untuk semua uang/qty</td></tr>
+  <tr><td>Kasir</td><td>Teks dasar 15px · total 30px · kembalian 32px · tombol tinggi ≥ 44px · target layar ≥ 1366×768</td></tr>
+  <tr><td>Owner</td><td>Mobile-first mulai 360px · target sentuh ≥ 44px · ≥ 1024px: tab bawah berubah jadi sidebar</td></tr>
+  <tr><td>Radius &amp; garis</td><td>Radius 8px (kartu/tombol), 12px (jendela); garis 1px <code>--border</code>; fokus: ring 2px <code>--primary</code></td></tr>
+  <tr><td>Komponen</td><td>shadcn/ui: Button, Dialog, Tabs, Input, Table, Sheet, Sonner. Kolom scan/cari dibuat sendiri.</td></tr>
+  <tr><td>Aksesibilitas</td><td>Navigasi keyboard penuh, fokus terlihat, kontras ≥ 4,5:1, dialog Radix (focus trap, Esc menutup)</td></tr>
+  <tr><td>Bahasa</td><td>Bahasa Indonesia langsung di komponen; tanpa library i18n</td></tr>
+</table></div>
+
+<h2 id="kasir">4. Layar kasir</h2>
+<figure><div class="frame">
+<div style="min-width:860px;background:#f6f7f5;font-family:Inter,system-ui,sans-serif;color:#1c2421;font-size:12px">
+  <div style="display:flex;justify-content:space-between;align-items:center;background:#fff;border-bottom:1px solid #e3e7e4;padding:8px 14px">
+    <b style="color:#1f7a4d">ShaziaMart</b>
+    <span style="color:#5e6b65">Rina · Shift 08.00 · ● Server tersambung · <span style="border:1px solid #e3e7e4;border-radius:6px;padding:3px 8px">Riwayat</span> <span style="border:1px solid #e3e7e4;border-radius:6px;padding:3px 8px">Kunci</span></span>
+  </div>
+  <div style="display:flex;gap:12px;padding:12px">
+    <div style="flex:1;min-width:0">
+      <div style="background:#fff;border:2px solid #1f7a4d;border-radius:8px;padding:9px 12px;color:#5e6b65;font-size:13px">🔍 Scan barcode / ketik nama atau kode…</div>
+      <div style="display:flex;gap:6px;margin:8px 0;flex-wrap:wrap">
+        <span style="background:#e6f2ea;color:#1f7a4d;border-radius:6px;padding:6px 12px;font-weight:600">Gula curah</span>
+        <span style="background:#e6f2ea;color:#1f7a4d;border-radius:6px;padding:6px 12px;font-weight:600">Beras curah</span>
+        <span style="background:#e6f2ea;color:#1f7a4d;border-radius:6px;padding:6px 12px;font-weight:600">Telur</span>
+        <span style="background:#e6f2ea;color:#1f7a4d;border-radius:6px;padding:6px 12px;font-weight:600">Minyak curah</span>
+        <span style="background:#e6f2ea;color:#1f7a4d;border-radius:6px;padding:6px 12px;font-weight:600">Tepung</span>
+      </div>
+      <div style="background:#fff;border:1px solid #e3e7e4;border-radius:8px">
+        <div style="display:grid;grid-template-columns:32px 1fr 80px 90px 90px;padding:6px 12px;color:#5e6b65;font-size:11px;border-bottom:1px solid #eef1ef"><span>NO.</span><span>BARANG</span><span>QTY</span><span>HARGA</span><span style="text-align:right">SUBTOTAL</span></div>
+        <div style="display:grid;grid-template-columns:32px 1fr 80px 90px 90px;padding:7px 12px;border-bottom:1px solid #eef1ef"><span>1</span><span>Beras Pandan Wangi 5 kg</span><span>1 pcs</span><span>78.000</span><b style="text-align:right">78.000</b></div>
+        <div style="display:grid;grid-template-columns:32px 1fr 80px 90px 90px;padding:7px 12px;border-bottom:1px solid #eef1ef"><span>2</span><span>Minyak Goreng Bimoli 2 L</span><span>2 pcs</span><span>36.000</span><b style="text-align:right">72.000</b></div>
+        <div style="display:grid;grid-template-columns:32px 1fr 80px 90px 90px;padding:7px 12px;border-bottom:1px solid #eef1ef"><span>3</span><span>Gula Pasir <i style="color:#5e6b65">curah</i></span><span>1,5 kg</span><span>18.000/kg</span><b style="text-align:right">27.000</b></div>
+        <div style="display:grid;grid-template-columns:32px 1fr 80px 90px 90px;padding:7px 12px;border-bottom:1px solid #eef1ef"><span>4</span><span>Telur Ayam <i style="color:#5e6b65">curah</i></span><span>1 kg</span><span>29.000/kg</span><b style="text-align:right">29.000</b></div>
+        <div style="display:grid;grid-template-columns:32px 1fr 80px 90px 90px;padding:7px 12px;border-bottom:1px solid #eef1ef"><span>5</span><span>Indomie Goreng <span style="background:#e6f2ea;color:#1f7a4d;border-radius:4px;padding:0 5px;font-size:10px">grosir</span></span><span>1 dus</span><span>112.000</span><b style="text-align:right">112.000</b></div>
+        <div style="display:grid;grid-template-columns:32px 1fr 80px 90px 90px;padding:7px 12px;background:#f0f8f3"><span>6</span><span>Kopi Kapal Api 165 g</span><span>3 pcs</span><span>14.500</span><b style="text-align:right">43.500</b></div>
+      </div>
+    </div>
+    <div style="width:250px;display:flex;flex-direction:column;gap:8px">
+      <div style="background:#fff;border:1px solid #e3e7e4;border-radius:8px;padding:12px">
+        <div style="color:#5e6b65;font-size:11px">6 BARANG · TOTAL</div>
+        <div style="font-size:30px;font-weight:700;letter-spacing:-.5px">Rp361.500</div>
+      </div>
+      <div style="background:#fff;border:1px solid #e3e7e4;border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:6px">
+        <span>☑ Cetak struk</span>
+        <span style="border:1px solid #e3e7e4;border-radius:6px;padding:8px;text-align:center">Tahan transaksi</span>
+      </div>
+      <div style="background:#1f7a4d;color:#fff;border-radius:8px;padding:16px;text-align:center;font-weight:700;font-size:16px;margin-top:auto">Bayar</div>
+    </div>
+  </div>
+</div>
+</div><figcaption>Layar kasir (1366×768). Baris terakhir yang ditambahkan disorot hijau muda.</figcaption></figure>
+
+<h3>Tabel keranjang</h3>
+<div class="table-wrap"><table>
+  <tr><th>Kolom</th><th>Isi</th></tr>
+  <tr><td>No.</td><td>Urutan baris (1, 2, 3…)</td></tr>
+  <tr><td>Barang</td><td>Nama; label <em>curah</em> untuk barang curah; tag <em>grosir</em> bila harga grosir berlaku</td></tr>
+  <tr><td>Qty</td><td>Jumlah + satuan: <code>2 pcs</code>, <code>1 dus</code>, <code>1,5 kg</code></td></tr>
+  <tr><td>Harga</td><td>Harga per satuan; curah per kg/L: <code>18.000/kg</code></td></tr>
+  <tr><td>Subtotal</td><td>Rata kanan, tebal</td></tr>
+</table></div>
+
+<h3>Interaksi</h3>
+<div class="table-wrap"><table>
+  <tr><th>Masukan</th><th>Perilaku</th></tr>
+  <tr><td>Scan</td><td>Rentetan ketikan dengan jeda &lt; 30 ms yang diakhiri Enter (atau suffix scanner) = scan, juga saat fokus tidak di kolom scan; diabaikan bila ada jendela terbuka.</td></tr>
+  <tr><td>Barcode / kode toko cocok</td><td>Tambah 1 satuan barcode itu; barang curah → buka jendela curah.</td></tr>
+  <tr><td>Barang sama di-scan lagi</td><td>Qty baris yang ada +1, baris disorot ulang (tidak membuat baris baru).</td></tr>
+  <tr><td>Ketik nama</td><td>Daftar hasil (maks 8) di bawah kolom; <code>↑</code> <code>↓</code> pilih, <code>Enter</code> tambah, <code>Esc</code> tutup.</td></tr>
+  <tr><td>Tidak ditemukan</td><td>Toast "Barang tidak ditemukan" + suara error; scan berhasil berbunyi "bip".</td></tr>
+  <tr><td>Ubah qty / hapus</td><td>Klik baris → tombol − / + dan Hapus muncul di baris; atau <code>↑</code> <code>↓</code> lalu <code>Delete</code> (hanya bila baris dipilih).</td></tr>
+  <tr><td>Tahan transaksi</td><td>Keranjang disimpan dengan nama/nomor; daftar keranjang ditahan bisa dilanjutkan.</td></tr>
+  <tr><td>Riwayat</td><td>Transaksi hari ini: cetak ulang struk; batal/retur butuh PIN pemilik.</td></tr>
+</table></div>
+
+<h2 id="bayar">5. Jendela bayar</h2>
+<figure><div class="frame">
+<div style="padding:24px;background:rgba(28,36,33,.45);font-family:Inter,system-ui,sans-serif;color:#1c2421;font-size:12px">
+  <div style="max-width:520px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;padding:14px 18px;border-bottom:1px solid #eef1ef"><span style="color:#5e6b65">TOTAL BELANJA · 6 barang</span><span style="font-size:24px;font-weight:700">Rp361.500</span></div>
+    <div style="display:flex;gap:6px;padding:12px 18px 0">
+      <span style="background:#1f7a4d;color:#fff;border-radius:6px;padding:8px 16px;font-weight:600">Tunai</span>
+      <span style="border:1px solid #e3e7e4;border-radius:6px;padding:8px 16px">QRIS</span>
+      <span style="border:1px solid #e3e7e4;border-radius:6px;padding:8px 16px">Kasbon</span>
+      <span style="border:1px solid #e3e7e4;border-radius:6px;padding:8px 16px">Campuran</span>
+    </div>
+    <div style="padding:12px 18px">
+      <div style="color:#5e6b65;font-size:11px;margin-bottom:4px">UANG DITERIMA</div>
+      <div style="border:2px solid #1f7a4d;border-radius:8px;padding:8px 12px;font-size:22px;font-weight:700">Rp400.000</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px;text-align:center">
+        <span style="border:1px solid #e3e7e4;border-radius:6px;padding:9px">Uang pas</span>
+        <span style="border:1px solid #e3e7e4;border-radius:6px;padding:9px">370.000</span>
+        <span style="background:#e6f2ea;border:1px solid #1f7a4d;color:#1f7a4d;border-radius:6px;padding:9px;font-weight:600">400.000</span>
+        <span style="border:1px solid #e3e7e4;border-radius:6px;padding:9px">500.000</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;background:#f0f8f3;border-radius:8px;padding:12px 14px;margin-top:12px"><span style="font-weight:600;color:#1f7a4d">KEMBALIAN</span><span style="font-size:32px;font-weight:800;color:#1f7a4d">Rp38.500</span></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px"><span style="color:#5e6b65">☑ Cetak struk</span><span style="background:#1f7a4d;color:#fff;border-radius:8px;padding:12px 28px;font-weight:700;font-size:14px">Selesai</span></div>
+    </div>
+  </div>
+</div>
+</div><figcaption>Jendela bayar, tab Tunai. Enter = Selesai, Esc = kembali ke keranjang.</figcaption></figure>
+
+<h3>Tombol nominal cepat</h3>
+<p>Selalu diawali <strong>Uang pas</strong> (= total), lalu maksimal 3 nominal di atas total, urut naik, tanpa duplikat:</p>
+<ul>
+  <li>Total &lt; Rp50.000: pembulatan ke atas ke kelipatan 5.000, 10.000, 20.000, 50.000, 100.000; ambil 3 pertama yang &gt; total.</li>
+  <li>Total ≥ Rp50.000: pembulatan ke atas ke kelipatan 10.000, 50.000, 100.000; bila kurang dari 3, tambah kelipatan 100.000 berikutnya.</li>
+</ul>
+<div class="table-wrap"><table>
+  <tr><th>Total</th><th>Tombol</th></tr>
+  <tr><td>Rp3.100</td><td>Uang pas · 5.000 · 10.000 · 20.000</td></tr>
+  <tr><td>Rp18.000</td><td>Uang pas · 20.000 · 50.000 · 100.000</td></tr>
+  <tr><td>Rp27.000</td><td>Uang pas · 30.000 · 40.000 · 50.000</td></tr>
+  <tr><td>Rp50.000</td><td>Uang pas · 100.000 · 200.000 · 300.000</td></tr>
+  <tr><td>Rp361.500</td><td>Uang pas · 370.000 · 400.000 · 500.000</td></tr>
+</table></div>
+
+<h3>Tab dan aturan</h3>
+<div class="table-wrap"><table>
+  <tr><th>Tab</th><th>Perilaku</th></tr>
+  <tr><td>Tunai</td><td>Kembalian = diterima − total, tampil besar. Bila kurang: "KURANG Rp…" merah, Selesai nonaktif.</td></tr>
+  <tr><td>QRIS</td><td>Gambar QRIS toko + nominal; kasir klik "Sudah masuk" setelah cek notifikasi.</td></tr>
+  <tr><td>Kasbon</td><td>Pilih/tambah pelanggan (nama + no. HP), tampil sisa utang &amp; limit. Melebihi limit → minta PIN pemilik.</td></tr>
+  <tr><td>Campuran</td><td>Tunai/QRIS sebagian + sisanya kasbon; sisa dihitung otomatis.</td></tr>
+</table></div>
+<ul>
+  <li><strong>Setelah selesai</strong>, kembalian tetap tampil besar di layar utama sampai scan berikutnya.</li>
+  <li><strong>409 PRICE_CHANGED</strong>: jendela berisi barang yang berubah (harga lama → baru); kasir konfirmasi lalu simpan ulang dengan <code>sale_id</code> yang sama.</li>
+  <li><strong>print_status gagal</strong>: toast "Struk gagal dicetak — cetak ulang dari Riwayat"; transaksi tetap tersimpan.</li>
+</ul>
+
+<h2 id="curah">6. Jendela curah</h2>
+<figure><div class="frame">
+<div style="background:rgba(28,36,33,.45);padding:20px">
+  <div style="max-width:380px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;font-family:Inter,system-ui,sans-serif;color:#1c2421;font-size:12px">
+    <div style="padding:12px 16px;border-bottom:1px solid #eef1ef;display:flex;justify-content:space-between;align-items:baseline"><b style="font-size:14px">Gula Pasir curah</b><span style="color:#5e6b65">Rp18.000 / kg</span></div>
+    <div style="padding:12px 16px">
+      <div style="display:flex;background:#f0f2f0;border-radius:8px;padding:3px"><span style="flex:1;text-align:center;background:#fff;border-radius:6px;padding:7px;font-weight:600">Berat (kg)</span><span style="flex:1;text-align:center;padding:7px;color:#5e6b65">Nominal (Rp)</span></div>
+      <div style="border:2px solid #1f7a4d;border-radius:8px;padding:8px 12px;font-size:24px;font-weight:700;margin-top:10px">1,5 <span style="font-size:14px;color:#5e6b65">kg</span></div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:8px;text-align:center">
+        <span style="border:1px solid #e3e7e4;border-radius:6px;padding:8px">¼</span><span style="border:1px solid #e3e7e4;border-radius:6px;padding:8px">½</span><span style="border:1px solid #e3e7e4;border-radius:6px;padding:8px">1</span><span style="background:#e6f2ea;border:1px solid #1f7a4d;color:#1f7a4d;border-radius:6px;padding:8px;font-weight:600">1½</span><span style="border:1px solid #e3e7e4;border-radius:6px;padding:8px">2</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;background:#f0f8f3;border-radius:8px;padding:10px 12px;margin-top:10px"><span style="color:#1f7a4d;font-weight:600">HARGA</span><span style="font-size:22px;font-weight:800;color:#1f7a4d">Rp27.000</span></div>
+      <div style="text-align:right;margin-top:10px"><span style="background:#1f7a4d;color:#fff;border-radius:8px;padding:11px 22px;font-weight:700">Masukkan</span></div>
+    </div>
+  </div>
+</div>
+</div><figcaption>Jendela curah, mode Berat. Mode Nominal: ketik 20.000 → "≈ 1,111 kg".</figcaption></figure>
+<div class="table-wrap"><table>
+  <tr><th>Mode</th><th>Aturan hitung</th><th>Dikirim ke server</th></tr>
+  <tr><td>Berat</td><td>Input kg maks 3 desimal → <code>gram</code> bulat. Subtotal = <code>round_half_up(harga_per_kg × gram ÷ 1000)</code>.</td><td><code>{unit_id, qty_base: gram}</code></td></tr>
+  <tr><td>Nominal</td><td>Subtotal = nominal persis. <code>gram = round_half_up(nominal × 1000 ÷ harga_per_kg)</code>, tampil "≈ x,xxx kg".</td><td><code>{unit_id, amount: nominal}</code></td></tr>
+</table></div>
+<p>Setiap item penjualan mengirim tepat salah satu dari <code>qty_base</code> atau <code>amount</code>; <code>amount</code> hanya sah untuk satuan curah. Tombol pecahan default ¼ · ½ · 1 · 1½ · 2 (kg/L), bisa diatur pemilik. Berat 0 atau kosong → Masukkan nonaktif.</p>
+
+<h2 id="shift">7. Shift, kunci layar, gangguan</h2>
+<div class="table-wrap"><table>
+  <tr><th>Kondisi</th><th>Tampilan</th></tr>
+  <tr><td>Belum ada shift terbuka</td><td>Layar "Buka shift": pilih kasir → PIN → modal awal laci.</td></tr>
+  <tr><td>Tutup shift</td><td>Hitung buta: kasir mengisi uang fisik (kalkulator per pecahan opsional); uang seharusnya &amp; selisih baru tampil setelah dikirim.</td></tr>
+  <tr><td>Idle 5 menit / klik Kunci</td><td>Layar PIN; keranjang tetap.</td></tr>
+  <tr><td>Server putus</td><td>Bar merah "Server tidak tersambung — transaksi belum bisa disimpan"; Bayar nonaktif; keranjang aman; coba ulang otomatis tiap 5 detik.</td></tr>
+  <tr><td>Refresh / listrik padam</td><td>Keranjang + <code>sale_id</code> dipulihkan dari localStorage.</td></tr>
+</table></div>
+
+<h2 id="owner">8. Aplikasi pemilik</h2>
+<figure><div class="frame" style="display:flex;justify-content:center;background:#e9ece9;padding:16px">
+<div style="width:300px;background:#f6f7f5;border-radius:28px;border:8px solid #1c2421;overflow:hidden;font-family:Inter,system-ui,sans-serif;color:#1c2421;font-size:12px">
+  <div style="background:#fff;padding:12px 14px;border-bottom:1px solid #e3e7e4"><div style="color:#5e6b65;font-size:11px">Jumat, 17 Okt · ● toko online</div><b style="font-size:15px;color:#1f7a4d">ShaziaMart</b></div>
+  <div style="padding:12px">
+    <div style="background:#fff;border:1px solid #e3e7e4;border-radius:10px;padding:12px">
+      <div style="color:#5e6b65;font-size:11px">OMZET HARI INI</div>
+      <div style="font-size:26px;font-weight:800">Rp4.872.500</div>
+      <div style="color:#1f7a4d;font-weight:600">▲ 12% dari Jumat lalu</div>
+      <svg viewBox="0 0 260 50" style="width:100%;height:46px;margin-top:6px"><polyline fill="none" stroke="#1f7a4d" stroke-width="2" points="0,40 20,38 40,30 60,34 80,22 100,26 120,18 140,20 160,12 180,16 200,10 220,14 240,8 260,6"/></svg>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+      <div style="background:#fff;border:1px solid #e3e7e4;border-radius:10px;padding:10px"><div style="color:#5e6b65;font-size:11px">LABA KOTOR</div><b style="font-size:16px">Rp612.300</b></div>
+      <div style="background:#fff;border:1px solid #e3e7e4;border-radius:10px;padding:10px"><div style="color:#5e6b65;font-size:11px">TRANSAKSI</div><b style="font-size:16px">138</b></div>
+      <div style="background:#fff;border:1px solid #e3e7e4;border-radius:10px;padding:10px"><div style="color:#5e6b65;font-size:11px">KASBON BARU</div><b style="font-size:16px">Rp185.000</b></div>
+      <div style="background:#fff;border:1px solid #e3e7e4;border-radius:10px;padding:10px"><div style="color:#5e6b65;font-size:11px">RATA2 / STRUK</div><b style="font-size:16px">Rp35.300</b></div>
+    </div>
+    <div style="margin-top:10px;color:#5e6b65;font-size:11px">PERLU PERHATIAN</div>
+    <div style="background:#fff;border:1px solid #e3e7e4;border-radius:10px;margin-top:4px"><div style="padding:8px 10px;border-bottom:1px solid #eef1ef">⚠ 7 barang stok menipis</div><div style="padding:8px 10px">💰 Selisih kas shift Rina −Rp5.000</div></div>
+  </div>
+  <div style="display:flex;justify-content:space-around;background:#fff;border-top:1px solid #e3e7e4;padding:8px 0 10px;font-size:10px;color:#5e6b65;text-align:center"><span style="color:#1f7a4d;font-weight:700">⌂<br>Beranda</span><span>▦<br>Barang</span><span>▤<br>Laporan</span><span>✎<br>Kasbon</span><span>⋯<br>Lainnya</span></div>
+</div>
+</div><figcaption>Beranda pemilik (360 px). Angka contoh.</figcaption></figure>
+<div class="table-wrap"><table>
+  <tr><th>Tab</th><th>Isi</th></tr>
+  <tr><td>Beranda</td><td>Omzet hari ini + grafik per jam vs hari yang sama minggu lalu; laba kotor, transaksi, kasbon baru, rata-rata per struk; "Perlu perhatian": stok menipis, stok minus, selisih kas, kasbon &gt; 30 hari.</td></tr>
+  <tr><td>Barang</td><td>Daftar + cari + filter kategori + penanda stok. Detail: satuan &amp; harga, grosir bertingkat, barcode, stok &amp; riwayat mutasi, riwayat harga. Aksi: ubah harga (tampil efek ke margin), barang masuk (pratinjau HPP baru), stok opname (cari atau scan kamera HP; selisih wajib beralasan).</td></tr>
+  <tr><td>Laporan</td><td>Periode hari/minggu/bulan/tanggal; grafik omzet &amp; laba; barang terlaris; per kategori; per kasir; ekspor Excel &amp; PDF.</td></tr>
+  <tr><td>Kasbon</td><td>Pelanggan urut saldo, kelompok umur 0–7 / 8–30 / &gt;30 hari; detail riwayat; atur limit; catat pelunasan.</td></tr>
+  <tr><td>Lainnya</td><td>Shift &amp; kas, Kasir (tambah/nonaktifkan/reset PIN), Log aktivitas, Pengaturan toko (identitas &amp; footer struk, gambar QRIS, cetak otomatis, batas diskon, limit kasbon default, stok minus, tombol curah &amp; pecahannya).</td></tr>
+</table></div>
+<p><strong>PWA:</strong> manifest + ikon, bisa dipasang ke layar utama. Service worker hanya menyimpan tampilan aplikasi, tidak menyimpan data. Tidak terhubung → layar "Tidak bisa terhubung ke toko — pastikan PC kasir menyala dan online" + Coba lagi. Beranda refresh otomatis tiap 60 detik dan bisa ditarik untuk refresh. Aksi sensitif memakai jendela konfirmasi.</p>
+
+<h2 id="kontrak">9. Kontrak API &amp; backend palsu</h2>
+<ul>
+  <li><code>api/openapi.yaml</code> (3.0.3) memuat semua endpoint yang dipakai UI, dikelompokkan per tag: <code>auth</code>, <code>shift</code>, <code>catalog</code>, <code>sales</code>, <code>credit</code>, <code>inventory</code>, <code>reports</code>, <code>settings</code>, <code>system</code>. Kode error didefinisikan sebagai enum pada skema <code>Problem</code>.</li>
+  <li>orval menghasilkan hook TanStack Query + skema Zod di <code>web/src/shared/api/gen</code>.</li>
+  <li><code>web/src/mocks/</code>: backend palsu stateful di memori yang menjalankan aturan bisnis sederhana (hitung ulang total, idempotensi <code>sale_id</code>, stok berkurang, saldo kasbon, hitung kas shift). Data contoh deterministik (seed tetap): ±60 barang sembako termasuk curah &amp; dus, 5 pelanggan kasbon, 2 kasir, penjualan 14 hari.</li>
+  <li>Skenario lewat <code>?skenario=</code> atau panel dev: <code>normal</code>, <code>server-mati</code>, <code>lambat</code> (1,5 detik), <code>harga-berubah</code>, <code>printer-gagal</code>, <code>stok-minus</code>. State disimpan di localStorage dengan tombol "Reset data".</li>
+  <li>MSW hanya aktif di mode development atau bila <code>VITE_MOCK=1</code>; build produksi tanpa MSW.</li>
+</ul>
+
+<h2 id="struktur">10. Struktur kode</h2>
+<pre><code>api/openapi.yaml
+web/
+├─ src/
+│  ├─ app/            router, providers (QueryClient, tema), layout kasir &amp; owner
+│  ├─ features/
+│  │  ├─ kasir/       cart (Zustand), scan-detector, curah, payment, shift, lock
+│  │  └─ owner/       home, products, reports, credit, more
+│  ├─ shared/
+│  │  ├─ ui/          komponen shadcn bergaya A
+│  │  ├─ lib/         money.ts, quantity.ts, denominations.ts
+│  │  └─ api/gen/     hasil orval (jangan diedit)
+│  └─ mocks/          handlers, db (state), seed, scenarios
+└─ e2e/               Playwright</code></pre>
+<p><code>/kasir</code> dan <code>/owner</code> di-<em>code-split</em>; masing-masing tidak memuat kode bagian lain.</p>
+
+<h2 id="testing">11. Testing</h2>
+<div class="table-wrap"><table>
+  <tr><th>Lapisan</th><th>Cakupan</th><th>Alat</th></tr>
+  <tr><td>Logika</td><td>formatRupiah, pembulatan curah, tombol nominal (tabel contoh di bagian 5), deteksi scan, logika keranjang</td><td>Vitest</td></tr>
+  <tr><td>Komponen</td><td>Jendela bayar, jendela curah, jendela 409, hitung buta tutup shift</td><td>Vitest + Testing Library + MSW</td></tr>
+  <tr><td>Alur</td><td>Jual tunai/QRIS/kasbon/campuran, buka/tutup shift, kunci layar, server mati, beranda owner 360×800 dan laptop</td><td>Playwright + MSW</td></tr>
+  <tr><td>Aksesibilitas</td><td>Nol pelanggaran serius/kritis</td><td>@axe-core/playwright</td></tr>
+</table></div>
+
+<h2 id="nanti">12. Di luar cakupan (dicatat untuk nanti)</h2>
+<ul>
+  <li>Tema gelap (gaya B) sebagai opsi.</li>
+  <li>Shortcut ketik curah langsung di kolom scan (<code>gula 1,5</code>).</li>
+  <li>Cetak label barcode toko (EAN-13 awalan 20).</li>
+  <li>APK owner via Capacitor.</li>
+</ul>
+
+</main>
+</body>
+</html>

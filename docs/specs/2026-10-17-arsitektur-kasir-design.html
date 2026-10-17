@@ -164,6 +164,7 @@
   <tr><th>Aturan</th><th>Detail</th></tr>
   <tr><td>Uang</td><td><code>int64</code> rupiah. Pembulatan setengah ke atas, di level baris item.</td></tr>
   <tr><td>Kuantitas</td><td><code>int64</code> dalam satuan dasar (pcs atau gram). Harga disimpan per satuan jual; total baris = <code>round(harga × qty_dasar ÷ isi_satuan)</code>.</td></tr>
+  <tr><td>Curah per nominal</td><td>Item penjualan mengirim tepat salah satu: <code>qty_base</code> atau <code>amount</code> (hanya satuan curah). Bila <code>amount</code>: subtotal = amount persis, <code>qty_base = round_half_up(amount × isi_satuan ÷ harga)</code>. Detail di <a href="2026-10-17-frontend-design.html#curah">spec frontend</a>.</td></tr>
   <tr><td>Stok</td><td><code>stock_movements</code> append-only (jual, retur, barang masuk, opname, rusak). <code>product_stock</code> = proyeksi yang diperbarui di transaksi yang sama dan bisa dibangun ulang dari ledger.</td></tr>
   <tr><td>Stok minus</td><td>Penjualan tetap diizinkan (default, bisa diubah pemilik); barang ditandai untuk ditinjau.</td></tr>
   <tr><td>Penjualan</td><td>Immutable setelah tersimpan. Batal/retur = baris pembalik + mutasi stok kebalikan. <code>sale_items</code> menyalin harga jual dan HPP saat itu.</td></tr>
