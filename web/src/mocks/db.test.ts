@@ -13,8 +13,21 @@ test("mockDb persist dan reset", () => {
   expect(mockDb.get().store.name).toBe("ShaziaMart");
 });
 
-test("mockDb pulih dari JSON rusak", () => {
+test("JSON rusak di localStorage -> default tanpa melempar", () => {
   localStorage.setItem("mock.db", "{bukan json");
+  expect(mockDb.get().store.name).toBe("ShaziaMart");
+});
+
+test("JSON bentuk valid di localStorage dimuat lazy", () => {
+  localStorage.setItem(
+    "mock.db",
+    JSON.stringify({ store: { id: "abc", name: "Toko Lain" } }),
+  );
+  expect(mockDb.get().store).toEqual({ id: "abc", name: "Toko Lain" });
+});
+
+test("JSON bentuk salah -> default", () => {
+  localStorage.setItem("mock.db", JSON.stringify({ store: 1 }));
   expect(mockDb.get().store.name).toBe("ShaziaMart");
 });
 

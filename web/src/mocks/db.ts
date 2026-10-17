@@ -56,3 +56,8 @@ export const mockDb = {
     persist(current);
   },
 };
+
+/** Hanya untuk test: buang cache memori agar `get()` memuat ulang dari localStorage. */
+export function __resetMockDbCacheForTests(): void {
+  current = null;
+}
