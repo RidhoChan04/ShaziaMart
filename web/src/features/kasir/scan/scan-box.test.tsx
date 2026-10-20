@@ -1,24 +1,28 @@
 import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, test, vi } from "vitest";
+import { server } from "@/mocks/node";
+import type { CatalogMatch } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { beep } from "@/shared/lib/beep";
 import { renderWithQuery } from "@/test/render-app";
 import { useCart } from "../cart/cart-store";
-import { ScanBox } from "./scan-box";
+import { ScanBox, useScanFocus } from "./scan-box";
 
 vi.mock("@/shared/lib/beep", () => ({ beep: vi.fn() }));
 
-function setup() {
-  const onResolved = vi.fn();
+function Harness({ onCurah }: { onCurah: (m: CatalogMatch) => void }) {
+  const focus = useScanFocus();
+  return <ScanBox focus={focus} onCurah={onCurah} />;
+}
+
+function setup(options: Parameters<typeof userEvent.setup>[0] = {}) {
   const onCurah = vi.fn();
-  const utils = renderWithQuery(
-    <ScanBox onResolved={onResolved} onCurah={onCurah} />,
-  );
-  const user = userEvent.setup();
+  const utils = renderWithQuery(<Harness onCurah={onCurah} />);
+  const user = userEvent.setup(options);
   const input = screen.getByRole("combobox", {
     name: "Scan barcode / ketik nama atau kode",
   });
-  return { ...utils, user, input, onResolved, onCurah };
+  return { ...utils, user, input, onCurah };
 }
 
 beforeEach(() => {
@@ -32,14 +36,13 @@ test("terfokus otomatis", () => {
 });
 
 test("Enter kode 089686010947 → baris Indomie pcs bertambah", async () => {
-  const { user, input, onResolved } = setup();
+  const { user, input } = setup();
   await user.type(input, "089686010947{Enter}");
   await waitFor(() => expect(useCart.getState().lines).toHaveLength(1));
   const line = useCart.getState().lines[0];
   expect(line?.productName).toBe("Indomie Goreng");
   expect(line?.unitName).toBe("pcs");
   expect(beep).toHaveBeenCalledWith("ok");
-  expect(onResolved).toHaveBeenCalledTimes(1);
   expect(input).toHaveValue("");
   expect(input).toHaveFocus();
 });
@@ -118,4 +121,46 @@ test("↑/↓ saat daftar tertutup menggeser pilihan keranjang", async () => {
   expect(useCart.getState().selectedLineId).toBe(
     useCart.getState().lines[0]?.lineId,
   );
+});
+
+test("Enter saat daftar terbuka tanpa sorotan menambah hasil pertama", async () => {
+  const { user, input } = setup();
+  await user.type(input, "kopi");
+  const options = await screen.findAllByRole("option");
+  await user.keyboard("{Enter}");
+  await waitFor(() => expect(useCart.getState().lines).toHaveLength(1));
+  const name = useCart.getState().lines[0]?.productName ?? "";
+  expect(options[0]).toHaveTextContent(name);
+  expect(input).toHaveValue("");
+});
+
+test("scan beruntun cepat: kolom kosong seketika, kode tidak menyatu", async () => {
+  // delay null: tidak ada jeda antar tombol, lookup pertama belum selesai saat kode kedua masuk.
+  const { user, input } = setup({ delay: null });
+  await user.type(input, "8991002101012{Enter}8992696404441{Enter}");
+  expect(input).toHaveValue("");
+  await waitFor(() => expect(useCart.getState().lines).toHaveLength(2));
+  expect(useCart.getState().lines.map((l) => l.productName)).toEqual([
+    "Beras Pandan Wangi 5 kg",
+    "Minyak Goreng Bimoli 2 L",
+  ]);
+  expect(beep).not.toHaveBeenCalledWith("error");
+});
+
+test("Enter kedua untuk kode yang masih dicari diabaikan", async () => {
+  const lookups: string[] = [];
+  const onStart = ({ request }: { request: Request }) => {
+    if (request.url.includes("/api/catalog/lookup")) lookups.push(request.url);
+  };
+  server.events.on("request:start", onStart);
+  try {
+    const { user, input } = setup({ delay: null });
+    await user.type(input, "089686010947{Enter}089686010947{Enter}");
+    await waitFor(() => expect(useCart.getState().lines).toHaveLength(1));
+    await act(() => new Promise((r) => setTimeout(r, 50)));
+    expect(useCart.getState().lines[0]?.qtyBase).toBe(1);
+    expect(lookups).toHaveLength(1);
+  } finally {
+    server.events.removeListener("request:start", onStart);
+  }
 });

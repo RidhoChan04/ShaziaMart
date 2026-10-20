@@ -1,17 +1,11 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
-import { toast } from "sonner";
-import { ApiError } from "@/shared/api/fetcher";
-import {
-  lookupCatalog,
-  useSearchCatalog,
-} from "@/shared/api/gen/catalog/catalog";
+import { useSearchCatalog } from "@/shared/api/gen/catalog/catalog";
 import type { CatalogMatch } from "@/shared/api/gen/shaziaMartAPI.schemas";
-import { beep } from "@/shared/lib/beep";
 import { cn } from "@/shared/lib/cn";
-import { pesanError } from "@/shared/lib/error-messages";
 import { formatRupiah } from "@/shared/lib/money";
 import { Input } from "@/shared/ui/input";
 import { useCart } from "../cart/cart-store";
+import { acceptMatch, resolveCode } from "./resolve-code";
 
 const DEBOUNCE_MS = 150;
 
@@ -29,13 +23,13 @@ function unitOf(match: CatalogMatch) {
 }
 
 export function ScanBox({
-  onResolved,
+  focus,
   onCurah,
 }: {
-  onResolved: (match: CatalogMatch) => void;
+  focus: ReturnType<typeof useScanFocus>;
   onCurah: (match: CatalogMatch) => void;
 }) {
-  const { ref, refocus } = useScanFocus();
+  const { ref, refocus } = focus;
   const listId = useId();
   const [text, setText] = useState("");
   const [q, setQ] = useState("");
@@ -62,34 +56,23 @@ export function ScanBox({
   const empty =
     open && searchActive && search.isSuccess && results.length === 0;
 
-  function reset() {
+  function clear() {
     setText("");
     setQ("");
     setActive(-1);
     setOpen(true);
-    refocus();
   }
 
   function accept(match: CatalogMatch) {
-    if (match.product.isCurah) {
-      onCurah(match);
-    } else {
-      useCart.getState().addUnit(match);
-      beep("ok");
-      onResolved(match);
-    }
-    reset();
+    acceptMatch(match, onCurah);
+    clear();
+    refocus();
   }
 
-  async function lookup(code: string) {
-    try {
-      accept(await lookupCatalog({ code }));
-    } catch (err) {
-      const notFound = err instanceof ApiError && err.code === "NOT_FOUND";
-      toast.error(notFound ? "Barang tidak ditemukan" : pesanError(err));
-      beep("error");
-      reset();
-    }
+  // Kolom dikosongkan sebelum lookup agar scan berikutnya tidak menyambung ke kode ini.
+  function lookup(code: string) {
+    clear();
+    void resolveCode(code, onCurah).then(refocus);
   }
 
   function onArrow(down: boolean) {
@@ -105,9 +88,10 @@ export function ScanBox({
 
   function onEnter() {
     const value = text.trim();
-    const picked = listOpen ? results[active] : undefined;
+    // Tanpa sorotan, Enter memilih hasil teratas.
+    const picked = listOpen ? (results[active] ?? results[0]) : undefined;
     if (picked) accept(picked);
-    else if (/^\d+$/.test(value)) void lookup(value);
+    else if (/^\d+$/.test(value)) lookup(value);
   }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
