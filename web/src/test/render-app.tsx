@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { AppProviders } from "@/app/providers";
 import { createAppQueryClient } from "@/app/query-client";
 import { createAppRouter } from "@/app/router";
+import { Toaster } from "@/shared/ui/sonner";
 
 /** QueryClient aplikasi (networkMode asli) per test; hanya retry dimatikan agar kegagalan langsung terlihat. */
 export function createTestQueryClient() {
@@ -32,7 +33,10 @@ export function renderApp(path: string) {
 export function renderWithQuery(ui: ReactNode) {
   const queryClient = createTestQueryClient();
   const utils = render(
-    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
+    <QueryClientProvider client={queryClient}>
+      {ui}
+      <Toaster />
+    </QueryClientProvider>,
   );
   return { ...utils, queryClient };
 }
