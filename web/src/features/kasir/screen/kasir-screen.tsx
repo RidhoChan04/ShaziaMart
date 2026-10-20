@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import type { CatalogMatch } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { CurahDialog } from "../curah/curah-dialog";
+import { PaymentDialog } from "../payment/payment-dialog";
 import { resolveCode } from "../scan/resolve-code";
 import { ScanBox, useScanFocus } from "../scan/scan-box";
 import { useScanDetector } from "../scan/use-scan-detector";
@@ -23,6 +24,10 @@ export function KasirScreen() {
     [refocus],
   );
   useScanDetector(onScan);
+  const closePay = useCallback(() => {
+    setPayOpen(false);
+    refocus();
+  }, [refocus]);
 
   return (
     <main className="flex min-h-0 flex-1 gap-3 p-3">
@@ -50,6 +55,7 @@ export function KasirScreen() {
           refocus();
         }}
       />
+      <PaymentDialog open={payOpen} onClose={closePay} onPaid={closePay} />
     </main>
   );
 }

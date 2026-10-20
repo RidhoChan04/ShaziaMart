@@ -1,39 +1,14 @@
 import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, test, vi } from "vitest";
-import { mockDb } from "@/mocks/db";
 import { setScenario } from "@/mocks/scenarios";
-import type { CatalogMatch } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { renderWithQuery } from "@/test/render-app";
+import { fillSpecCart } from "@/test/spec-cart";
 import { useCart } from "../cart/cart-store";
 import { KasirScreen } from "./kasir-screen";
 import { QuickCurahStrip } from "./quick-curah-strip";
 
 vi.mock("@/shared/lib/beep", () => ({ beep: vi.fn() }));
-
-function match(name: string): CatalogMatch {
-  const product = mockDb.get().products.find((p) => p.name === name);
-  const unit = product?.units[0];
-  if (!product || !unit) throw new Error(`Barang ${name} tidak ada di seed`);
-  return { product, unitId: unit.id };
-}
-
-function repeat(n: number, fn: () => void) {
-  for (let i = 0; i < n; i += 1) fn();
-}
-
-/** Enam baris contoh spec bagian 4 (Indomie 40 pcs → harga grosir). */
-function fillSpecCart() {
-  act(() => {
-    const cart = useCart.getState();
-    cart.addUnit(match("Beras Pandan Wangi 5 kg"));
-    repeat(2, () => cart.addUnit(match("Minyak Goreng Bimoli 2 L")));
-    cart.addCurah(match("Gula Pasir"), { qtyBase: 1500 });
-    cart.addCurah(match("Telur Ayam"), { qtyBase: 1000 });
-    repeat(40, () => cart.addUnit(match("Indomie Goreng")));
-    repeat(3, () => cart.addUnit(match("Kopi Kapal Api 165 g")));
-  });
-}
 
 function setup() {
   const user = userEvent.setup();
@@ -277,5 +252,8 @@ test("tidak ada handler tombol F (keydown F12 tidak membuka bayar)", async () =>
   expect(ev.defaultPrevented).toBe(false);
   expect(bayar()).toHaveAttribute("aria-expanded", "false");
   await user.click(bayar());
-  expect(bayar()).toHaveAttribute("aria-expanded", "true");
+  // Jendela bayar modal menyembunyikan panel dari pohon aksesibilitas.
+  expect(
+    screen.getByRole("button", { name: "Bayar", hidden: true }),
+  ).toHaveAttribute("aria-expanded", "true");
 });
