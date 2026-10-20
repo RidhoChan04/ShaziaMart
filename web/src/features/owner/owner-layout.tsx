@@ -11,7 +11,7 @@ import {
 import {
   useRecheckServer,
   useServerHealth,
-} from "@/shared/components/server-status";
+} from "@/shared/hooks/use-server-health";
 import { Button } from "@/shared/ui/button";
 
 const dateFormat = new Intl.DateTimeFormat("id-ID", {

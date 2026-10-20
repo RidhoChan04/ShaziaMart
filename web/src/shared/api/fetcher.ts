@@ -66,9 +66,8 @@ function toApiError(
 }
 
 /**
- * Mutator orval (httpClient: fetch). Orval menamai tipe respons sebagai
- * envelope `{ data, status, headers }`, sehingga sukses mengembalikan envelope itu;
- * respons non-2xx dilempar sebagai ApiError.
+ * Mutator orval (httpClient: fetch). Sukses (2xx) mengembalikan body hasil parse
+ * (`undefined` bila kosong, mis. 204); respons non-2xx dilempar sebagai ApiError.
  */
 export const customFetch = async <T>(
   url: string,
@@ -89,7 +88,7 @@ export const customFetch = async <T>(
   const contentType = res.headers.get("content-type") ?? "";
   const body = await readBody(res, contentType);
   if (!res.ok) throw toApiError(res.status, contentType, body);
-  return { data: body, status: res.status, headers: res.headers } as T;
+  return body as T;
 };
 
 /** Dibaca orval: tipe error default hook yang dihasilkan. */

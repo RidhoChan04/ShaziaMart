@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { mockDb } from "./db";
+import { type MockState, mockDb } from "./db";
 import { rng } from "./seed";
 
 test("mockDb persist dan reset", () => {
@@ -35,4 +35,11 @@ test("rng deterministik", () => {
   const a = rng(20261017);
   const b = rng(20261017);
   expect([a(), a(), a()]).toEqual([b(), b(), b()]);
+});
+
+test("mockDb.get mengembalikan salinan — mutasi tidak bocor", () => {
+  mockDb.reset();
+  const s = mockDb.get() as MockState;
+  s.store.name = "X";
+  expect(mockDb.get().store.name).toBe("ShaziaMart");
 });

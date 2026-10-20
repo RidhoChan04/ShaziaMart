@@ -1,9 +1,7 @@
 import { Outlet } from "@tanstack/react-router";
 import { ServerDownBar } from "@/shared/components/server-down-bar";
-import {
-  ServerStatus,
-  useServerHealth,
-} from "@/shared/components/server-status";
+import { ServerStatus } from "@/shared/components/server-status";
+import { useServerHealth } from "@/shared/hooks/use-server-health";
 import { Button } from "@/shared/ui/button";
 
 export function KasirLayout() {

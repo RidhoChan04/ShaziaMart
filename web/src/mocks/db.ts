@@ -42,14 +42,16 @@ function persist(state: MockState): void {
 let current: MockState | null = null;
 
 export const mockDb = {
-  get(): MockState {
+  /** Salinan: mengubahnya tidak memengaruhi cache; ubah lewat `update`. */
+  get(): Readonly<MockState> {
     current ??= load();
-    return current;
+    return structuredClone(current);
   },
   update(fn: (s: MockState) => void): void {
-    const state = mockDb.get();
-    fn(state);
-    persist(state);
+    const next = structuredClone(mockDb.get());
+    fn(next);
+    persist(next);
+    current = next;
   },
   reset(): void {
     current = defaults();

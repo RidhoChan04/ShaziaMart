@@ -20,3 +20,8 @@ test("Button varian primary memakai token primary", () => {
   render(<Button variant="primary">Bayar</Button>);
   expect(screen.getByRole("button").className).toContain("bg-primary");
 });
+
+test("Button memberi umpan balik saat ditekan", () => {
+  render(<Button>Bayar</Button>);
+  expect(screen.getByRole("button").className).toContain("active:scale-[0.97]");
+});

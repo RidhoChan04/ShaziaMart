@@ -1,5 +1,6 @@
 import { afterEach, expect, expectTypeOf, test, vi } from "vitest";
 import { ApiError, customFetch } from "./fetcher";
+import type { Health } from "./gen/shaziaMartAPI.schemas";
 import { useGetHealth } from "./gen/system/system";
 
 function mockFetch(status: number, body: unknown, contentType: string) {
@@ -80,22 +81,23 @@ test("problem+json dengan code tak dikenal menjadi INTERNAL", async () => {
   });
 });
 
-test("200 mengembalikan envelope orval dengan body", async () => {
+test("200 mengembalikan body langsung", async () => {
   mockFetch(200, { ok: true }, "application/json");
-  await expect(customFetch("/api/x", {})).resolves.toMatchObject({
-    status: 200,
-    data: { ok: true },
-  });
+  await expect(customFetch("/api/x", {})).resolves.toEqual({ ok: true });
 });
 
-test("204 tanpa body mengembalikan data undefined", async () => {
+test("204 mengembalikan undefined", async () => {
   vi.spyOn(globalThis, "fetch").mockResolvedValue(
     new Response(null, { status: 204 }),
   );
-  await expect(customFetch("/api/x", {})).resolves.toMatchObject({
-    status: 204,
-    data: undefined,
-  });
+  await expect(customFetch("/api/x", {})).resolves.toBeUndefined();
+});
+
+test("data hook yang dihasilkan bertipe body", () => {
+  const useIt = () => useGetHealth();
+  expectTypeOf<ReturnType<typeof useIt>["data"]>().toEqualTypeOf<
+    Health | undefined
+  >();
 });
 
 test("error hook yang dihasilkan bertipe ApiError", () => {

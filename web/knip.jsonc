@@ -12,8 +12,7 @@
     // Di-import lewat @import di src/app/styles.css; knip tidak membaca CSS.
     "tailwindcss",
     "@fontsource-variable/inter",
-    // Dipakai skema zod hasil generate; dipakai langsung mulai rencana F2.
-    "zod"
+    "tw-animate-css"
   ],
   "ignoreExportsUsedInFile": true
 }
