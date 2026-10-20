@@ -5,7 +5,7 @@ import { cn } from "@/shared/lib/cn";
 import { formatRupiah } from "@/shared/lib/money";
 import { Input } from "@/shared/ui/input";
 import { useCart } from "../cart/cart-store";
-import { acceptMatch, resolveCode } from "./resolve-code";
+import { acceptMatch, resolveCode, resolveName } from "./resolve-code";
 
 const DEBOUNCE_MS = 150;
 
@@ -76,10 +76,10 @@ export function ScanBox({
     refocus();
   }
 
-  // Kolom dikosongkan sebelum lookup agar scan berikutnya tidak menyambung ke kode ini.
-  function lookup(code: string) {
+  // Kolom dikosongkan sebelum dicari agar scan berikutnya tidak menyambung ke teks ini.
+  function resolveLater(find: () => Promise<void>) {
     clear();
-    void resolveCode(code, onCurah).then(refocus);
+    void find().then(refocus);
   }
 
   function onArrow(down: boolean) {
@@ -95,10 +95,17 @@ export function ScanBox({
 
   function onEnter() {
     const value = text.trim();
+    // Daftar di layar hanya berlaku bila teks sudah sampai ke pencarian (debounce) dan hasilnya ada.
+    const current = value === q && !search.isPending;
     // Tanpa sorotan, Enter memilih hasil teratas.
-    const picked = listOpen ? (results[active] ?? results[0]) : undefined;
+    const picked =
+      current && listOpen ? (results[active] ?? results[0]) : undefined;
     if (picked) accept(picked);
-    else if (/^\d+$/.test(value)) lookup(value);
+    else if (/^\d+$/.test(value))
+      resolveLater(() => resolveCode(value, onCurah));
+    else if (!current && value.length >= 2) {
+      resolveLater(() => resolveName(value, onCurah));
+    }
   }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {

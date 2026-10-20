@@ -1,5 +1,6 @@
 import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { delay, http } from "msw";
 import { beforeEach, expect, test, vi } from "vitest";
 import { server } from "@/mocks/node";
 import type { CatalogMatch } from "@/shared/api/gen/shaziaMartAPI.schemas";
@@ -147,20 +148,37 @@ test("scan beruntun cepat: kolom kosong seketika, kode tidak menyatu", async () 
   expect(beep).not.toHaveBeenCalledWith("error");
 });
 
-test("Enter kedua untuk kode yang masih dicari diabaikan", async () => {
+test("scan ulang kode sama saat lookup pertama masih lambat → qty 2, dua lookup", async () => {
   const lookups: string[] = [];
-  const onStart = ({ request }: { request: Request }) => {
-    if (request.url.includes("/api/catalog/lookup")) lookups.push(request.url);
-  };
-  server.events.on("request:start", onStart);
-  try {
-    const { user, input } = setup({ delay: null });
-    await user.type(input, "089686010947{Enter}089686010947{Enter}");
-    await waitFor(() => expect(useCart.getState().lines).toHaveLength(1));
-    await act(() => new Promise((r) => setTimeout(r, 50)));
-    expect(useCart.getState().lines[0]?.qtyBase).toBe(1);
-    expect(lookups).toHaveLength(1);
-  } finally {
-    server.events.removeListener("request:start", onStart);
-  }
+  server.use(
+    http.get("/api/catalog/lookup", async ({ request }) => {
+      lookups.push(request.url);
+      await delay(100);
+    }),
+  );
+  const { user, input } = setup({ delay: null });
+  await user.type(input, "089686010947{Enter}089686010947{Enter}");
+  expect(input).toHaveValue("");
+  await waitFor(() => expect(useCart.getState().lines[0]?.qtyBase).toBe(2));
+  expect(useCart.getState().lines).toHaveLength(1);
+  expect(lookups).toHaveLength(2);
+});
+
+test("Enter sebelum pencarian menyusul teks terbaru → hasil teks terbaru, bukan hasil lama", async () => {
+  const { user, input } = setup({ delay: null });
+  await user.type(input, "gula");
+  expect((await screen.findAllByRole("option"))[0]).toHaveTextContent(/^Gula/);
+  await user.clear(input);
+  await user.type(input, "kopi{Enter}");
+  await waitFor(() => expect(useCart.getState().lines).toHaveLength(1));
+  expect(useCart.getState().lines[0]?.productName).toMatch(/^Kopi /);
+  expect(input).toHaveValue("");
+});
+
+test("Enter pada nama tanpa hasil (pencarian belum menyusul) → toast 'Barang tidak ditemukan'", async () => {
+  const { user, input } = setup({ delay: null });
+  await user.type(input, "zzzqqq{Enter}");
+  expect(await screen.findByText("Barang tidak ditemukan")).toBeInTheDocument();
+  expect(beep).toHaveBeenCalledWith("error");
+  expect(useCart.getState().lines).toHaveLength(0);
 });
