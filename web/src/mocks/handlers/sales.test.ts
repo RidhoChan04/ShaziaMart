@@ -321,6 +321,52 @@ describe("createSale", () => {
     expect(balanceOf("Pak Joko")).toBe(326000);
   });
 
+  test("pelanggan di atas limit tetap boleh belanja tanpa kasbon → 201", async () => {
+    await loginWithShift();
+    mockDb.update((s) => {
+      const joko = s.customers.find((c) => c.name === "Pak Joko");
+      if (joko) joko.balance = 326000;
+    });
+    const cash = await post("/api/sales", {
+      ...cashSale(),
+      customerId: customerId("Pak Joko"),
+    });
+    expect(cash.status).toBe(201);
+    const qris = await post("/api/sales", {
+      ...cashSale(),
+      payments: [{ method: "qris", amount: 36000 }],
+      customerId: customerId("Pak Joko"),
+    });
+    expect(qris.status).toBe(201);
+    expect(balanceOf("Pak Joko")).toBe(326000);
+  });
+
+  test.each([
+    ["tepat di limit → 201", 10000, 201, 300000],
+    ["lebih 1 rupiah → 409 CREDIT_LIMIT", 10001, 409, 290000],
+  ])("batas kasbon: %s", async (_, credit, status, balance) => {
+    await loginWithShift();
+    const res = await post("/api/sales", {
+      ...cashSale(),
+      payments: [
+        { method: "cash", amount: 36000 - credit },
+        { method: "credit", amount: credit },
+      ],
+      cashReceived: 36000 - credit,
+      customerId: customerId("Pak Joko"),
+    });
+    expect(res.status).toBe(status);
+    if (status === 409) {
+      expect(await json<CreditLimitProblem>(res)).toMatchObject({
+        code: "CREDIT_LIMIT",
+        balance: 290000,
+        creditLimit: 300000,
+        attempted: credit,
+      });
+    }
+    expect(balanceOf("Pak Joko")).toBe(balance);
+  });
+
   test("kredit tanpa customerId → 422 'Pelanggan wajib dipilih'", async () => {
     await loginWithShift();
     const res = await post("/api/sales", {
@@ -414,6 +460,22 @@ describe("createSale", () => {
     const res = await post("/api/sales", cashSale());
     expect(res.status).toBe(409);
     expect((await json<Problem>(res)).code).toBe("SHIFT_CLOSED");
+  });
+
+  test("kirim ulang saleId setelah shift ditutup → 200 penjualan lama", async () => {
+    await loginWithShift();
+    const body = cashSale(2);
+    const created = await json<Sale>(await post("/api/sales", body));
+    await post("/api/shifts/current/close", { countedCash: 272000 });
+    await login("123456");
+    const before = mockDb.get();
+    const replay = await post("/api/sales", body);
+    expect(replay.status).toBe(200);
+    expect(await json<Sale>(replay)).toEqual(created);
+    const after = mockDb.get();
+    expect(after.sales).toHaveLength(1);
+    expect(after.stock).toEqual(before.stock);
+    expect(after.shift).toBeNull();
   });
 });
 

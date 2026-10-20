@@ -1,6 +1,5 @@
 import { HttpResponse, http } from "msw";
 import type {
-  CreditLimitProblem,
   PriceChangedProblem,
   PrintResult,
   PrintStatus,
@@ -11,6 +10,7 @@ import { formatSaleNumber, jakartaDateKey } from "../sale-number";
 import {
   type CheckedPayments,
   checkPayments,
+  creditExcess,
   isOwnerPin,
   isRejection,
   type PricedItem,
@@ -99,22 +99,13 @@ function priceRequest(
 /** Aturan 7: kasbon di atas limit butuh PIN pemilik. */
 function creditGate(
   users: readonly MockUser[],
-  { customer, credit }: CheckedPayments,
+  paid: CheckedPayments,
   ownerPin: unknown,
 ): Response | null {
-  if (!customer || customer.balance + credit <= customer.creditLimit) {
-    return null;
-  }
+  const excess = creditExcess(paid);
+  if (!excess) return null;
   if (ownerPin === undefined) {
-    const extra: Pick<
-      CreditLimitProblem,
-      "balance" | "creditLimit" | "attempted"
-    > = {
-      balance: customer.balance,
-      creditLimit: customer.creditLimit,
-      attempted: credit,
-    };
-    return problem(409, "CREDIT_LIMIT", "Kasbon melebihi batas", extra);
+    return problem(409, "CREDIT_LIMIT", "Kasbon melebihi batas", excess);
   }
   return isOwnerPin(users, ownerPin)
     ? null
@@ -156,19 +147,20 @@ export const salesHandlers = [
     "/api/sales",
     withScenario(async ({ request }) => {
       // Setelah body dibaca semuanya sinkron, jadi cek & simpan atomik.
+      // Urutan: sesi → replay saleId (R7, juga saat shift sudah tutup) → shift → aturan 3–8.
       const body = await readJson(request);
       const state = mockDb.get();
       const user = requireSession(state);
       if (user instanceof Response) return user;
-      if (!state.shift) {
-        return problem(409, "SHIFT_CLOSED", "Tidak ada shift yang terbuka");
-      }
       const saleId = body?.saleId;
       if (!body || typeof saleId !== "string" || saleId === "") {
         return invalid("saleId wajib diisi");
       }
       const existing = state.sales.find((s) => s.id === saleId);
       if (existing) return HttpResponse.json(existing);
+      if (!state.shift) {
+        return problem(409, "SHIFT_CLOSED", "Tidak ada shift yang terbuka");
+      }
       if (typeof body.print !== "boolean") return invalid("print wajib diisi");
 
       const priced = priceRequest(saleId, body.items);

@@ -1,4 +1,5 @@
 import type {
+  CreditLimitProblem,
   Customer,
   PaymentInput,
   PaymentInputMethod,
@@ -204,6 +205,21 @@ export function checkPayments(
     change: cashReceived - cash,
     customer,
   };
+}
+
+/** Aturan 7: limit hanya berlaku untuk bagian kasbon; null bila tidak melewati limit. */
+export function creditExcess({
+  customer,
+  credit,
+}: CheckedPayments): Pick<
+  CreditLimitProblem,
+  "balance" | "creditLimit" | "attempted"
+> | null {
+  if (!customer || credit === 0) return null;
+  const { balance, creditLimit } = customer;
+  return balance + credit > creditLimit
+    ? { balance, creditLimit, attempted: credit }
+    : null;
 }
 
 export const isOwnerPin = (users: readonly MockUser[], pin: unknown): boolean =>
