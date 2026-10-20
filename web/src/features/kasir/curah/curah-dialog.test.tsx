@@ -1,5 +1,6 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { beforeEach, expect, test, vi } from "vitest";
 import { createSeedState } from "@/mocks/seed-data";
 import type { CatalogMatch } from "@/shared/api/gen/shaziaMartAPI.schemas";
@@ -113,4 +114,37 @@ test("Enter pada nilai tidak valid tidak menambah; Esc menutup", async () => {
   await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
   expect(useCart.getState().lines).toHaveLength(0);
   expect(within(document.body).queryByText("HARGA")).not.toBeNull();
+});
+
+test("ganti barang saat dialog terbuka → isian & tab direset", async () => {
+  const user = userEvent.setup();
+  let swap: () => void = () => {};
+  function Swap() {
+    const [m, setM] = useState(gula());
+    swap = () => setM(minyak());
+    return <CurahDialog match={m} onClose={vi.fn()} />;
+  }
+  renderWithQuery(<Swap />);
+  await user.click(screen.getByRole("tab", { name: "Nominal (Rp)" }));
+  await user.type(screen.getByRole("textbox", { name: "Nominal (Rp)" }), "500");
+  act(() => swap());
+  expect(screen.getByRole("tab", { name: "Berat (L)" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  expect(screen.getByRole("textbox", { name: "Berat (L)" })).toHaveValue("");
+  await user.click(screen.getByRole("tab", { name: "Nominal (Rp)" }));
+  expect(screen.getByRole("textbox", { name: "Nominal (Rp)" })).toHaveValue("");
+});
+
+test("nominal Rp1 (0 g) → Masukkan nonaktif, Enter tidak menambah", async () => {
+  const { user } = setup();
+  await user.click(screen.getByRole("tab", { name: "Nominal (Rp)" }));
+  await user.type(
+    screen.getByRole("textbox", { name: "Nominal (Rp)" }),
+    "1{Enter}",
+  );
+  expect(masukkan()).toBeDisabled();
+  expect(screen.getByText("HARGA").parentElement).toHaveTextContent("—");
+  expect(useCart.getState().lines).toHaveLength(0);
 });

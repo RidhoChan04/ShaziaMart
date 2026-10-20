@@ -47,7 +47,10 @@ function compute(unit: Unit, mode: Mode, text: string) {
       return qtyBase === null ? null : priceLine(unit, { qtyBase });
     }
     const amount = parseRupiah(text);
-    return amount === null || amount <= 0 ? null : priceLine(unit, { amount });
+    if (amount === null || amount <= 0) return null;
+    const p = priceLine(unit, { amount });
+    // Nominal terlalu kecil untuk 1 gram/ml tidak boleh jadi baris berjumlah 0.
+    return p.qtyBase > 0 ? p : null;
   } catch {
     return null;
   }
@@ -215,7 +218,13 @@ export function CurahDialog({
             ?.focus();
         }}
       >
-        {match && <CurahForm match={match} onClose={onClose} />}
+        {match && (
+          <CurahForm
+            key={`${match.product.id}:${match.unitId}`}
+            match={match}
+            onClose={onClose}
+          />
+        )}
       </DialogContent>
     </Dialog>
   );
