@@ -288,6 +288,27 @@ test("hold lalu resume mengembalikan saleId & baris; resume saat keranjang beris
   expect(at(s().held, 0).lines).toEqual(second.lines);
 });
 
+test("hold & resume: pilihan Cetak struk tidak terbawa ke keranjang lain", () => {
+  s().addUnit(pcs);
+  s().setPrintReceipt(true);
+  s().hold();
+  expect(s().printReceipt).toBeNull();
+  s().addUnit(dus);
+  s().setPrintReceipt(false);
+  s().resume(at(s().held, 0).id);
+  expect(s().printReceipt).toBeNull();
+});
+
+test("applyPriceChanges pada baris nominal curah: qtyLabel mengikuti harga baru", () => {
+  s().addCurah(gulaMatch, { amount: 20000 });
+  s().applyPriceChanges([
+    { unitId: "u-gula", oldUnitPrice: 18000, newUnitPrice: 20000 },
+  ]);
+  const v = cartLineView(at(s().lines, 0), 0);
+  expect(v.subtotal).toBe(20000);
+  expect(v.qtyLabel).toBe("1 kg");
+});
+
 test("applyPriceChanges mengubah harga baris", () => {
   s().addUnit(dus);
   s().addUnit(pcs);

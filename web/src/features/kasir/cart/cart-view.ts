@@ -31,7 +31,8 @@ export function cartLineView(line: CartLine, index: number): CartLineView {
     const unit = line.baseUnit === "ml" ? "L" : "kg";
     return {
       no: index + 1,
-      qtyLabel: formatGram(line.qtyBase, unit),
+      // Baris nominal: jumlah dari harga terkini, sama dengan yang dicatat server.
+      qtyLabel: formatGram(p.qtyBase, unit),
       priceLabel: `${formatAngka(line.listPrice)}/${line.unitName}`,
       unitPrice: p.unitPrice,
       subtotal: p.subtotal,

@@ -6,7 +6,14 @@ import type {
   WholesaleTier,
 } from "../../../shared/api/gen/shaziaMartAPI.schemas";
 import { newId } from "../../../shared/lib/id";
-import { priceLine, unitPriceFor } from "../../../shared/lib/pricing";
+import { priceLine } from "../../../shared/lib/pricing";
+import {
+  findUnit,
+  newLine,
+  step,
+  withActiveHeld,
+  withPriceChanges,
+} from "./cart-helpers";
 
 export interface CartLine {
   lineId: string;
@@ -31,7 +38,7 @@ export interface HeldCart {
   lines: CartLine[];
 }
 
-interface CartData {
+export interface CartData {
   saleId: string;
   lines: CartLine[];
   selectedLineId: string | null;
@@ -62,38 +69,6 @@ export type CartState = CartData & {
   resume(heldId: string): void;
 };
 
-function findUnit(match: CatalogMatch) {
-  const unit = match.product.units.find((u) => u.id === match.unitId);
-  if (!unit) {
-    throw new Error(
-      `Satuan ${match.unitId} tidak ada pada ${match.product.id}`,
-    );
-  }
-  return unit;
-}
-
-function newLine(
-  match: CatalogMatch,
-  qtyBase: number,
-  amount: number | null,
-): CartLine {
-  const unit = findUnit(match);
-  return {
-    lineId: newId(),
-    unitId: unit.id,
-    productId: match.product.id,
-    productName: match.product.name,
-    unitName: unit.name,
-    isCurah: match.product.isCurah,
-    baseUnit: match.product.baseUnit,
-    unitSize: unit.unitSize,
-    listPrice: unit.price,
-    wholesaleTiers: unit.wholesaleTiers,
-    qtyBase,
-    amount,
-  };
-}
-
 function initialData(): CartData {
   return {
     saleId: newId(),
@@ -105,37 +80,6 @@ function initialData(): CartData {
     lastChange: null,
     heldSeq: 0,
   };
-}
-
-/** Tahan keranjang aktif (bila berisi) ke daftar `held`. */
-function withActiveHeld(d: CartData): Pick<CartData, "held" | "heldSeq"> {
-  if (d.lines.length === 0) return { held: d.held, heldSeq: d.heldSeq };
-  const n = d.heldSeq + 1;
-  return {
-    held: [
-      ...d.held,
-      {
-        id: newId(),
-        label: `Keranjang ${n}`,
-        heldAt: Date.now(),
-        saleId: d.saleId,
-        lines: d.lines,
-      },
-    ],
-    heldSeq: n,
-  };
-}
-
-function step(d: CartData, dir: 1 | -1): string | null {
-  if (d.lines.length === 0) return null;
-  const cur = d.lines.findIndex((l) => l.lineId === d.selectedLineId);
-  const next =
-    cur === -1
-      ? dir === 1
-        ? 0
-        : d.lines.length - 1
-      : Math.min(d.lines.length - 1, Math.max(0, cur + dir));
-  return d.lines[next]?.lineId ?? null;
 }
 
 export function createCartStore(storage: Storage = localStorage) {
@@ -231,25 +175,8 @@ export function createCartStore(storage: Storage = localStorage) {
           set({ printReceipt: value });
         },
 
-        // Baris grosir: tier tetap; listPrice berubah hanya bila harga lama cocok.
         applyPriceChanges(changes) {
-          set((d) => ({
-            lines: d.lines.map((l) => {
-              const c = changes.find((x) => x.unitId === l.unitId);
-              if (!c) return l;
-              const { wholesale } = unitPriceFor(
-                {
-                  price: l.listPrice,
-                  unitSize: l.unitSize,
-                  wholesaleTiers: l.wholesaleTiers,
-                },
-                l.qtyBase,
-              );
-              return !wholesale || c.oldUnitPrice === l.listPrice
-                ? { ...l, listPrice: c.newUnitPrice }
-                : l;
-            }),
-          }));
+          set((d) => ({ lines: withPriceChanges(d.lines, changes) }));
         },
 
         completeSale(change) {
@@ -274,6 +201,7 @@ export function createCartStore(storage: Storage = localStorage) {
                   ...withActiveHeld(d),
                   lines: [],
                   saleId: newId(),
+                  printReceipt: null,
                   selectedLineId: null,
                   lastAddedLineId: null,
                 },
@@ -289,6 +217,7 @@ export function createCartStore(storage: Storage = localStorage) {
               ...withActiveHeld(rest),
               saleId: target.saleId,
               lines: target.lines,
+              printReceipt: null,
               selectedLineId: null,
               lastAddedLineId: null,
               lastChange: null,
