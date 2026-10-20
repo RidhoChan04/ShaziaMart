@@ -24,7 +24,8 @@ export function beep(kind: "ok" | "error"): void {
   try {
     const ctx = getContext();
     if (!ctx) return;
-    if (ctx.state === "suspended") void ctx.resume();
+    if (ctx.state === "suspended")
+      Promise.resolve(ctx.resume()).catch(() => {});
     const { hz, seconds } = TONES[kind];
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();

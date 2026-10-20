@@ -67,3 +67,19 @@ test("beep tidak melempar bila WebAudio rusak", () => {
   });
   expect(() => beep("error")).not.toThrow();
 });
+
+test("beep: resume() yang ditolak tidak menjadi unhandled rejection", async () => {
+  const { ctx } = stubAudio();
+  ctx.state = "suspended";
+  const rejected = Promise.reject(new Error("InvalidStateError"));
+  const catchSpy = vi.spyOn(rejected, "catch");
+  ctx.resume.mockReturnValue(rejected);
+  const unhandled = vi.fn();
+  process.on("unhandledRejection", unhandled);
+  expect(() => beep("ok")).not.toThrow();
+  await new Promise((r) => setTimeout(r, 10));
+  process.off("unhandledRejection", unhandled);
+  expect(ctx.resume).toHaveBeenCalled();
+  expect(catchSpy).toHaveBeenCalled();
+  expect(unhandled).not.toHaveBeenCalled();
+});
