@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import type { CatalogMatch } from "@/shared/api/gen/shaziaMartAPI.schemas";
+import { CurahDialog } from "../curah/curah-dialog";
 import { resolveCode } from "../scan/resolve-code";
 import { ScanBox, useScanFocus } from "../scan/scan-box";
 import { useScanDetector } from "../scan/use-scan-detector";
@@ -41,6 +42,13 @@ export function KasirScreen() {
         payOpen={payOpen}
         onPay={() => setPayOpen(true)}
         onAction={refocus}
+      />
+      <CurahDialog
+        match={curah}
+        onClose={() => {
+          setCurah(null);
+          refocus();
+        }}
       />
     </main>
   );
