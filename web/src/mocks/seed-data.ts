@@ -80,11 +80,11 @@ const FIXTURES: Fixture[] = [
   pcs("Beras Pandan Wangi 5 kg", "1002", 78000, "8991002101012"),
   pcs("Minyak Goreng Bimoli 2 L", "1003", 36000, "8992696404441"),
   pcs("Kopi Kapal Api 165 g", "1004", 14500, "8991002105126"),
-  curah("Gula Pasir (curah)", "2001", "gram", "kg", 18000),
-  curah("Beras (curah)", "2002", "gram", "kg", 14000),
-  curah("Telur Ayam (curah)", "2003", "gram", "kg", 29000),
-  curah("Minyak Goreng (curah)", "2004", "ml", "L", 17000),
-  curah("Tepung Terigu (curah)", "2005", "gram", "kg", 13000),
+  curah("Gula Pasir", "2001", "gram", "kg", 18000),
+  curah("Beras", "2002", "gram", "kg", 14000),
+  curah("Telur Ayam", "2003", "gram", "kg", 29000),
+  curah("Minyak Goreng", "2004", "ml", "L", 17000),
+  curah("Tepung Terigu", "2005", "gram", "kg", 13000),
 ];
 
 const TOTAL_PRODUCTS = 60;
@@ -232,9 +232,7 @@ export function createSeedState(): MockState {
       storeName: "ShaziaMart",
       autoPrint: true,
       curahFractions: [250, 500, 1000, 1500, 2000],
-      quickCurahProductIds: products
-        .filter((p) => p.storeCode >= "2001" && p.storeCode <= "2005")
-        .map((p) => p.id),
+      quickCurahProductIds: products.filter((p) => p.isCurah).map((p) => p.id),
       qrisImageUrl: "/qris-contoh.svg",
       allowNegativeStock: true,
     },

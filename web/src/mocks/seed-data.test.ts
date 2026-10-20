@@ -59,6 +59,16 @@ test("fixture curah & settings", () => {
   const curah = ["2001", "2002", "2003", "2004", "2005"].map((c) =>
     s.products.find((p) => p.storeCode === c),
   );
+  expect(curah.map((p) => p?.name)).toEqual([
+    "Gula Pasir",
+    "Beras",
+    "Telur Ayam",
+    "Minyak Goreng",
+    "Tepung Terigu",
+  ]);
+  expect(s.products.filter((p) => p.isCurah).map((p) => p.id)).toEqual(
+    s.settings.quickCurahProductIds,
+  );
   expect(curah.map((p) => p?.isCurah)).toEqual([true, true, true, true, true]);
   expect(curah.map((p) => p?.baseUnit)).toEqual([
     "gram",
