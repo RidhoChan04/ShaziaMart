@@ -1,7 +1,7 @@
-export const SEED = 20261017;
+const SEED = 20261017;
 
-/** PRNG deterministik mulberry32. */
-export function rng(seed: number): () => number {
+/** PRNG deterministik mulberry32; tanpa argumen memakai seed tetap proyek. */
+export function rng(seed: number = SEED): () => number {
   let a = seed >>> 0;
   return () => {
     a = (a + 0x6d2b79f5) >>> 0;

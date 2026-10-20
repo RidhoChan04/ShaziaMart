@@ -21,7 +21,7 @@ const dateFormat = new Intl.DateTimeFormat("id-ID", {
 });
 
 /** "Sabtu, 17 Okt" */
-export function formatOwnerDate(date: Date): string {
+function formatOwnerDate(date: Date): string {
   return dateFormat.format(date);
 }
 
