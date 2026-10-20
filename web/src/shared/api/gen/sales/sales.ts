@@ -36,9 +36,9 @@ import type {
   PinRequiredResponse,
   PriceChangedProblem,
   PrintResult,
-  Problem,
   Sale,
   SaleRequest,
+  ShiftClosedProblem,
   UnauthorizedOrPinInvalidResponse,
   UnauthorizedResponse,
   ValidationFailedResponse,
@@ -113,7 +113,7 @@ return customFetch<Sale>(getCreateSaleUrl(),
 
 export const getCreateSaleMutationKey = () => ['createSale'] as const;
 
-export const getCreateSaleMutationOptions = <TError = ErrorType<UnauthorizedOrPinInvalidResponse | Problem | PriceChangedProblem | CreditLimitProblem | ValidationFailedResponse>,
+export const getCreateSaleMutationOptions = <TError = ErrorType<UnauthorizedOrPinInvalidResponse | ShiftClosedProblem | PriceChangedProblem | CreditLimitProblem | ValidationFailedResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSale>>, TError,CreateSaleMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof createSale>>, TError,CreateSaleMutationVariables, TContext> => {
 
@@ -142,13 +142,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type CreateSaleMutationResult = NonNullable<Awaited<ReturnType<typeof createSale>>>
     export type CreateSaleMutationBody = SaleRequest
-    export type CreateSaleMutationError = ErrorType<UnauthorizedOrPinInvalidResponse | Problem | PriceChangedProblem | CreditLimitProblem | ValidationFailedResponse>
+    export type CreateSaleMutationError = ErrorType<UnauthorizedOrPinInvalidResponse | ShiftClosedProblem | PriceChangedProblem | CreditLimitProblem | ValidationFailedResponse>
     export type CreateSaleMutationVariables = {data: SaleRequest}
 
     /**
  * @summary Simpan penjualan
  */
-export const useCreateSale = <TError = ErrorType<UnauthorizedOrPinInvalidResponse | Problem | PriceChangedProblem | CreditLimitProblem | ValidationFailedResponse>,
+export const useCreateSale = <TError = ErrorType<UnauthorizedOrPinInvalidResponse | ShiftClosedProblem | PriceChangedProblem | CreditLimitProblem | ValidationFailedResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSale>>, TError,CreateSaleMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof createSale>>,

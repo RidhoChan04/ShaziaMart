@@ -66,17 +66,47 @@ export interface PriceChange {
   newUnitPrice: number;
 }
 
+export type ShiftClosedProblemCode = typeof ShiftClosedProblemCode[keyof typeof ShiftClosedProblemCode];
+
+
+export const ShiftClosedProblemCode = {
+  SHIFT_CLOSED: 'SHIFT_CLOSED',
+} as const;
+
+/**
+ * Problem SHIFT_CLOSED.
+ */
+export type ShiftClosedProblem = Problem & {
+  code: ShiftClosedProblemCode;
+};
+
+export type PriceChangedProblemCode = typeof PriceChangedProblemCode[keyof typeof PriceChangedProblemCode];
+
+
+export const PriceChangedProblemCode = {
+  PRICE_CHANGED: 'PRICE_CHANGED',
+} as const;
+
 /**
  * Problem PRICE_CHANGED dengan daftar perubahan harga.
  */
 export type PriceChangedProblem = Problem & {
+  code: PriceChangedProblemCode;
   changes: PriceChange[];
 };
+
+export type CreditLimitProblemCode = typeof CreditLimitProblemCode[keyof typeof CreditLimitProblemCode];
+
+
+export const CreditLimitProblemCode = {
+  CREDIT_LIMIT: 'CREDIT_LIMIT',
+} as const;
 
 /**
  * Problem CREDIT_LIMIT dengan saldo, batas, dan nilai kasbon yang dicoba.
  */
 export type CreditLimitProblem = Problem & {
+  code: CreditLimitProblemCode;
   balance: number;
   creditLimit: number;
   attempted: number;

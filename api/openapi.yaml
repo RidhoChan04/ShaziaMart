@@ -279,9 +279,15 @@ paths:
             application/problem+json:
               schema:
                 oneOf:
-                  - $ref: "#/components/schemas/Problem"
+                  - $ref: "#/components/schemas/ShiftClosedProblem"
                   - $ref: "#/components/schemas/PriceChangedProblem"
                   - $ref: "#/components/schemas/CreditLimitProblem"
+                discriminator:
+                  propertyName: code
+                  mapping:
+                    SHIFT_CLOSED: "#/components/schemas/ShiftClosedProblem"
+                    PRICE_CHANGED: "#/components/schemas/PriceChangedProblem"
+                    CREDIT_LIMIT: "#/components/schemas/CreditLimitProblem"
         "422":
           $ref: "#/components/responses/ValidationFailed"
   /api/sales/today:
@@ -514,13 +520,26 @@ components:
           type: integer
         newUnitPrice:
           type: integer
+    ShiftClosedProblem:
+      description: Problem SHIFT_CLOSED.
+      allOf:
+        - $ref: "#/components/schemas/Problem"
+        - type: object
+          required: [code]
+          properties:
+            code:
+              type: string
+              enum: [SHIFT_CLOSED]
     PriceChangedProblem:
       description: Problem PRICE_CHANGED dengan daftar perubahan harga.
       allOf:
         - $ref: "#/components/schemas/Problem"
         - type: object
-          required: [changes]
+          required: [code, changes]
           properties:
+            code:
+              type: string
+              enum: [PRICE_CHANGED]
             changes:
               type: array
               items:
@@ -530,8 +549,11 @@ components:
       allOf:
         - $ref: "#/components/schemas/Problem"
         - type: object
-          required: [balance, creditLimit, attempted]
+          required: [code, balance, creditLimit, attempted]
           properties:
+            code:
+              type: string
+              enum: [CREDIT_LIMIT]
             balance:
               type: integer
             creditLimit:

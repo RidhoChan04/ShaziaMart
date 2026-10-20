@@ -57,3 +57,25 @@ test("creditLimitProblemSchema cocok dengan tipe hasil generate", () => {
 test("ErrorCode tetap 13 kode F1", () => {
   expect(Object.values(ErrorCode)).toHaveLength(13);
 });
+
+test("409 dikunci oleh code: PRICE_CHANGED lolos skema harga, CREDIT_LIMIT tidak", () => {
+  const credit = {
+    type: "about:blank",
+    title: "Batas kasbon terlampaui",
+    status: 409,
+    code: "CREDIT_LIMIT",
+    balance: 10000,
+    creditLimit: 50000,
+    attempted: 60000,
+  };
+  const price = {
+    type: "about:blank",
+    title: "Harga berubah",
+    status: 409,
+    code: "PRICE_CHANGED",
+    changes: [{ unitId: "u1", oldUnitPrice: 1000, newUnitPrice: 1200 }],
+  };
+  expect(priceChangedProblemSchema.safeParse(price).success).toBe(true);
+  expect(priceChangedProblemSchema.safeParse(credit).success).toBe(false);
+  expect(creditLimitProblemSchema.safeParse(price).success).toBe(false);
+});
