@@ -58,7 +58,7 @@ Aturan ini berlaku untuk semua kode di repo. Tujuannya satu: kode yang mudah dib
 
 ## Pemeriksaan otomatis (harus hijau sebelum merge)
 
-`npm run lint` · `npm run typecheck` · `npm run knip` · `npm run gen:check` · `npm test` · `npm run build` · `npm run size:check` · `npm run e2e`
+`npm run lint` (perbaikan otomatis: `npm run lint:fix`) · `npm run typecheck` · `npm run knip` · `npm run gen:check` · `npm test` · `npm run build` · `npm run size:check` · `npm run e2e`
 
 ## Commit
 
