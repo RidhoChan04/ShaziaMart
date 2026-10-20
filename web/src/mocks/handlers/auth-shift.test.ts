@@ -79,6 +79,17 @@ describe("auth", () => {
 });
 
 describe("shift", () => {
+  test("shift saat ini terbaca tanpa sesi (layar kunci butuh kasir shift)", async () => {
+    await login("123456");
+    await post("/api/shifts", { openingCash: 0 });
+    await post("/api/auth/logout", {});
+    const res = await fetch("/api/shifts/current");
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { shift: unknown }).shift).toMatchObject({
+      kasirName: "Rina",
+    });
+  });
+
   test("buka shift tanpa sesi -> 401; dua kali -> 409 SHIFT_ALREADY_OPEN", async () => {
     expect((await post("/api/shifts", { openingCash: 1000 })).status).toBe(401);
     await login("123456");

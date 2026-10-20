@@ -15,6 +15,7 @@ import * as zod from 'zod';
 
 
 /**
+ * Tanpa sesi — layar kunci perlu tahu kasir shift sebelum PIN dimasukkan.
  * @summary Shift yang sedang terbuka
  */
 export const GetCurrentShiftResponse = zod.object({

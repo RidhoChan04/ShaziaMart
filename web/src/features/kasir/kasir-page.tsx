@@ -1,5 +1,10 @@
 import { KasirScreen } from "./screen/kasir-screen";
+import { KasirGate } from "./shift/kasir-gate";
 
 export function KasirPage() {
-  return <KasirScreen />;
+  return (
+    <KasirGate>
+      <KasirScreen />
+    </KasirGate>
+  );
 }

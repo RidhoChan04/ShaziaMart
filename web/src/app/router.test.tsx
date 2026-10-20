@@ -10,11 +10,14 @@ test("/ redirect ke /kasir", async () => {
   expect(router.state.location.pathname).toBe("/kasir");
 });
 
-test("layout kasir: status server dan tombol Riwayat/Kunci nonaktif", async () => {
+test("layout kasir: status server; Riwayat/Kunci hanya saat sesi + shift", async () => {
   renderApp("/kasir");
   expect(await screen.findByText("● Server tersambung")).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Riwayat" })).toBeDisabled();
-  expect(screen.getByRole("button", { name: "Kunci" })).toBeDisabled();
+  expect(
+    await screen.findByRole("heading", { name: "Buka shift" }),
+  ).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Riwayat" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Kunci" })).toBeNull();
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 });
 

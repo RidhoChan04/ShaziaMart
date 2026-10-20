@@ -25,8 +25,6 @@ export const shiftHandlers = [
     "/api/shifts/current",
     withScenario(() => {
       const state = mockDb.get();
-      const user = requireSession(state);
-      if (user instanceof Response) return user;
       const body: CurrentShift = {
         shift: state.shift ? toShift(state.shift) : null,
       };

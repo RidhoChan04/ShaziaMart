@@ -18,6 +18,13 @@ export function useScanFocus() {
   return { ref, refocus };
 }
 
+/** Fokus ke kolom scan dari luar layar kasir (mis. tombol header). */
+export function focusScanBox() {
+  requestAnimationFrame(() =>
+    document.querySelector<HTMLInputElement>("[data-scan-box]")?.focus(),
+  );
+}
+
 function unitOf(match: CatalogMatch) {
   return match.product.units.find((u) => u.id === match.unitId);
 }
@@ -118,6 +125,7 @@ export function ScanBox({
       <Input
         ref={ref}
         autoFocus
+        data-scan-box
         role="combobox"
         aria-label="Scan barcode / ketik nama atau kode"
         aria-autocomplete="list"

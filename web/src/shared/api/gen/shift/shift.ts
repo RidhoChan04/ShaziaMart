@@ -74,6 +74,7 @@ export const getGetCurrentShiftUrl = () => {
 }
 
 /**
+ * Tanpa sesi — layar kunci perlu tahu kasir shift sebelum PIN dimasukkan.
  * @summary Shift yang sedang terbuka
  */
 export const getCurrentShift = async ( options?: Parameters<typeof customFetch>[1]): Promise<CurrentShift> => {
@@ -98,7 +99,7 @@ export const getGetCurrentShiftQueryKey = () => {
     }
 
 
-export const getGetCurrentShiftQueryOptions = <TData = Awaited<ReturnType<typeof getCurrentShift>>, TError = ErrorType<UnauthorizedResponse>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCurrentShift>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+export const getGetCurrentShiftQueryOptions = <TData = Awaited<ReturnType<typeof getCurrentShift>>, TError = ErrorType<unknown>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCurrentShift>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -117,10 +118,10 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetCurrentShiftQueryResult = NonNullable<Awaited<ReturnType<typeof getCurrentShift>>>
-export type GetCurrentShiftQueryError = ErrorType<UnauthorizedResponse>
+export type GetCurrentShiftQueryError = ErrorType<unknown>
 
 
-export function useGetCurrentShift<TData = Awaited<ReturnType<typeof getCurrentShift>>, TError = ErrorType<UnauthorizedResponse>>(
+export function useGetCurrentShift<TData = Awaited<ReturnType<typeof getCurrentShift>>, TError = ErrorType<unknown>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCurrentShift>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getCurrentShift>>,
@@ -130,7 +131,7 @@ export function useGetCurrentShift<TData = Awaited<ReturnType<typeof getCurrentS
       >, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetCurrentShift<TData = Awaited<ReturnType<typeof getCurrentShift>>, TError = ErrorType<UnauthorizedResponse>>(
+export function useGetCurrentShift<TData = Awaited<ReturnType<typeof getCurrentShift>>, TError = ErrorType<unknown>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCurrentShift>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getCurrentShift>>,
@@ -140,7 +141,7 @@ export function useGetCurrentShift<TData = Awaited<ReturnType<typeof getCurrentS
       >, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetCurrentShift<TData = Awaited<ReturnType<typeof getCurrentShift>>, TError = ErrorType<UnauthorizedResponse>>(
+export function useGetCurrentShift<TData = Awaited<ReturnType<typeof getCurrentShift>>, TError = ErrorType<unknown>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCurrentShift>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
@@ -148,7 +149,7 @@ export function useGetCurrentShift<TData = Awaited<ReturnType<typeof getCurrentS
  * @summary Shift yang sedang terbuka
  */
 
-export function useGetCurrentShift<TData = Awaited<ReturnType<typeof getCurrentShift>>, TError = ErrorType<UnauthorizedResponse>>(
+export function useGetCurrentShift<TData = Awaited<ReturnType<typeof getCurrentShift>>, TError = ErrorType<unknown>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCurrentShift>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {

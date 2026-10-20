@@ -108,8 +108,7 @@ paths:
       tags: [shift]
       operationId: getCurrentShift
       summary: Shift yang sedang terbuka
-      security:
-        - cookieAuth: []
+      description: Tanpa sesi — layar kunci perlu tahu kasir shift sebelum PIN dimasukkan.
       responses:
         "200":
           description: Shift saat ini; shift bernilai null bila belum ada
@@ -117,8 +116,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CurrentShift"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
   /api/shifts:
     post:
       tags: [shift]
