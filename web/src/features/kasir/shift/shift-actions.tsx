@@ -2,7 +2,11 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useLogout } from "@/shared/api/gen/auth/auth";
-import type { Session, Shift } from "@/shared/api/gen/shaziaMartAPI.schemas";
+import type {
+  Session,
+  Shift,
+  ShiftClosure,
+} from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { Button } from "@/shared/ui/button";
 import { useCart } from "../cart/cart-store";
 import { focusScanBox } from "../scan/scan-box";
@@ -33,7 +37,11 @@ export function ShiftInfo({
 }
 
 /** Tombol header saat shift terbuka: Riwayat, Kunci (juga otomatis saat idle), Tutup shift. */
-export function ShiftActions() {
+export function ShiftActions({
+  onClosed,
+}: {
+  onClosed: (closure: ShiftClosure) => void;
+}) {
   const client = useQueryClient();
   const hasLines = useCart((s) => s.lines.length > 0);
   const [closing, setClosing] = useState(false);
@@ -73,7 +81,14 @@ export function ShiftActions() {
       >
         Tutup shift
       </Button>
-      <CloseShiftDialog open={closing} onClose={() => setClosing(false)} />
+      <CloseShiftDialog
+        open={closing}
+        onClose={() => setClosing(false)}
+        onClosed={(closure) => {
+          setClosing(false);
+          onClosed(closure);
+        }}
+      />
     </>
   );
 }

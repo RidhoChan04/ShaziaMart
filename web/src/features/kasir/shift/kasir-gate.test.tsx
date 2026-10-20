@@ -1,8 +1,10 @@
 import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { http } from "msw";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { mockDb } from "@/mocks/db";
 import { loginWithShift, post } from "@/mocks/handlers/test-helpers";
+import { server } from "@/mocks/node";
 import { renderApp } from "@/test/render-app";
 import { fillSpecCart } from "@/test/spec-cart";
 import { useCart } from "../cart/cart-store";
@@ -34,7 +36,7 @@ test("tanpa shift → Buka shift: Rina → PIN 123456 → modal 200.000 → laya
   expect(header().queryByRole("button", { name: "Tutup shift" })).toBeNull();
 
   await user.click(await screen.findByRole("button", { name: "Rina" }));
-  await user.type(pin(), "123456");
+  await typePin("123456");
   const modal = await screen.findByRole("textbox", {
     name: "Modal awal di laci",
   });
@@ -65,7 +67,7 @@ test("PIN salah → 'PIN salah'; 5x → 'Terlalu banyak PIN salah — coba lagi 
   const user = userEvent.setup();
   renderApp("/kasir");
   await user.click(await screen.findByRole("button", { name: "Rina" }));
-  await user.type(pin(), "000000");
+  await typePin("000000");
   expect(await screen.findByRole("alert")).toHaveTextContent("PIN salah");
   expect(pin()).toHaveValue("");
 
@@ -109,9 +111,9 @@ test("klik Kunci → Layar terkunci; PIN benar → kembali, keranjang utuh", asy
   expect(mockDb.get().session).toBeNull();
   expect(mockDb.get().shift).not.toBeNull();
 
-  await user.type(pin(), "000000");
+  await typePin("000000");
   expect(await screen.findByRole("alert")).toHaveTextContent("PIN salah");
-  await user.type(pin(), "123456");
+  await typePin("123456");
   expect(await scanBox()).toBeInTheDocument();
   expect(screen.getByText("6 BARANG · TOTAL")).toBeInTheDocument();
   expect(useCart.getState().lines).toHaveLength(6);
@@ -216,10 +218,10 @@ test("batal tutup shift (Esc) → kursor kembali ke kolom scan", async () => {
   expect(mockDb.get().shift).not.toBeNull();
 });
 
-test("tutup shift → Selesai → kembali ke Buka shift", async () => {
+test("hasil tutup shift bertahan walau gerbang dimuat ulang; Selesai → Buka shift", async () => {
   await loginWithShift(200_000);
   const user = userEvent.setup();
-  renderApp("/kasir");
+  const { queryClient } = renderApp("/kasir");
   expect(await scanBox()).toBeInTheDocument();
   await user.click(header().getByRole("button", { name: "Tutup shift" }));
   const dialog = await screen.findByRole("dialog", { name: "Tutup shift" });
@@ -228,14 +230,84 @@ test("tutup shift → Selesai → kembali ke Buka shift", async () => {
     "200.000",
   );
   await user.click(within(dialog).getByRole("button", { name: "Tutup shift" }));
-  await user.click(
-    await within(dialog).findByRole("button", { name: "Selesai" }),
-  );
+  expect(await screen.findByText("Uang seharusnya")).toBeInTheDocument();
 
+  // Server sudah menghapus sesi & shift; refetch apa pun membalik gerbang.
+  await act(() => queryClient.refetchQueries());
+  expect(
+    await screen.findByRole("heading", { name: "Buka shift", hidden: true }),
+  ).toBeInTheDocument();
+  expect(screen.getByText("Uang seharusnya")).toBeVisible();
+  expect(screen.getByText("Selisih")).toBeVisible();
+
+  await user.click(screen.getByRole("button", { name: "Selesai" }));
   expect(
     await screen.findByRole("heading", { name: "Buka shift" }),
   ).toBeInTheDocument();
-  expect(screen.queryByRole("dialog")).toBeNull();
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   expect(mockDb.get().shift).toBeNull();
   expect(mockDb.get().closedShifts).toHaveLength(1);
+});
+
+/** Hitung request PIN login yang sampai ke server palsu. */
+function countPinLogins() {
+  const calls = { n: 0 };
+  server.use(
+    http.post("/api/auth/pin-login", () => {
+      calls.n += 1;
+    }),
+  );
+  return calls;
+}
+
+/** Jeda antar-tombol persis: hanya `performance.now()` yang dipalsukan. */
+function typingAt(gapMs: number) {
+  if (!vi.isFakeTimers()) vi.useFakeTimers({ toFake: ["performance"] });
+  return userEvent.setup({
+    delay: gapMs,
+    advanceTimers: (ms) => vi.advanceTimersByTime(ms),
+  });
+}
+
+/** PIN diketik dengan kecepatan tangan manusia. */
+const typePin = (value: string) => typingAt(60).type(pin(), value);
+
+async function renderLocked() {
+  await loginWithShift();
+  await post("/api/auth/logout", {});
+  renderApp("/kasir");
+  await screen.findByRole("heading", { name: "Layar terkunci" });
+}
+
+test("scan EAN-13 di layar kunci → ditolak tanpa percobaan PIN", async () => {
+  await renderLocked();
+  const calls = countPinLogins();
+  const user = typingAt(5);
+  await user.type(pin(), "8991002101234{Enter}");
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "Itu barcode, bukan PIN",
+  );
+  expect(pin()).toHaveValue("");
+  expect(calls.n).toBe(0);
+  expect(mockDb.get().pinFailures).toEqual({});
+  expect(screen.getByRole("heading", { name: "Layar terkunci" })).toBeVisible();
+});
+
+test("PIN diketik manusia (jeda 60 ms) tetap masuk", async () => {
+  await renderLocked();
+  const calls = countPinLogins();
+  await typePin("123456");
+  expect(await scanBox()).toBeInTheDocument();
+  expect(calls.n).toBe(1);
+});
+
+test("setelah scan ditolak, PIN berikutnya diterima", async () => {
+  await renderLocked();
+  const user = typingAt(5);
+  await user.type(pin(), "8991002101234{Enter}");
+  await screen.findByText("Itu barcode, bukan PIN");
+  const human = typingAt(80);
+  await human.type(pin(), "123456");
+  expect(await scanBox()).toBeInTheDocument();
 });

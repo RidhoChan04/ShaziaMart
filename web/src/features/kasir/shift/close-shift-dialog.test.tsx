@@ -1,10 +1,13 @@
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { beforeEach, expect, test, vi } from "vitest";
 import { mockDb } from "@/mocks/db";
 import { loginWithShift } from "@/mocks/handlers/test-helpers";
+import type { ShiftClosure } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { renderWithQuery } from "@/test/render-app";
 import { CloseShiftDialog } from "./close-shift-dialog";
+import { ShiftClosureDialog } from "./shift-closure-dialog";
 
 /** Modal awal 200.000 + penjualan tunai 150.000 → uang seharusnya 350.000. */
 beforeEach(async () => {
@@ -14,31 +17,47 @@ beforeEach(async () => {
   });
 });
 
+/** Sama seperti layout: jendela hitung → jendela hasil. */
+function Harness({ onDone }: { onDone: () => void }) {
+  const [closure, setClosure] = useState<ShiftClosure | null>(null);
+  return (
+    <>
+      <CloseShiftDialog
+        open={closure === null}
+        onClose={() => {}}
+        onClosed={setClosure}
+      />
+      <ShiftClosureDialog closure={closure} onDone={onDone} />
+    </>
+  );
+}
+
 function setup() {
   const user = userEvent.setup();
   const onClose = vi.fn();
-  renderWithQuery(<CloseShiftDialog open onClose={onClose} />);
-  const dialog = screen.getByRole("dialog", { name: "Tutup shift" });
-  const ui = within(dialog);
+  renderWithQuery(<Harness onDone={onClose} />);
+  const ui = within(screen.getByRole("dialog", { name: "Tutup shift" }));
   return {
     user,
     onClose,
     ui,
+    result: () => within(screen.getByRole("dialog", { name: "Tutup shift" })),
     counted: () => ui.getByRole("textbox", { name: "Uang fisik di laci" }),
     submit: () => ui.getByRole("button", { name: "Tutup shift" }),
   };
 }
 
 test("tutup shift hitung buta: uang seharusnya tidak tampil sebelum kirim; hasil selisih −Rp5.000", async () => {
-  const { user, ui, counted, submit, onClose } = setup();
+  const { user, counted, submit, onClose, result } = setup();
   expect(submit()).toBeDisabled();
   await user.type(counted(), "345.000");
-  expect(ui.queryByText("Uang seharusnya")).toBeNull();
-  expect(ui.queryByText("Rp350.000")).toBeNull();
-  expect(ui.queryByText("Selisih")).toBeNull();
+  expect(screen.queryByText("Uang seharusnya")).toBeNull();
+  expect(screen.queryByText("Rp350.000")).toBeNull();
+  expect(screen.queryByText("Selisih")).toBeNull();
 
   await user.click(submit());
-  expect(await ui.findByText("Uang seharusnya")).toBeInTheDocument();
+  expect(await screen.findByText("Uang seharusnya")).toBeInTheDocument();
+  const ui = result();
   const row = (label: string) =>
     ui.getByText(label).closest("div") as HTMLElement;
   expect(within(row("Uang seharusnya")).getByText("Rp350.000")).toBeVisible();
@@ -53,10 +72,10 @@ test("tutup shift hitung buta: uang seharusnya tidak tampil sebelum kirim; hasil
 });
 
 test("selisih lebih tampil dengan tanda +", async () => {
-  const { user, ui, counted, submit } = setup();
+  const { user, counted, submit } = setup();
   await user.type(counted(), "360.000");
   await user.click(submit());
-  const selisih = await ui.findByText("+Rp10.000");
+  const selisih = await screen.findByText("+Rp10.000");
   expect(selisih).not.toHaveClass("text-danger");
 });
 
