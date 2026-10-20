@@ -1,6 +1,10 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
-import { useCreateSale } from "@/shared/api/gen/sales/sales";
+import {
+  getListTodaySalesQueryKey,
+  useCreateSale,
+} from "@/shared/api/gen/sales/sales";
 import type { PriceChange, Sale } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import {
   creditLimitProblemSchema,
@@ -26,6 +30,7 @@ const NONE: SubmitPrompt = { kind: "none" };
  * 409 PRICE_CHANGED / CREDIT_LIMIT membuka prompt; error lain jadi pesan di jendela bayar.
  */
 export function useSubmitSale(onPaid: (sale: Sale) => void) {
+  const client = useQueryClient();
   const { mutate, isPending } = useCreateSale({ mutation: { retry: false } });
   // Penjaga sinkron: klik kedua sebelum render ulang tetap diabaikan.
   const inFlight = useRef(false);
@@ -70,6 +75,9 @@ export function useSubmitSale(onPaid: (sale: Sale) => void) {
       {
         onSuccess: (sale) => {
           setPrompt(NONE);
+          void client.invalidateQueries({
+            queryKey: getListTodaySalesQueryKey(),
+          });
           useCart.getState().completeSale(sale.change);
           if (sale.printStatus === "gagal") {
             toast.error("Struk gagal dicetak — cetak ulang dari Riwayat");

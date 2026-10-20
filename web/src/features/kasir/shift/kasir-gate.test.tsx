@@ -49,9 +49,16 @@ test("tanpa shift → Buka shift: Rina → PIN 123456 → modal 200.000 → laya
     openingCash: 200_000,
   });
   expect(header().getByText(/^Rina · Shift \d{2}\.\d{2}$/)).toBeInTheDocument();
-  expect(header().getByRole("button", { name: "Riwayat" })).toBeDisabled();
+  expect(header().getByRole("button", { name: "Riwayat" })).toBeEnabled();
   expect(header().getByRole("button", { name: "Kunci" })).toBeEnabled();
   expect(header().getByRole("button", { name: "Tutup shift" })).toBeEnabled();
+
+  await user.click(header().getByRole("button", { name: "Riwayat" }));
+  expect(
+    await screen.findByText("Belum ada transaksi hari ini"),
+  ).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Tutup" }));
+  await waitFor(async () => expect(await scanBox()).toHaveFocus());
 });
 
 test("Ganti kasir kembali ke pilihan kasir", async () => {

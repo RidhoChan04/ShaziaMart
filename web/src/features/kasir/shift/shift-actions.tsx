@@ -9,6 +9,7 @@ import type {
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { Button } from "@/shared/ui/button";
 import { useCart } from "../cart/cart-store";
+import { HistorySheet } from "../history/history-sheet";
 import { focusScanBox } from "../scan/scan-box";
 import { CloseShiftDialog } from "./close-shift-dialog";
 import { setSession, syncGate } from "./gate-state";
@@ -45,6 +46,7 @@ export function ShiftActions({
   const client = useQueryClient();
   const hasLines = useCart((s) => s.lines.length > 0);
   const [closing, setClosing] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   // Kunci tetap berlaku di layar walau server tidak menjawab.
   const logout = useLogout({
     mutation: {
@@ -61,10 +63,10 @@ export function ShiftActions({
 
   return (
     <>
-      {/* Diisi di Task 13. */}
-      <Button variant="outline" disabled>
+      <Button variant="outline" onClick={() => setHistoryOpen(true)}>
         Riwayat
       </Button>
+      <HistorySheet open={historyOpen} onClose={() => setHistoryOpen(false)} />
       <Button variant="outline" onClick={lock} disabled={logout.isPending}>
         Kunci
       </Button>

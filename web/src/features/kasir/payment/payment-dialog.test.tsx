@@ -12,6 +12,7 @@ import { mockDb } from "@/mocks/db";
 import { loginWithShift } from "@/mocks/handlers/test-helpers";
 import { server } from "@/mocks/node";
 import { setScenario } from "@/mocks/scenarios";
+import { getListTodaySalesQueryKey } from "@/shared/api/gen/sales/sales";
 import type { SaleRequest } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { renderWithQuery } from "@/test/render-app";
 import { fillSpecCart, seedMatch } from "@/test/spec-cart";
@@ -41,7 +42,7 @@ function addBimoli() {
 async function openPay(fill: () => void = addBimoli) {
   fill();
   const user = userEvent.setup();
-  renderWithQuery(<KasirScreen />);
+  const { queryClient } = renderWithQuery(<KasirScreen />);
   const scan = screen.getByRole("combobox", {
     name: "Scan barcode / ketik nama atau kode",
   });
@@ -52,6 +53,7 @@ async function openPay(fill: () => void = addBimoli) {
   const ui = within(dialog);
   return {
     user,
+    queryClient,
     scan,
     dialog,
     ui,
@@ -319,6 +321,17 @@ test("campuran tunai 200.000 + sisa kasbon Bu Sari", async () => {
   });
   expect(sari?.balance).toBe(281500);
   expect(panelChange()).toHaveTextContent("Rp50.000");
+});
+
+test("penjualan berhasil → riwayat hari ini ditandai basi", async () => {
+  const { user, ui, selesai, queryClient } = await openPay();
+  const key = getListTodaySalesQueryKey();
+  queryClient.setQueryData(key, []);
+  expect(queryClient.getQueryState(key)?.isInvalidated).toBe(false);
+  await user.click(ui.getByRole("button", { name: "Uang pas" }));
+  await user.click(selesai());
+  await waitFor(() => expect(payDialog()).toBeNull());
+  expect(queryClient.getQueryState(key)?.isInvalidated).toBe(true);
 });
 
 test("printer-gagal → toast struk gagal", async () => {
