@@ -70,6 +70,28 @@ describe("auth", () => {
     vi.setSystemTime(1_700_000_000_000 + 300_000);
     expect((await login("123456")).status).toBe(200);
   });
+
+  test("login sukses mereset hitungan gagal", async () => {
+    for (let i = 0; i < 4; i++)
+      expect((await login("000000")).status).toBe(401);
+    expect((await login("123456")).status).toBe(200);
+    for (let i = 0; i < 4; i++)
+      expect((await login("000000")).status).toBe(401);
+    expect((await login("000000")).status).toBe(423);
+  });
+
+  test("setelah kunci kedaluwarsa hitungan gagal mulai dari nol", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(1_700_000_000_000);
+    for (let i = 0; i < 5; i++) await login("000000");
+    vi.setSystemTime(1_700_000_000_000 + 300_000);
+    const first = await login("000000");
+    expect(first.status).toBe(401);
+    expect(((await first.json()) as { code: string }).code).toBe("PIN_INVALID");
+    for (let i = 0; i < 3; i++)
+      expect((await login("000000")).status).toBe(401);
+    expect((await login("000000")).status).toBe(423);
+  });
 });
 
 describe("shift", () => {
