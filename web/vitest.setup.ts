@@ -2,6 +2,7 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, configure } from "@testing-library/react";
 import { afterAll, afterEach, beforeAll } from "vitest";
 import { __resetMockDbCacheForTests } from "@/mocks/db";
+import { __resetSalesScenarioForTests } from "@/mocks/handlers/sales";
 import { server } from "@/mocks/node";
 
 // jsdom tidak mengimplementasikan scrollTo; stub agar keluaran tes bersih.
@@ -20,6 +21,7 @@ afterEach(() => {
   localStorage.clear();
   history.replaceState(null, "", "/");
   __resetMockDbCacheForTests();
+  __resetSalesScenarioForTests();
 });
 
 afterAll(() => {

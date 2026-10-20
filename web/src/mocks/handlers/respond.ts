@@ -7,6 +7,7 @@ import type { MockState, MockUser } from "../db";
 
 const TITLES: Record<number, string> = {
   401: "Tidak diizinkan",
+  403: "Akses ditolak",
   404: "Tidak ditemukan",
   409: "Konflik",
   422: "Data tidak valid",

@@ -2,27 +2,11 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 import type { Session } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { mockDb } from "../db";
 import { setScenario } from "../scenarios";
+import { login, post } from "./test-helpers";
 
 afterEach(() => {
   vi.useRealTimers();
 });
-
-function post(path: string, body: unknown): Promise<Response> {
-  return fetch(path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-}
-
-function userId(name: string): string {
-  const user = mockDb.get().users.find((u) => u.name === name);
-  if (!user) throw new Error(`seed tanpa ${name}`);
-  return user.id;
-}
-
-const login = (pin: string, name = "Rina"): Promise<Response> =>
-  post("/api/auth/pin-login", { userId: userId(name), pin });
 
 describe("auth", () => {
   test("login PIN benar membuat sesi", async () => {
