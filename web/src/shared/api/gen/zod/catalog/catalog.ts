@@ -21,6 +21,9 @@ export const LookupCatalogQueryParams = zod.object({
   "code": zod.string().describe('Barcode atau kode toko (persis)')
 })
 
+
+
+
 export const LookupCatalogResponse = zod.object({
   "product": zod.object({
   "id": zod.string(),
@@ -32,12 +35,12 @@ export const LookupCatalogResponse = zod.object({
   "id": zod.string(),
   "productId": zod.string(),
   "name": zod.string(),
-  "unitSize": zod.int().describe('Jumlah satuan dasar per satuan jual.'),
+  "unitSize": zod.int().min(1).describe('Jumlah satuan dasar per satuan jual.'),
   "price": zod.int(),
   "wholesaleTiers": zod.array(zod.object({
   "minQty": zod.int(),
   "price": zod.int()
-}).describe('Harga grosir berlaku bila qtyBase >= minQty.')),
+}).describe('Harga grosir per satuan jual. Berlaku hanya bila qtyBase kelipatan unitSize;\njumlah = qtyBase / unitSize (dalam satuan jual) dan dipakai tier dengan minQty\nterbesar yang <= jumlah. minQty dalam satuan jual, bukan satuan dasar.\n')),
   "barcodes": zod.array(zod.string())
 }))
 }),
@@ -45,12 +48,16 @@ export const LookupCatalogResponse = zod.object({
 })
 
 /**
- * Mengembalikan paling banyak 8 hasil.
- * @summary Cari barang menurut nama atau kode
+ * Mencari menurut nama saja (barcode / kode toko lewat lookupCatalog); q kurang dari
+ * 2 karakter atau hanya angka menghasilkan daftar kosong. Mengembalikan paling banyak 8 hasil.
+ * @summary Cari barang menurut nama
  */
 export const SearchCatalogQueryParams = zod.object({
-  "q": zod.string().describe('Kata kunci nama atau kode')
+  "q": zod.string().describe('Kata kunci nama barang')
 })
+
+
+
 
 export const SearchCatalogResponseItem = zod.object({
   "product": zod.object({
@@ -63,12 +70,12 @@ export const SearchCatalogResponseItem = zod.object({
   "id": zod.string(),
   "productId": zod.string(),
   "name": zod.string(),
-  "unitSize": zod.int().describe('Jumlah satuan dasar per satuan jual.'),
+  "unitSize": zod.int().min(1).describe('Jumlah satuan dasar per satuan jual.'),
   "price": zod.int(),
   "wholesaleTiers": zod.array(zod.object({
   "minQty": zod.int(),
   "price": zod.int()
-}).describe('Harga grosir berlaku bila qtyBase >= minQty.')),
+}).describe('Harga grosir per satuan jual. Berlaku hanya bila qtyBase kelipatan unitSize;\njumlah = qtyBase / unitSize (dalam satuan jual) dan dipakai tier dengan minQty\nterbesar yang <= jumlah. minQty dalam satuan jual, bukan satuan dasar.\n')),
   "barcodes": zod.array(zod.string())
 }))
 }),
@@ -79,6 +86,9 @@ export const SearchCatalogResponse = zod.array(SearchCatalogResponseItem).max(8)
 /**
  * @summary Barang curah pilihan cepat
  */
+
+
+
 export const ListQuickCurahResponseItem = zod.object({
   "product": zod.object({
   "id": zod.string(),
@@ -90,12 +100,12 @@ export const ListQuickCurahResponseItem = zod.object({
   "id": zod.string(),
   "productId": zod.string(),
   "name": zod.string(),
-  "unitSize": zod.int().describe('Jumlah satuan dasar per satuan jual.'),
+  "unitSize": zod.int().min(1).describe('Jumlah satuan dasar per satuan jual.'),
   "price": zod.int(),
   "wholesaleTiers": zod.array(zod.object({
   "minQty": zod.int(),
   "price": zod.int()
-}).describe('Harga grosir berlaku bila qtyBase >= minQty.')),
+}).describe('Harga grosir per satuan jual. Berlaku hanya bila qtyBase kelipatan unitSize;\njumlah = qtyBase / unitSize (dalam satuan jual) dan dipakai tier dengan minQty\nterbesar yang <= jumlah. minQty dalam satuan jual, bukan satuan dasar.\n')),
   "barcodes": zod.array(zod.string())
 }))
 }),

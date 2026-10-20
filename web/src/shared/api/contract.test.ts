@@ -5,7 +5,8 @@ import type {
   PriceChangedProblem,
 } from "./gen/shaziaMartAPI.schemas";
 import { ErrorCode } from "./gen/shaziaMartAPI.schemas";
-import { CreateSaleBody } from "./gen/zod/sales/sales";
+import { LookupCatalogResponse } from "./gen/zod/catalog/catalog";
+import { CreateSaleBody, VoidSaleBody } from "./gen/zod/sales/sales";
 import { creditLimitProblemSchema, priceChangedProblemSchema } from "./problem";
 
 test("skema zod createSale menolak body tanpa saleId", () => {
@@ -78,4 +79,35 @@ test("409 dikunci oleh code: PRICE_CHANGED lolos skema harga, CREDIT_LIMIT tidak
   expect(priceChangedProblemSchema.safeParse(price).success).toBe(true);
   expect(priceChangedProblemSchema.safeParse(credit).success).toBe(false);
   expect(creditLimitProblemSchema.safeParse(price).success).toBe(false);
+});
+
+test("VoidRequest: ownerPin opsional (tanpa PIN → 403 PIN_REQUIRED), alasan wajib", () => {
+  expect(VoidSaleBody.safeParse({ reason: "salah input" }).success).toBe(true);
+  expect(VoidSaleBody.safeParse({ ownerPin: "999999" }).success).toBe(false);
+});
+
+test("ProductUnit.unitSize minimal 1", () => {
+  const match = (unitSize: number) => ({
+    product: {
+      id: "p1",
+      name: "Gula",
+      storeCode: "2001",
+      isCurah: true,
+      baseUnit: "gram",
+      units: [
+        {
+          id: "u1",
+          productId: "p1",
+          name: "kg",
+          unitSize,
+          price: 18000,
+          wholesaleTiers: [],
+          barcodes: [],
+        },
+      ],
+    },
+    unitId: "u1",
+  });
+  expect(LookupCatalogResponse.safeParse(match(1000)).success).toBe(true);
+  expect(LookupCatalogResponse.safeParse(match(0)).success).toBe(false);
 });

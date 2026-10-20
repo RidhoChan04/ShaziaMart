@@ -124,15 +124,20 @@ export function priceItems(
   return priced;
 }
 
-/** Aturan 5: harga klien vs harga efektif server. */
+/** Aturan 5: harga klien vs harga efektif server; satu entri per unitId (yang pertama). */
 export function priceChanges(items: readonly PricedItem[]): PriceChange[] {
-  return items
-    .filter((p) => p.expectedUnitPrice !== p.item.unitPrice)
-    .map((p) => ({
-      unitId: p.item.unitId,
+  const changes: PriceChange[] = [];
+  for (const p of items) {
+    const { unitId, unitPrice } = p.item;
+    if (p.expectedUnitPrice === unitPrice) continue;
+    if (changes.some((c) => c.unitId === unitId)) continue;
+    changes.push({
+      unitId,
       oldUnitPrice: p.expectedUnitPrice,
-      newUnitPrice: p.item.unitPrice,
-    }));
+      newUnitPrice: unitPrice,
+    });
+  }
+  return changes;
 }
 
 function safeSum(values: readonly number[]): number | null {

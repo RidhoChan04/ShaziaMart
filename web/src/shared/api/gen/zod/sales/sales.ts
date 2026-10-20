@@ -71,8 +71,8 @@ export const CreateSaleResponse = zod.object({
   "method": zod.enum(['cash', 'qris', 'credit']),
   "amount": zod.int().min(1)
 })),
-  "cashReceived": zod.int(),
-  "change": zod.int(),
+  "cashReceived": zod.int().describe('Uang tunai diterima; 0 bila penjualan tanpa bagian tunai.'),
+  "change": zod.int().describe('Kembalian; 0 bila penjualan tanpa bagian tunai.'),
   "customerId": zod.string().nullable(),
   "status": zod.enum(['selesai', 'dibatalkan']),
   "printStatus": zod.enum(['tercetak', 'tidak_dicetak', 'gagal'])
@@ -106,8 +106,8 @@ export const ListTodaySalesResponseItem = zod.object({
   "method": zod.enum(['cash', 'qris', 'credit']),
   "amount": zod.int().min(1)
 })),
-  "cashReceived": zod.int(),
-  "change": zod.int(),
+  "cashReceived": zod.int().describe('Uang tunai diterima; 0 bila penjualan tanpa bagian tunai.'),
+  "change": zod.int().describe('Kembalian; 0 bila penjualan tanpa bagian tunai.'),
   "customerId": zod.string().nullable(),
   "status": zod.enum(['selesai', 'dibatalkan']),
   "printStatus": zod.enum(['tercetak', 'tidak_dicetak', 'gagal'])
@@ -137,7 +137,7 @@ export const voidSaleBodyOwnerPinRegExp = new RegExp('^\\d{6}$');
 
 
 export const VoidSaleBody = zod.object({
-  "ownerPin": zod.string().regex(voidSaleBodyOwnerPinRegExp),
+  "ownerPin": zod.string().regex(voidSaleBodyOwnerPinRegExp).optional().describe('PIN pemilik; tanpa PIN server menjawab 403 PIN_REQUIRED.'),
   "reason": zod.string().min(1)
 })
 
@@ -166,8 +166,8 @@ export const VoidSaleResponse = zod.object({
   "method": zod.enum(['cash', 'qris', 'credit']),
   "amount": zod.int().min(1)
 })),
-  "cashReceived": zod.int(),
-  "change": zod.int(),
+  "cashReceived": zod.int().describe('Uang tunai diterima; 0 bila penjualan tanpa bagian tunai.'),
+  "change": zod.int().describe('Kembalian; 0 bila penjualan tanpa bagian tunai.'),
   "customerId": zod.string().nullable(),
   "status": zod.enum(['selesai', 'dibatalkan']),
   "printStatus": zod.enum(['tercetak', 'tidak_dicetak', 'gagal'])

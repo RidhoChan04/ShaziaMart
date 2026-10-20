@@ -201,17 +201,25 @@ paths:
                 $ref: "#/components/schemas/CatalogMatch"
         "404":
           $ref: "#/components/responses/NotFound"
+        "422":
+          description: Parameter code kosong atau tidak ada (VALIDATION)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
   /api/catalog/search:
     get:
       tags: [catalog]
       operationId: searchCatalog
-      summary: Cari barang menurut nama atau kode
-      description: Mengembalikan paling banyak 8 hasil.
+      summary: Cari barang menurut nama
+      description: |
+        Mencari menurut nama saja (barcode / kode toko lewat lookupCatalog); q kurang dari
+        2 karakter atau hanya angka menghasilkan daftar kosong. Mengembalikan paling banyak 8 hasil.
       parameters:
         - name: q
           in: query
           required: true
-          description: Kata kunci nama atau kode
+          description: Kata kunci nama barang
           schema:
             type: string
       responses:
@@ -539,6 +547,7 @@ components:
               enum: [PRICE_CHANGED]
             changes:
               type: array
+              description: Satu entri per unitId (beberapa baris dengan satuan sama tetap satu entri).
               items:
                 $ref: "#/components/schemas/PriceChange"
     CreditLimitProblem:
@@ -661,7 +670,10 @@ components:
           type: boolean
     WholesaleTier:
       type: object
-      description: Harga grosir berlaku bila qtyBase >= minQty.
+      description: |
+        Harga grosir per satuan jual. Berlaku hanya bila qtyBase kelipatan unitSize;
+        jumlah = qtyBase / unitSize (dalam satuan jual) dan dipakai tier dengan minQty
+        terbesar yang <= jumlah. minQty dalam satuan jual, bukan satuan dasar.
       required: [minQty, price]
       properties:
         minQty:
@@ -680,6 +692,7 @@ components:
           type: string
         unitSize:
           type: integer
+          minimum: 1
           description: Jumlah satuan dasar per satuan jual.
         price:
           type: integer
@@ -823,8 +836,10 @@ components:
             $ref: "#/components/schemas/PaymentInput"
         cashReceived:
           type: integer
+          description: Uang tunai diterima; 0 bila penjualan tanpa bagian tunai.
         change:
           type: integer
+          description: Kembalian; 0 bila penjualan tanpa bagian tunai.
         customerId:
           type: string
           nullable: true
@@ -844,11 +859,12 @@ components:
           $ref: "#/components/schemas/PrintStatus"
     VoidRequest:
       type: object
-      required: [ownerPin, reason]
+      required: [reason]
       properties:
         ownerPin:
           type: string
           pattern: '^\d{6}$'
+          description: PIN pemilik; tanpa PIN server menjawab 403 PIN_REQUIRED.
         reason:
           type: string
           minLength: 1

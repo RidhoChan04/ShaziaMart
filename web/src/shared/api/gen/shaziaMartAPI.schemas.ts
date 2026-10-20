@@ -92,6 +92,7 @@ export const PriceChangedProblemCode = {
  */
 export type PriceChangedProblem = Problem & {
   code: PriceChangedProblemCode;
+  /** Satu entri per unitId (beberapa baris dengan satuan sama tetap satu entri). */
   changes: PriceChange[];
 };
 
@@ -179,7 +180,9 @@ export interface KasirSettings {
 }
 
 /**
- * Harga grosir berlaku bila qtyBase >= minQty.
+ * Harga grosir per satuan jual. Berlaku hanya bila qtyBase kelipatan unitSize;
+ * jumlah = qtyBase / unitSize (dalam satuan jual) dan dipakai tier dengan minQty
+ * terbesar yang <= jumlah. minQty dalam satuan jual, bukan satuan dasar.
  */
 export interface WholesaleTier {
   minQty: number;
@@ -190,7 +193,10 @@ export interface ProductUnit {
   id: string;
   productId: string;
   name: string;
-  /** Jumlah satuan dasar per satuan jual. */
+  /**
+     * Jumlah satuan dasar per satuan jual.
+     * @minimum 1
+     */
   unitSize: number;
   price: number;
   wholesaleTiers: WholesaleTier[];
@@ -313,7 +319,9 @@ export interface Sale {
   items: SaleItem[];
   total: number;
   payments: PaymentInput[];
+  /** Uang tunai diterima; 0 bila penjualan tanpa bagian tunai. */
   cashReceived: number;
+  /** Kembalian; 0 bila penjualan tanpa bagian tunai. */
   change: number;
   /** @nullable */
   customerId: string | null;
@@ -326,8 +334,11 @@ export interface PrintResult {
 }
 
 export interface VoidRequest {
-  /** @pattern ^\d{6}$ */
-  ownerPin: string;
+  /**
+     * PIN pemilik; tanpa PIN server menjawab 403 PIN_REQUIRED.
+     * @pattern ^\d{6}$
+     */
+  ownerPin?: string;
   /** @minLength 1 */
   reason: string;
 }
@@ -401,7 +412,7 @@ code: string;
 
 export type SearchCatalogParams = {
 /**
- * Kata kunci nama atau kode
+ * Kata kunci nama barang
  */
 q: string;
 };
