@@ -255,7 +255,7 @@ test("persist: state dipulihkan dari localStorage (saleId & baris sama)", async 
   const stored = JSON.parse(localStorage.getItem("kasir.cart") ?? "{}") as {
     state: Record<string, unknown>;
   };
-  expect(stored.state["addUnit"]).toBeUndefined();
+  expect(stored.state.addUnit).toBeUndefined();
 });
 
 test("setelah completeSale, rehydrate tidak memunculkan baris lama", async () => {

@@ -32,6 +32,8 @@ export function DevPanel() {
   const queryClient = useQueryClient();
   const selectId = useId();
   const [scenario, setLocalScenario] = useState<Scenario>(getScenario);
+  const [open, setOpen] = useState(false);
+  const panelId = useId();
   const onOwner = useLocation({
     select: (l) => l.pathname.startsWith("/owner"),
   });
@@ -54,38 +56,55 @@ export function DevPanel() {
   }
 
   return (
-    <aside
-      aria-label="Panel pengembang"
+    <div
       className={cn(
-        "fixed right-3 z-50 flex items-center gap-2 rounded-md border border-border bg-surface p-2 text-xs text-text shadow-md",
+        // Kiri bawah: tidak menutupi tombol Bayar (kanan bawah) di layar kasir.
+        "fixed left-3 z-50 flex flex-col items-start gap-1 text-xs text-text",
         // Di owner (HP) jangan menutupi tab bawah.
         onOwner
           ? "bottom-[calc(4.5rem+env(safe-area-inset-bottom))] lg:bottom-3"
           : "bottom-3",
       )}
     >
-      <label htmlFor={selectId} className="font-medium">
-        Skenario
-      </label>
-      <select
-        id={selectId}
-        value={scenario}
-        onChange={onScenarioChange}
-        className="h-8 rounded-md border border-border bg-surface px-2"
-      >
-        {scenarios.map((s) => (
-          <option key={s} value={s}>
-            {s}
-          </option>
-        ))}
-      </select>
+      {open ? (
+        <aside
+          id={panelId}
+          aria-label="Isi panel pengembang"
+          className="flex items-center gap-2 rounded-md border border-border bg-surface p-2 shadow-md"
+        >
+          <label htmlFor={selectId} className="font-medium">
+            Skenario
+          </label>
+          <select
+            id={selectId}
+            value={scenario}
+            onChange={onScenarioChange}
+            className="h-8 rounded-md border border-border bg-surface px-2"
+          >
+            {scenarios.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={onReset}
+            className="h-8 rounded-md border border-border bg-surface px-2 font-medium hover:bg-primary-soft"
+          >
+            Reset data
+          </button>
+        </aside>
+      ) : null}
       <button
         type="button"
-        onClick={onReset}
-        className="h-8 rounded-md border border-border bg-surface px-2 font-medium hover:bg-primary-soft"
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={() => setOpen((v) => !v)}
+        className="h-8 rounded-md border border-border bg-surface px-2 font-medium shadow-md hover:bg-primary-soft"
       >
-        Reset data
+        Panel pengembang
       </button>
-    </aside>
+    </div>
   );
 }

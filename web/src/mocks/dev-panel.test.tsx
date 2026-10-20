@@ -5,8 +5,32 @@ import { renderApp } from "@/test/render-app";
 import { mockDb } from "./db";
 import { getScenario, scenarios } from "./scenarios";
 
-test("DevPanel: pilihan berlabel Skenario memuat semua skenario", async () => {
+async function expandPanel(user: ReturnType<typeof userEvent.setup>) {
+  const toggle = await screen.findByRole("button", {
+    name: "Panel pengembang",
+  });
+  expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await user.click(toggle);
+  expect(toggle).toHaveAttribute("aria-expanded", "true");
+}
+
+test("DevPanel: tertutup secara bawaan, toggle membuka dan menutup", async () => {
+  const user = userEvent.setup();
   renderApp("/kasir");
+  expect(
+    await screen.findByRole("button", { name: "Panel pengembang" }),
+  ).toBeInTheDocument();
+  expect(screen.queryByLabelText("Skenario")).toBeNull();
+  await expandPanel(user);
+  expect(screen.getByLabelText("Skenario")).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Panel pengembang" }));
+  expect(screen.queryByLabelText("Skenario")).toBeNull();
+});
+
+test("DevPanel: pilihan berlabel Skenario memuat semua skenario", async () => {
+  const user = userEvent.setup();
+  renderApp("/kasir");
+  await expandPanel(user);
   const select = await screen.findByLabelText("Skenario");
   if (!(select instanceof HTMLSelectElement)) throw new Error("bukan select");
   expect(Array.from(select.options, (o) => o.value)).toEqual([...scenarios]);
@@ -17,6 +41,7 @@ test("DevPanel: ganti skenario menyimpan dan memuat ulang data", async () => {
   const user = userEvent.setup();
   renderApp("/kasir");
   expect(await screen.findByText("● Server tersambung")).toBeInTheDocument();
+  await expandPanel(user);
 
   await user.selectOptions(screen.getByLabelText("Skenario"), "server-mati");
   expect(getScenario()).toBe("server-mati");
@@ -28,6 +53,7 @@ test("DevPanel: ?skenario= di URL tampil dan tetap bisa diganti lewat panel", as
   const user = userEvent.setup();
   history.replaceState(null, "", "/kasir?skenario=server-mati");
   renderApp("/kasir");
+  await expandPanel(user);
   const select = await screen.findByLabelText("Skenario");
   expect(select).toHaveValue("server-mati");
   expect(await screen.findByRole("alert")).toBeInTheDocument();
@@ -40,6 +66,7 @@ test("DevPanel: ?skenario= di URL tampil dan tetap bisa diganti lewat panel", as
 test("DevPanel: Reset data mengembalikan data mock ke awal", async () => {
   const user = userEvent.setup();
   renderApp("/kasir");
+  await expandPanel(user);
   mockDb.update((s) => {
     s.store.name = "Toko Lain";
   });

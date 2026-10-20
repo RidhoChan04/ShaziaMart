@@ -28,7 +28,7 @@ export default defineConfig({
     command:
       "npm run build:mock && npm run preview -- --port 4173 --strictPort",
     url: "http://localhost:4173/kasir",
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
     timeout: 120_000,
   },
 });

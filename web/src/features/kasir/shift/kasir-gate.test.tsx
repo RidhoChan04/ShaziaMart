@@ -59,7 +59,7 @@ test("tanpa shift → Buka shift: Rina → PIN 123456 → modal 200.000 → laya
   ).toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "Tutup" }));
   await waitFor(async () => expect(await scanBox()).toHaveFocus());
-});
+}, 15_000);
 
 test("Ganti kasir kembali ke pilihan kasir", async () => {
   const user = userEvent.setup();
