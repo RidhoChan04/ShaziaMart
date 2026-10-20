@@ -3,6 +3,12 @@
  * Do not edit manually.
  * ShaziaMart API
  * Kontrak API kasir sembako. Sumber kebenaran tunggal untuk frontend dan backend.
+ * Semua uang dan jumlah berupa integer (rupiah utuh; qtyBase dalam satuan dasar pcs/gram/ml).
+ * Semua waktu berupa integer epoch milidetik UTC. Error memakai application/problem+json.
+ * Autentikasi memakai cookie sesi kasir_session. Endpoint shift, sales, dan session
+ * memerlukan sesi; health, users, pin-login, settings, catalog, dan customers publik
+ * (satu PC di localhost).
+ *
  * OpenAPI spec version: 0.1.0
  */
 export type HealthStatus = typeof HealthStatus[keyof typeof HealthStatus];
@@ -53,4 +59,327 @@ export interface Problem {
   code: ErrorCode;
   detail?: string;
 }
+
+export interface PriceChange {
+  unitId: string;
+  oldUnitPrice: number;
+  newUnitPrice: number;
+}
+
+/**
+ * Problem PRICE_CHANGED dengan daftar perubahan harga.
+ */
+export type PriceChangedProblem = Problem & {
+  changes: PriceChange[];
+};
+
+/**
+ * Problem CREDIT_LIMIT dengan saldo, batas, dan nilai kasbon yang dicoba.
+ */
+export type CreditLimitProblem = Problem & {
+  balance: number;
+  creditLimit: number;
+  attempted: number;
+};
+
+export type UserRole = typeof UserRole[keyof typeof UserRole];
+
+
+export const UserRole = {
+  kasir: 'kasir',
+  pemilik: 'pemilik',
+} as const;
+
+export interface User {
+  id: string;
+  name: string;
+  role: UserRole;
+}
+
+export interface Session {
+  user: User;
+}
+
+export interface PinLoginRequest {
+  userId: string;
+  /** @pattern ^\d{6}$ */
+  pin: string;
+}
+
+export interface Shift {
+  id: string;
+  kasirId: string;
+  kasirName: string;
+  openedAt: number;
+  openingCash: number;
+}
+
+export interface CurrentShift {
+  shift: Shift | null;
+}
+
+export interface OpenShiftRequest {
+  /** @minimum 0 */
+  openingCash: number;
+}
+
+export interface CloseShiftRequest {
+  /** @minimum 0 */
+  countedCash: number;
+}
+
+export interface ShiftClosure {
+  shiftId: string;
+  openingCash: number;
+  cashSales: number;
+  expectedCash: number;
+  countedCash: number;
+  difference: number;
+  salesCount: number;
+}
+
+export interface KasirSettings {
+  storeName: string;
+  autoPrint: boolean;
+  /** Pecahan curah dalam qtyBase. */
+  curahFractions: number[];
+  quickCurahProductIds: string[];
+  qrisImageUrl: string;
+  allowNegativeStock: boolean;
+}
+
+/**
+ * Harga grosir berlaku bila qtyBase >= minQty.
+ */
+export interface WholesaleTier {
+  minQty: number;
+  price: number;
+}
+
+export interface ProductUnit {
+  id: string;
+  productId: string;
+  name: string;
+  /** Jumlah satuan dasar per satuan jual. */
+  unitSize: number;
+  price: number;
+  wholesaleTiers: WholesaleTier[];
+  barcodes: string[];
+}
+
+export type ProductBaseUnit = typeof ProductBaseUnit[keyof typeof ProductBaseUnit];
+
+
+export const ProductBaseUnit = {
+  pcs: 'pcs',
+  gram: 'gram',
+  ml: 'ml',
+} as const;
+
+export interface Product {
+  id: string;
+  name: string;
+  storeCode: string;
+  isCurah: boolean;
+  baseUnit: ProductBaseUnit;
+  units: ProductUnit[];
+}
+
+export interface CatalogMatch {
+  product: Product;
+  unitId: string;
+}
+
+/**
+ * Tepat salah satu dari qtyBase atau amount wajib diisi (ditegakkan server; 422
+ * INVALID_QUANTITY bila keduanya ada atau keduanya kosong). amount (nominal rupiah)
+ * hanya untuk satuan curah.
+ */
+export interface SaleItemInput {
+  unitId: string;
+  /** @minimum 1 */
+  qtyBase?: number;
+  /** @minimum 1 */
+  amount?: number;
+  expectedUnitPrice: number;
+}
+
+export type PaymentInputMethod = typeof PaymentInputMethod[keyof typeof PaymentInputMethod];
+
+
+export const PaymentInputMethod = {
+  cash: 'cash',
+  qris: 'qris',
+  credit: 'credit',
+} as const;
+
+export interface PaymentInput {
+  method: PaymentInputMethod;
+  /** @minimum 1 */
+  amount: number;
+}
+
+export interface SaleRequest {
+  /** ID dari klien (idempotensi); saleId yang sama mengembalikan penjualan lama dengan 200. */
+  saleId: string;
+  /** @minItems 1 */
+  items: SaleItemInput[];
+  /** @minItems 1 */
+  payments: PaymentInput[];
+  cashReceived?: number;
+  customerId?: string;
+  print: boolean;
+  /**
+     * Otorisasi pemilik bila server memintanya.
+     * @pattern ^\d{6}$
+     */
+  ownerPin?: string;
+}
+
+export type SaleItemBaseUnit = typeof SaleItemBaseUnit[keyof typeof SaleItemBaseUnit];
+
+
+export const SaleItemBaseUnit = {
+  pcs: 'pcs',
+  gram: 'gram',
+  ml: 'ml',
+} as const;
+
+export interface SaleItem {
+  unitId: string;
+  productName: string;
+  unitName: string;
+  isCurah: boolean;
+  baseUnit: SaleItemBaseUnit;
+  unitSize: number;
+  qtyBase: number;
+  unitPrice: number;
+  subtotal: number;
+  wholesale: boolean;
+}
+
+export type SaleStatus = typeof SaleStatus[keyof typeof SaleStatus];
+
+
+export const SaleStatus = {
+  selesai: 'selesai',
+  dibatalkan: 'dibatalkan',
+} as const;
+
+export type PrintStatus = typeof PrintStatus[keyof typeof PrintStatus];
+
+
+export const PrintStatus = {
+  tercetak: 'tercetak',
+  tidak_dicetak: 'tidak_dicetak',
+  gagal: 'gagal',
+} as const;
+
+export interface Sale {
+  id: string;
+  number: string;
+  createdAt: number;
+  kasirName: string;
+  items: SaleItem[];
+  total: number;
+  payments: PaymentInput[];
+  cashReceived: number;
+  change: number;
+  /** @nullable */
+  customerId: string | null;
+  status: SaleStatus;
+  printStatus: PrintStatus;
+}
+
+export interface PrintResult {
+  printStatus: PrintStatus;
+}
+
+export interface VoidRequest {
+  /** @pattern ^\d{6}$ */
+  ownerPin: string;
+  /** @minLength 1 */
+  reason: string;
+}
+
+export interface Customer {
+  id: string;
+  name: string;
+  phone: string;
+  balance: number;
+  creditLimit: number;
+}
+
+export interface NewCustomer {
+  /** @minLength 2 */
+  name: string;
+  /** @pattern ^\d{8,15}$ */
+  phone: string;
+}
+
+/**
+ * Tidak ada sesi (UNAUTHORIZED)
+ */
+export type UnauthorizedResponse = Problem;
+
+/**
+ * PIN salah (PIN_INVALID)
+ */
+export type PinInvalidResponse = Problem;
+
+/**
+ * Terlalu banyak percobaan PIN (LOCKED_OUT)
+ */
+export type LockedOutResponse = Problem;
+
+/**
+ * UNAUTHORIZED atau PIN_INVALID
+ */
+export type UnauthorizedOrPinInvalidResponse = Problem;
+
+/**
+ * PIN pemilik diperlukan (PIN_REQUIRED)
+ */
+export type PinRequiredResponse = Problem;
+
+/**
+ * Tidak ditemukan (NOT_FOUND)
+ */
+export type NotFoundResponse = Problem;
+
+/**
+ * Shift sudah terbuka (SHIFT_ALREADY_OPEN)
+ */
+export type ShiftAlreadyOpenResponse = Problem;
+
+/**
+ * Tidak ada shift terbuka (SHIFT_CLOSED)
+ */
+export type ShiftClosedResponse = Problem;
+
+/**
+ * Input tidak valid (VALIDATION atau INVALID_QUANTITY)
+ */
+export type ValidationFailedResponse = Problem;
+
+export type LookupCatalogParams = {
+/**
+ * Barcode atau kode toko (persis)
+ */
+code: string;
+};
+
+export type SearchCatalogParams = {
+/**
+ * Kata kunci nama atau kode
+ */
+q: string;
+};
+
+export type SearchCustomersParams = {
+/**
+ * Nama atau telepon
+ */
+q?: string;
+};
 

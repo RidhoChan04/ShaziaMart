@@ -2,7 +2,13 @@ openapi: 3.0.3
 info:
   title: ShaziaMart API
   version: 0.1.0
-  description: Kontrak API kasir sembako. Sumber kebenaran tunggal untuk frontend dan backend.
+  description: |
+    Kontrak API kasir sembako. Sumber kebenaran tunggal untuk frontend dan backend.
+    Semua uang dan jumlah berupa integer (rupiah utuh; qtyBase dalam satuan dasar pcs/gram/ml).
+    Semua waktu berupa integer epoch milidetik UTC. Error memakai application/problem+json.
+    Autentikasi memakai cookie sesi kasir_session. Endpoint shift, sales, dan session
+    memerlukan sesi; health, users, pin-login, settings, catalog, dan customers publik
+    (satu PC di localhost).
 tags:
   - name: system
   - name: auth
@@ -32,7 +38,429 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Health"
+  /api/users/kasir:
+    get:
+      tags: [auth]
+      operationId: listKasirUsers
+      summary: Daftar pengguna kasir untuk layar PIN
+      responses:
+        "200":
+          description: Pengguna kasir
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+  /api/auth/pin-login:
+    post:
+      tags: [auth]
+      operationId: pinLogin
+      summary: Masuk dengan PIN kasir
+      description: PIN_INVALID (401) bila PIN salah; LOCKED_OUT (423) bila terlalu banyak percobaan.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PinLoginRequest"
+      responses:
+        "200":
+          description: Sesi dibuat (cookie kasir_session diset)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "401":
+          $ref: "#/components/responses/PinInvalid"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+        "423":
+          $ref: "#/components/responses/LockedOut"
+  /api/auth/session:
+    get:
+      tags: [auth]
+      operationId: getSession
+      summary: Sesi aktif
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Sesi aktif
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/auth/logout:
+    post:
+      tags: [auth]
+      operationId: logout
+      summary: Keluar (kunci layar)
+      security:
+        - cookieAuth: []
+      responses:
+        "204":
+          description: Sesi dihapus
+  /api/shifts/current:
+    get:
+      tags: [shift]
+      operationId: getCurrentShift
+      summary: Shift yang sedang terbuka
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Shift saat ini; shift bernilai null bila belum ada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CurrentShift"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/shifts:
+    post:
+      tags: [shift]
+      operationId: openShift
+      summary: Buka shift
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OpenShiftRequest"
+      responses:
+        "201":
+          description: Shift dibuka
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Shift"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/ShiftAlreadyOpen"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+  /api/shifts/current/close:
+    post:
+      tags: [shift]
+      operationId: closeShift
+      summary: Tutup shift
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CloseShiftRequest"
+      responses:
+        "200":
+          description: Shift ditutup
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShiftClosure"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/ShiftClosed"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+  /api/settings/kasir:
+    get:
+      tags: [settings]
+      operationId: getKasirSettings
+      summary: Pengaturan layar kasir
+      responses:
+        "200":
+          description: Pengaturan kasir
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KasirSettings"
+  /api/catalog/lookup:
+    get:
+      tags: [catalog]
+      operationId: lookupCatalog
+      summary: Cari satu barang dari barcode atau kode toko
+      parameters:
+        - name: code
+          in: query
+          required: true
+          description: Barcode atau kode toko (persis)
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Barang cocok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CatalogMatch"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /api/catalog/search:
+    get:
+      tags: [catalog]
+      operationId: searchCatalog
+      summary: Cari barang menurut nama atau kode
+      description: Mengembalikan paling banyak 8 hasil.
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Kata kunci nama atau kode
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Kecocokan, maksimal 8 hasil
+          content:
+            application/json:
+              schema:
+                type: array
+                maxItems: 8
+                items:
+                  $ref: "#/components/schemas/CatalogMatch"
+  /api/catalog/quick-curah:
+    get:
+      tags: [catalog]
+      operationId: listQuickCurah
+      summary: Barang curah pilihan cepat
+      responses:
+        "200":
+          description: Kecocokan sesuai quickCurahProductIds
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CatalogMatch"
+  /api/sales:
+    post:
+      tags: [sales]
+      operationId: createSale
+      summary: Simpan penjualan
+      description: |
+        Idempoten menurut saleId. 401 membawa UNAUTHORIZED atau PIN_INVALID (ownerPin salah).
+        409 membawa SHIFT_CLOSED, PRICE_CHANGED (PriceChangedProblem), atau CREDIT_LIMIT
+        (CreditLimitProblem). 422 membawa VALIDATION atau INVALID_QUANTITY.
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaleRequest"
+      responses:
+        "200":
+          description: saleId sudah pernah disimpan; penjualan lama dikembalikan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Sale"
+        "201":
+          description: Penjualan dibuat
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Sale"
+        "401":
+          $ref: "#/components/responses/UnauthorizedOrPinInvalid"
+        "409":
+          description: SHIFT_CLOSED, PRICE_CHANGED, atau CREDIT_LIMIT
+          content:
+            application/problem+json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/Problem"
+                  - $ref: "#/components/schemas/PriceChangedProblem"
+                  - $ref: "#/components/schemas/CreditLimitProblem"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+  /api/sales/today:
+    get:
+      tags: [sales]
+      operationId: listTodaySales
+      summary: Penjualan hari ini, terbaru dulu
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Penjualan hari ini
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Sale"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/sales/{saleId}/print:
+    post:
+      tags: [sales]
+      operationId: printSale
+      summary: Cetak ulang struk
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: saleId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Hasil cetak
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PrintResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /api/sales/{saleId}/void:
+    post:
+      tags: [sales]
+      operationId: voidSale
+      summary: Batalkan penjualan (PIN pemilik)
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: saleId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VoidRequest"
+      responses:
+        "200":
+          description: Penjualan dibatalkan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Sale"
+        "401":
+          $ref: "#/components/responses/UnauthorizedOrPinInvalid"
+        "403":
+          $ref: "#/components/responses/PinRequired"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+  /api/customers:
+    get:
+      tags: [credit]
+      operationId: searchCustomers
+      summary: Cari pelanggan
+      parameters:
+        - name: q
+          in: query
+          required: false
+          description: Nama atau telepon
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Pelanggan
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Customer"
+    post:
+      tags: [credit]
+      operationId: createCustomer
+      summary: Tambah pelanggan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewCustomer"
+      responses:
+        "201":
+          description: Pelanggan dibuat
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Customer"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
 components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: kasir_session
+  responses:
+    Unauthorized:
+      description: Tidak ada sesi (UNAUTHORIZED)
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    PinInvalid:
+      description: PIN salah (PIN_INVALID)
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    LockedOut:
+      description: Terlalu banyak percobaan PIN (LOCKED_OUT)
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    UnauthorizedOrPinInvalid:
+      description: UNAUTHORIZED atau PIN_INVALID
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    PinRequired:
+      description: PIN pemilik diperlukan (PIN_REQUIRED)
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    NotFound:
+      description: Tidak ditemukan (NOT_FOUND)
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    ShiftAlreadyOpen:
+      description: Shift sudah terbuka (SHIFT_ALREADY_OPEN)
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    ShiftClosed:
+      description: Tidak ada shift terbuka (SHIFT_CLOSED)
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    ValidationFailed:
+      description: Input tidak valid (VALIDATION atau INVALID_QUANTITY)
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
   schemas:
     Health:
       type: object
@@ -76,3 +504,356 @@ components:
           $ref: "#/components/schemas/ErrorCode"
         detail:
           type: string
+    PriceChange:
+      type: object
+      required: [unitId, oldUnitPrice, newUnitPrice]
+      properties:
+        unitId:
+          type: string
+        oldUnitPrice:
+          type: integer
+        newUnitPrice:
+          type: integer
+    PriceChangedProblem:
+      description: Problem PRICE_CHANGED dengan daftar perubahan harga.
+      allOf:
+        - $ref: "#/components/schemas/Problem"
+        - type: object
+          required: [changes]
+          properties:
+            changes:
+              type: array
+              items:
+                $ref: "#/components/schemas/PriceChange"
+    CreditLimitProblem:
+      description: Problem CREDIT_LIMIT dengan saldo, batas, dan nilai kasbon yang dicoba.
+      allOf:
+        - $ref: "#/components/schemas/Problem"
+        - type: object
+          required: [balance, creditLimit, attempted]
+          properties:
+            balance:
+              type: integer
+            creditLimit:
+              type: integer
+            attempted:
+              type: integer
+    User:
+      type: object
+      required: [id, name, role]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+          enum: [kasir, pemilik]
+    Session:
+      type: object
+      required: [user]
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+    PinLoginRequest:
+      type: object
+      required: [userId, pin]
+      properties:
+        userId:
+          type: string
+        pin:
+          type: string
+          pattern: '^\d{6}$'
+    Shift:
+      type: object
+      required: [id, kasirId, kasirName, openedAt, openingCash]
+      properties:
+        id:
+          type: string
+        kasirId:
+          type: string
+        kasirName:
+          type: string
+        openedAt:
+          type: integer
+          format: int64
+        openingCash:
+          type: integer
+    CurrentShift:
+      type: object
+      required: [shift]
+      properties:
+        shift:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/Shift"
+    OpenShiftRequest:
+      type: object
+      required: [openingCash]
+      properties:
+        openingCash:
+          type: integer
+          minimum: 0
+    CloseShiftRequest:
+      type: object
+      required: [countedCash]
+      properties:
+        countedCash:
+          type: integer
+          minimum: 0
+    ShiftClosure:
+      type: object
+      required: [shiftId, openingCash, cashSales, expectedCash, countedCash, difference, salesCount]
+      properties:
+        shiftId:
+          type: string
+        openingCash:
+          type: integer
+        cashSales:
+          type: integer
+        expectedCash:
+          type: integer
+        countedCash:
+          type: integer
+        difference:
+          type: integer
+        salesCount:
+          type: integer
+    KasirSettings:
+      type: object
+      required: [storeName, autoPrint, curahFractions, quickCurahProductIds, qrisImageUrl, allowNegativeStock]
+      properties:
+        storeName:
+          type: string
+        autoPrint:
+          type: boolean
+        curahFractions:
+          type: array
+          description: Pecahan curah dalam qtyBase.
+          items:
+            type: integer
+        quickCurahProductIds:
+          type: array
+          items:
+            type: string
+        qrisImageUrl:
+          type: string
+        allowNegativeStock:
+          type: boolean
+    WholesaleTier:
+      type: object
+      description: Harga grosir berlaku bila qtyBase >= minQty.
+      required: [minQty, price]
+      properties:
+        minQty:
+          type: integer
+        price:
+          type: integer
+    ProductUnit:
+      type: object
+      required: [id, productId, name, unitSize, price, wholesaleTiers, barcodes]
+      properties:
+        id:
+          type: string
+        productId:
+          type: string
+        name:
+          type: string
+        unitSize:
+          type: integer
+          description: Jumlah satuan dasar per satuan jual.
+        price:
+          type: integer
+        wholesaleTiers:
+          type: array
+          items:
+            $ref: "#/components/schemas/WholesaleTier"
+        barcodes:
+          type: array
+          items:
+            type: string
+    Product:
+      type: object
+      required: [id, name, storeCode, isCurah, baseUnit, units]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        storeCode:
+          type: string
+        isCurah:
+          type: boolean
+        baseUnit:
+          type: string
+          enum: [pcs, gram, ml]
+        units:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProductUnit"
+    CatalogMatch:
+      type: object
+      required: [product, unitId]
+      properties:
+        product:
+          $ref: "#/components/schemas/Product"
+        unitId:
+          type: string
+    SaleItemInput:
+      type: object
+      description: |
+        Tepat salah satu dari qtyBase atau amount wajib diisi (ditegakkan server; 422
+        INVALID_QUANTITY bila keduanya ada atau keduanya kosong). amount (nominal rupiah)
+        hanya untuk satuan curah.
+      required: [unitId, expectedUnitPrice]
+      properties:
+        unitId:
+          type: string
+        qtyBase:
+          type: integer
+          minimum: 1
+        amount:
+          type: integer
+          minimum: 1
+        expectedUnitPrice:
+          type: integer
+    PaymentInput:
+      type: object
+      required: [method, amount]
+      properties:
+        method:
+          type: string
+          enum: [cash, qris, credit]
+        amount:
+          type: integer
+          minimum: 1
+    SaleRequest:
+      type: object
+      required: [saleId, items, payments, print]
+      properties:
+        saleId:
+          type: string
+          description: ID dari klien (idempotensi); saleId yang sama mengembalikan penjualan lama dengan 200.
+        items:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/SaleItemInput"
+        payments:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/PaymentInput"
+        cashReceived:
+          type: integer
+        customerId:
+          type: string
+        print:
+          type: boolean
+        ownerPin:
+          type: string
+          pattern: '^\d{6}$'
+          description: Otorisasi pemilik bila server memintanya.
+    SaleItem:
+      type: object
+      required: [unitId, productName, unitName, isCurah, baseUnit, unitSize, qtyBase, unitPrice, subtotal, wholesale]
+      properties:
+        unitId:
+          type: string
+        productName:
+          type: string
+        unitName:
+          type: string
+        isCurah:
+          type: boolean
+        baseUnit:
+          type: string
+          enum: [pcs, gram, ml]
+        unitSize:
+          type: integer
+        qtyBase:
+          type: integer
+        unitPrice:
+          type: integer
+        subtotal:
+          type: integer
+        wholesale:
+          type: boolean
+    Sale:
+      type: object
+      required: [id, number, createdAt, kasirName, items, total, payments, cashReceived, change, customerId, status, printStatus]
+      properties:
+        id:
+          type: string
+        number:
+          type: string
+        createdAt:
+          type: integer
+          format: int64
+        kasirName:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/SaleItem"
+        total:
+          type: integer
+        payments:
+          type: array
+          items:
+            $ref: "#/components/schemas/PaymentInput"
+        cashReceived:
+          type: integer
+        change:
+          type: integer
+        customerId:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [selesai, dibatalkan]
+        printStatus:
+          $ref: "#/components/schemas/PrintStatus"
+    PrintStatus:
+      type: string
+      enum: [tercetak, tidak_dicetak, gagal]
+    PrintResult:
+      type: object
+      required: [printStatus]
+      properties:
+        printStatus:
+          $ref: "#/components/schemas/PrintStatus"
+    VoidRequest:
+      type: object
+      required: [ownerPin, reason]
+      properties:
+        ownerPin:
+          type: string
+          pattern: '^\d{6}$'
+        reason:
+          type: string
+          minLength: 1
+    Customer:
+      type: object
+      required: [id, name, phone, balance, creditLimit]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        phone:
+          type: string
+        balance:
+          type: integer
+        creditLimit:
+          type: integer
+    NewCustomer:
+      type: object
+      required: [name, phone]
+      properties:
+        name:
+          type: string
+          minLength: 2
+        phone:
+          type: string
+          pattern: '^\d{8,15}$'
