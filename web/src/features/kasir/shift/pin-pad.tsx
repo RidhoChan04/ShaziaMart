@@ -1,16 +1,9 @@
-import {
-  type ComponentProps,
-  type KeyboardEvent,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { type ComponentProps, useEffect, useRef, useState } from "react";
+import { useScanGuard } from "@/shared/hooks/use-scan-guard";
 import { cn } from "@/shared/lib/cn";
 import { Button } from "@/shared/ui/button";
 
 const PIN_LENGTH = 6;
-// Sama dengan detektor scan: ketikan berjarak < 30 ms datang dari scanner, bukan tangan.
-const SCAN_GAP_MS = 30;
 const DIGITS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
 
 type Props = {
@@ -24,8 +17,8 @@ type Props = {
 export function PinPad({ onComplete, pending, error }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [pin, setPin] = useState("");
-  const [scanned, setScanned] = useState(false);
-  const lastDigitAt = useRef(Number.NEGATIVE_INFINITY);
+  // Rentetan scan mengosongkan seluruh PIN, bukan hanya mengembalikan isian sebelumnya.
+  const guard = useScanGuard(() => setPin(""));
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -41,26 +34,11 @@ export function PinPad({ onComplete, pending, error }: Props) {
     }
   };
   const press = (next: string) => {
-    setScanned(false);
+    guard.reset();
     if (!pending) change(next);
     inputRef.current?.focus();
   };
-  // Rentetan cepat (termasuk Enter penutupnya) dibuang seluruhnya.
-  const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    const digit = /^\d$/.test(e.key);
-    if (!digit && e.key !== "Enter") return;
-    const now = performance.now();
-    const burst = now - lastDigitAt.current < SCAN_GAP_MS;
-    if (digit) lastDigitAt.current = now;
-    if (burst) {
-      e.preventDefault();
-      setPin("");
-      setScanned(true);
-    } else if (digit) {
-      setScanned(false);
-    }
-  };
-  const message = scanned ? "Itu barcode, bukan PIN" : error;
+  const message = guard.scanned ? "Itu barcode, bukan PIN" : error;
 
   return (
     <div className="grid justify-items-center gap-4">
@@ -74,7 +52,7 @@ export function PinPad({ onComplete, pending, error }: Props) {
           maxLength={PIN_LENGTH}
           readOnly={pending}
           value={pin}
-          onKeyDown={onKeyDown}
+          onKeyDown={guard.onKeyDown}
           onChange={(e) => change(e.target.value)}
           className="absolute inset-0 opacity-0"
         />

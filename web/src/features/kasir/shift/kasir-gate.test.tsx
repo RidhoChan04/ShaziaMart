@@ -1,5 +1,4 @@
 import { act, screen, waitFor, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { http } from "msw";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { mockDb } from "@/mocks/db";
@@ -7,6 +6,7 @@ import { loginWithShift, post } from "@/mocks/handlers/test-helpers";
 import { server } from "@/mocks/node";
 import { renderApp } from "@/test/render-app";
 import { fillSpecCart } from "@/test/spec-cart";
+import { humanTyping, typingAt } from "@/test/typing";
 import { useCart } from "../cart/cart-store";
 
 vi.mock("@/shared/lib/beep", () => ({ beep: vi.fn() }));
@@ -27,7 +27,7 @@ afterEach(() => {
 });
 
 test("tanpa shift → Buka shift: Rina → PIN 123456 → modal 200.000 → layar kasir", async () => {
-  const user = userEvent.setup();
+  const user = humanTyping();
   renderApp("/kasir");
   expect(
     await screen.findByRole("heading", { name: "Buka shift" }),
@@ -62,7 +62,7 @@ test("tanpa shift → Buka shift: Rina → PIN 123456 → modal 200.000 → laya
 }, 15_000);
 
 test("Ganti kasir kembali ke pilihan kasir", async () => {
-  const user = userEvent.setup();
+  const user = humanTyping();
   renderApp("/kasir");
   await user.click(await screen.findByRole("button", { name: "Budi" }));
   expect(screen.getByText("PIN untuk Budi")).toBeInTheDocument();
@@ -71,7 +71,7 @@ test("Ganti kasir kembali ke pilihan kasir", async () => {
 });
 
 test("PIN salah → 'PIN salah'; 5x → 'Terlalu banyak PIN salah — coba lagi dalam 5 menit'", async () => {
-  const user = userEvent.setup();
+  const user = humanTyping();
   renderApp("/kasir");
   await user.click(await screen.findByRole("button", { name: "Rina" }));
   await typePin("000000");
@@ -92,7 +92,7 @@ test("PIN salah → 'PIN salah'; 5x → 'Terlalu banyak PIN salah — coba lagi 
 });
 
 test("tombol Hapus menghapus digit terakhir", async () => {
-  const user = userEvent.setup();
+  const user = humanTyping();
   renderApp("/kasir");
   await user.click(await screen.findByRole("button", { name: "Rina" }));
   await user.click(screen.getByRole("button", { name: "1" }));
@@ -105,7 +105,7 @@ test("tombol Hapus menghapus digit terakhir", async () => {
 test("klik Kunci → Layar terkunci; PIN benar → kembali, keranjang utuh", async () => {
   await loginWithShift();
   fillSpecCart();
-  const user = userEvent.setup();
+  const user = humanTyping();
   renderApp("/kasir");
   expect(await scanBox()).toBeInTheDocument();
 
@@ -152,7 +152,7 @@ test("idle 5 menit → terkunci (fake timers); aktivitas mereset hitungan", asyn
 
 test("refresh saat terkunci tetap terkunci (sesi kosong, shift ada)", async () => {
   await loginWithShift();
-  const user = userEvent.setup();
+  const user = humanTyping();
   const first = renderApp("/kasir");
   expect(await scanBox()).toBeInTheDocument();
   await user.click(header().getByRole("button", { name: "Kunci" }));
@@ -174,7 +174,7 @@ test("refresh saat terkunci tetap terkunci (sesi kosong, shift ada)", async () =
 test("sesi berakhir di server (401 UNAUTHORIZED) → Layar terkunci", async () => {
   await loginWithShift();
   fillSpecCart();
-  const user = userEvent.setup();
+  const user = humanTyping();
   renderApp("/kasir");
   expect(await scanBox()).toBeInTheDocument();
   await post("/api/auth/logout", {});
@@ -198,7 +198,7 @@ test("sesi berakhir di server (401 UNAUTHORIZED) → Layar terkunci", async () =
 test("tutup shift ditolak saat keranjang berisi", async () => {
   await loginWithShift();
   fillSpecCart();
-  const user = userEvent.setup();
+  const user = humanTyping();
   renderApp("/kasir");
   expect(await scanBox()).toBeInTheDocument();
   await user.click(header().getByRole("button", { name: "Tutup shift" }));
@@ -214,7 +214,7 @@ test("tutup shift ditolak saat keranjang berisi", async () => {
 
 test("batal tutup shift (Esc) → kursor kembali ke kolom scan", async () => {
   await loginWithShift();
-  const user = userEvent.setup();
+  const user = humanTyping();
   renderApp("/kasir");
   const scan = await scanBox();
   await user.click(header().getByRole("button", { name: "Tutup shift" }));
@@ -227,7 +227,7 @@ test("batal tutup shift (Esc) → kursor kembali ke kolom scan", async () => {
 
 test("hasil tutup shift bertahan walau gerbang dimuat ulang; Selesai → Buka shift", async () => {
   await loginWithShift(200_000);
-  const user = userEvent.setup();
+  const user = humanTyping();
   const { queryClient } = renderApp("/kasir");
   expect(await scanBox()).toBeInTheDocument();
   await user.click(header().getByRole("button", { name: "Tutup shift" }));
@@ -267,17 +267,8 @@ function countPinLogins() {
   return calls;
 }
 
-/** Jeda antar-tombol persis: hanya `performance.now()` yang dipalsukan. */
-function typingAt(gapMs: number) {
-  if (!vi.isFakeTimers()) vi.useFakeTimers({ toFake: ["performance"] });
-  return userEvent.setup({
-    delay: gapMs,
-    advanceTimers: (ms) => vi.advanceTimersByTime(ms),
-  });
-}
-
 /** PIN diketik dengan kecepatan tangan manusia. */
-const typePin = (value: string) => typingAt(60).type(pin(), value);
+const typePin = (value: string) => humanTyping().type(pin(), value);
 
 async function renderLocked() {
   await loginWithShift();

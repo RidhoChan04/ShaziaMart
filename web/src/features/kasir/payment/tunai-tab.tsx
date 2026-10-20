@@ -1,11 +1,13 @@
 import { useId } from "react";
+import { useScanGuard } from "@/shared/hooks/use-scan-guard";
 import { cn } from "@/shared/lib/cn";
 import { quickCashOptions } from "@/shared/lib/denominations";
 import { formatAngka, formatRupiah, parseRupiah } from "@/shared/lib/money";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
+import { ScannedAlert } from "../shared/scanned-alert";
 
-/** Kolom uang dengan awalan "Rp"; teks tampil apa adanya, diparse oleh model. */
+/** Kolom uang dengan awalan "Rp"; teks tampil apa adanya, diparse oleh model. Rentetan scan ditolak. */
 export function MoneyField({
   label,
   value,
@@ -16,6 +18,7 @@ export function MoneyField({
   onChange: (text: string) => void;
 }) {
   const id = useId();
+  const guard = useScanGuard(onChange);
   return (
     <div className="grid gap-1">
       <label htmlFor={id} className="text-xs text-muted">
@@ -30,10 +33,12 @@ export function MoneyField({
           inputMode="numeric"
           autoComplete="off"
           value={value}
+          onKeyDown={guard.onKeyDown}
           onChange={(e) => onChange(e.target.value)}
           className="h-14 border-2 border-primary pl-11 text-[22px] font-bold tabular-nums"
         />
       </div>
+      <ScannedAlert show={guard.scanned} />
     </div>
   );
 }

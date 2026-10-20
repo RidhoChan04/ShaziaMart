@@ -1,6 +1,6 @@
 import "@testing-library/jest-dom/vitest";
 import { cleanup, configure } from "@testing-library/react";
-import { afterAll, afterEach, beforeAll } from "vitest";
+import { afterAll, afterEach, beforeAll, vi } from "vitest";
 import { __resetMockDbCacheForTests } from "@/mocks/db";
 import { __resetSalesScenarioForTests } from "@/mocks/handlers/sales";
 import { server } from "@/mocks/node";
@@ -17,6 +17,7 @@ beforeAll(() => {
 
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   server.resetHandlers();
   localStorage.clear();
   history.replaceState(null, "", "/");

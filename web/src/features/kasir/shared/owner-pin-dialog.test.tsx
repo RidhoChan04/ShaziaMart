@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { expect, test, vi } from "vitest";
+import { humanTyping, scannerTyping } from "@/test/typing";
 import { OwnerPinDialog } from "./owner-pin-dialog";
 
 function setup(props: Partial<Parameters<typeof OwnerPinDialog>[0]> = {}) {
@@ -16,7 +16,7 @@ function setup(props: Partial<Parameters<typeof OwnerPinDialog>[0]> = {}) {
       {...props}
     />,
   );
-  return { user: userEvent.setup(), onSubmit, onCancel };
+  return { user: humanTyping(), onSubmit, onCancel };
 }
 
 const pin = () => screen.getByLabelText("PIN");
@@ -68,4 +68,18 @@ test("pending: tombol nonaktif dan Esc tidak membatalkan", async () => {
   await user.keyboard("{Escape}");
   expect(onCancel).not.toHaveBeenCalled();
   expect(onSubmit).not.toHaveBeenCalled();
+});
+
+test("scan di kolom PIN: rentetan dibuang, Enter penutupnya tidak mengirim", async () => {
+  const { user, onSubmit } = setup();
+  await user.type(pin(), "99999");
+  await scannerTyping().type(pin(), "8991002101234{Enter}");
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "Itu barcode, bukan angka",
+  );
+  expect(pin()).toHaveValue("99999");
+  expect(onSubmit).not.toHaveBeenCalled();
+  await user.type(pin(), "9{Enter}");
+  expect(screen.queryByRole("alert")).toBeNull();
+  expect(onSubmit).toHaveBeenCalledExactlyOnceWith("999999");
 });

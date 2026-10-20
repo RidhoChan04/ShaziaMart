@@ -1,11 +1,13 @@
 import { screen, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { http } from "msw";
 import { useState } from "react";
 import { beforeEach, expect, test, vi } from "vitest";
 import { mockDb } from "@/mocks/db";
 import { loginWithShift } from "@/mocks/handlers/test-helpers";
+import { server } from "@/mocks/node";
 import type { ShiftClosure } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { renderWithQuery } from "@/test/render-app";
+import { humanTyping, scannerTyping } from "@/test/typing";
 import { CloseShiftDialog } from "./close-shift-dialog";
 import { ShiftClosureDialog } from "./shift-closure-dialog";
 
@@ -33,7 +35,7 @@ function Harness({ onDone }: { onDone: () => void }) {
 }
 
 function setup() {
-  const user = userEvent.setup();
+  const user = humanTyping();
   const onClose = vi.fn();
   renderWithQuery(<Harness onDone={onClose} />);
   const ui = within(screen.getByRole("dialog", { name: "Tutup shift" }));
@@ -97,4 +99,26 @@ test("uang fisik tidak valid → tombol nonaktif", async () => {
   await user.clear(counted());
   await user.type(counted(), "0");
   expect(submit()).toBeEnabled();
+});
+
+test("scan di Uang fisik di laci: rentetan dibuang, Enter penutupnya tidak menutup shift", async () => {
+  const closes = { n: 0 };
+  server.use(
+    http.post("/api/shifts/current/close", () => {
+      closes.n += 1;
+    }),
+  );
+  const { user, ui, counted } = setup();
+  await user.type(counted(), "345.000");
+  await scannerTyping().type(counted(), "8991002101234{Enter}");
+
+  expect(ui.getByRole("alert")).toHaveTextContent("Itu barcode, bukan angka");
+  expect(counted()).toHaveValue("345.000");
+  await new Promise((r) => setTimeout(r, 50));
+  expect(closes.n).toBe(0);
+  expect(mockDb.get().shift).not.toBeNull();
+
+  await user.type(counted(), "{Enter}");
+  expect(await screen.findByText("Uang seharusnya")).toBeInTheDocument();
+  expect(closes.n).toBe(1);
 });

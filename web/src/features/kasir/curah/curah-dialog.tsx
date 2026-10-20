@@ -4,6 +4,7 @@ import type {
   CatalogMatch,
   ProductUnit,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
+import { useScanGuard } from "@/shared/hooks/use-scan-guard";
 import { cn } from "@/shared/lib/cn";
 import { formatAngka, formatRupiah, parseRupiah } from "@/shared/lib/money";
 import { priceLine } from "@/shared/lib/pricing";
@@ -19,6 +20,7 @@ import {
 import { Input } from "@/shared/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs";
 import { useCart } from "../cart/cart-store";
+import { ScannedAlert } from "../shared/scanned-alert";
 
 type Mode = "berat" | "nominal";
 type Unit = Pick<ProductUnit, "price" | "unitSize" | "wholesaleTiers">;
@@ -71,6 +73,8 @@ function CurahForm({
   const [berat, setBerat] = useState("");
   const [nominal, setNominal] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+  // Satu penjaga untuk kedua kolom: hanya kolom mode aktif yang tampil.
+  const guard = useScanGuard(mode === "berat" ? setBerat : setNominal);
 
   const unit = match.product.units.find((u) => u.id === match.unitId);
   // Tab/ fokus: input aktif selalu terfokus saat mode berganti.
@@ -124,6 +128,7 @@ function CurahForm({
               inputMode="decimal"
               autoComplete="off"
               value={berat}
+              onKeyDown={guard.onKeyDown}
               onChange={(e) => setBerat(e.target.value)}
               className="h-14 border-2 border-primary pr-12 text-2xl font-bold tabular-nums"
             />
@@ -172,6 +177,7 @@ function CurahForm({
               inputMode="numeric"
               autoComplete="off"
               value={nominal}
+              onKeyDown={guard.onKeyDown}
               onChange={(e) => setNominal(e.target.value)}
               className="h-14 border-2 border-primary pl-11 text-2xl font-bold tabular-nums"
             />
@@ -183,6 +189,7 @@ function CurahForm({
           )}
         </TabsContent>
       </Tabs>
+      <ScannedAlert show={guard.scanned} />
       <div className="flex items-baseline justify-between rounded-lg bg-success-soft px-3 py-2.5">
         <span className="font-semibold text-primary">HARGA</span>
         <span className="text-[22px] font-extrabold text-primary tabular-nums">

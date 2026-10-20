@@ -1,10 +1,10 @@
 import { act, screen, waitFor, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { beforeEach, expect, test, vi } from "vitest";
 import { createSeedState } from "@/mocks/seed-data";
 import type { CatalogMatch } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { renderWithQuery } from "@/test/render-app";
+import { humanTyping, scannerTyping } from "@/test/typing";
 import { useCart } from "../cart/cart-store";
 import { cartLineView } from "../cart/cart-view";
 import { CurahDialog } from "./curah-dialog";
@@ -24,7 +24,7 @@ const minyak = () => matchOf("2004");
 function setup(match: CatalogMatch = gula()) {
   const onClose = vi.fn();
   renderWithQuery(<CurahDialog match={match} onClose={onClose} />);
-  return { user: userEvent.setup(), onClose };
+  return { user: humanTyping(), onClose };
 }
 
 const masukkan = () => screen.getByRole("button", { name: "Masukkan" });
@@ -117,7 +117,7 @@ test("Enter pada nilai tidak valid tidak menambah; Esc menutup", async () => {
 });
 
 test("ganti barang saat dialog terbuka → isian & tab direset", async () => {
-  const user = userEvent.setup();
+  const user = humanTyping();
   let swap: () => void = () => {};
   function Swap() {
     const [m, setM] = useState(gula());
@@ -148,3 +148,26 @@ test("nominal Rp1 (0 g) → Masukkan nonaktif, Enter tidak menambah", async () =
   expect(screen.getByText("HARGA").parentElement).toHaveTextContent("—");
   expect(useCart.getState().lines).toHaveLength(0);
 });
+
+test.each([
+  ["Berat (kg)", "1,5"],
+  ["Nominal (Rp)", "20000"],
+])(
+  "scan di %s: rentetan dibuang, Enter penutupnya tidak memasukkan",
+  async (name, value) => {
+    const { user, onClose } = setup();
+    await user.click(screen.getByRole("tab", { name }));
+    const field = screen.getByRole("textbox", { name });
+    await user.type(field, value);
+    await scannerTyping().type(field, "8992761111014{Enter}");
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Itu barcode, bukan angka",
+    );
+    expect(field).toHaveValue(value);
+    expect(useCart.getState().lines).toHaveLength(0);
+    expect(onClose).not.toHaveBeenCalled();
+    await user.type(field, "{Enter}");
+    expect(useCart.getState().lines).toHaveLength(1);
+  },
+);

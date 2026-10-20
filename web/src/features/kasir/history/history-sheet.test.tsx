@@ -1,11 +1,11 @@
 import { screen, waitFor, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, test, vi } from "vitest";
 import { mockDb } from "@/mocks/db";
 import { loginWithShift } from "@/mocks/handlers/test-helpers";
 import { setScenario } from "@/mocks/scenarios";
 import type { Sale } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { renderWithQuery } from "@/test/render-app";
+import { humanTyping } from "@/test/typing";
 import { HistorySheet } from "./history-sheet";
 
 function makeSale(n: number, over: Partial<Sale> = {}): Sale {
@@ -49,7 +49,7 @@ beforeEach(async () => {
 function setup() {
   const onClose = vi.fn();
   renderWithQuery(<HistorySheet open onClose={onClose} />);
-  return { user: userEvent.setup(), onClose };
+  return { user: humanTyping(), onClose };
 }
 
 const row = (n: number) =>

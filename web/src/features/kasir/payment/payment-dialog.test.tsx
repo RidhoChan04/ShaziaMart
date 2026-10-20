@@ -5,7 +5,6 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { delay, HttpResponse, http } from "msw";
 import { beforeEach, expect, test, vi } from "vitest";
 import { mockDb } from "@/mocks/db";
@@ -13,57 +12,11 @@ import { loginWithShift } from "@/mocks/handlers/test-helpers";
 import { server } from "@/mocks/node";
 import { setScenario } from "@/mocks/scenarios";
 import { getListTodaySalesQueryKey } from "@/shared/api/gen/sales/sales";
-import type { SaleRequest } from "@/shared/api/gen/shaziaMartAPI.schemas";
-import { renderWithQuery } from "@/test/render-app";
-import { fillSpecCart, seedMatch } from "@/test/spec-cart";
+import { openPay, panelChange, payDialog, trackSales } from "@/test/payment";
+import { fillSpecCart } from "@/test/spec-cart";
 import { useCart } from "../cart/cart-store";
-import { KasirScreen } from "../screen/kasir-screen";
 
 vi.mock("@/shared/lib/beep", () => ({ beep: vi.fn() }));
-
-const BIMOLI = "Minyak Goreng Bimoli 2 L";
-
-/** Catat body setiap POST /api/sales, lalu teruskan ke handler mock. */
-function trackSales(wait = 0) {
-  const bodies: SaleRequest[] = [];
-  server.use(
-    http.post("/api/sales", async ({ request }) => {
-      bodies.push((await request.clone().json()) as SaleRequest);
-      if (wait > 0) await delay(wait);
-    }),
-  );
-  return bodies;
-}
-
-function addBimoli() {
-  act(() => useCart.getState().addUnit(seedMatch(BIMOLI)));
-}
-
-async function openPay(fill: () => void = addBimoli) {
-  fill();
-  const user = userEvent.setup();
-  const { queryClient } = renderWithQuery(<KasirScreen />);
-  const scan = screen.getByRole("combobox", {
-    name: "Scan barcode / ketik nama atau kode",
-  });
-  const bayar = screen.getByRole("button", { name: "Bayar" });
-  await waitFor(() => expect(bayar).toBeEnabled());
-  await user.click(bayar);
-  const dialog = await screen.findByRole("dialog", { name: "Pembayaran" });
-  const ui = within(dialog);
-  return {
-    user,
-    queryClient,
-    scan,
-    dialog,
-    ui,
-    selesai: () => ui.getByRole("button", { name: "Selesai" }),
-    received: () => ui.getByRole("textbox", { name: "UANG DITERIMA" }),
-  };
-}
-
-const payDialog = () => screen.queryByRole("dialog", { name: "Pembayaran" });
-const panelChange = () => screen.getByRole("status");
 
 beforeEach(async () => {
   useCart.setState(useCart.getInitialState(), true);

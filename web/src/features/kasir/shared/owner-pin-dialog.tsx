@@ -1,4 +1,5 @@
 import { useId, useState } from "react";
+import { useScanGuard } from "@/shared/hooks/use-scan-guard";
 import { Button } from "@/shared/ui/button";
 import {
   Dialog,
@@ -9,6 +10,7 @@ import {
   DialogTitle,
 } from "@/shared/ui/dialog";
 import { Input } from "@/shared/ui/input";
+import { ScannedAlert } from "./scanned-alert";
 
 const PIN_LENGTH = 6;
 
@@ -33,6 +35,7 @@ function PinForm({
   const reasonId = useId();
   const [pin, setPin] = useState("");
   const [reason, setReason] = useState("");
+  const guard = useScanGuard(setPin);
   const ready =
     pin.length === PIN_LENGTH && (!requireReason || reason.trim() !== "");
 
@@ -56,6 +59,7 @@ function PinForm({
         autoComplete="off"
         maxLength={PIN_LENGTH}
         value={pin}
+        onKeyDown={guard.onKeyDown}
         onChange={(e) =>
           setPin(e.target.value.replace(/\D/g, "").slice(0, PIN_LENGTH))
         }
@@ -75,7 +79,8 @@ function PinForm({
           />
         </>
       )}
-      {error && (
+      <ScannedAlert show={guard.scanned} />
+      {error && !guard.scanned && (
         <p role="alert" className="text-sm font-medium text-danger">
           {error}
         </p>
