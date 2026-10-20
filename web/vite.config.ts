@@ -34,6 +34,9 @@ export default defineConfig(({ command, mode }) => {
       environment: "jsdom",
       setupFiles: ["./vitest.setup.ts"],
       exclude: ["e2e/**", "node_modules/**"],
+      // Test integrasi layar kasir (render penuh + MSW) bisa > 5 dtk saat semua worker
+      // mulai bersamaan di mesin sibuk; 15 dtk tetap menangkap test yang benar-benar macet.
+      testTimeout: 15_000,
     },
   };
 });

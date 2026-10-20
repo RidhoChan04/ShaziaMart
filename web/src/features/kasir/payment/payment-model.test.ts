@@ -1,11 +1,13 @@
 import { act } from "@testing-library/react";
 import { beforeEach, describe, expect, test } from "vitest";
+import type { Sale, SaleRequest } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { fillSpecCart, seedMatch } from "@/test/spec-cart";
 import { useCart } from "../cart/cart-store";
 import {
   buildSaleRequest,
   type PaymentDraft,
   paymentState,
+  saleMatchesRequest,
 } from "./payment-model";
 
 const unitId = (name: string) => seedMatch(name).unitId;
@@ -252,5 +254,46 @@ describe("paymentState", () => {
         customerId: "c2",
       });
     });
+  });
+});
+
+describe("saleMatchesRequest", () => {
+  const request: Pick<SaleRequest, "payments"> = {
+    payments: [
+      { method: "cash", amount: 20000 },
+      { method: "credit", amount: 16000 },
+    ],
+  };
+  const sale = (patch: Partial<Sale>): Pick<Sale, "total" | "payments"> => ({
+    total: 36000,
+    payments: request.payments,
+    ...patch,
+  });
+
+  test.each([
+    ["sama persis", sale({}), true],
+    [
+      "urutan pembayaran beda",
+      sale({ payments: [...request.payments].reverse() }),
+      true,
+    ],
+    ["total beda", sale({ total: 39100 }), false],
+    [
+      "nominal beda",
+      sale({
+        payments: [
+          { method: "cash", amount: 23100 },
+          { method: "credit", amount: 16000 },
+        ],
+      }),
+      false,
+    ],
+    [
+      "metode beda",
+      sale({ payments: [{ method: "qris", amount: 36000 }] }),
+      false,
+    ],
+  ])("%s → %s", (_name, stored, expected) => {
+    expect(saleMatchesRequest(stored, request)).toBe(expected);
   });
 });

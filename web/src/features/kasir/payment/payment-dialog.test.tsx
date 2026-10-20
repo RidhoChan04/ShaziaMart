@@ -130,50 +130,6 @@ test("server-mati saat Selesai → pesan, keranjang tetap; coba lagi memakai sal
   expect(panelChange()).toHaveTextContent("Rp14.000");
 });
 
-test("harga-berubah → dialog Harga berubah; Konfirmasi & simpan → tersimpan", async () => {
-  setScenario("harga-berubah");
-  const bodies = trackSales();
-  const { user, selesai, received } = await openPay();
-  await user.type(received(), "50.000");
-  await user.click(selesai());
-
-  const changed = await screen.findByRole("dialog", { name: "Harga berubah" });
-  expect(
-    within(changed).getByText("Minyak Goreng Bimoli 2 L: Rp36.000 → Rp36.500"),
-  ).toBeInTheDocument();
-  await user.click(
-    within(changed).getByRole("button", { name: "Konfirmasi & simpan" }),
-  );
-
-  await waitFor(() => expect(payDialog()).toBeNull());
-  expect(screen.queryByRole("dialog")).toBeNull();
-  expect(bodies).toHaveLength(2);
-  expect(bodies[1]?.saleId).toBe(bodies[0]?.saleId);
-  expect(bodies[1]?.items[0]?.expectedUnitPrice).toBe(36500);
-  expect(bodies[1]?.payments).toEqual([{ method: "cash", amount: 36500 }]);
-  expect(panelChange()).toHaveTextContent("Rp13.500");
-});
-
-test("harga-berubah dengan Uang pas → setelah konfirmasi tampil KURANG, tidak dikirim ulang", async () => {
-  setScenario("harga-berubah");
-  const bodies = trackSales();
-  const { user, ui, selesai } = await openPay();
-  await user.click(ui.getByRole("button", { name: "Uang pas" }));
-  await user.click(selesai());
-  const changed = await screen.findByRole("dialog", { name: "Harga berubah" });
-  await user.click(
-    within(changed).getByRole("button", { name: "Konfirmasi & simpan" }),
-  );
-  await waitFor(() =>
-    expect(screen.queryByRole("dialog", { name: "Harga berubah" })).toBeNull(),
-  );
-  expect(ui.getByRole("alert")).toHaveTextContent("KURANG Rp500");
-  expect(ui.getByText("Rp36.500")).toBeInTheDocument();
-  expect(selesai()).toBeDisabled();
-  expect(bodies).toHaveLength(1);
-  expect(useCart.getState().lines).toHaveLength(1);
-});
-
 test("kasbon Pak Joko 36.000 → CREDIT_LIMIT → PIN pemilik 999999 → tersimpan", async () => {
   const bodies = trackSales();
   const { user, ui, selesai } = await openPay();

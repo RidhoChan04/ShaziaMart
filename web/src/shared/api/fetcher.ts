@@ -65,17 +65,29 @@ function toApiError(
   return new ApiError({ status, code: "INTERNAL", body });
 }
 
+// Request macet (server hidup tapi tidak menjawab) tidak boleh mengunci layar kasir.
+const TIMEOUT_MS = 15_000;
+
 /**
  * Mutator orval (httpClient: fetch). Sukses (2xx) mengembalikan body hasil parse
  * (`undefined` bila kosong, mis. 204); respons non-2xx dilempar sebagai ApiError.
+ * Gagal jaringan, batal, atau tanpa jawaban 15 dtk menjadi ApiError NETWORK.
  */
 export const customFetch = async <T>(
   url: string,
   init: RequestInit,
 ): Promise<T> => {
+  // setTimeout biasa (bukan AbortSignal.timeout) agar bisa dihentikan setelah selesai dan dites.
+  const timeout = new AbortController();
+  const timer = setTimeout(() => timeout.abort(), TIMEOUT_MS);
+  const signal = init.signal
+    ? AbortSignal.any([init.signal, timeout.signal])
+    : timeout.signal;
   let res: Response;
+  let body: unknown;
   try {
-    res = await fetch(url, init);
+    res = await fetch(url, { ...init, signal });
+    body = await readBody(res, res.headers.get("content-type") ?? "");
   } catch (cause) {
     throw new ApiError({
       status: 0,
@@ -83,11 +95,13 @@ export const customFetch = async <T>(
       message:
         cause instanceof Error ? cause.message : "Gagal terhubung ke server",
     });
+  } finally {
+    clearTimeout(timer);
   }
 
-  const contentType = res.headers.get("content-type") ?? "";
-  const body = await readBody(res, contentType);
-  if (!res.ok) throw toApiError(res.status, contentType, body);
+  if (!res.ok) {
+    throw toApiError(res.status, res.headers.get("content-type") ?? "", body);
+  }
   return body as T;
 };
 

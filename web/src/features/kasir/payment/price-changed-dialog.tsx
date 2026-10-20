@@ -11,15 +11,22 @@ import {
 } from "@/shared/ui/dialog";
 import type { CartLine } from "../cart/cart-store";
 
-/** 409 PRICE_CHANGED: tampilkan harga lama → baru; konfirmasi menyimpan ulang dengan saleId yang sama. */
+/** Satu baris per satuan walau server mengirim ganda (kontrak: satu per unitId). */
+const perUnit = (changes: readonly PriceChange[]) =>
+  changes.filter(
+    (c, i) => changes.findIndex((x) => x.unitId === c.unitId) === i,
+  );
+
+/** 409 PRICE_CHANGED: harga lama → baru dan total lama → baru; konfirmasi menerapkan harga baru. */
 export function PriceChangedDialog({
-  changes,
+  prompt,
   lines,
   pending,
   onConfirm,
   onCancel,
 }: {
-  changes: PriceChange[] | null;
+  /** Total dihitung saat 409 diterima, agar tidak bergeser setelah harga diterapkan. */
+  prompt: { changes: PriceChange[]; oldTotal: number; newTotal: number } | null;
   lines: readonly CartLine[];
   pending: boolean;
   onConfirm: () => void;
@@ -30,7 +37,7 @@ export function PriceChangedDialog({
 
   return (
     <Dialog
-      open={changes !== null}
+      open={prompt !== null}
       onOpenChange={(open) => {
         if (!open && !pending) onCancel();
       }}
@@ -43,12 +50,20 @@ export function PriceChangedDialog({
           </DialogDescription>
         </DialogHeader>
         <ul className="grid gap-1 tabular-nums">
-          {changes?.map((c) => (
-            <li key={c.unitId}>
-              {`${nameOf(c.unitId)}: ${formatRupiah(c.oldUnitPrice)} → ${formatRupiah(c.newUnitPrice)}`}
-            </li>
-          ))}
+          {prompt &&
+            perUnit(prompt.changes).map((c) => (
+              <li key={c.unitId}>
+                {`${nameOf(c.unitId)}: ${formatRupiah(c.oldUnitPrice)} → ${formatRupiah(c.newUnitPrice)}`}
+              </li>
+            ))}
         </ul>
+        {prompt && (
+          <p className="flex flex-wrap gap-x-2 tabular-nums">
+            <span className="text-muted">{`Total lama ${formatRupiah(prompt.oldTotal)}`}</span>
+            <span aria-hidden>→</span>
+            <span className="font-bold">{`Total baru ${formatRupiah(prompt.newTotal)}`}</span>
+          </p>
+        )}
         <DialogFooter>
           <Button variant="outline" onClick={onCancel} disabled={pending}>
             Batal

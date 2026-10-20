@@ -1,5 +1,6 @@
 import type {
   PaymentInput,
+  Sale,
   SaleItemInput,
   SaleRequest,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
@@ -187,4 +188,22 @@ export function buildSaleRequest(
     print,
     ...(ownerPin === undefined ? {} : { ownerPin }),
   };
+}
+
+const paymentKey = (payments: readonly PaymentInput[]) =>
+  payments
+    .map((p) => `${p.method}:${p.amount}`)
+    .sort()
+    .join(",");
+
+/** Penjualan yang dikembalikan server sama dengan yang dikirim (total & pembayaran). */
+export function saleMatchesRequest(
+  sale: Pick<Sale, "total" | "payments">,
+  request: Pick<SaleRequest, "payments">,
+): boolean {
+  const requested = request.payments.reduce((sum, p) => sum + p.amount, 0);
+  return (
+    sale.total === requested &&
+    paymentKey(sale.payments) === paymentKey(request.payments)
+  );
 }

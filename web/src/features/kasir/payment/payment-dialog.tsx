@@ -14,7 +14,6 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs";
 import { useCart } from "../cart/cart-store";
 import { cartSummary } from "../cart/cart-view";
-import { OwnerPinDialog } from "../shared/owner-pin-dialog";
 import { CampuranFields } from "./campuran-tab";
 import { KasbonFields } from "./kasbon-tab";
 import {
@@ -22,8 +21,8 @@ import {
   type PaymentDraft,
   paymentState,
 } from "./payment-model";
-import { PriceChangedDialog } from "./price-changed-dialog";
 import { QrisPanel } from "./qris-tab";
+import { SalePrompts } from "./sale-prompts";
 import { CashFields } from "./tunai-tab";
 import { useSubmitSale } from "./use-submit-sale";
 
@@ -95,7 +94,6 @@ function PaymentSession({ onClose, onPaid }: Props) {
   const sale = useSubmitSale(onPaid);
   const busy = sale.pending;
   const canSubmit = state.canSubmit && !busy && online;
-  const { prompt } = sale;
 
   function submit() {
     if (canSubmit && state.choice) sale.submit(state.choice, print);
@@ -191,6 +189,11 @@ function PaymentSession({ onClose, onPaid }: Props) {
                   {sale.error}
                 </p>
               )}
+              {sale.notice && (
+                <p role="status" className="text-sm font-medium text-warning">
+                  {sale.notice}
+                </p>
+              )}
               <div className="flex items-center justify-between">
                 <label className="flex h-11 cursor-pointer items-center gap-2 text-muted">
                   <input
@@ -203,6 +206,14 @@ function PaymentSession({ onClose, onPaid }: Props) {
                   />
                   Cetak struk
                 </label>
+                {!online && !sale.error && (
+                  <p
+                    role="status"
+                    className="ml-auto pr-3 text-sm font-medium text-danger"
+                  >
+                    Server tidak tersambung — coba lagi
+                  </p>
+                )}
                 <Button
                   type="submit"
                   size="lg"
@@ -217,31 +228,15 @@ function PaymentSession({ onClose, onPaid }: Props) {
           </form>
         </DialogContent>
       </Dialog>
-      <PriceChangedDialog
-        changes={prompt.kind === "priceChanged" ? prompt.changes : null}
+      <SalePrompts
+        sale={sale}
         lines={lines}
-        pending={busy}
-        onConfirm={() =>
-          sale.confirmPrices(
-            () =>
-              paymentState(
-                cartSummary(useCart.getState().lines).total,
-                draftOf(tab, fields),
-              ).choice,
-          )
+        rechoose={() =>
+          paymentState(
+            cartSummary(useCart.getState().lines).total,
+            draftOf(tab, fields),
+          ).choice
         }
-        onCancel={sale.dismissPrompt}
-      />
-      <OwnerPinDialog
-        open={prompt.kind === "ownerPin"}
-        title="PIN pemilik"
-        requireReason={false}
-        onSubmit={sale.confirmPin}
-        onCancel={sale.dismissPrompt}
-        error={
-          prompt.kind === "ownerPin" ? (prompt.error ?? undefined) : undefined
-        }
-        pending={busy}
       />
     </>
   );

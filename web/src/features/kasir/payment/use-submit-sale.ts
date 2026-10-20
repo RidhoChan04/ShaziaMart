@@ -12,17 +12,32 @@ import {
   readProblem,
 } from "@/shared/api/problem";
 import { pesanError } from "@/shared/lib/error-messages";
+import { withPriceChanges } from "../cart/cart-helpers";
 import { useCart } from "../cart/cart-store";
-import { buildSaleRequest, type PaymentChoice } from "./payment-model";
+import { cartSummary } from "../cart/cart-view";
+import {
+  buildSaleRequest,
+  type PaymentChoice,
+  saleMatchesRequest,
+} from "./payment-model";
 
 export type SubmitPrompt =
   | { kind: "none" }
-  | { kind: "priceChanged"; changes: PriceChange[] }
-  | { kind: "ownerPin"; error: string | null };
+  | {
+      kind: "priceChanged";
+      changes: PriceChange[];
+      oldTotal: number;
+      newTotal: number;
+    }
+  | { kind: "ownerPin"; error: string | null }
+  | { kind: "replayed"; sale: Sale };
+
+export type SaleSubmission = ReturnType<typeof useSubmitSale>;
 
 type Attempt = { choice: PaymentChoice; print: boolean; ownerPin?: string };
 
 const NONE: SubmitPrompt = { kind: "none" };
+const TOTAL_CHANGED = "Total berubah — periksa pembayaran";
 
 /**
  * Kirim penjualan dari keranjang. Satu request sekaligus; `saleId` keranjang dipakai
@@ -37,11 +52,19 @@ export function useSubmitSale(onPaid: (sale: Sale) => void) {
   const last = useRef<Attempt | null>(null);
   const [prompt, setPrompt] = useState<SubmitPrompt>(NONE);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   function fail(err: unknown, attempt: Attempt) {
     const priceChanged = readProblem(err, priceChangedProblemSchema);
     if (priceChanged) {
-      setPrompt({ kind: "priceChanged", changes: priceChanged.changes });
+      const { changes } = priceChanged;
+      const { lines } = useCart.getState();
+      setPrompt({
+        kind: "priceChanged",
+        changes,
+        oldTotal: cartSummary(lines).total,
+        newTotal: cartSummary(withPriceChanges(lines, changes)).total,
+      });
       return;
     }
     if (readProblem(err, creditLimitProblemSchema)) {
@@ -57,56 +80,81 @@ export function useSubmitSale(onPaid: (sale: Sale) => void) {
     setError(pesanError(err));
   }
 
+  /** Penjualan tersimpan: keranjang selesai dengan kembalian dari server. */
+  function finish(sale: Sale) {
+    setPrompt(NONE);
+    void client.invalidateQueries({ queryKey: getListTodaySalesQueryKey() });
+    useCart.getState().completeSale(sale.change);
+    if (sale.printStatus === "gagal") {
+      toast.error("Struk gagal dicetak — cetak ulang dari Riwayat");
+    }
+    onPaid(sale);
+  }
+
   function send(attempt: Attempt) {
     if (inFlight.current) return;
     inFlight.current = true;
     last.current = attempt;
     setError(null);
+    setNotice(null);
     if (attempt.ownerPin !== undefined)
       setPrompt({ kind: "ownerPin", error: null });
-    const body = buildSaleRequest(
-      useCart.getState(),
-      attempt.choice,
-      attempt.print,
-      attempt.ownerPin,
-    );
-    mutate(
-      { data: body },
-      {
-        onSuccess: (sale) => {
-          setPrompt(NONE);
-          void client.invalidateQueries({
-            queryKey: getListTodaySalesQueryKey(),
-          });
-          useCart.getState().completeSale(sale.change);
-          if (sale.printStatus === "gagal") {
-            toast.error("Struk gagal dicetak — cetak ulang dari Riwayat");
-          }
-          onPaid(sale);
+    try {
+      const body = buildSaleRequest(
+        useCart.getState(),
+        attempt.choice,
+        attempt.print,
+        attempt.ownerPin,
+      );
+      mutate(
+        { data: body },
+        {
+          // saleId yang sama dengan isi lain (jawaban sebelumnya hilang): yang tersimpan yang benar.
+          onSuccess: (sale) =>
+            saleMatchesRequest(sale, body)
+              ? finish(sale)
+              : setPrompt({ kind: "replayed", sale }),
+          onError: (err) => fail(err, attempt),
+          onSettled: () => {
+            inFlight.current = false;
+          },
         },
-        onError: (err) => fail(err, attempt),
-        onSettled: () => {
-          inFlight.current = false;
-        },
-      },
-    );
+      );
+    } catch (err) {
+      inFlight.current = false;
+      fail(err, attempt);
+    }
   }
 
   return {
     prompt,
     error,
+    /** Keterangan non-error di jendela bayar, mis. total berubah. */
+    notice,
     pending: isPending,
     submit: (choice: PaymentChoice, print: boolean) => send({ choice, print }),
-    /** Terapkan harga baru lalu kirim ulang; `rechoose` menilai ulang isian terhadap total baru. */
+    /**
+     * Terapkan harga baru. Hanya tunai yang uangnya masih menutup total baru dikirim
+     * ulang otomatis (`rechoose` menilai ulang isian); QRIS, kasbon, dan campuran
+     * kembali ke jendela bayar agar kasir memeriksa pembayaran dengan total baru.
+     */
     confirmPrices(rechoose: () => PaymentChoice | null) {
       if (prompt.kind !== "priceChanged" || !last.current) return;
       useCart.getState().applyPriceChanges(prompt.changes);
-      const choice = rechoose();
-      if (choice) send({ ...last.current, choice });
-      else setPrompt(NONE);
+      const choice = last.current.choice.kind === "tunai" ? rechoose() : null;
+      if (choice) {
+        send({ ...last.current, choice });
+        return;
+      }
+      setPrompt(NONE);
+      setNotice(TOTAL_CHANGED);
     },
     confirmPin(pin: string) {
       if (last.current) send({ ...last.current, ownerPin: pin });
+    },
+    /** Penjualan lama (replay saleId) diakui kasir: selesaikan keranjang dengan data server. */
+    acceptReplayed() {
+      if (prompt.kind === "replayed") finish(prompt.sale);
     },
     dismissPrompt() {
       if (!inFlight.current) setPrompt(NONE);

@@ -49,6 +49,42 @@ test("gagal jaringan menjadi NETWORK", async () => {
   });
 });
 
+/** fetch palsu yang tidak pernah menjawab; hanya berhenti bila signal dibatalkan. */
+function mockFetchHang() {
+  return vi
+    .spyOn(globalThis, "fetch")
+    .mockImplementation(
+      (_url, init) =>
+        new Promise<Response>((_resolve, reject) =>
+          init?.signal?.addEventListener("abort", () =>
+            reject(init.signal?.reason),
+          ),
+        ),
+    );
+}
+
+test("tanpa jawaban 15 dtk → NETWORK", async () => {
+  vi.useFakeTimers();
+  mockFetchHang();
+  const settled = vi.fn();
+  const result = customFetch("/api/x", {}).catch((e: unknown) => {
+    settled();
+    return e;
+  });
+  await vi.advanceTimersByTimeAsync(14_999);
+  expect(settled).not.toHaveBeenCalled();
+  await vi.advanceTimersByTimeAsync(1);
+  expect(await result).toMatchObject({ status: 0, code: "NETWORK" });
+});
+
+test("signal pemanggil tetap bisa membatalkan → NETWORK", async () => {
+  mockFetchHang();
+  const controller = new AbortController();
+  const result = customFetch("/api/x", { signal: controller.signal });
+  controller.abort();
+  await expect(result).rejects.toMatchObject({ status: 0, code: "NETWORK" });
+});
+
 test("500 non-problem menjadi INTERNAL", async () => {
   mockFetch(500, "oops", "text/plain");
   await expect(customFetch("/api/x", {})).rejects.toMatchObject({
