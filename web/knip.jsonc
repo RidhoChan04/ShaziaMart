@@ -1,0 +1,19 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema-jsonc.json",
+  "entry": ["orval.config.ts", "pwa-assets.config.ts"],
+  "project": ["src/**/*.{ts,tsx}", "e2e/**/*.ts"],
+  "ignore": [
+    // Kode hasil generate orval: jangan dinilai manual.
+    "src/shared/api/gen/**",
+    // Komponen shadcn diperlakukan seperti library: ekspor standarnya boleh tidak terpakai.
+    "src/shared/ui/**"
+  ],
+  "ignoreDependencies": [
+    // Di-import lewat @import di src/app/styles.css; knip tidak membaca CSS.
+    "tailwindcss",
+    "@fontsource-variable/inter",
+    // Dipakai skema zod hasil generate; dipakai langsung mulai rencana F2.
+    "zod"
+  ],
+  "ignoreExportsUsedInFile": true
+}

@@ -25,8 +25,11 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
+      - run: npm run knip
       - run: npm run gen:check
       - run: npm test
+      - run: npm run build
+      - run: npm run size:check
       - run: npx playwright install --with-deps chromium
 
       - id: e2e
