@@ -1,6 +1,7 @@
 import { expect, test } from "vitest";
-import { type MockState, mockDb } from "./db";
+import { __resetMockDbCacheForTests, type MockState, mockDb } from "./db";
 import { rng } from "./seed";
+import { createSeedState } from "./seed-data";
 
 test("mockDb persist dan reset", () => {
   mockDb.update((s) => {
@@ -10,24 +11,28 @@ test("mockDb persist dan reset", () => {
     "X",
   );
   mockDb.reset();
-  expect(mockDb.get().store.name).toBe("ShaziaMart");
+  expect(mockDb.get()).toEqual(createSeedState());
 });
 
 test("JSON rusak di localStorage -> default tanpa melempar", () => {
   localStorage.setItem("mock.db", "{bukan json");
+  __resetMockDbCacheForTests();
   expect(mockDb.get().store.name).toBe("ShaziaMart");
 });
 
-test("JSON bentuk valid di localStorage dimuat lazy", () => {
-  localStorage.setItem(
-    "mock.db",
-    JSON.stringify({ store: { id: "abc", name: "Toko Lain" } }),
-  );
+test("JSON bentuk valid v2 di localStorage dimuat lazy", () => {
+  const stored: MockState = {
+    ...createSeedState(),
+    store: { id: "abc", name: "Toko Lain" },
+  };
+  localStorage.setItem("mock.db", JSON.stringify(stored));
+  __resetMockDbCacheForTests();
   expect(mockDb.get().store).toEqual({ id: "abc", name: "Toko Lain" });
 });
 
 test("JSON bentuk salah -> default", () => {
-  localStorage.setItem("mock.db", JSON.stringify({ store: 1 }));
+  localStorage.setItem("mock.db", JSON.stringify({ version: 2, store: 1 }));
+  __resetMockDbCacheForTests();
   expect(mockDb.get().store.name).toBe("ShaziaMart");
 });
 
