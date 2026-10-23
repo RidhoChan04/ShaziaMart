@@ -5,9 +5,10 @@ import type {
   PrintStatus,
   Sale,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
+import { jakartaDateKey } from "@/shared/lib/business-day";
 import { type MockSale, type MockState, type MockUser, mockDb } from "../db";
 import { appendCredit } from "../ledger";
-import { formatSaleNumber, jakartaDateKey } from "../sale-number";
+import { formatSaleNumber } from "../sale-number";
 import {
   type CheckedPayments,
   checkPayments,

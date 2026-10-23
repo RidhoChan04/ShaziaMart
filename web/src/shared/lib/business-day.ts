@@ -1,9 +1,26 @@
-import { jakartaDateKey } from "./sale-number";
-
 export const HOUR_MS = 3_600_000;
 export const DAY_MS = 86_400_000;
 /** Asia/Jakarta tetap UTC+7 (tanpa DST). */
 const JAKARTA_OFFSET_MS = 7 * HOUR_MS;
+
+const JAKARTA_DATE = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Jakarta",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+const JAKARTA_LABEL = new Intl.DateTimeFormat("id-ID", {
+  timeZone: "Asia/Jakarta",
+  weekday: "long",
+  day: "numeric",
+  month: "short",
+});
+
+/** Tanggal bisnis "YYYYMMDD" di zona Asia/Jakarta untuk waktu UTC ms. */
+export function jakartaDateKey(ms: number): string {
+  return JAKARTA_DATE.format(ms).replaceAll("-", "");
+}
 
 export type BusinessDay = {
   /** "YYYYMMDD" */
@@ -34,3 +51,7 @@ export function businessDay(ms: number): BusinessDay {
 /** Hari bisnis `back` hari sebelum hari bisnis `day`. */
 export const daysBefore = (day: BusinessDay, back: number): BusinessDay =>
   businessDay(day.start - back * DAY_MS + 12 * HOUR_MS);
+
+/** "Jumat, 23 Okt" */
+export const businessDayLabel = (day: BusinessDay): string =>
+  JAKARTA_LABEL.format(day.start);

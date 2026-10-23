@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { businessDay, DAY_MS, HOUR_MS } from "./business-day";
+import { businessDay, DAY_MS, HOUR_MS } from "@/shared/lib/business-day";
 import type { MockSale, MockState } from "./db";
 import { ownerTodaySummary } from "./owner-summary";
 import { formatSaleNumber } from "./sale-number";

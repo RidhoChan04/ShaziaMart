@@ -1,4 +1,5 @@
 import { expect, expectNoA11yViolations, test } from "./fixtures.ts";
+import { loginOwner } from "./owner-helpers.ts";
 
 test.describe("kasir", () => {
   test.beforeEach(({ page: _page }, info) => {
@@ -25,8 +26,17 @@ test.describe("owner", () => {
     test.skip(!info.project.name.startsWith("owner-"), "hanya project owner");
   });
 
-  test("owner HP: tab bawah; laptop: sidebar", async ({ page }, info) => {
+  test("owner: tanpa sesi tampil Masuk pemilik", async ({ page }) => {
     await page.goto("/owner");
+    await expect(
+      page.getByRole("heading", { name: "Masuk pemilik" }),
+    ).toBeVisible();
+    await expectNoA11yViolations(page);
+  });
+
+  test("owner HP: tab bawah; laptop: sidebar", async ({ page }, info) => {
+    await loginOwner(page);
+    await expect(page.getByText("● toko online")).toBeVisible();
     const nav = page.getByRole("navigation", { name: "Navigasi utama" });
     await expect(nav.getByRole("link")).toHaveCount(5);
     const box = await nav.boundingBox();
@@ -44,7 +54,7 @@ test.describe("owner", () => {
   test("owner: deep link /owner/laporan tetap SPA dan mendapat data mock", async ({
     page,
   }) => {
-    await page.goto("/owner/laporan");
+    await loginOwner(page, "/owner/laporan");
     await expect(page.getByRole("heading", { name: "Laporan" })).toBeVisible();
     await expect(page.getByText("Tidak bisa terhubung ke toko")).toHaveCount(0);
   });

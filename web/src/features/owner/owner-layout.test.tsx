@@ -1,16 +1,21 @@
-import { screen, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { ownerLogin } from "@/mocks/handlers/test-helpers";
 import { setScenario } from "@/mocks/scenarios";
+import { getGetHealthQueryKey } from "@/shared/api/gen/system/system";
 import { renderApp } from "@/test/render-app";
 
 const OFFLINE_TEXT =
   "Tidak bisa terhubung ke toko — pastikan PC kasir menyala dan online";
+const BANNER = "Tidak terhubung ke toko — data terakhir ditampilkan";
 
-beforeEach(() => {
+beforeEach(async () => {
   // Hanya Date yang dipalsukan agar MSW dan React Query tetap memakai timer asli.
   vi.useFakeTimers({ toFake: ["Date"] });
-  vi.setSystemTime(new Date(2026, 9, 17, 9, 0));
+  // Sabtu 17 Okt 2026, 09.00 WIB
+  vi.setSystemTime(Date.UTC(2026, 9, 17, 2, 0));
+  await ownerLogin();
 });
 
 afterEach(() => {
@@ -68,14 +73,44 @@ test("owner: /owner adalah Beranda dan navigasi berpindah halaman", async () => 
   );
 });
 
-test("owner: header menampilkan tanggal hari ini format Indonesia dan nama toko", async () => {
+test("owner: header menampilkan tanggal hari bisnis, nama toko, dan status toko", async () => {
   renderApp("/owner");
-  const header = await screen.findByRole("banner");
-  expect(within(header).getByText("Sabtu, 17 Okt")).toBeInTheDocument();
-  expect(within(header).getByText("ShaziaMart")).toBeInTheDocument();
+  const header = within(await screen.findByRole("banner"));
+  expect(header.getByText("Sabtu, 17 Okt")).toBeInTheDocument();
+  expect(header.getByText("ShaziaMart")).toBeInTheDocument();
+  const status = await header.findByText("● toko online");
+  expect(status).toHaveAttribute("role", "status");
+  expect(status).toHaveClass("text-primary");
 });
 
-test("owner offline menampilkan layar tidak bisa terhubung + Coba lagi", async () => {
+test("offline setelah data dimuat → halaman tetap + banner; pulih → banner hilang", async () => {
+  const { queryClient } = renderApp("/owner/barang");
+  const heading = await screen.findByRole("heading", {
+    level: 1,
+    name: "Barang",
+  });
+  await screen.findByText("● toko online");
+  const pollHealth = () =>
+    act(() => queryClient.refetchQueries({ queryKey: getGetHealthQueryKey() }));
+
+  setScenario("server-mati");
+  await pollHealth();
+  const banner = await screen.findByText(BANNER);
+  expect(banner).toHaveAttribute("role", "status");
+  // Halaman yang sama tetap terpasang (bukan dipasang ulang).
+  expect(heading).toBeInTheDocument();
+  expect(screen.queryByText(OFFLINE_TEXT)).not.toBeInTheDocument();
+  const status = screen.getByText("● toko offline");
+  expect(status).toHaveClass("text-danger");
+
+  setScenario("normal");
+  await pollHealth();
+  await waitFor(() => expect(screen.queryByText(BANNER)).toBeNull());
+  expect(heading).toBeInTheDocument();
+  expect(screen.getByText("● toko online")).toBeInTheDocument();
+});
+
+test("offline sebelum data apa pun dimuat → layar penuh tidak bisa terhubung + Coba lagi", async () => {
   const user = userEvent.setup();
   setScenario("server-mati");
   renderApp("/owner/barang");

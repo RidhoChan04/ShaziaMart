@@ -5,14 +5,12 @@ import type {
   Session,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { mockDb } from "../db";
-import { login, post } from "./test-helpers";
+import { login, ownerLogin, post } from "./test-helpers";
 
 afterEach(() => {
   vi.useRealTimers();
 });
 
-const ownerLogin = (name = "Pak Ahmad", password = "pemilik123") =>
-  post("/api/owner/login", { name, password });
 const code = async (res: Response) =>
   ((await res.json()) as { code: string }).code;
 const summary = async () =>

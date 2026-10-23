@@ -7,6 +7,7 @@ test.each([
   ["UNAUTHORIZED", "Sesi berakhir — masukkan PIN lagi"],
   ["PIN_INVALID", "PIN salah"],
   ["PIN_REQUIRED", "Butuh PIN pemilik"],
+  ["LOGIN_INVALID", "Nama atau password salah"],
   ["LOCKED_OUT", "Terlalu banyak PIN salah — coba lagi dalam 5 menit"],
   ["SHIFT_CLOSED", "Shift belum dibuka"],
   ["SHIFT_ALREADY_OPEN", "Shift sudah dibuka"],

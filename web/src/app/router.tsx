@@ -63,6 +63,17 @@ function RouteError(_props: ErrorComponentProps) {
   );
 }
 
+function RoutePending() {
+  return (
+    <p
+      role="status"
+      className="flex min-h-dvh items-center justify-center p-4 text-muted"
+    >
+      Memuat…
+    </p>
+  );
+}
+
 const rootRoute = createRootRoute({
   component: RootLayout,
   notFoundComponent: NotFound,
@@ -146,6 +157,9 @@ export function createAppRouter(options: { history?: RouterHistory } = {}) {
     routeTree,
     history: options.history ?? createBrowserHistory(),
     defaultErrorComponent: RouteError,
+    defaultPendingComponent: RoutePending,
+    // Chunk yang cepat dimuat tidak sempat memunculkan "Memuat…".
+    defaultPendingMs: 200,
   });
 }
 

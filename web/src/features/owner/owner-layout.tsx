@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { Link, Outlet } from "@tanstack/react-router";
 import {
   ChartColumn,
@@ -6,24 +7,21 @@ import {
   type LucideIcon,
   NotebookPen,
   Package,
+  TriangleAlert,
+  Wifi,
   WifiOff,
 } from "lucide-react";
+import { getGetOwnerSessionQueryKey } from "@/shared/api/gen/owner/owner";
+import { useBusinessDay } from "@/shared/hooks/use-business-day";
 import {
+  type ServerHealth,
   useRecheckServer,
   useServerHealth,
 } from "@/shared/hooks/use-server-health";
+import { cn } from "@/shared/lib/cn";
 import { Button } from "@/shared/ui/button";
-
-const dateFormat = new Intl.DateTimeFormat("id-ID", {
-  weekday: "long",
-  day: "numeric",
-  month: "short",
-});
-
-/** "Sabtu, 17 Okt" */
-function formatOwnerDate(date: Date): string {
-  return dateFormat.format(date);
-}
+import { OwnerGate } from "./auth/owner-gate";
+import { useOwnerSession } from "./auth/owner-session";
 
 type NavItem = {
   to:
@@ -70,35 +68,98 @@ function OwnerNav() {
   );
 }
 
+function StoreStatus({ online, checking }: ServerHealth) {
+  const Icon = online ? Wifi : WifiOff;
+  return (
+    <span
+      role="status"
+      className={cn(
+        "flex items-center gap-1.5 text-xs font-medium",
+        online ? "text-primary" : "text-danger",
+      )}
+    >
+      {!checking && (
+        <>
+          <Icon aria-hidden="true" className="size-3.5" />
+          {online ? "● toko online" : "● toko offline"}
+        </>
+      )}
+    </span>
+  );
+}
+
+function OfflineBanner() {
+  return (
+    <div
+      role="status"
+      className="mb-4 flex items-center gap-2 rounded-md border border-warning bg-surface px-3 py-2 text-sm font-medium"
+    >
+      <TriangleAlert
+        aria-hidden="true"
+        className="size-4 shrink-0 text-warning"
+      />
+      Tidak terhubung ke toko — data terakhir ditampilkan
+    </div>
+  );
+}
+
+/** Belum ada data sama sekali: tidak ada yang bisa ditampilkan selain ajakan coba lagi. */
 function OwnerOffline() {
+  const client = useQueryClient();
   const { recheck, rechecking } = useRecheckServer();
+  const retry = () => {
+    recheck();
+    void client.refetchQueries({ queryKey: getGetOwnerSessionQueryKey() });
+  };
   return (
     <div className="mx-auto flex max-w-sm flex-col items-center gap-4 py-16 text-center">
       <WifiOff aria-hidden="true" className="size-10 text-muted" />
       <h1 className="text-base font-semibold">
         Tidak bisa terhubung ke toko — pastikan PC kasir menyala dan online
       </h1>
-      <Button onClick={recheck} disabled={rechecking}>
+      <Button onClick={retry} disabled={rechecking}>
         Coba lagi
       </Button>
     </div>
   );
 }
 
-export function OwnerLayout() {
-  const { online, checking } = useServerHealth();
-  const offline = !online && !checking;
+function OwnerShell() {
+  const health = useServerHealth();
+  const { label } = useBusinessDay();
+  // Sesi yang sudah termuat = data pernah dimuat; halaman tetap dipasang saat offline.
+  const session = useOwnerSession();
+  const loaded = session.data != null;
+  const offline = !health.online && !health.checking;
 
   return (
     <div className="min-h-dvh bg-bg lg:grid lg:grid-cols-[240px_1fr] lg:grid-rows-[auto_1fr]">
-      <header className="border-b border-border bg-surface px-4 py-3 lg:col-start-2 lg:row-start-1">
-        <p className="text-xs text-muted">{formatOwnerDate(new Date())}</p>
-        <p className="text-base font-bold text-primary">ShaziaMart</p>
+      <header className="flex items-start justify-between gap-3 border-b border-border bg-surface px-4 py-3 lg:col-start-2 lg:row-start-1">
+        <div>
+          <p className="text-xs text-muted">{label}</p>
+          <p className="text-base font-bold text-primary">ShaziaMart</p>
+        </div>
+        <StoreStatus {...health} />
       </header>
       <OwnerNav />
       <main className="p-4 pb-24 lg:col-start-2 lg:row-start-2 lg:p-6">
-        {offline ? <OwnerOffline /> : <Outlet />}
+        {loaded ? (
+          <>
+            {offline && <OfflineBanner />}
+            <Outlet />
+          </>
+        ) : (
+          <OwnerOffline />
+        )}
       </main>
     </div>
+  );
+}
+
+export function OwnerLayout() {
+  return (
+    <OwnerGate>
+      <OwnerShell />
+    </OwnerGate>
   );
 }

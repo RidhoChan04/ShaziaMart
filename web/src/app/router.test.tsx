@@ -1,5 +1,6 @@
 import { screen, within } from "@testing-library/react";
 import { expect, test } from "vitest";
+import { ownerLogin } from "@/mocks/handlers/test-helpers";
 import { setScenario } from "@/mocks/scenarios";
 import { renderApp } from "@/test/render-app";
 
@@ -38,6 +39,7 @@ test("halaman tak dikenal menampilkan pesan Indonesia", async () => {
 });
 
 test("start_url PWA /owner/ (garis miring di akhir) membuka Beranda", async () => {
+  await ownerLogin();
   renderApp("/owner/");
   expect(
     await screen.findByRole("heading", { level: 1, name: "Beranda" }),

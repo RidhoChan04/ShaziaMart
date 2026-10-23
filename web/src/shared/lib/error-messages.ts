@@ -7,6 +7,7 @@ const MESSAGES: Record<string, string> = {
   UNAUTHORIZED: "Sesi berakhir — masukkan PIN lagi",
   PIN_INVALID: "PIN salah",
   PIN_REQUIRED: "Butuh PIN pemilik",
+  LOGIN_INVALID: "Nama atau password salah",
   LOCKED_OUT: "Terlalu banyak PIN salah — coba lagi dalam 5 menit",
   SHIFT_CLOSED: "Shift belum dibuka",
   SHIFT_ALREADY_OPEN: "Shift sudah dibuka",
@@ -17,7 +18,7 @@ const MESSAGES: Record<string, string> = {
   INTERNAL: GENERIC,
 };
 
-/** Pesan Bahasa Indonesia untuk kasir; hanya membaca `code` dan `detail`. */
+/** Pesan Bahasa Indonesia untuk kasir & pemilik; hanya membaca `code` dan `detail`. */
 export function pesanError(error: unknown): string {
   if (!(error instanceof ApiError)) return GENERIC;
   if (error.code === "VALIDATION") return error.detail ?? "Data tidak valid";

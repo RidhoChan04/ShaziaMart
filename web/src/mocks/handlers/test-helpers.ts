@@ -19,6 +19,12 @@ export function userId(name: string): string {
 export const login = (pin: string, name = "Rina"): Promise<Response> =>
   post("/api/auth/pin-login", { userId: userId(name), pin });
 
+/** Login pemilik (realm `/api/owner`, terpisah dari sesi kasir). */
+export const ownerLogin = (
+  name = "Pak Ahmad",
+  password = "pemilik123",
+): Promise<Response> => post("/api/owner/login", { name, password });
+
 /** Login sebagai Rina lalu buka shift dengan modal awal. */
 export async function loginWithShift(openingCash = 200_000): Promise<void> {
   if ((await login("123456")).status !== 200) throw new Error("login gagal");
