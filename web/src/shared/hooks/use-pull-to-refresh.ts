@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const PULL_THRESHOLD_PX = 64;
 
@@ -8,6 +8,11 @@ const PULL_THRESHOLD_PX = 64;
  */
 export function usePullToRefresh(onRefresh: () => Promise<unknown>): boolean {
   const [refreshing, setRefreshing] = useState(false);
+  // Pendengar dipasang sekali; callback terbaru dibaca lewat ref.
+  const latest = useRef(onRefresh);
+  useEffect(() => {
+    latest.current = onRefresh;
+  }, [onRefresh]);
 
   useEffect(() => {
     let startY: number | null = null;
@@ -22,8 +27,11 @@ export function usePullToRefresh(onRefresh: () => Promise<unknown>): boolean {
     };
     const onMove = (e: TouchEvent) => {
       const touch = e.touches[0];
-      if (e.touches.length === 1 && touch) lastY = touch.clientY;
-      else startY = null;
+      if (e.touches.length === 1 && touch && window.scrollY === 0) {
+        lastY = touch.clientY;
+      } else {
+        startY = null;
+      }
     };
     const onEnd = () => {
       const pulled = startY !== null && lastY - startY > PULL_THRESHOLD_PX;
@@ -31,7 +39,7 @@ export function usePullToRefresh(onRefresh: () => Promise<unknown>): boolean {
       if (!pulled || busy) return;
       busy = true;
       setRefreshing(true);
-      void onRefresh().finally(() => {
+      void latest.current().finally(() => {
         busy = false;
         setRefreshing(false);
       });
@@ -51,7 +59,7 @@ export function usePullToRefresh(onRefresh: () => Promise<unknown>): boolean {
       document.removeEventListener("touchend", onEnd);
       document.removeEventListener("touchcancel", cancel);
     };
-  }, [onRefresh]);
+  }, []);
 
   return refreshing;
 }

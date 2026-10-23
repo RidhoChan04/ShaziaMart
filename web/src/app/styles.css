@@ -24,6 +24,11 @@
 }
 
 @layer base {
+  /* Cegah tarik-muat-ulang bawaan browser; hanya html (penggulir akar) yang berpengaruh. */
+  html {
+    overscroll-behavior-y: contain;
+  }
+
   *,
   ::before,
   ::after {

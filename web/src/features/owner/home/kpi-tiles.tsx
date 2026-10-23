@@ -1,5 +1,7 @@
 import type { OwnerTodaySummary } from "@/shared/api/gen/shaziaMartAPI.schemas";
+import { cn } from "@/shared/lib/cn";
 import { formatRupiah } from "@/shared/lib/money";
+import { CARD } from "./card-style";
 
 export function KpiTiles({ summary }: { summary: OwnerTodaySummary }) {
   const tiles = [
@@ -11,10 +13,7 @@ export function KpiTiles({ summary }: { summary: OwnerTodaySummary }) {
   return (
     <dl className="grid grid-cols-2 gap-2 lg:gap-3">
       {tiles.map(([label, value]) => (
-        <div
-          key={label}
-          className="min-w-0 rounded-lg border border-border bg-surface p-3"
-        >
+        <div key={label} className={cn(CARD, "min-w-0")}>
           <dt className="text-[11px] text-muted">{label}</dt>
           <dd className="num truncate text-base font-bold">{value}</dd>
         </div>

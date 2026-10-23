@@ -11,13 +11,13 @@ import { pesanError } from "@/shared/lib/error-messages";
 import { formatRupiah } from "@/shared/lib/money";
 import { Button } from "@/shared/ui/button";
 import { AttentionList } from "./attention-list";
+import { CARD } from "./card-style";
 import { comparisonText } from "./home-model";
 import { HourlyChart } from "./hourly-chart";
 import { KpiTiles } from "./kpi-tiles";
 
 const REFRESH_MS = 60_000;
 
-const CARD = "rounded-lg border border-border bg-surface p-3";
 const TREND_COLOR = {
   up: "text-primary",
   down: "text-danger",

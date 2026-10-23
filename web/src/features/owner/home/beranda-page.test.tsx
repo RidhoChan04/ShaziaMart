@@ -158,6 +158,7 @@ test("kunci query memuat tanggal bisnis; ganti hari → kunci baru", async () =>
   vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
   // Sabtu 17 Okt 2026, 23.59.59 WIB
   vi.setSystemTime(Date.UTC(2026, 9, 17, 16, 59, 59));
+  await sellAndCloseShiftShort();
   await ownerLogin();
   const { queryClient } = renderApp("/owner");
   const has = (date: string) =>
@@ -165,9 +166,17 @@ test("kunci query memuat tanggal bisnis; ganti hari → kunci baru", async () =>
     undefined;
   await vi.waitFor(() => expect(has("2026-10-17")).toBe(true));
   expect(has("2026-10-18")).toBe(false);
+  await vi.waitFor(() =>
+    expect(screen.getByText("Rp36.000", { selector: "p" })).toBeInTheDocument(),
+  );
 
   await act(() => vi.advanceTimersByTimeAsync(1000));
   await vi.waitFor(() => expect(has("2026-10-18")).toBe(true));
+  // Angka hari kemarin tidak tampil sebagai angka hari baru.
+  await vi.waitFor(() =>
+    expect(card("OMZET HARI INI").getByText("Rp0")).toBeInTheDocument(),
+  );
+  expect(screen.queryByText("Rp36.000")).not.toBeInTheDocument();
 });
 
 test("tarik untuk refresh di layar sentuh memuat ulang ringkasan", async () => {
@@ -177,7 +186,12 @@ test("tarik untuk refresh di layar sentuh memuat ulang ringkasan", async () => {
   setScenario("lambat");
   const fetches = vi.fn();
   queryClient.getQueryCache().subscribe((e) => {
-    if (e.type === "updated" && e.action.type === "fetch") fetches();
+    if (
+      e.type === "updated" &&
+      e.action.type === "fetch" &&
+      e.query.queryKey[0] === SUMMARY_KEY[0]
+    )
+      fetches();
   });
 
   fireEvent.touchStart(document, { touches: [{ clientY: 100 }] });

@@ -91,3 +91,34 @@ test("gestur dua jari diabaikan", () => {
   });
   expect(onRefresh).not.toHaveBeenCalled();
 });
+
+test("halaman bergulir di tengah gestur → gestur dibatalkan", () => {
+  const onRefresh = vi.fn();
+  renderHook(() => usePullToRefresh(onRefresh));
+  act(() => {
+    fireEvent.touchStart(document, touch(100));
+    Object.defineProperty(window, "scrollY", { value: 30, configurable: true });
+    fireEvent.touchMove(document, touch(300));
+    Object.defineProperty(window, "scrollY", { value: 0, configurable: true });
+    fireEvent.touchEnd(document);
+  });
+  expect(onRefresh).not.toHaveBeenCalled();
+});
+
+test("callback baru di tengah gestur tetap menyelesaikan gestur dan dipanggil", () => {
+  const first = vi.fn(() => Promise.resolve());
+  const second = vi.fn(() => Promise.resolve());
+  const { rerender } = renderHook(({ cb }) => usePullToRefresh(cb), {
+    initialProps: { cb: first },
+  });
+  act(() => {
+    fireEvent.touchStart(document, touch(100));
+    fireEvent.touchMove(document, touch(200));
+  });
+  rerender({ cb: second });
+  act(() => {
+    fireEvent.touchEnd(document);
+  });
+  expect(first).not.toHaveBeenCalled();
+  expect(second).toHaveBeenCalledTimes(1);
+});
