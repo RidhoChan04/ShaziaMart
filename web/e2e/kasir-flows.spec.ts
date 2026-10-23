@@ -146,8 +146,10 @@ test("refresh di tengah transaksi memulihkan keranjang", async ({ page }) => {
   await openShift(page, RINA);
   await scan(page, BERAS);
   await scan(page, KAPAL_API);
-  await page.reload();
   const total = page.getByRole("complementary", { name: "Total" });
+  // Scan menambah barang secara asinkron; tunggu keranjang terisi sebelum muat ulang.
+  await expect(total).toContainText("2 BARANG");
+  await page.reload();
   await expect(total).toContainText("2 BARANG");
   await expect(total).toContainText("Rp92.500");
 });
