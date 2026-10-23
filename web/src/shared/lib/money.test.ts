@@ -1,5 +1,10 @@
 import { expect, test } from "vitest";
-import { formatAngka, formatRupiah, parseRupiah } from "./money";
+import {
+  formatAngka,
+  formatRupiah,
+  formatRupiahShort,
+  parseRupiah,
+} from "./money";
 
 test.each([
   [0, "Rp0"],
@@ -30,3 +35,28 @@ test.each([
   ["12,5", null],
   ["4.00.000", null],
 ])("parseRupiah(%j) = %j", (s, n) => expect(parseRupiah(s)).toBe(n));
+
+test.each([
+  [0, "Rp0"],
+  [999, "Rp999"],
+  [1000, "Rp1 rb"],
+  [12500, "Rp12,5 rb"],
+  [361500, "Rp361,5 rb"],
+  [361549, "Rp361,5 rb"],
+  [361550, "Rp361,6 rb"],
+  [999949, "Rp999,9 rb"],
+  [999950, "Rp1 jt"],
+  [1000000, "Rp1 jt"],
+  [4872500, "Rp4,9 jt"],
+  [12345678, "Rp12,3 jt"],
+  [1234567890, "Rp1.234,6 jt"],
+  [-361500, "-Rp361,5 rb"],
+  [-999950, "-Rp1 jt"],
+  [-500, "-Rp500"],
+])("formatRupiahShort(%i) = %s", (n, s) =>
+  expect(formatRupiahShort(n)).toBe(s),
+);
+
+test("formatRupiahShort menolak pecahan", () => {
+  expect(() => formatRupiahShort(1.5)).toThrow(RangeError);
+});
