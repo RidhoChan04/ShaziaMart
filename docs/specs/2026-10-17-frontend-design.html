@@ -338,6 +338,16 @@ web/
   <tr><td>Aksesibilitas</td><td>Nol pelanggaran serius/kritis</td><td>@axe-core/playwright</td></tr>
 </table></div>
 
+<h2 id="owner-kontrak">12a. Aplikasi pemilik — kontrak &amp; login (disetujui 23 Okt 2026)</h2>
+<div class="table-wrap"><table>
+  <tr><th>Topik</th><th>Keputusan</th></tr>
+  <tr><td>Pembagian rencana</td><td><strong>F3a</strong> login pemilik + Beranda + riwayat contoh 14 hari · <strong>F3b</strong> Barang (daftar, detail, tambah/edit satuan, barcode, grosir; ubah harga + riwayat; barang masuk; stok opname dengan kamera) · <strong>F3c</strong> Laporan + ekspor, Kasbon, Lainnya (shift &amp; kas, kasir, log aktivitas, pengaturan).</td></tr>
+  <tr><td>Login pemilik</td><td>Nama + password; sesi 30 hari di HP. Realm terpisah dari kasir: semua endpoint pemilik di <code>/api/owner/…</code> dengan cookie <code>owner_session</code>. Kasir mengunci/keluar tidak memengaruhi sesi pemilik dan sebaliknya. Akses jarak jauh tetap di belakang Cloudflare Access.</td></tr>
+  <tr><td>Data ringkasan</td><td>Endpoint ringkasan pemilik (mis. <code>/api/owner/summary/today</code>) dihitung dari data penjualan yang sama. Backend palsu memuat riwayat 14 hari deterministik dengan pola jam ramai pagi &amp; sore.</td></tr>
+  <tr><td>Harga grosir berubah (penghalang dari F2)</td><td>Respons 409 <code>PRICE_CHANGED</code> membawa harga normal dan seluruh tier grosir terbaru per satuan; keranjang mengganti keduanya. Dikerjakan di F3b.</td></tr>
+  <tr><td>Ekspor (F3c)</td><td>Excel: library dimuat hanya saat tombol ekspor diklik. PDF: tampilan cetak browser (stylesheet cetak), tanpa library PDF.</td></tr>
+</table></div>
+
 <h2 id="nanti">12. Di luar cakupan (dicatat untuk nanti)</h2>
 <ul>
   <li>Tema gelap (gaya B) sebagai opsi.</li>
