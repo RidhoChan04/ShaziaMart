@@ -1,6 +1,6 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { expect, test } from "vitest";
+import { afterEach, expect, test, vi } from "vitest";
 import type { HourBucket } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { HourlyChart } from "./hourly-chart";
 
@@ -22,6 +22,31 @@ const SAMPLE = [
 
 const renderChart = (hourly: HourBucket[], nowHour = 11) =>
   render(<HourlyChart hourly={hourly} weekday="Jumat" nowHour={nowHour} />);
+
+const GROUP = { name: "Omzet per jam hari ini dan Jumat lalu" };
+
+afterEach(() => vi.unstubAllGlobals());
+
+/** ResizeObserver palsu yang langsung melaporkan lebar tertentu saat observe(). */
+function stubWidth(width: number) {
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      cb: ResizeObserverCallback;
+      constructor(cb: ResizeObserverCallback) {
+        this.cb = cb;
+      }
+      observe() {
+        this.cb(
+          [{ contentRect: { width } } as ResizeObserverEntry],
+          this as unknown as ResizeObserver,
+        );
+      }
+      disconnect() {}
+      unobserve() {}
+    },
+  );
+}
 
 const paths = (c: HTMLElement) =>
   Array.from(c.querySelectorAll("svg path[stroke]"));
@@ -100,17 +125,92 @@ test("tabel sr-only memuat satu baris per jam di jendela", () => {
   expect(row).toHaveTextContent("Rp350.000");
 });
 
-test("gambar punya ringkasan aksesibel", () => {
+test("grup berlabel bisa difokus; svg disembunyikan dari pembaca layar", () => {
+  const { container } = renderChart(SAMPLE);
+  expect(screen.getByRole("group", GROUP)).toHaveAttribute("tabindex", "0");
+  expect(container.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+});
+
+test("titik aktif diumumkan lewat live region sr-only", async () => {
+  const user = userEvent.setup();
   renderChart(SAMPLE);
-  expect(
-    screen.getByRole("img", { name: "Omzet per jam hari ini dan Jumat lalu" }),
-  ).toBeInTheDocument();
+  const live = screen.getByTestId("chart-live");
+  expect(live).toHaveAttribute("aria-live", "polite");
+  expect(live).toBeEmptyDOMElement();
+  screen.getByRole("group", GROUP).focus();
+  await user.keyboard("{ArrowRight}{ArrowLeft}");
+  expect(live).toHaveTextContent(
+    "10.00, Hari ini Rp400.000, Jumat lalu Rp350.000",
+  );
+  await user.keyboard("{Escape}");
+  expect(live).toBeEmptyDOMElement();
+});
+
+test("tinggi tetap 160 piksel dan viewBox mengikuti lebar terukur", () => {
+  stubWidth(1280);
+  const { container } = renderChart(SAMPLE);
+  const svg = container.querySelector("svg");
+  expect(svg).toHaveAttribute("viewBox", "0 0 1280 160");
+  expect(svg).toHaveStyle({ height: "160px" });
+});
+
+test("tanpa ResizeObserver memakai lebar 360", () => {
+  const { container } = renderChart(SAMPLE);
+  expect(container.querySelector("svg")).toHaveAttribute(
+    "viewBox",
+    "0 0 360 160",
+  );
+});
+
+test("lebar berbeda menggeser x tetapi ukuran font tetap", () => {
+  const read = () => {
+    const { container, unmount } = renderChart(SAMPLE);
+    const label = Array.from(container.querySelectorAll("svg text")).find(
+      (t) => t.textContent === "12.00",
+    );
+    const out = [label?.getAttribute("x"), label?.getAttribute("font-size")];
+    unmount();
+    return out;
+  };
+  stubWidth(360);
+  const narrow = read();
+  stubWidth(1280);
+  const wide = read();
+  expect(Number(wide[0])).toBeGreaterThan(Number(narrow[0]));
+  expect(wide[1]).toBe("11");
+  expect(narrow[1]).toBe("11");
+});
+
+test("perubahan lebar saat berjalan menggambar ulang", () => {
+  let notify: (w: number) => void = () => {};
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      cb: ResizeObserverCallback;
+      constructor(cb: ResizeObserverCallback) {
+        this.cb = cb;
+        notify = (w) =>
+          this.cb(
+            [{ contentRect: { width: w } } as ResizeObserverEntry],
+            this as unknown as ResizeObserver,
+          );
+      }
+      observe() {}
+      disconnect() {}
+    },
+  );
+  const { container } = renderChart(SAMPLE);
+  act(() => notify(500));
+  expect(container.querySelector("svg")).toHaveAttribute(
+    "viewBox",
+    "0 0 500 160",
+  );
 });
 
 test("keyboard: panah memindah crosshair + tooltip, Esc menyembunyikan", async () => {
   const user = userEvent.setup();
   renderChart(SAMPLE);
-  const plot = screen.getByRole("img");
+  const plot = screen.getByRole("group", GROUP);
   expect(screen.queryByTestId("chart-tooltip")).not.toBeInTheDocument();
 
   plot.focus();
@@ -136,7 +236,7 @@ test("keyboard: panah memindah crosshair + tooltip, Esc menyembunyikan", async (
 test("panah tidak keluar dari jendela", async () => {
   const user = userEvent.setup();
   renderChart(SAMPLE);
-  screen.getByRole("img").focus();
+  screen.getByRole("group", GROUP).focus();
   await user.keyboard("{ArrowRight}".repeat(20));
   expect(screen.getByTestId("chart-tooltip")).toHaveTextContent("13.00");
   await user.keyboard("{ArrowLeft}".repeat(20));
