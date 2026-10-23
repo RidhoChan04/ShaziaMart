@@ -1,6 +1,6 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, expect, test, vi } from "vitest";
-import { mockDb } from "@/mocks/db";
+import { type MockSale, mockDb } from "@/mocks/db";
 import { loginWithShift } from "@/mocks/handlers/test-helpers";
 import { setScenario } from "@/mocks/scenarios";
 import type { Sale } from "@/shared/api/gen/shaziaMartAPI.schemas";
@@ -8,7 +8,7 @@ import { renderWithQuery } from "@/test/render-app";
 import { humanTyping } from "@/test/typing";
 import { HistorySheet } from "./history-sheet";
 
-function makeSale(n: number, over: Partial<Sale> = {}): Sale {
+function makeSale(n: number, over: Partial<Sale> = {}): MockSale {
   return {
     id: `sale-${n}`,
     number: `20261020-000${n}`,
@@ -22,6 +22,7 @@ function makeSale(n: number, over: Partial<Sale> = {}): Sale {
     customerId: null,
     status: "selesai",
     printStatus: "tercetak",
+    costTotal: 0,
     ...over,
   };
 }

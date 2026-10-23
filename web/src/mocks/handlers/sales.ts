@@ -5,7 +5,8 @@ import type {
   PrintStatus,
   Sale,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
-import { type MockState, type MockUser, mockDb } from "../db";
+import { type MockSale, type MockState, type MockUser, mockDb } from "../db";
+import { appendCredit } from "../ledger";
 import { formatSaleNumber, jakartaDateKey } from "../sale-number";
 import {
   type CheckedPayments,
@@ -17,6 +18,7 @@ import {
   priceChanges,
   priceItems,
   type Rejection,
+  saleCost,
   saleTotal,
 } from "../sale-rules";
 import { getScenario, withScenario } from "../scenarios";
@@ -42,6 +44,12 @@ const notFound = () => problem(404, "NOT_FOUND", "Penjualan tidak ditemukan");
 const amountOf = (sale: Sale, method: "cash" | "credit"): number =>
   sale.payments.find((p) => p.method === method)?.amount ?? 0;
 
+/** HPP hanya untuk endpoint pemilik; respons kasir tidak boleh memuatnya. */
+function toPublicSale(s: MockSale): Sale {
+  const { costTotal: _, ...sale } = s;
+  return sale;
+}
+
 /** Aturan 4: naikkan harga satuan item pertama sekali per saleId. */
 function bumpFirstPrice(saleId: string, items: readonly PricedItem[]): boolean {
   if (getScenario() !== "harga-berubah" || priceBumpedSaleIds.has(saleId)) {
@@ -65,8 +73,15 @@ function applyVoid(s: MockState, sale: Sale): void {
     if (productId)
       s.stock[productId] = (s.stock[productId] ?? 0) + item.qtyBase;
   }
-  const customer = s.customers.find((c) => c.id === sale.customerId);
-  if (customer) customer.balance -= amountOf(sale, "credit");
+  const credit = amountOf(sale, "credit");
+  if (sale.customerId && credit > 0) {
+    appendCredit(s, {
+      customerId: sale.customerId,
+      amount: -credit,
+      at: Date.now(),
+      saleId: sale.id,
+    });
+  }
   // Kas hanya dikoreksi bila penjualan milik shift yang sedang terbuka.
   if (s.shift && sale.createdAt >= s.shift.openedAt) {
     s.shift.cashSales -= amountOf(sale, "cash");
@@ -112,27 +127,35 @@ function creditGate(
     : problem(401, "PIN_INVALID", "PIN salah");
 }
 
-/** Aturan 8: simpan penjualan beserta efeknya ke stok, saldo, dan shift. */
+/** Aturan 8: simpan penjualan beserta HPP dan efeknya ke stok, buku kasbon, dan shift. */
 function commitSale(
   draft: Omit<Sale, "number" | "createdAt">,
   items: readonly PricedItem[],
   paid: CheckedPayments,
-): Sale {
+): MockSale {
   const createdAt = Date.now();
   const dateKey = jakartaDateKey(createdAt);
-  const seq = (mockDb.get().saleSeq[dateKey] ?? 0) + 1;
-  const sale: Sale = {
+  const { saleSeq, unitCosts } = mockDb.get();
+  const seq = (saleSeq[dateKey] ?? 0) + 1;
+  const sale: MockSale = {
     ...draft,
     number: formatSaleNumber(createdAt, seq),
     createdAt,
+    costTotal: saleCost(unitCosts, draft.items),
   };
   mockDb.update((s) => {
     s.saleSeq[dateKey] = seq;
     for (const { productId, item } of items) {
       s.stock[productId] = (s.stock[productId] ?? 0) - item.qtyBase;
     }
-    const buyer = s.customers.find((c) => c.id === sale.customerId);
-    if (buyer) buyer.balance += paid.credit;
+    if (sale.customerId && paid.credit > 0) {
+      appendCredit(s, {
+        customerId: sale.customerId,
+        amount: paid.credit,
+        at: createdAt,
+        saleId: sale.id,
+      });
+    }
     if (s.shift) {
       s.shift.cashSales += paid.cash;
       s.shift.salesCount += 1;
@@ -157,7 +180,7 @@ export const salesHandlers = [
         return invalid("saleId wajib diisi");
       }
       const existing = state.sales.find((s) => s.id === saleId);
-      if (existing) return HttpResponse.json(existing);
+      if (existing) return HttpResponse.json(toPublicSale(existing));
       if (!state.shift) {
         return problem(409, "SHIFT_CLOSED", "Tidak ada shift yang terbuka");
       }
@@ -191,7 +214,7 @@ export const salesHandlers = [
         items,
         paid,
       );
-      return HttpResponse.json(sale, { status: 201 });
+      return HttpResponse.json(toPublicSale(sale), { status: 201 });
     }),
   ),
   http.get(
@@ -205,7 +228,8 @@ export const salesHandlers = [
       const sales = [...state.sales]
         .reverse()
         .filter((s) => jakartaDateKey(s.createdAt) === today)
-        .sort((a, b) => b.createdAt - a.createdAt);
+        .sort((a, b) => b.createdAt - a.createdAt)
+        .map(toPublicSale);
       return HttpResponse.json(sales);
     }),
   ),
@@ -244,9 +268,10 @@ export const salesHandlers = [
       if (typeof reason !== "string" || reason.trim() === "") {
         return invalid("Alasan wajib diisi");
       }
-      if (sale.status === "dibatalkan") return HttpResponse.json(sale);
-      mockDb.update((s) => applyVoid(s, sale));
-      const voided: Sale = { ...sale, status: "dibatalkan" };
+      const voided: Sale = { ...toPublicSale(sale), status: "dibatalkan" };
+      if (sale.status !== "dibatalkan") {
+        mockDb.update((s) => applyVoid(s, sale));
+      }
       return HttpResponse.json(voided);
     }),
   ),

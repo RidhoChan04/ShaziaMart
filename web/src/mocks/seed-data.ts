@@ -1,21 +1,14 @@
 import type {
-  Customer,
   Product,
   ProductBaseUnit,
   ProductUnit,
   WholesaleTier,
 } from "../shared/api/gen/shaziaMartAPI.schemas";
+import { roundHalfUp } from "../shared/lib/quantity";
 import type { MockState, MockUser } from "./db";
-import { rng } from "./seed";
+import { KIND, makeId, rng } from "./seed";
 import { CATALOG_NAMES } from "./seed-catalog-names";
-
-/** Jenis ID: bagian waktu UUIDv7 tetap per jenis, jadi urut dan stabil antar-run. */
-const KIND = { store: 0, user: 1, product: 2, unit: 3, customer: 4 } as const;
-
-function makeId(kind: number, n: number): string {
-  const ts = (0x01900000 + kind).toString(16).padStart(8, "0");
-  return `${ts}-0000-7000-8000-${n.toString(16).padStart(12, "0")}`;
-}
+import { seedCustomers } from "./seed-customers";
 
 type UnitSpec = {
   name: string;
@@ -89,23 +82,22 @@ const FIXTURES: Fixture[] = [
 
 const TOTAL_PRODUCTS = 60;
 
+/** HPP tetap ("storeCode/satuan" -> Rp) untuk fixture yang dipakai test angka persis. */
+const FIXED_COSTS: Record<string, number> = {
+  "1001/pcs": 2650,
+  "1001/dus": 104000,
+  "1002/pcs": 71000,
+  "2001/kg": 16500,
+};
+
+/** Stok minimum = 10 satuan jual pertama (curah: 10 kg = 10000 g). */
+const MIN_STOCK_UNITS = 10;
+const LOW_STOCK_PRODUCTS = 7;
+
 const SEED_USERS: Omit<MockUser, "id">[] = [
   { name: "Rina", role: "kasir", pin: "123456" },
   { name: "Budi", role: "kasir", pin: "654321" },
-  { name: "Pak Ahmad", role: "pemilik", pin: "999999" },
-];
-
-const SEED_CUSTOMERS: [
-  name: string,
-  phone: string,
-  limit: number,
-  balance: number,
-][] = [
-  ["Bu Sari", "081234500001", 500000, 120000],
-  ["Pak Joko", "081234500002", 300000, 290000],
-  ["Mbak Dewi", "081234500003", 500000, 0],
-  ["Pak Udin", "081234500004", 200000, 50000],
-  ["Bu Tini", "081234500005", 1000000, 640000],
+  { name: "Pak Ahmad", role: "pemilik", pin: "999999", password: "pemilik123" },
 ];
 
 /** Pengacakan Fisher-Yates deterministik. */
@@ -187,7 +179,11 @@ function generatedFixtures(rand: () => number, count: number): Fixture[] {
     });
 }
 
-export function createSeedState(): MockState {
+/** 85–93% harga, dibulatkan ke Rp50. */
+const costFromPrice = (price: number, rand: () => number): number =>
+  roundHalfUp(price * (85 + Math.floor(rand() * 9)), 5000) * 50;
+
+export function createSeedState(now: number = Date.now()): MockState {
   const rand = rng();
   const fixtures = [
     ...FIXTURES,
@@ -202,32 +198,42 @@ export function createSeedState(): MockState {
     stock[p.id] = p.isCurah ? qty * 1000 : qty;
   }
 
+  const unitCosts: Record<string, number> = {};
+  const minStock: Record<string, number> = {};
+  for (const p of products) {
+    minStock[p.id] = MIN_STOCK_UNITS * (p.units[0]?.unitSize ?? 1);
+    for (const u of p.units) {
+      unitCosts[u.id] =
+        FIXED_COSTS[`${p.storeCode}/${u.name}`] ?? costFromPrice(u.price, rand);
+    }
+  }
+  // Barang buatan saja, agar fixture yang dipakai E2E tidak pernah menipis.
+  const generated = products.slice(FIXTURES.length);
+  for (const p of shuffle(generated, rand).slice(0, LOW_STOCK_PRODUCTS)) {
+    const min = minStock[p.id] ?? MIN_STOCK_UNITS;
+    stock[p.id] = 1 + Math.floor(rand() * (min - 1)); // 1 .. min − 1
+  }
+
   const users: MockUser[] = SEED_USERS.map((u, i) => ({
     ...u,
     id: makeId(KIND.user, i + 1),
   }));
-  const customers: Customer[] = SEED_CUSTOMERS.map(
-    ([name, phone, creditLimit, balance], i) => ({
-      id: makeId(KIND.customer, i + 1),
-      name,
-      phone,
-      creditLimit,
-      balance,
-    }),
-  );
-
   return {
-    version: 2,
+    version: 3,
     store: { id: makeId(KIND.store, 1), name: "ShaziaMart" },
     users,
     session: null,
     pinFailures: {},
+    ownerSession: null,
+    ownerLoginFailures: {},
     shift: null,
     closedShifts: [],
     products,
     stock,
+    minStock,
+    unitCosts,
     sales: [],
-    customers,
+    ...seedCustomers(now),
     settings: {
       storeName: "ShaziaMart",
       autoPrint: true,

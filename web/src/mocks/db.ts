@@ -9,22 +9,47 @@ import type {
 } from "../shared/api/gen/shaziaMartAPI.schemas";
 import { createSeedState } from "./seed-data";
 
-export type MockUser = User & { pin: string };
+/** `password` hanya untuk pemilik (login aplikasi pemilik); mock saja. */
+export type MockUser = User & { pin: string; password?: string };
 export type MockShift = Shift & { cashSales: number; salesCount: number };
+/** HPP disalin saat penjualan; tidak pernah dikirim ke endpoint kasir. */
+export type MockSale = Sale & { costTotal: number };
+
+/** Buku kasbon append-only: + kasbon, − pelunasan/batal. */
+export type CreditEntry = {
+  id: string;
+  customerId: string;
+  amount: number;
+  at: number;
+  saleId: string | null;
+};
+
+type LoginFailures = Record<
+  string,
+  { count: number; lockedUntil: number | null }
+>;
 
 export type MockState = {
-  version: 2;
+  version: 3;
   store: { id: string; name: string };
   users: MockUser[];
   session: { userId: string } | null;
-  pinFailures: Record<string, { count: number; lockedUntil: number | null }>;
+  pinFailures: LoginFailures;
+  ownerSession: { userId: string } | null;
+  ownerLoginFailures: LoginFailures;
   shift: MockShift | null;
   closedShifts: ShiftClosure[];
   products: Product[];
   /** productId -> qtyBase */
   stock: Record<string, number>;
-  sales: Sale[];
+  /** productId -> qtyBase */
+  minStock: Record<string, number>;
+  /** unitId -> HPP per satuan jual (Rp) */
+  unitCosts: Record<string, number>;
+  sales: MockSale[];
   customers: Customer[];
+  /** `customer.balance` selalu = Σ entri pelanggan itu. */
+  creditLedger: CreditEntry[];
   settings: KasirSettings;
   /** "YYYYMMDD" -> urutan terakhir */
   saleSeq: Record<string, number>;
@@ -37,20 +62,32 @@ const isObj = (x: unknown): x is Record<string, unknown> =>
 
 /** Pemeriksaan struktur murah (bukan validasi mendalam). */
 function isState(value: unknown): value is MockState {
-  if (!isObj(value) || value.version !== 2) return false;
+  if (!isObj(value) || value.version !== 3) return false;
   const { store } = value;
   return (
     isObj(store) &&
     typeof store.id === "string" &&
     typeof store.name === "string" &&
-    ["users", "closedShifts", "products", "sales", "customers"].every((k) =>
-      Array.isArray(value[k]),
-    ) &&
-    ["pinFailures", "stock", "settings", "saleSeq"].every((k) =>
-      isObj(value[k]),
-    ) &&
-    (value.session === null || isObj(value.session)) &&
-    (value.shift === null || isObj(value.shift))
+    [
+      "users",
+      "closedShifts",
+      "products",
+      "sales",
+      "customers",
+      "creditLedger",
+    ].every((k) => Array.isArray(value[k])) &&
+    [
+      "pinFailures",
+      "ownerLoginFailures",
+      "stock",
+      "minStock",
+      "unitCosts",
+      "settings",
+      "saleSeq",
+    ].every((k) => isObj(value[k])) &&
+    ["session", "ownerSession", "shift"].every(
+      (k) => value[k] === null || isObj(value[k]),
+    )
   );
 }
 

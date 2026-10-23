@@ -8,6 +8,7 @@ import type {
   SaleItem,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { cartTotal, priceLine } from "@/shared/lib/pricing";
+import { roundHalfUp } from "@/shared/lib/quantity";
 import type { MockUser } from "./db";
 
 /** Penolakan 422; handler mengubahnya menjadi problem+json. */
@@ -151,6 +152,17 @@ function safeSum(values: readonly number[]): number | null {
 /** Total penjualan, atau null bila di luar rentang aman. */
 export const saleTotal = (items: readonly PricedItem[]): number | null =>
   safeSum(items.map((p) => p.item.subtotal));
+
+/** HPP penjualan: Σ round_half_up(HPP satuan × qtyBase ÷ unitSize); HPP tak tercatat = 0. */
+export const saleCost = (
+  unitCosts: Readonly<Record<string, number>>,
+  items: readonly SaleItem[],
+): number =>
+  items.reduce(
+    (sum, i) =>
+      sum + roundHalfUp((unitCosts[i.unitId] ?? 0) * i.qtyBase, i.unitSize),
+    0,
+  );
 
 function parsePayments(raw: unknown): PaymentInput[] | Rejection {
   if (!Array.isArray(raw) || raw.length === 0) {
