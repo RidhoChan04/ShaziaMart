@@ -9,6 +9,11 @@
  * memerlukan sesi; health, users, pin-login, settings, catalog, dan customers publik
  * (satu PC di localhost).
  *
+ * Endpoint pemilik berada di bawah /api/owner dengan realm cookie terpisah total dari kasir:
+ * owner_session (berlaku 30 hari). Sesi kasir tidak berlaku di sana dan sebaliknya.
+ * HPP dan laba hanya muncul di endpoint /api/owner; endpoint kasir tidak pernah memuatnya.
+ * Hari bisnis memakai zona Asia/Jakarta.
+ *
  * OpenAPI spec version: 0.1.0
  */
 export type HealthStatus = typeof HealthStatus[keyof typeof HealthStatus];
@@ -50,6 +55,7 @@ export const ErrorCode = {
   PRICE_CHANGED: 'PRICE_CHANGED',
   CREDIT_LIMIT: 'CREDIT_LIMIT',
   INVALID_QUANTITY: 'INVALID_QUANTITY',
+  LOGIN_INVALID: 'LOGIN_INVALID',
 } as const;
 
 export interface Problem {
@@ -125,6 +131,81 @@ export interface User {
   id: string;
   name: string;
   role: UserRole;
+}
+
+export interface OwnerLogin {
+  /** @minLength 1 */
+  name: string;
+  /** @minLength 1 */
+  password: string;
+}
+
+export interface OwnerSession {
+  user: User;
+}
+
+export interface HourBucket {
+  /**
+     * Jam lokal Asia/Jakarta.
+     * @minimum 0
+     * @maximum 23
+     */
+  hour: number;
+  /** Omzet hari ini pada jam ini (rupiah). */
+  revenue: number;
+  /** Omzet hari yang sama minggu lalu pada jam ini (rupiah). */
+  lastWeekRevenue: number;
+}
+
+export interface CashDifference {
+  shiftId: string;
+  kasirName: string;
+  /** Waktu shift ditutup (epoch ms UTC). */
+  closedAt: number;
+  /** Uang fisik dikurangi uang seharusnya (rupiah); tidak nol. */
+  difference: number;
+}
+
+export interface OverdueCredit {
+  /** Jumlah pelanggan bersaldo kasbon > 0 yang entri kasbon belum lunas tertuanya lebih dari 30 hari. */
+  count: number;
+  /** Jumlah saldo kasbon seluruh pelanggan tersebut (rupiah). */
+  total: number;
+}
+
+export interface Attention {
+  lowStockCount: number;
+  negativeStockCount: number;
+  /** Shift hari ini (Asia/Jakarta) yang sudah ditutup dengan selisih kas tidak nol, terbaru dulu. */
+  cashDifferences: CashDifference[];
+  overdueCredit: OverdueCredit;
+}
+
+/**
+ * Semua uang integer rupiah. revenue, grossProfit, newCredit, dan avgTicket hanya menghitung
+ * penjualan berstatus selesai. avgTicket = round_half_up(revenue / salesCount), 0 bila tidak ada penjualan.
+ */
+export interface OwnerTodaySummary {
+  /** Tanggal bisnis hari ini di Asia/Jakarta (YYYY-MM-DD). */
+  date: string;
+  /** Nama hari Bahasa Indonesia untuk hari yang sama minggu lalu, mis. "Jumat". */
+  weekdayLastWeek: string;
+  revenue: number;
+  /** Omzet dikurangi HPP (rupiah). */
+  grossProfit: number;
+  salesCount: number;
+  /** Total kasbon baru hari ini (rupiah). */
+  newCredit: number;
+  avgTicket: number;
+  /** Omzet seluruh hari yang sama minggu lalu (rupiah). */
+  lastWeekRevenue: number;
+  /**
+     * Tepat 24 bucket; indeks = jam lokal Asia/Jakarta (0-23).
+     * @minItems 24
+     * @maxItems 24
+     */
+  hourly: HourBucket[];
+  attention: Attention;
 }
 
 export interface Session {
@@ -357,6 +438,11 @@ export interface NewCustomer {
   /** @pattern ^\d{8,15}$ */
   phone: string;
 }
+
+/**
+ * Nama atau password salah (LOGIN_INVALID)
+ */
+export type LoginInvalidResponse = Problem;
 
 /**
  * Tidak ada sesi (UNAUTHORIZED)

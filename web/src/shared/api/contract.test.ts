@@ -2,10 +2,15 @@ import { expect, expectTypeOf, test } from "vitest";
 import type { z } from "zod";
 import type {
   CreditLimitProblem,
+  OwnerTodaySummary,
   PriceChangedProblem,
 } from "./gen/shaziaMartAPI.schemas";
 import { ErrorCode } from "./gen/shaziaMartAPI.schemas";
 import { LookupCatalogResponse } from "./gen/zod/catalog/catalog";
+import {
+  GetOwnerTodaySummaryResponse,
+  OwnerLoginBody,
+} from "./gen/zod/owner/owner";
 import { CreateSaleBody, VoidSaleBody } from "./gen/zod/sales/sales";
 import { creditLimitProblemSchema, priceChangedProblemSchema } from "./problem";
 
@@ -55,8 +60,50 @@ test("creditLimitProblemSchema cocok dengan tipe hasil generate", () => {
   expect(ok.success).toBe(true);
 });
 
-test("ErrorCode tetap 13 kode F1", () => {
-  expect(Object.values(ErrorCode)).toHaveLength(13);
+test("ErrorCode berisi 14 kode termasuk LOGIN_INVALID", () => {
+  expect(Object.values(ErrorCode)).toHaveLength(14);
+  expect(ErrorCode.LOGIN_INVALID).toBe("LOGIN_INVALID");
+});
+
+test("OwnerLogin menolak nama kosong dan password kosong", () => {
+  const ok = { name: "budi", password: "rahasia" };
+  expect(OwnerLoginBody.safeParse(ok).success).toBe(true);
+  expect(OwnerLoginBody.safeParse({ ...ok, name: "" }).success).toBe(false);
+  expect(OwnerLoginBody.safeParse({ ...ok, password: "" }).success).toBe(false);
+});
+
+test("fixture OwnerTodaySummary valid terhadap skema respons dan tipe", () => {
+  const summary = {
+    date: "2026-10-23",
+    weekdayLastWeek: "Jumat",
+    revenue: 1500000,
+    grossProfit: 300000,
+    salesCount: 30,
+    newCredit: 50000,
+    avgTicket: 50000,
+    lastWeekRevenue: 1200000,
+    hourly: Array.from({ length: 24 }, (_, hour) => ({
+      hour,
+      revenue: hour * 1000,
+      lastWeekRevenue: hour * 900,
+    })),
+    attention: {
+      lowStockCount: 2,
+      negativeStockCount: 1,
+      cashDifferences: [
+        {
+          shiftId: "sh1",
+          kasirName: "Sari",
+          closedAt: 1790000000000,
+          difference: -5000,
+        },
+      ],
+      overdueCredit: { count: 1, total: 75000 },
+    },
+  } satisfies OwnerTodaySummary;
+  expect(GetOwnerTodaySummaryResponse.safeParse(summary).success).toBe(true);
+  const short = { ...summary, hourly: summary.hourly.slice(0, 23) };
+  expect(GetOwnerTodaySummaryResponse.safeParse(short).success).toBe(false);
 });
 
 test("409 dikunci oleh code: PRICE_CHANGED lolos skema harga, CREDIT_LIMIT tidak", () => {

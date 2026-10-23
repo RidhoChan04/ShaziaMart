@@ -9,6 +9,11 @@
  * memerlukan sesi; health, users, pin-login, settings, catalog, dan customers publik
  * (satu PC di localhost).
  *
+ * Endpoint pemilik berada di bawah /api/owner dengan realm cookie terpisah total dari kasir:
+ * owner_session (berlaku 30 hari). Sesi kasir tidak berlaku di sana dan sebaliknya.
+ * HPP dan laba hanya muncul di endpoint /api/owner; endpoint kasir tidak pernah memuatnya.
+ * Hari bisnis memakai zona Asia/Jakarta.
+ *
  * OpenAPI spec version: 0.1.0
  */
 import {
