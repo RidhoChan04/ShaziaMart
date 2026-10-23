@@ -44,6 +44,15 @@ export function requireSession(
   return user ?? problem(401, "UNAUTHORIZED", "Sesi tidak ditemukan");
 }
 
+/** Pemilik sesi pemilik aktif (terpisah dari sesi kasir), atau 401 UNAUTHORIZED. */
+export function requireOwnerSession(
+  state: Readonly<MockState>,
+): MockUser | Response {
+  const userId = state.ownerSession?.userId;
+  const user = state.users.find((u) => u.id === userId && u.role === "pemilik");
+  return user ?? problem(401, "UNAUTHORIZED", "Sesi pemilik tidak ditemukan");
+}
+
 export async function readJson(
   request: Request,
 ): Promise<Record<string, unknown> | null> {

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 import type { Session } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { mockDb } from "../db";
 import { setScenario } from "../scenarios";
-import { login, post } from "./test-helpers";
+import { login, placedShifts, post } from "./test-helpers";
 
 afterEach(() => {
   vi.useRealTimers();
@@ -138,7 +138,7 @@ describe("shift", () => {
     const state = mockDb.get();
     expect(state.shift).toBeNull();
     expect(state.session).toBeNull();
-    expect(state.closedShifts).toHaveLength(1);
+    expect(placedShifts(state)).toHaveLength(1);
   });
 
   test("tutup shift tanpa shift -> 409 SHIFT_CLOSED", async () => {

@@ -1,5 +1,6 @@
 import type { ProductUnit } from "@/shared/api/gen/shaziaMartAPI.schemas";
-import { mockDb } from "../db";
+import { type MockSale, type MockState, mockDb } from "../db";
+import { KIND, makeId } from "../seed";
 
 export function post(path: string, body: unknown): Promise<Response> {
   return fetch(path, {
@@ -37,4 +38,19 @@ export function customerId(name: string): string {
   const customer = mockDb.get().customers.find((c) => c.name === name);
   if (!customer) throw new Error(`seed tanpa ${name}`);
   return customer.id;
+}
+
+const HISTORY_SALE = makeId(KIND.sale, 0).slice(0, 8);
+const HISTORY_SHIFT = makeId(KIND.shift, 0).slice(0, 8);
+
+/** Penjualan yang dibuat test ini; riwayat 14 hari seed tidak ikut. */
+export function placedSales(
+  state: Readonly<MockState> = mockDb.get(),
+): MockSale[] {
+  return state.sales.filter((s) => !s.id.startsWith(HISTORY_SALE));
+}
+
+/** Shift yang ditutup test ini; shift riwayat seed tidak ikut. */
+export function placedShifts(state: Readonly<MockState> = mockDb.get()) {
+  return state.closedShifts.filter((c) => !c.shiftId.startsWith(HISTORY_SHIFT));
 }

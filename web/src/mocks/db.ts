@@ -11,6 +11,11 @@ import { createSeedState } from "./seed-data";
 
 /** `password` hanya untuk pemilik (login aplikasi pemilik); mock saja. */
 export type MockUser = User & { pin: string; password?: string };
+/** Shift tertutup + nama kasir dan waktu tutup (untuk ringkasan pemilik). */
+export type MockClosedShift = ShiftClosure & {
+  kasirName: string;
+  closedAt: number;
+};
 export type MockShift = Shift & { cashSales: number; salesCount: number };
 /** HPP disalin saat penjualan; tidak pernah dikirim ke endpoint kasir. */
 export type MockSale = Sale & { costTotal: number };
@@ -38,7 +43,7 @@ export type MockState = {
   ownerSession: { userId: string } | null;
   ownerLoginFailures: LoginFailures;
   shift: MockShift | null;
-  closedShifts: ShiftClosure[];
+  closedShifts: MockClosedShift[];
   products: Product[];
   /** productId -> qtyBase */
   stock: Record<string, number>;

@@ -85,7 +85,11 @@ export const shiftHandlers = [
         salesCount: shift.salesCount,
       };
       mockDb.update((s) => {
-        s.closedShifts.push(closure);
+        s.closedShifts.push({
+          ...closure,
+          kasirName: shift.kasirName,
+          closedAt: Date.now(),
+        });
         s.shift = null;
         s.session = null;
       });

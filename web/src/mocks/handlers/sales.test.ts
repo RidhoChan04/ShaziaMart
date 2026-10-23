@@ -13,6 +13,7 @@ import {
   customerId,
   login,
   loginWithShift,
+  placedSales,
   post,
   unitOf,
 } from "./test-helpers";
@@ -154,7 +155,7 @@ describe("createSale", () => {
     expect(different.status).toBe(200);
     expect(await json<Sale>(different)).toEqual(created);
     const state = mockDb.get();
-    expect(state.sales).toHaveLength(1);
+    expect(placedSales(state)).toHaveLength(1);
     expect(stockOf(BIMOLI)).toBe(before - 2);
     expect(state.shift).toMatchObject({ cashSales: 72000, salesCount: 1 });
   });
@@ -190,7 +191,7 @@ describe("createSale", () => {
     });
     expect(res.status).toBe(422);
     expect((await json<Problem>(res)).code).toBe("INVALID_QUANTITY");
-    expect(mockDb.get().sales).toHaveLength(0);
+    expect(placedSales()).toHaveLength(0);
   });
 
   test.each([
@@ -247,7 +248,7 @@ describe("createSale", () => {
       },
       { unitId: unitOf(GULA).id, oldUnitPrice: 17000, newUnitPrice: 18000 },
     ]);
-    expect(mockDb.get().sales).toHaveLength(0);
+    expect(placedSales()).toHaveLength(0);
   });
 
   test("harga-berubah: pertama 409 PRICE_CHANGED (+500), kirim ulang dengan harga baru → 201", async () => {
@@ -315,7 +316,7 @@ describe("createSale", () => {
       expect((await json<Problem>(wrong)).code).toBe("PIN_INVALID");
     }
     expect(balanceOf("Pak Joko")).toBe(290000);
-    expect(mockDb.get().sales).toHaveLength(0);
+    expect(placedSales()).toHaveLength(0);
     const ok = await post("/api/sales", { ...body, ownerPin: "999999" });
     expect(ok.status).toBe(201);
     expect(await json<Sale>(ok)).toMatchObject({ cashReceived: 0, change: 0 });
@@ -434,7 +435,7 @@ describe("createSale", () => {
       });
       expect(res.status).toBe(422);
       expect((await json<Problem>(res)).code).toBe("VALIDATION");
-      expect(mockDb.get().sales).toHaveLength(0);
+      expect(placedSales()).toHaveLength(0);
     },
   );
 
@@ -478,7 +479,7 @@ describe("createSale", () => {
     expect(replay.status).toBe(200);
     expect(await json<Sale>(replay)).toEqual(created);
     const after = mockDb.get();
-    expect(after.sales).toHaveLength(1);
+    expect(placedSales(after)).toHaveLength(1);
     expect(after.stock).toEqual(before.stock);
     expect(after.shift).toBeNull();
   });
@@ -578,11 +579,11 @@ describe("printSale & listTodaySales", () => {
     const failed = await post(`/api/sales/${sale.id}/print`, {});
     expect(failed.status).toBe(200);
     expect(await failed.json()).toEqual({ printStatus: "gagal" });
-    expect(mockDb.get().sales[0]?.printStatus).toBe("gagal");
+    expect(placedSales()[0]?.printStatus).toBe("gagal");
     setScenario("normal");
     const ok = await post(`/api/sales/${sale.id}/print`, {});
     expect(await ok.json()).toEqual({ printStatus: "tercetak" });
-    expect(mockDb.get().sales[0]?.printStatus).toBe("tercetak");
+    expect(placedSales()[0]?.printStatus).toBe("tercetak");
     expect((await post("/api/sales/x/print", {})).status).toBe(404);
   });
 

@@ -2,7 +2,11 @@ import { act, screen, waitFor, within } from "@testing-library/react";
 import { http } from "msw";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { mockDb } from "@/mocks/db";
-import { loginWithShift, post } from "@/mocks/handlers/test-helpers";
+import {
+  loginWithShift,
+  placedShifts,
+  post,
+} from "@/mocks/handlers/test-helpers";
 import { server } from "@/mocks/node";
 import { renderApp } from "@/test/render-app";
 import { fillSpecCart } from "@/test/spec-cart";
@@ -253,7 +257,7 @@ test("hasil tutup shift bertahan walau gerbang dimuat ulang; Selesai → Buka sh
   ).toBeInTheDocument();
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   expect(mockDb.get().shift).toBeNull();
-  expect(mockDb.get().closedShifts).toHaveLength(1);
+  expect(placedShifts()).toHaveLength(1);
 });
 
 /** Hitung request PIN login yang sampai ke server palsu. */

@@ -109,13 +109,10 @@ test("PIN seed dan state awal", () => {
   expect([
     s.session,
     s.shift,
-    s.closedShifts,
-    s.sales,
     s.pinFailures,
-    s.saleSeq,
     s.ownerSession,
     s.ownerLoginFailures,
-  ]).toEqual([null, null, [], [], {}, {}, null, {}]);
+  ]).toEqual([null, null, {}, null, {}]);
 });
 
 test("pelanggan seed", () => {

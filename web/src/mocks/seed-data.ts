@@ -6,6 +6,7 @@ import type {
 } from "../shared/api/gen/shaziaMartAPI.schemas";
 import { roundHalfUp } from "../shared/lib/quantity";
 import type { MockState, MockUser } from "./db";
+import { generateHistory } from "./history";
 import { KIND, makeId, rng } from "./seed";
 import { CATALOG_NAMES } from "./seed-catalog-names";
 import { seedCustomers } from "./seed-customers";
@@ -218,7 +219,7 @@ export function createSeedState(now: number = Date.now()): MockState {
     ...u,
     id: makeId(KIND.user, i + 1),
   }));
-  return {
+  const state: MockState = {
     version: 3,
     store: { id: makeId(KIND.store, 1), name: "ShaziaMart" },
     users,
@@ -244,4 +245,6 @@ export function createSeedState(now: number = Date.now()): MockState {
     },
     saleSeq: {},
   };
+  generateHistory(state, now);
+  return state;
 }

@@ -8,7 +8,7 @@ import {
 import { delay, HttpResponse, http } from "msw";
 import { beforeEach, expect, test, vi } from "vitest";
 import { mockDb } from "@/mocks/db";
-import { loginWithShift } from "@/mocks/handlers/test-helpers";
+import { loginWithShift, placedSales } from "@/mocks/handlers/test-helpers";
 import { server } from "@/mocks/node";
 import { setScenario } from "@/mocks/scenarios";
 import { getListTodaySalesQueryKey } from "@/shared/api/gen/sales/sales";
@@ -90,7 +90,7 @@ test("Selesai diklik dua kali → hanya satu POST /api/sales", async () => {
   await user.keyboard("{Enter}");
   await waitFor(() => expect(payDialog()).toBeNull());
   expect(bodies).toHaveLength(1);
-  expect(mockDb.get().sales).toHaveLength(1);
+  expect(placedSales()).toHaveLength(1);
 });
 
 test("dua submit sebelum render ulang → tetap satu POST", async () => {
@@ -126,7 +126,7 @@ test("server-mati saat Selesai → pesan, keranjang tetap; coba lagi memakai sal
   await user.click(selesai());
   await waitFor(() => expect(payDialog()).toBeNull());
   expect(bodies.map((b) => b.saleId)).toEqual([saleId, saleId]);
-  expect(mockDb.get().sales.map((s) => s.id)).toEqual([saleId]);
+  expect(placedSales().map((s) => s.id)).toEqual([saleId]);
   expect(panelChange()).toHaveTextContent("Rp14.000");
 });
 
@@ -255,7 +255,7 @@ test("printer-gagal → toast struk gagal", async () => {
     await screen.findByText("Struk gagal dicetak — cetak ulang dari Riwayat"),
   ).toBeInTheDocument();
   expect(payDialog()).toBeNull();
-  expect(mockDb.get().sales[0]?.printStatus).toBe("gagal");
+  expect(placedSales()[0]?.printStatus).toBe("gagal");
 });
 
 test("Esc menutup jendela bayar tanpa menyimpan", async () => {

@@ -20,6 +20,8 @@ export const KIND = {
   unit: 3,
   customer: 4,
   credit: 5,
+  sale: 6,
+  shift: 7,
 } as const;
 
 export function makeId(kind: number, n: number): string {

@@ -1,8 +1,11 @@
 import { act, screen, waitFor, within } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import { beforeEach, expect, test, vi } from "vitest";
-import { mockDb } from "@/mocks/db";
-import { loginWithShift, post } from "@/mocks/handlers/test-helpers";
+import {
+  loginWithShift,
+  placedSales,
+  post,
+} from "@/mocks/handlers/test-helpers";
 import { server } from "@/mocks/node";
 import { setScenario } from "@/mocks/scenarios";
 import type { SaleRequest } from "@/shared/api/gen/shaziaMartAPI.schemas";
@@ -61,7 +64,7 @@ test("UANG DITERIMA diketik manusia (jeda 60 ms) + Enter → tersimpan", async (
   await user.type(received(), "50000{Enter}");
   await waitFor(() => expect(payDialog()).toBeNull());
   expect(bodies).toHaveLength(1);
-  expect(mockDb.get().sales[0]?.cashReceived).toBe(50000);
+  expect(placedSales()[0]?.cashReceived).toBe(50000);
   expect(screen.queryByText("Itu barcode, bukan angka")).toBeNull();
 });
 
@@ -93,7 +96,7 @@ test("POST /api/sales tanpa jawaban → 15 dtk kemudian pesan; Selesai aktif lag
   await user.click(selesai());
   await waitFor(() => expect(payDialog()).toBeNull());
   expect(saleIds).toEqual([saleId, saleId]);
-  expect(mockDb.get().sales.map((s) => s.id)).toEqual([saleId]);
+  expect(placedSales().map((s) => s.id)).toEqual([saleId]);
 });
 
 test("buildSaleRequest melempar → pesan tampil, Selesai tetap bisa dipakai lagi", async () => {
@@ -146,7 +149,7 @@ test("jawaban hilang lalu keranjang diubah → saleId sudah tersimpan: dialog tr
   await first.user.type(first.received(), "50000");
   await first.user.click(first.selesai());
   expect(await first.ui.findByRole("alert")).toHaveTextContent(OFFLINE);
-  const stored = mockDb.get().sales[0];
+  const stored = placedSales()[0];
   expect(stored?.total).toBe(39100);
 
   await first.user.keyboard("{Escape}");
@@ -179,5 +182,5 @@ test("jawaban hilang lalu keranjang diubah → saleId sudah tersimpan: dialog tr
   expect(payDialog()).toBeNull();
   expect(useCart.getState().lines).toHaveLength(0);
   expect(panelChange()).toHaveTextContent("Rp10.900");
-  expect(mockDb.get().sales).toHaveLength(1);
+  expect(placedSales()).toHaveLength(1);
 });

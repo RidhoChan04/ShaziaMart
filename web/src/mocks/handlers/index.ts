@@ -1,6 +1,7 @@
 import { authHandlers } from "./auth";
 import { catalogHandlers } from "./catalog";
 import { customerHandlers } from "./customers";
+import { ownerHandlers } from "./owner";
 import { salesHandlers } from "./sales";
 import { settingsHandlers } from "./settings";
 import { shiftHandlers } from "./shift";
@@ -14,4 +15,5 @@ export const handlers = [
   ...catalogHandlers,
   ...salesHandlers,
   ...customerHandlers,
+  ...ownerHandlers,
 ];
