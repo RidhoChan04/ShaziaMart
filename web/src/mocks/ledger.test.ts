@@ -88,3 +88,51 @@ test.each([
     daysAgo === null ? null : NOW - daysAgo * DAY,
   );
 });
+
+test.each([
+  [
+    "batal kasbon membatalkan entrinya sendiri, utang 35 hari tetap terlihat",
+    [
+      [35, 50000, null],
+      [0, 60000, "s1"],
+      [0, -60000, "s1"],
+    ],
+    35,
+  ],
+  [
+    "batal campuran (bagian kasbon saja) membatalkan entrinya sendiri",
+    [
+      [40, 10000, null],
+      [2, 16000, "s2"],
+      [1, -16000, "s2"],
+    ],
+    40,
+  ],
+  [
+    "pelunasan tanpa saleId tetap FIFO di samping batal",
+    [
+      [40, 10000, null],
+      [20, 30000, "s3"],
+      [10, -10000, null],
+      [5, 25000, "s4"],
+      [1, -25000, "s4"],
+    ],
+    20,
+  ],
+  [
+    "pelunasan memakan kasbon penjualan terlama, bukan kasbon tanpa saleId",
+    [
+      [40, 30000, "s5"],
+      [20, 10000, null],
+      [10, -30000, null],
+    ],
+    20,
+  ],
+] as const)("oldestUnpaidAt batal: %s", (_, entries, daysAgo) => {
+  const s = emptyLedger();
+  const udin = idOf(s, "Pak Udin");
+  for (const [days, amount, saleId] of entries) {
+    appendCredit(s, { customerId: udin, amount, at: NOW - days * DAY, saleId });
+  }
+  expect(oldestUnpaidAt(s, udin)).toBe(NOW - daysAgo * DAY);
+});

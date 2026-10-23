@@ -24,17 +24,34 @@ export function appendCredit(
   if (customer) customer.balance = balanceOf(state, entry.customerId);
 }
 
-/** Waktu kasbon tertua yang belum lunas; pelunasan memakan kasbon terlama dulu (FIFO). */
+/**
+ * Waktu kasbon tertua yang belum lunas. Batal (entri negatif ber-saleId) membatalkan
+ * kasbon penjualannya sendiri; hanya pelunasan (saleId null) yang memakan utang terlama dulu (FIFO).
+ */
 export function oldestUnpaidAt(
   state: Readonly<Ledger>,
   customerId: string,
 ): number | null {
   const entries = entriesOf(state, customerId);
-  let paid = entries.reduce((sum, e) => sum - Math.min(e.amount, 0), 0);
-  const debts = entries.filter((e) => e.amount > 0).sort((a, b) => a.at - b.at);
+  const debts = entries
+    .filter((e) => e.amount > 0)
+    .map((e) => ({ at: e.at, saleId: e.saleId, left: e.amount }))
+    .sort((a, b) => a.at - b.at);
+  let paid = 0;
+  for (const e of entries) {
+    if (e.amount >= 0) continue;
+    let rest = -e.amount;
+    for (const debt of debts) {
+      if (e.saleId === null || debt.saleId !== e.saleId) continue;
+      const take = Math.min(debt.left, rest);
+      debt.left -= take;
+      rest -= take;
+    }
+    paid += rest;
+  }
   for (const debt of debts) {
-    if (debt.amount > paid) return debt.at;
-    paid -= debt.amount;
+    if (debt.left > paid) return debt.at;
+    paid -= debt.left;
   }
   return null;
 }
