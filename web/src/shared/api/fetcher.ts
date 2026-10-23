@@ -7,6 +7,8 @@ export class ApiError extends Error {
   readonly code: ApiErrorCode;
   readonly detail?: string;
   readonly body?: unknown;
+  /** Path request (tanpa origin/query), mis. `/api/owner/session`; kosong bila dibuat manual. */
+  readonly url: string;
 
   constructor(init: {
     status: number;
@@ -14,11 +16,13 @@ export class ApiError extends Error {
     message?: string;
     detail?: string;
     body?: unknown;
+    url?: string;
   }) {
     super(init.message ?? init.detail ?? init.code);
     this.name = "ApiError";
     this.status = init.status;
     this.code = init.code;
+    this.url = init.url ?? "";
     if (init.detail !== undefined) this.detail = init.detail;
     if (init.body !== undefined) this.body = init.body;
   }
@@ -44,6 +48,7 @@ async function readBody(res: Response, contentType: string): Promise<unknown> {
 }
 
 function toApiError(
+  url: string,
   status: number,
   contentType: string,
   body: unknown,
@@ -55,6 +60,7 @@ function toApiError(
   ) {
     const p = body as { code?: unknown; detail?: unknown; title?: unknown };
     return new ApiError({
+      url,
       status,
       code: isErrorCode(p.code) ? p.code : "INTERNAL",
       ...(typeof p.title === "string" ? { message: p.title } : {}),
@@ -62,7 +68,7 @@ function toApiError(
       body,
     });
   }
-  return new ApiError({ status, code: "INTERNAL", body });
+  return new ApiError({ url, status, code: "INTERNAL", body });
 }
 
 // Request macet (server hidup tapi tidak menjawab) tidak boleh mengunci layar kasir.
@@ -77,6 +83,7 @@ export const customFetch = async <T>(
   url: string,
   init: RequestInit,
 ): Promise<T> => {
+  const path = new URL(url, "http://localhost").pathname;
   // setTimeout biasa (bukan AbortSignal.timeout) agar bisa dihentikan setelah selesai dan dites.
   const timeout = new AbortController();
   const timer = setTimeout(() => timeout.abort(), TIMEOUT_MS);
@@ -90,6 +97,7 @@ export const customFetch = async <T>(
     body = await readBody(res, res.headers.get("content-type") ?? "");
   } catch (cause) {
     throw new ApiError({
+      url: path,
       status: 0,
       code: "NETWORK",
       message:
@@ -100,7 +108,12 @@ export const customFetch = async <T>(
   }
 
   if (!res.ok) {
-    throw toApiError(res.status, res.headers.get("content-type") ?? "", body);
+    throw toApiError(
+      path,
+      res.status,
+      res.headers.get("content-type") ?? "",
+      body,
+    );
   }
   return body as T;
 };

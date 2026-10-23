@@ -1,6 +1,5 @@
 import {
   type QueryClient,
-  type QueryKey,
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
@@ -13,17 +12,14 @@ import {
 import type { OwnerSession } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { HEALTH_POLL_MS } from "@/shared/hooks/use-server-health";
 
+const OWNER_PATH = "/api/owner/";
+
 const isUnauthorized = (error: unknown): boolean =>
   error instanceof ApiError && error.code === "UNAUTHORIZED";
 
-// Query pemilik berkunci URL `/api/owner/…`; mutasinya berkunci operationId `owner…`.
-const isOwnerKey = (key: QueryKey | undefined): boolean => {
-  const head = key?.[0];
-  return (
-    typeof head === "string" &&
-    (head.startsWith("/api/owner/") || head.startsWith("owner"))
-  );
-};
+// Realm ditentukan oleh URL request yang gagal, bukan nama operasi/kunci cache.
+const isOwnerUnauthorized = (error: unknown): boolean =>
+  isUnauthorized(error) && (error as ApiError).url.startsWith(OWNER_PATH);
 
 /**
  * `null` = belum login (401 bukan galat). Sesi hanya berubah lewat login/keluar
@@ -55,28 +51,32 @@ export function setOwnerSession(client: QueryClient, session: OwnerSession) {
 
 /** Keluar: sesi kosong dan data pemilik lain dibuang agar tidak terlihat sesudah login berikutnya. */
 export function clearOwnerSession(client: QueryClient) {
-  const sessionKey = getGetOwnerSessionQueryKey();
+  const [sessionPath] = getGetOwnerSessionQueryKey();
+  // Kunci query hasil orval adalah URL-nya.
   client.removeQueries({
-    predicate: (q) => isOwnerKey(q.queryKey) && q.queryKey[0] !== sessionKey[0],
+    predicate: ({ queryKey: [head] }) =>
+      typeof head === "string" &&
+      head.startsWith(OWNER_PATH) &&
+      head !== sessionPath,
   });
-  client.setQueryData<OwnerSession | null>(sessionKey, null);
+  client.setQueryData<OwnerSession | null>(getGetOwnerSessionQueryKey(), null);
 }
 
 /** 401 `UNAUTHORIZED` dari query/mutasi pemilik mana pun → kembali ke login; 401 kasir diabaikan. */
 export function useLogoutOnUnauthorized() {
   const client = useQueryClient();
   useEffect(() => {
-    const drop = (key: QueryKey | undefined, error: unknown) => {
-      if (isOwnerKey(key) && isUnauthorized(error)) clearOwnerSession(client);
+    const drop = (error: unknown) => {
+      if (isOwnerUnauthorized(error)) clearOwnerSession(client);
     };
     const offQueries = client.getQueryCache().subscribe((event) => {
       if (event.type === "updated" && event.action.type === "error") {
-        drop(event.query.queryKey, event.action.error);
+        drop(event.action.error);
       }
     });
     const offMutations = client.getMutationCache().subscribe((event) => {
       if (event.type === "updated" && event.action.type === "error") {
-        drop(event.mutation.options.mutationKey, event.action.error);
+        drop(event.action.error);
       }
     });
     return () => {

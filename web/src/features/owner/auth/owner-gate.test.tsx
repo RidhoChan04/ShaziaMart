@@ -1,11 +1,17 @@
-import { act, screen, waitFor } from "@testing-library/react";
+import {
+  type QueryClient,
+  QueryClientProvider,
+  useMutation,
+} from "@tanstack/react-query";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http } from "msw";
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
 import { mockDb } from "@/mocks/db";
 import { problem } from "@/mocks/handlers/respond";
 import { login, ownerLogin, post } from "@/mocks/handlers/test-helpers";
 import { server } from "@/mocks/node";
+import { customFetch } from "@/shared/api/fetcher";
 import { getGetSessionQueryKey, getSession } from "@/shared/api/gen/auth/auth";
 import {
   getGetOwnerSessionQueryKey,
@@ -157,4 +163,67 @@ test("401 UNAUTHORIZED dari mutasi pemilik → kembali ke login", async () => {
       screen.getByRole("heading", { name: "Masuk pemilik" }),
     ).toBeInTheDocument(),
   );
+});
+
+/** Mutasi biasa (operationId tidak berawalan "owner") yang memanggil `path`. */
+function renderTrigger(client: QueryClient, path: string, key: string) {
+  function Trigger() {
+    const mutation = useMutation({
+      mutationKey: [key],
+      mutationFn: () => customFetch<void>(path, { method: "POST" }),
+    });
+    return (
+      <button type="button" onClick={() => mutation.mutate()}>
+        {`Picu ${key}`}
+      </button>
+    );
+  }
+  render(
+    <QueryClientProvider client={client}>
+      <Trigger />
+    </QueryClientProvider>,
+  );
+  return screen.getByRole("button", { name: `Picu ${key}` });
+}
+
+const unauthorized = () =>
+  problem(401, "UNAUTHORIZED", "Sesi pemilik tidak ditemukan");
+
+test("401 dari mutasi /api/owner/* tanpa awalan 'owner' pada operationId → login", async () => {
+  await ownerLogin();
+  server.use(http.post("/api/owner/products/p1/price", unauthorized));
+  const { queryClient } = renderApp("/owner");
+  await page("Beranda");
+  const user = userEvent.setup();
+  await user.click(
+    renderTrigger(
+      queryClient,
+      "/api/owner/products/p1/price",
+      "updateProductPrice",
+    ),
+  );
+  expect(await loginHeading()).toBeInTheDocument();
+});
+
+test("401 dari mutasi kasir diabaikan walau kuncinya berawalan 'owner'", async () => {
+  await ownerLogin();
+  const hit = vi.fn();
+  server.use(
+    http.post("/api/sales", () => {
+      hit();
+      return unauthorized();
+    }),
+  );
+  const { queryClient } = renderApp("/owner");
+  await page("Beranda");
+  const user = userEvent.setup();
+  await user.click(renderTrigger(queryClient, "/api/sales", "ownerTrap"));
+  await waitFor(() => expect(hit).toHaveBeenCalled());
+  await waitFor(() =>
+    expect(queryClient.getMutationCache().getAll()[0]?.state.status).toBe(
+      "error",
+    ),
+  );
+  expect(screen.getByRole("heading", { name: "Beranda" })).toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: "Masuk pemilik" })).toBeNull();
 });

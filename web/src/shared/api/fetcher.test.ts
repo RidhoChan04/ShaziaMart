@@ -85,6 +85,43 @@ test("signal pemanggil tetap bisa membatalkan → NETWORK", async () => {
   await expect(result).rejects.toMatchObject({ status: 0, code: "NETWORK" });
 });
 
+test("ApiError membawa path request (tanpa origin/query) untuk problem, jaringan, dan timeout", async () => {
+  mockFetch(
+    401,
+    { type: "about:blank", title: "x", status: 401, code: "UNAUTHORIZED" },
+    "application/problem+json",
+  );
+  await expect(
+    customFetch("/api/owner/summary/today?x=1", {}),
+  ).rejects.toMatchObject({
+    code: "UNAUTHORIZED",
+    url: "/api/owner/summary/today",
+  });
+  vi.restoreAllMocks();
+
+  mockFetch(500, "oops", "text/plain");
+  await expect(
+    customFetch("http://localhost:4173/api/owner/session", {}),
+  ).rejects.toMatchObject({ code: "INTERNAL", url: "/api/owner/session" });
+  vi.restoreAllMocks();
+
+  mockFetchReject(new TypeError("Failed to fetch"));
+  await expect(customFetch("/api/auth/session", {})).rejects.toMatchObject({
+    code: "NETWORK",
+    url: "/api/auth/session",
+  });
+  vi.restoreAllMocks();
+
+  vi.useFakeTimers();
+  mockFetchHang();
+  const result = customFetch("/api/sales", {}).catch((e: unknown) => e);
+  await vi.advanceTimersByTimeAsync(15_000);
+  expect(await result).toMatchObject({ code: "NETWORK", url: "/api/sales" });
+});
+
+test("ApiError buatan tangan tanpa url → url kosong", () =>
+  expect(new ApiError({ status: 0, code: "NETWORK" }).url).toBe(""));
+
 test("500 non-problem menjadi INTERNAL", async () => {
   mockFetch(500, "oops", "text/plain");
   await expect(customFetch("/api/x", {})).rejects.toMatchObject({
