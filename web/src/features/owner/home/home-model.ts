@@ -50,11 +50,11 @@ export function hourWindow(
   return { from: from + shift, to: to + shift };
 }
 
-type AttentionItem = {
+export type AttentionItem = {
   key: string;
   text: string;
   tone: "warning" | "critical";
-  to: string;
+  to: "/owner/barang" | "/owner/lainnya" | "/owner/kasbon";
 };
 
 export function attentionItems(a: Attention): AttentionItem[] {

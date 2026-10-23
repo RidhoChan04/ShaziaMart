@@ -9,10 +9,6 @@ function PlaceholderPage({ title }: { title: string }) {
   return <h1 className="text-xl font-bold">{title}</h1>;
 }
 
-export function BerandaPage() {
-  return <PlaceholderPage title="Beranda" />;
-}
-
 export function BarangPage() {
   return <PlaceholderPage title="Barang" />;
 }
