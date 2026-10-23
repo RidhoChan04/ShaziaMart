@@ -4,6 +4,7 @@ import {
   businessDayLabel,
   daysBefore,
   jakartaDateKey,
+  jakartaHour,
 } from "./business-day";
 
 describe("hari bisnis Asia/Jakarta", () => {
@@ -38,4 +39,13 @@ describe("hari bisnis Asia/Jakarta", () => {
   ])("businessDayLabel(%i) = %s", (ms, label) =>
     expect(businessDayLabel(businessDay(ms))).toBe(label),
   );
+});
+
+describe("jakartaHour", () => {
+  test.each([
+    [Date.UTC(2026, 9, 22, 16, 59, 59, 999), 23],
+    [Date.UTC(2026, 9, 22, 17), 0],
+    [Date.UTC(2026, 9, 23, 2, 30), 9],
+    [Date.UTC(1969, 11, 31, 23, 59), 6],
+  ])("jakartaHour(%i) = %i", (ms, hour) => expect(jakartaHour(ms)).toBe(hour));
 });

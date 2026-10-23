@@ -48,6 +48,12 @@ export function businessDay(ms: number): BusinessDay {
   };
 }
 
+/** Jam (0-23) di zona Asia/Jakarta untuk waktu UTC ms. */
+export const jakartaHour = (ms: number): number =>
+  Math.floor(
+    ((((ms + JAKARTA_OFFSET_MS) % DAY_MS) + DAY_MS) % DAY_MS) / HOUR_MS,
+  );
+
 /** Hari bisnis `back` hari sebelum hari bisnis `day`. */
 export const daysBefore = (day: BusinessDay, back: number): BusinessDay =>
   businessDay(day.start - back * DAY_MS + 12 * HOUR_MS);
