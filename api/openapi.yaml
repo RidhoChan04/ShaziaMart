@@ -506,7 +506,6 @@ components:
         application/problem+json:
           schema:
             $ref: "#/components/schemas/Problem"
-
     Unauthorized:
       description: Tidak ada sesi (UNAUTHORIZED)
       content:
@@ -694,10 +693,10 @@ components:
           description: Jam lokal Asia/Jakarta.
         revenue:
           type: integer
-          description: Omzet hari ini pada jam ini (rupiah).
+          description: Omzet penjualan selesai hari ini pada jam ini (rupiah).
         lastWeekRevenue:
           type: integer
-          description: Omzet hari yang sama minggu lalu pada jam ini (rupiah).
+          description: Omzet penjualan selesai pada jam ini sepanjang jam penuh di hari yang sama minggu lalu (rupiah); grafik menampilkan seluruh hari minggu lalu.
     CashDifference:
       type: object
       required: [shiftId, kasirName, closedAt, difference]
@@ -729,11 +728,13 @@ components:
       properties:
         lowStockCount:
           type: integer
+          description: Jumlah barang dengan 0 <= stok < stok minimum.
         negativeStockCount:
           type: integer
+          description: Jumlah barang dengan stok < 0; dihitung terpisah, tidak termasuk di lowStockCount.
         cashDifferences:
           type: array
-          description: Shift hari ini (Asia/Jakarta) yang sudah ditutup dengan selisih kas tidak nol, terbaru dulu.
+          description: Shift yang sudah ditutup dengan selisih kas tidak nol, dengan closedAt jatuh pada hari ini (Asia/Jakarta); terbaru dulu.
           items:
             $ref: "#/components/schemas/CashDifference"
         overdueCredit:
@@ -742,7 +743,7 @@ components:
       type: object
       description: |
         Semua uang integer rupiah. revenue, grossProfit, newCredit, dan avgTicket hanya menghitung
-        penjualan berstatus selesai. avgTicket = round_half_up(revenue / salesCount), 0 bila tidak ada penjualan.
+        penjualan berstatus selesai (semua field bertipe omzet hanya menghitung penjualan selesai). avgTicket = round_half_up(revenue / salesCount), 0 bila tidak ada penjualan.
       required: [date, weekdayLastWeek, revenue, grossProfit, salesCount, newCredit, avgTicket, lastWeekRevenue, hourly, attention]
       properties:
         date:
@@ -756,17 +757,17 @@ components:
           type: integer
         grossProfit:
           type: integer
-          description: Omzet dikurangi HPP (rupiah).
+          description: Jumlah untuk penjualan selesai hari ini dari (total penjualan - HPP yang disalin saat penjualan terjadi) (rupiah); HPP saat ini tidak dipakai untuk penjualan lampau.
         salesCount:
           type: integer
         newCredit:
           type: integer
-          description: Total kasbon baru hari ini (rupiah).
+          description: Jumlah bagian kasbon (metode pembayaran credit) dari penjualan selesai hari ini (rupiah).
         avgTicket:
           type: integer
         lastWeekRevenue:
           type: integer
-          description: Omzet seluruh hari yang sama minggu lalu (rupiah).
+          description: Omzet penjualan selesai pada hari yang sama minggu lalu dari 00.00 sampai jam dan menit yang sama dengan saat ini (Asia/Jakarta), pembanding sepadan untuk omzet hari ini.
         hourly:
           type: array
           minItems: 24

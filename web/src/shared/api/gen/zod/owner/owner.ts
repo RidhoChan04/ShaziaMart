@@ -74,29 +74,29 @@ export const GetOwnerTodaySummaryResponse = zod.object({
   "date": zod.iso.date().describe('Tanggal bisnis hari ini di Asia/Jakarta (YYYY-MM-DD).'),
   "weekdayLastWeek": zod.string().describe('Nama hari Bahasa Indonesia untuk hari yang sama minggu lalu, mis. "Jumat".'),
   "revenue": zod.int(),
-  "grossProfit": zod.int().describe('Omzet dikurangi HPP (rupiah).'),
+  "grossProfit": zod.int().describe('Jumlah untuk penjualan selesai hari ini dari (total penjualan - HPP yang disalin saat penjualan terjadi) (rupiah); HPP saat ini tidak dipakai untuk penjualan lampau.'),
   "salesCount": zod.int(),
-  "newCredit": zod.int().describe('Total kasbon baru hari ini (rupiah).'),
+  "newCredit": zod.int().describe('Jumlah bagian kasbon (metode pembayaran credit) dari penjualan selesai hari ini (rupiah).'),
   "avgTicket": zod.int(),
-  "lastWeekRevenue": zod.int().describe('Omzet seluruh hari yang sama minggu lalu (rupiah).'),
+  "lastWeekRevenue": zod.int().describe('Omzet penjualan selesai pada hari yang sama minggu lalu dari 00.00 sampai jam dan menit yang sama dengan saat ini (Asia/Jakarta), pembanding sepadan untuk omzet hari ini.'),
   "hourly": zod.array(zod.object({
   "hour": zod.int().min(getOwnerTodaySummaryResponseHourlyItemHourMin).max(getOwnerTodaySummaryResponseHourlyItemHourMax).describe('Jam lokal Asia/Jakarta.'),
-  "revenue": zod.int().describe('Omzet hari ini pada jam ini (rupiah).'),
-  "lastWeekRevenue": zod.int().describe('Omzet hari yang sama minggu lalu pada jam ini (rupiah).')
+  "revenue": zod.int().describe('Omzet penjualan selesai hari ini pada jam ini (rupiah).'),
+  "lastWeekRevenue": zod.int().describe('Omzet penjualan selesai pada jam ini sepanjang jam penuh di hari yang sama minggu lalu (rupiah); grafik menampilkan seluruh hari minggu lalu.')
 })).min(getOwnerTodaySummaryResponseHourlyMin).max(getOwnerTodaySummaryResponseHourlyMax).describe('Tepat 24 bucket; indeks = jam lokal Asia/Jakarta (0-23).'),
   "attention": zod.object({
-  "lowStockCount": zod.int(),
-  "negativeStockCount": zod.int(),
+  "lowStockCount": zod.int().describe('Jumlah barang dengan 0 <= stok < stok minimum.'),
+  "negativeStockCount": zod.int().describe('Jumlah barang dengan stok < 0; dihitung terpisah, tidak termasuk di lowStockCount.'),
   "cashDifferences": zod.array(zod.object({
   "shiftId": zod.string(),
   "kasirName": zod.string(),
   "closedAt": zod.int().describe('Waktu shift ditutup (epoch ms UTC).'),
   "difference": zod.int().describe('Uang fisik dikurangi uang seharusnya (rupiah); tidak nol.')
-})).describe('Shift hari ini (Asia/Jakarta) yang sudah ditutup dengan selisih kas tidak nol, terbaru dulu.'),
+})).describe('Shift yang sudah ditutup dengan selisih kas tidak nol, dengan closedAt jatuh pada hari ini (Asia/Jakarta); terbaru dulu.'),
   "overdueCredit": zod.object({
   "count": zod.int().describe('Jumlah pelanggan bersaldo kasbon > 0 yang entri kasbon belum lunas tertuanya lebih dari 30 hari.'),
   "total": zod.int().describe('Jumlah saldo kasbon seluruh pelanggan tersebut (rupiah).')
 })
 })
-}).describe('Semua uang integer rupiah. revenue, grossProfit, newCredit, dan avgTicket hanya menghitung\npenjualan berstatus selesai. avgTicket = round_half_up(revenue / salesCount), 0 bila tidak ada penjualan.\n')
+}).describe('Semua uang integer rupiah. revenue, grossProfit, newCredit, dan avgTicket hanya menghitung\npenjualan berstatus selesai (semua field bertipe omzet hanya menghitung penjualan selesai). avgTicket = round_half_up(revenue / salesCount), 0 bila tidak ada penjualan.\n')
 

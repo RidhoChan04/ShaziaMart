@@ -151,9 +151,9 @@ export interface HourBucket {
      * @maximum 23
      */
   hour: number;
-  /** Omzet hari ini pada jam ini (rupiah). */
+  /** Omzet penjualan selesai hari ini pada jam ini (rupiah). */
   revenue: number;
-  /** Omzet hari yang sama minggu lalu pada jam ini (rupiah). */
+  /** Omzet penjualan selesai pada jam ini sepanjang jam penuh di hari yang sama minggu lalu (rupiah); grafik menampilkan seluruh hari minggu lalu. */
   lastWeekRevenue: number;
 }
 
@@ -174,16 +174,18 @@ export interface OverdueCredit {
 }
 
 export interface Attention {
+  /** Jumlah barang dengan 0 <= stok < stok minimum. */
   lowStockCount: number;
+  /** Jumlah barang dengan stok < 0; dihitung terpisah, tidak termasuk di lowStockCount. */
   negativeStockCount: number;
-  /** Shift hari ini (Asia/Jakarta) yang sudah ditutup dengan selisih kas tidak nol, terbaru dulu. */
+  /** Shift yang sudah ditutup dengan selisih kas tidak nol, dengan closedAt jatuh pada hari ini (Asia/Jakarta); terbaru dulu. */
   cashDifferences: CashDifference[];
   overdueCredit: OverdueCredit;
 }
 
 /**
  * Semua uang integer rupiah. revenue, grossProfit, newCredit, dan avgTicket hanya menghitung
- * penjualan berstatus selesai. avgTicket = round_half_up(revenue / salesCount), 0 bila tidak ada penjualan.
+ * penjualan berstatus selesai (semua field bertipe omzet hanya menghitung penjualan selesai). avgTicket = round_half_up(revenue / salesCount), 0 bila tidak ada penjualan.
  */
 export interface OwnerTodaySummary {
   /** Tanggal bisnis hari ini di Asia/Jakarta (YYYY-MM-DD). */
@@ -191,13 +193,13 @@ export interface OwnerTodaySummary {
   /** Nama hari Bahasa Indonesia untuk hari yang sama minggu lalu, mis. "Jumat". */
   weekdayLastWeek: string;
   revenue: number;
-  /** Omzet dikurangi HPP (rupiah). */
+  /** Jumlah untuk penjualan selesai hari ini dari (total penjualan - HPP yang disalin saat penjualan terjadi) (rupiah); HPP saat ini tidak dipakai untuk penjualan lampau. */
   grossProfit: number;
   salesCount: number;
-  /** Total kasbon baru hari ini (rupiah). */
+  /** Jumlah bagian kasbon (metode pembayaran credit) dari penjualan selesai hari ini (rupiah). */
   newCredit: number;
   avgTicket: number;
-  /** Omzet seluruh hari yang sama minggu lalu (rupiah). */
+  /** Omzet penjualan selesai pada hari yang sama minggu lalu dari 00.00 sampai jam dan menit yang sama dengan saat ini (Asia/Jakarta), pembanding sepadan untuk omzet hari ini. */
   lastWeekRevenue: number;
   /**
      * Tepat 24 bucket; indeks = jam lokal Asia/Jakarta (0-23).
