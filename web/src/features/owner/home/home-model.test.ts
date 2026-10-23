@@ -34,16 +34,40 @@ describe("hourWindow", () => {
   test.each([
     ["kosong total -> default 06-21", [], 14, { from: 6, to: 21 }],
     [
-      "rentang dari jam pertama sampai terakhir yang punya omzet",
+      "rentang >= 6 jam dipertahankan",
       buckets({ 7: [100, 0], 15: [0, 50] }),
       14,
       { from: 7, to: 15 },
     ],
     [
-      "seri hari ini dan minggu lalu digabung",
-      buckets({ 9: [0, 10], 12: [10, 0] }),
+      "rentang tepat 6 jam dipertahankan",
+      buckets({ 9: [0, 10], 14: [10, 0] }),
       20,
-      { from: 9, to: 12 },
+      { from: 9, to: 14 },
+    ],
+    [
+      "satu jam aktif dilebarkan ke 6 jam",
+      buckets({ 10: [100, 0] }),
+      20,
+      { from: 7, to: 12 },
+    ],
+    [
+      "rentang pendek dilebarkan simetris",
+      buckets({ 10: [100, 0], 11: [0, 5] }),
+      20,
+      { from: 8, to: 13 },
+    ],
+    [
+      "jam aktif 0 digeser ke dalam 0-23",
+      buckets({ 0: [100, 0] }),
+      20,
+      { from: 0, to: 5 },
+    ],
+    [
+      "jam aktif 23 digeser ke dalam 0-23",
+      buckets({ 23: [100, 0] }),
+      20,
+      { from: 18, to: 23 },
     ],
     [
       "semua nol -> 6 jam berpusat di jam sekarang",
@@ -51,18 +75,10 @@ describe("hourWindow", () => {
       14,
       { from: 11, to: 16 },
     ],
-    [
-      "semua nol dekat tengah malam digeser ke dalam 0-23",
-      buckets({}),
-      23,
-      { from: 18, to: 23 },
-    ],
-    [
-      "semua nol dini hari digeser ke dalam 0-23",
-      buckets({}),
-      1,
-      { from: 0, to: 5 },
-    ],
+    ["semua nol jam 23", buckets({}), 23, { from: 18, to: 23 }],
+    ["semua nol jam 3 (batas)", buckets({}), 3, { from: 0, to: 5 }],
+    ["semua nol jam 2 digeser", buckets({}), 2, { from: 0, to: 5 }],
+    ["semua nol jam 1 digeser", buckets({}), 1, { from: 0, to: 5 }],
   ] as const)("%s", (_name, hourly, nowHour, expected) => {
     expect(hourWindow(hourly as HourBucket[], nowHour)).toEqual(expected);
   });
@@ -120,6 +136,16 @@ describe("attentionItems", () => {
         to: "/owner/kasbon",
       },
     ]);
+  });
+
+  test("selisih kas 0 dilewati", () => {
+    const zero = {
+      shiftId: "s0",
+      kasirName: "Rina",
+      closedAt: 1,
+      difference: 0,
+    };
+    expect(attentionItems({ ...none, cashDifferences: [zero] })).toEqual([]);
   });
 
   test("item bernilai 0 dilewati", () => {

@@ -28,9 +28,10 @@ export function comparisonText(
 }
 
 const DEFAULT_WINDOW = { from: 6, to: 21 };
-const EMPTY_WINDOW_HOURS = 6;
+const MIN_WINDOW_HOURS = 6;
+const LAST_HOUR = 23;
 
-/** Jam yang ditampilkan grafik: dari omzet pertama sampai terakhir di salah satu seri. */
+/** Jam yang ditampilkan grafik: rentang jam beromzet (atau jam sekarang bila tak ada), minimal 6 jam. */
 export function hourWindow(
   hourly: HourBucket[],
   nowHour: number,
@@ -39,14 +40,14 @@ export function hourWindow(
   const active = hourly
     .filter((b) => b.revenue > 0 || b.lastWeekRevenue > 0)
     .map((b) => b.hour);
-  if (active.length > 0)
-    return { from: Math.min(...active), to: Math.max(...active) };
-  // Tanpa omzet: jendela tetap muat di 0-23 walau jam sekarang dekat tengah malam.
-  const from = Math.min(
-    Math.max(nowHour - EMPTY_WINDOW_HOURS / 2, 0),
-    24 - EMPTY_WINDOW_HOURS,
-  );
-  return { from, to: from + EMPTY_WINDOW_HOURS - 1 };
+  const first = active.length > 0 ? Math.min(...active) : nowHour;
+  const last = active.length > 0 ? Math.max(...active) : nowHour;
+  const extra = Math.max(MIN_WINDOW_HOURS - (last - first + 1), 0);
+  const from = first - Math.ceil(extra / 2);
+  const to = last + Math.floor(extra / 2);
+  // Geser (bukan potong) agar tetap muat di 0-23 dengan lebar sama.
+  const shift = Math.max(-from, 0) - Math.max(to - LAST_HOUR, 0);
+  return { from: from + shift, to: to + shift };
 }
 
 type AttentionItem = {
@@ -75,6 +76,7 @@ export function attentionItems(a: Attention): AttentionItem[] {
     });
   }
   for (const c of a.cashDifferences) {
+    if (c.difference === 0) continue;
     const signed =
       c.difference > 0
         ? `+${formatRupiah(c.difference)}`
