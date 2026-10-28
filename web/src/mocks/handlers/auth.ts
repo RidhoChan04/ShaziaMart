@@ -2,13 +2,16 @@ import { HttpResponse, http } from "msw";
 import type { Session, User } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { mockDb } from "../db";
 import { withScenario } from "../scenarios";
-import { invalid, problem, readJson, requireSession } from "./respond";
-
-const MAX_FAILURES = 5;
-const LOCK_MS = 300_000;
-const LOCK_DETAIL = "Coba lagi dalam 5 menit";
-
-const toUser = ({ id, name, role }: User): User => ({ id, name, role });
+import {
+  invalid,
+  LOCK_DETAIL,
+  LOCK_MS,
+  MAX_FAILURES,
+  problem,
+  readJson,
+  requireSession,
+  toUser,
+} from "./respond";
 
 export const authHandlers = [
   http.get(

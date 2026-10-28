@@ -1,4 +1,5 @@
 import type { ProductUnit } from "@/shared/api/gen/shaziaMartAPI.schemas";
+import { newId } from "@/shared/lib/id";
 import { type MockSale, type MockState, mockDb } from "../db";
 import { KIND, makeId } from "../seed";
 
@@ -45,6 +46,36 @@ export function customerId(name: string): string {
   if (!customer) throw new Error(`seed tanpa ${name}`);
   return customer.id;
 }
+
+export const customerBalance = (name: string) =>
+  mockDb.get().customers.find((c) => c.name === name)?.balance;
+
+export const json = async <T>(res: Response) => (await res.json()) as T;
+
+type Qty = { qtyBase: number } | { amount: number };
+
+/** Baris penjualan dengan harga satuan yang diharapkan klien. */
+export const saleItem = (
+  name: string,
+  qty: Qty,
+  expectedUnitPrice: number,
+  unitName?: string,
+) => ({ unitId: unitOf(name, unitName).id, expectedUnitPrice, ...qty });
+
+export const BIMOLI = "Minyak Goreng Bimoli 2 L";
+
+/** Bimoli ×n dibayar tunai pas. */
+export const cashSale = (n = 1, extra: Record<string, unknown> = {}) => ({
+  saleId: newId(),
+  items: [saleItem(BIMOLI, { qtyBase: n }, 36000)],
+  payments: [{ method: "cash", amount: 36000 * n }],
+  cashReceived: 36000 * n,
+  print: false,
+  ...extra,
+});
+
+export const voidSale = (id: string, body: unknown) =>
+  post(`/api/sales/${id}/void`, body);
 
 const HISTORY_SALE = makeId(KIND.sale, 0).slice(0, 8);
 const HISTORY_SHIFT = makeId(KIND.shift, 0).slice(0, 8);

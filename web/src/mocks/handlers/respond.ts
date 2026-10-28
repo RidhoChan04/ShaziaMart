@@ -2,8 +2,17 @@ import { HttpResponse } from "msw";
 import type {
   ErrorCode,
   Problem,
+  User,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import type { MockState, MockUser } from "../db";
+
+/** Kunci login (PIN kasir dan password pemilik): 5x salah → terkunci 5 menit. */
+export const MAX_FAILURES = 5;
+export const LOCK_MS = 300_000;
+export const LOCK_DETAIL = "Coba lagi dalam 5 menit";
+
+/** Pengguna publik: tanpa PIN/password. */
+export const toUser = ({ id, name, role }: User): User => ({ id, name, role });
 
 const TITLES: Record<number, string> = {
   401: "Tidak diizinkan",

@@ -2,18 +2,21 @@ import { HttpResponse, http } from "msw";
 import type {
   OwnerSession,
   OwnerTodaySummary,
-  User,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { mockDb } from "../db";
 import { ownerTodaySummary } from "../owner-summary";
 import { withScenario } from "../scenarios";
-import { invalid, problem, readJson, requireOwnerSession } from "./respond";
+import {
+  invalid,
+  LOCK_DETAIL,
+  LOCK_MS,
+  MAX_FAILURES,
+  problem,
+  readJson,
+  requireOwnerSession,
+  toUser,
+} from "./respond";
 
-const MAX_FAILURES = 5;
-const LOCK_MS = 300_000;
-const LOCK_DETAIL = "Coba lagi dalam 5 menit";
-
-const toUser = ({ id, name, role }: User): User => ({ id, name, role });
 const normalize = (name: string): string => name.trim().toLowerCase();
 
 export const ownerHandlers = [

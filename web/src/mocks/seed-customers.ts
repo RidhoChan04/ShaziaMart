@@ -1,9 +1,8 @@
+import { DAY_MS } from "@/shared/lib/business-day";
 import type { Customer } from "../shared/api/gen/shaziaMartAPI.schemas";
 import type { CreditEntry } from "./db";
 import { appendCredit } from "./ledger";
 import { KIND, makeId } from "./seed";
-
-const DAY_MS = 86_400_000;
 
 /** Buku kasbon awal per pelanggan: [hari lalu, jumlah]; negatif = pelunasan. */
 const SEED_CUSTOMERS: [
