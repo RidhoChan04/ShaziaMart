@@ -61,7 +61,8 @@ export function useGateState(): GateState {
     query: { ...STABLE, refetchInterval: pollWhileUnknown },
   });
   if (session.data === undefined || current.data === undefined) {
-    return session.isError || current.isError
+    // Bukan `isError`: refetch setelah galat kembali "pending" dan kartu offline akan berkedip tiap dicoba.
+    return session.errorUpdatedAt > 0 || current.errorUpdatedAt > 0
       ? { status: "offline" }
       : { status: "loading" };
   }

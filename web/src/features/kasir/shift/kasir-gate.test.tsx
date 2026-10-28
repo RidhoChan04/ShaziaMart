@@ -8,6 +8,9 @@ import {
   post,
 } from "@/mocks/handlers/test-helpers";
 import { server } from "@/mocks/node";
+import { setScenario } from "@/mocks/scenarios";
+import { getGetSessionQueryKey } from "@/shared/api/gen/auth/auth";
+import { HEALTH_POLL_MS } from "@/shared/hooks/use-server-health";
 import { renderApp } from "@/test/render-app";
 import { fillSpecCart } from "@/test/spec-cart";
 import { humanTyping, typingAt } from "@/test/typing";
@@ -63,6 +66,20 @@ test("tanpa shift → Buka shift: Rina → PIN 123456 → modal 200.000 → laya
   ).toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "Tutup" }));
   await waitFor(async () => expect(await scanBox()).toHaveFocus());
+});
+
+test("server mati sejak awal: kartu Menunggu server tetap terpasang saat dicoba lagi", async () => {
+  vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+  setScenario("server-mati");
+  const { queryClient } = renderApp("/kasir");
+  const card = await screen.findByText("Menunggu server");
+
+  // Percobaan berikutnya tertahan 1,5 dtk agar terlihat selama berlangsung.
+  setScenario("lambat");
+  await act(() => vi.advanceTimersByTimeAsync(HEALTH_POLL_MS));
+  await act(() => new Promise((r) => setTimeout(r, 100)));
+  expect(queryClient.isFetching({ queryKey: getGetSessionQueryKey() })).toBe(1);
+  expect(card).toBeInTheDocument();
 });
 
 test("Ganti kasir kembali ke pilihan kasir", async () => {
