@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { LoadingScreen } from "@/shared/components/loading-screen";
 import { OwnerLoginScreen } from "./owner-login-screen";
 import { useLogoutOnUnauthorized, useOwnerSession } from "./owner-session";
 
@@ -11,6 +12,7 @@ export function OwnerGate({ children }: { children: ReactNode }) {
   const session = useOwnerSession();
   if (session.data === null) return <OwnerLoginScreen />;
   // Bukan `isPending`: refetch setelah galat kembali "pending" dan akan melepas isi tiap kali dicoba.
-  if (session.data === undefined && session.errorUpdatedAt === 0) return null;
+  if (session.data === undefined && session.errorUpdatedAt === 0)
+    return <LoadingScreen />;
   return children;
 }

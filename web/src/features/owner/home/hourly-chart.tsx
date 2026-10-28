@@ -1,7 +1,7 @@
 import {
   type KeyboardEvent,
   type PointerEvent,
-  useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -18,17 +18,23 @@ import {
 
 const FALLBACK_WIDTH = 360;
 
-/** Lebar elemen dalam piksel; 360 bila ResizeObserver tidak tersedia (jsdom). */
+/** Lebar elemen dalam piksel; 360 bila tidak terukur (jsdom). */
 function useWidth() {
   const ref = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(FALLBACK_WIDTH);
-  useEffect(() => {
+  // Ukur sebelum layar dilukis agar frame pertama tidak tergambar selebar 360.
+  useLayoutEffect(() => {
     const el = ref.current;
-    if (!el || typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(([entry]) => {
-      const w = Math.round(entry?.contentRect.width ?? 0);
+    if (!el) return;
+    const update = (raw: number) => {
+      const w = Math.round(raw);
       if (w > 0) setWidth(w);
-    });
+    };
+    update(el.getBoundingClientRect().width);
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(([entry]) =>
+      update(entry?.contentRect.width ?? 0),
+    );
     observer.observe(el);
     return () => observer.disconnect();
   }, []);

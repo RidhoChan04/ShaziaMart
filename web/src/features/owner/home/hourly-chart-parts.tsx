@@ -4,7 +4,7 @@ import type { ChartRow } from "./hourly-chart-geometry";
 export const TODAY_NAME = "Hari ini";
 const TODAY_SWATCH = "h-0.5 bg-chart-1";
 /** Perkiraan setengah lebar tooltip, agar tidak keluar dari kartu. */
-const TOOLTIP_HALF_WIDTH = 100;
+const TOOLTIP_HALF_WIDTH = 110;
 const LAST_WEEK_SWATCH = "border-t-2 border-dashed border-chart-2";
 
 function Swatch({ className }: { className: string }) {

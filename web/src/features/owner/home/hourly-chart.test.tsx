@@ -25,7 +25,10 @@ const renderChart = (hourly: HourBucket[], nowHour = 11) =>
 
 const GROUP = { name: "Omzet per jam hari ini dan Jumat lalu" };
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
 
 /** ResizeObserver palsu yang langsung melaporkan lebar tertentu saat observe(). */
 function stubWidth(width: number) {
@@ -152,6 +155,17 @@ test("tinggi tetap 160 piksel dan viewBox mengikuti lebar terukur", () => {
   const svg = container.querySelector("svg");
   expect(svg).toHaveAttribute("viewBox", "0 0 1280 160");
   expect(svg).toHaveStyle({ height: "160px" });
+});
+
+test("lebar diukur langsung saat dipasang, sebelum ResizeObserver melapor", () => {
+  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
+    width: 720.4,
+  } as DOMRect);
+  const { container } = renderChart(SAMPLE);
+  expect(container.querySelector("svg")).toHaveAttribute(
+    "viewBox",
+    "0 0 720 160",
+  );
 });
 
 test("tanpa ResizeObserver memakai lebar 360", () => {

@@ -42,7 +42,13 @@ function Hero({ summary }: { summary: OwnerTodaySummary }) {
   );
 }
 
-function Summary({ summary }: { summary: OwnerTodaySummary }) {
+function Summary({
+  summary,
+  nowHour,
+}: {
+  summary: OwnerTodaySummary;
+  nowHour: number;
+}) {
   return (
     <div className="grid gap-3 lg:grid-cols-2 lg:items-start lg:gap-4">
       <div className="grid gap-3">
@@ -54,7 +60,7 @@ function Summary({ summary }: { summary: OwnerTodaySummary }) {
           <HourlyChart
             hourly={summary.hourly}
             weekday={summary.weekdayLastWeek}
-            nowHour={jakartaHour(Date.now())}
+            nowHour={nowHour}
           />
         </section>
       </div>
@@ -141,7 +147,11 @@ export function BerandaPage() {
         </p>
       )}
       {query.data ? (
-        <Summary summary={query.data} />
+        // Jam data, bukan jam render: saat server mati garis tidak menjalar ke jam kosong.
+        <Summary
+          summary={query.data}
+          nowHour={jakartaHour(query.dataUpdatedAt)}
+        />
       ) : query.isError ? (
         <LoadError error={query.error} onRetry={() => void query.refetch()} />
       ) : (

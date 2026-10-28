@@ -1,6 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { LogOut } from "lucide-react";
 import { useOwnerLogout } from "@/shared/api/gen/owner/owner";
+import { pesanError } from "@/shared/lib/error-messages";
 import { Button } from "@/shared/ui/button";
 import { clearOwnerSession } from "./auth/owner-session";
 
@@ -38,6 +39,11 @@ export function LainnyaPage() {
         <LogOut aria-hidden="true" />
         Keluar
       </Button>
+      {logout.isError && (
+        <p role="alert" className="text-sm font-medium text-danger">
+          {pesanError(logout.error)}
+        </p>
+      )}
     </div>
   );
 }

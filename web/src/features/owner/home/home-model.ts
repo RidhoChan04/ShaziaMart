@@ -14,12 +14,13 @@ export function comparisonText(
 ): { text: string; trend: Trend } {
   if (lastWeekRevenue === 0)
     return { text: `Belum ada data ${weekday} lalu`, trend: "none" };
-  if (revenue === lastWeekRevenue)
-    return { text: `Sama dengan ${weekday} lalu`, trend: "flat" };
   const percent = roundHalfUp(
     Math.abs(revenue - lastWeekRevenue) * 100,
     lastWeekRevenue,
   );
+  // Selisih yang dibulatkan ke 0% dibaca "sama", bukan "▲ 0%".
+  if (percent === 0)
+    return { text: `Sama dengan ${weekday} lalu`, trend: "flat" };
   const up = revenue > lastWeekRevenue;
   return {
     text: `${up ? "▲" : "▼"} ${percent}% dari ${weekday} lalu`,

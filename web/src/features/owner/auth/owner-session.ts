@@ -14,12 +14,12 @@ import { HEALTH_POLL_MS } from "@/shared/hooks/use-server-health";
 
 const OWNER_PATH = "/api/owner/";
 
-const isUnauthorized = (error: unknown): boolean =>
+const isUnauthorized = (error: unknown): error is ApiError =>
   error instanceof ApiError && error.code === "UNAUTHORIZED";
 
 // Realm ditentukan oleh URL request yang gagal, bukan nama operasi/kunci cache.
 const isOwnerUnauthorized = (error: unknown): boolean =>
-  isUnauthorized(error) && (error as ApiError).url.startsWith(OWNER_PATH);
+  isUnauthorized(error) && error.url.startsWith(OWNER_PATH);
 
 /**
  * `null` = belum login (401 bukan galat). Sesi hanya berubah lewat login/keluar

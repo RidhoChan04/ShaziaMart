@@ -15,7 +15,9 @@ describe("comparisonText", () => {
     [0, 4350000, "▼ 100% dari Jumat lalu", "down"],
     [3, 2, "▲ 50% dari Jumat lalu", "up"], // tepat .5 naik
     [201, 200, "▲ 1% dari Jumat lalu", "up"], // 0,5% -> 1%
-    [1001, 1000, "▲ 0% dari Jumat lalu", "up"], // 0,1% -> 0%
+    [1001, 1000, "Sama dengan Jumat lalu", "flat"], // 0,1% -> 0%
+    [1000001, 1000000, "Sama dengan Jumat lalu", "flat"],
+    [999999, 1000000, "Sama dengan Jumat lalu", "flat"],
     [9007199254740, 4503599627370, "▲ 100% dari Jumat lalu", "up"],
   ] as const)("(%i, %i)", (revenue, last, text, trend) => {
     expect(comparisonText(revenue, last, "Jumat")).toEqual({ text, trend });

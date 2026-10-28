@@ -56,7 +56,9 @@ export function OwnerLoginScreen() {
         </div>
         {login.isError && (
           <p role="alert" className="text-sm font-medium text-danger">
-            {pesanError(login.error)}
+            {login.error.code === "LOCKED_OUT"
+              ? "Terlalu banyak percobaan salah — coba lagi dalam 5 menit"
+              : pesanError(login.error)}
           </p>
         )}
         <Button type="submit" size="lg" disabled={!filled || login.isPending}>

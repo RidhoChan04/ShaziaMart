@@ -11,6 +11,7 @@ import { mockDb } from "@/mocks/db";
 import { problem } from "@/mocks/handlers/respond";
 import { login, ownerLogin, post } from "@/mocks/handlers/test-helpers";
 import { server } from "@/mocks/node";
+import { setScenario } from "@/mocks/scenarios";
 import { customFetch } from "@/shared/api/fetcher";
 import { getGetSessionQueryKey, getSession } from "@/shared/api/gen/auth/auth";
 import {
@@ -55,6 +56,15 @@ test("tanpa sesi → Masuk pemilik; Pak Ahmad / pemilik123 → Beranda", async (
   expect(mockDb.get().ownerSession).not.toBeNull();
 });
 
+test("sesi masih diperiksa → Memuat…, bukan layar kosong", async () => {
+  setScenario("lambat");
+  const { router } = renderApp("/owner");
+  // Chunk pemilik sudah dimuat; yang tertunda hanya pemeriksaan sesi.
+  await waitFor(() => expect(router.state.status).toBe("idle"));
+  expect(screen.getByRole("status")).toHaveTextContent("Memuat…");
+  expect(await loginHeading()).toBeInTheDocument();
+});
+
 test("tautan langsung /owner/laporan: setelah login tetap di Laporan", async () => {
   renderApp("/owner/laporan");
   await loginHeading();
@@ -77,7 +87,9 @@ test("terkunci setelah 5x salah → pesan Terlalu banyak…", async () => {
   renderApp("/owner");
   await loginHeading();
   await submitLogin("Pak Ahmad", "salah");
-  expect(await screen.findByRole("alert")).toHaveTextContent(/^Terlalu banyak/);
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "Terlalu banyak percobaan salah — coba lagi dalam 5 menit",
+  );
 });
 
 test("kasir mengunci layar tidak mengeluarkan pemilik (state.session vs ownerSession)", async () => {
@@ -127,6 +139,19 @@ test("Keluar → layar login", async () => {
   expect(await loginHeading()).toBeInTheDocument();
   expect(mockDb.get().ownerSession).toBeNull();
   expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
+});
+
+test("Keluar gagal → pesan galat, tetap masuk", async () => {
+  await ownerLogin();
+  renderApp("/owner/lainnya");
+  const user = userEvent.setup();
+  const keluar = await screen.findByRole("button", { name: "Keluar" });
+  setScenario("server-mati");
+  await user.click(keluar);
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "Server tidak tersambung — coba lagi",
+  );
+  expect(screen.getByRole("heading", { name: "Lainnya" })).toBeInTheDocument();
 });
 
 test("401 UNAUTHORIZED dari query /api/owner/* → kembali ke login", async () => {

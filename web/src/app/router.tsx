@@ -11,6 +11,7 @@ import {
   redirect,
 } from "@tanstack/react-router";
 import { lazy, Suspense } from "react";
+import { LoadingScreen } from "@/shared/components/loading-screen";
 import { Button } from "@/shared/ui/button";
 
 const mockEnabled = import.meta.env.DEV || import.meta.env.VITE_MOCK === "1";
@@ -60,17 +61,6 @@ function RouteError(_props: ErrorComponentProps) {
       <h1 className="text-xl font-bold">Terjadi kesalahan</h1>
       <Button onClick={() => window.location.reload()}>Muat ulang</Button>
     </main>
-  );
-}
-
-function RoutePending() {
-  return (
-    <p
-      role="status"
-      className="flex min-h-dvh items-center justify-center p-4 text-muted"
-    >
-      Memuat…
-    </p>
   );
 }
 
@@ -157,7 +147,7 @@ export function createAppRouter(options: { history?: RouterHistory } = {}) {
     routeTree,
     history: options.history ?? createBrowserHistory(),
     defaultErrorComponent: RouteError,
-    defaultPendingComponent: RoutePending,
+    defaultPendingComponent: LoadingScreen,
     // Chunk yang cepat dimuat tidak sempat memunculkan "Memuat…".
     defaultPendingMs: 200,
   });

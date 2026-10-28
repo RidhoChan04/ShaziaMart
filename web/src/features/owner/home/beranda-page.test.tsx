@@ -38,6 +38,12 @@ const card = (label: string) => {
   return within(el);
 };
 
+function pullToRefresh() {
+  fireEvent.touchStart(document, { touches: [{ clientY: 100 }] });
+  fireEvent.touchMove(document, { touches: [{ clientY: 180 }] });
+  fireEvent.touchEnd(document);
+}
+
 /** Kasir Rina menjual 1 Bimoli tunai, lalu menutup shift dengan uang kurang Rp5.000. */
 async function sellAndCloseShiftShort() {
   await loginWithShift(200_000);
@@ -153,6 +159,30 @@ test("refetch gagal saat data sudah ada → data lama tetap, tanpa layar galat",
   expect(screen.queryByLabelText("Memuat beranda")).toBeNull();
 });
 
+test("server mati lalu jam berganti: garis hari ini berhenti di jam data terakhir", async () => {
+  // Sabtu 17 Okt 2026, 10.00 WIB
+  vi.setSystemTime(Date.UTC(2026, 9, 17, 3, 0));
+  await ownerLogin();
+  renderApp("/owner");
+  await screen.findByText("OMZET HARI INI");
+
+  // 13.00 WIB, server mati: tarik-segarkan gagal, data 10.00 tetap tampil.
+  setScenario("server-mati");
+  vi.setSystemTime(Date.UTC(2026, 9, 17, 6, 0));
+  pullToRefresh();
+  expect(screen.getByText("Memuat…")).toBeInTheDocument();
+  await waitFor(() => expect(screen.queryByText("Memuat…")).toBeNull());
+
+  const row = (hour: string) =>
+    within(screen.getByRole("table")).getByRole("row", {
+      name: new RegExp(`^${hour}`),
+    });
+  expect(row("10.00")).toHaveTextContent(/^10\.00Rp/);
+  for (const hour of ["11.00", "12.00", "13.00"]) {
+    expect(row(hour)).toHaveTextContent(new RegExp(`^${hour}-Rp`));
+  }
+});
+
 test("kunci query memuat tanggal bisnis; ganti hari → kunci baru", async () => {
   vi.useRealTimers();
   vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
@@ -194,9 +224,7 @@ test("tarik untuk refresh di layar sentuh memuat ulang ringkasan", async () => {
       fetches();
   });
 
-  fireEvent.touchStart(document, { touches: [{ clientY: 100 }] });
-  fireEvent.touchMove(document, { touches: [{ clientY: 180 }] });
-  fireEvent.touchEnd(document);
+  pullToRefresh();
 
   expect(await screen.findByText("Memuat…")).toBeInTheDocument();
   expect(fetches).toHaveBeenCalled();
