@@ -1,6 +1,8 @@
 import { expect, expectNoA11yViolations, test } from "./fixtures.ts";
 import { typePin } from "./kasir-helpers.ts";
-import { loginOwner } from "./owner-helpers.ts";
+import { fillOwnerLogin, loginOwner } from "./owner-helpers.ts";
+
+const OFFLINE_DETECT_MS = 3 * 5_000; // 3× HEALTH_POLL_MS
 
 test.beforeEach(({ page: _page }, info) => {
   test.skip(!info.project.name.startsWith("owner-"), "hanya project owner");
@@ -10,9 +12,7 @@ test("login salah menampilkan pesan dan tetap di halaman masuk", async ({
   page,
 }) => {
   await page.goto("/owner");
-  await page.getByLabel("Nama").fill("Pak Ahmad");
-  await page.getByLabel("Password").fill("salah-total");
-  await page.getByRole("button", { name: "Masuk" }).click();
+  await fillOwnerLogin(page, "salah-total");
   await expect(page.getByText("Nama atau password salah")).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Masuk pemilik" }),
@@ -65,7 +65,7 @@ test("server mati setelah data dimuat: banner offline, halaman tetap", async ({
   // Pemeriksaan kesehatan berjalan tiap 5 detik; tunggu hasilnya, bukan jeda.
   await expect(
     page.getByText("Tidak terhubung ke toko — data terakhir ditampilkan"),
-  ).toBeVisible({ timeout: 15_000 });
+  ).toBeVisible({ timeout: OFFLINE_DETECT_MS });
   await expect(page.getByText("● toko offline")).toBeVisible();
   await expect(page.getByText("OMZET HARI INI")).toBeVisible();
   await expect(
@@ -90,6 +90,10 @@ test("kasir login di tab lain tidak mengeluarkan pemilik", async ({
   ).toBeVisible();
   await kasirTab.close();
 
+  await expect(page.getByText("OMZET HARI INI")).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Masuk pemilik" }),
+  ).toHaveCount(0);
   await page.reload();
   await expect(page.getByText("OMZET HARI INI")).toBeVisible();
   await expect(
