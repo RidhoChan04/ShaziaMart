@@ -119,6 +119,13 @@ function persist(state: MockState): void {
 
 let current: MockState | null = null;
 
+// Tab lain (mis. kasir dan pemilik) menulis state yang sama: muat ulang saat berubah.
+if (typeof window !== "undefined") {
+  window.addEventListener("storage", (e) => {
+    if (e.key === STORAGE_KEY || e.key === null) current = null;
+  });
+}
+
 export const mockDb = {
   /** Salinan: mengubahnya tidak memengaruhi cache; ubah lewat `update`. */
   get(): Readonly<MockState> {

@@ -88,3 +88,29 @@ test.each(["unitCosts", "minStock", "creditLedger", "ownerLoginFailures"])(
     expect(mockDb.get().store.name).toBe("ShaziaMart");
   },
 );
+
+// key null = localStorage.clear() di tab lain.
+test.each(["mock.db", null])(
+  "event storage key %s dari tab lain membuang cache",
+  (key) => {
+    mockDb.reset();
+    expect(mockDb.get().store.name).toBe("ShaziaMart");
+    const fromOtherTab: MockState = {
+      ...createSeedState(),
+      store: { id: "abc", name: "Tab Lain" },
+    };
+    localStorage.setItem("mock.db", JSON.stringify(fromOtherTab));
+    window.dispatchEvent(new StorageEvent("storage", { key }));
+    expect(mockDb.get().store.name).toBe("Tab Lain");
+  },
+);
+
+test("event storage key lain tidak membuang cache", () => {
+  mockDb.reset();
+  localStorage.setItem(
+    "mock.db",
+    JSON.stringify({ ...createSeedState(), store: { id: "x", name: "Lain" } }),
+  );
+  window.dispatchEvent(new StorageEvent("storage", { key: "mock.skenario" }));
+  expect(mockDb.get().store.name).toBe("ShaziaMart");
+});
