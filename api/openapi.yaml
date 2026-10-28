@@ -465,6 +465,7 @@ paths:
       tags: [owner]
       operationId: ownerLogout
       summary: Keluar pemilik
+      description: Selalu 204 (idempoten), juga tanpa sesi.
       security:
         - ownerCookieAuth: []
       responses:
@@ -678,6 +679,7 @@ components:
           minLength: 1
     OwnerSession:
       type: object
+      description: user.role selalu pemilik.
       required: [user]
       properties:
         user:
@@ -760,6 +762,7 @@ components:
           description: Jumlah untuk penjualan selesai hari ini dari (total penjualan - HPP yang disalin saat penjualan terjadi) (rupiah); HPP saat ini tidak dipakai untuk penjualan lampau.
         salesCount:
           type: integer
+          description: Jumlah penjualan selesai hari ini.
         newCredit:
           type: integer
           description: Jumlah bagian kasbon (metode pembayaran credit) dari penjualan selesai hari ini (rupiah).
@@ -767,7 +770,7 @@ components:
           type: integer
         lastWeekRevenue:
           type: integer
-          description: Omzet penjualan selesai pada hari yang sama minggu lalu dari 00.00 sampai jam dan menit yang sama dengan saat ini (Asia/Jakarta), pembanding sepadan untuk omzet hari ini.
+          description: Omzet penjualan selesai pada hari yang sama minggu lalu dari 00.00 sampai akhir menit saat ini (menit berjalan ikut dihitung) (Asia/Jakarta), pembanding sepadan untuk omzet hari ini.
         hourly:
           type: array
           minItems: 24

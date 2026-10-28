@@ -140,6 +140,9 @@ export interface OwnerLogin {
   password: string;
 }
 
+/**
+ * user.role selalu pemilik.
+ */
 export interface OwnerSession {
   user: User;
 }
@@ -195,11 +198,12 @@ export interface OwnerTodaySummary {
   revenue: number;
   /** Jumlah untuk penjualan selesai hari ini dari (total penjualan - HPP yang disalin saat penjualan terjadi) (rupiah); HPP saat ini tidak dipakai untuk penjualan lampau. */
   grossProfit: number;
+  /** Jumlah penjualan selesai hari ini. */
   salesCount: number;
   /** Jumlah bagian kasbon (metode pembayaran credit) dari penjualan selesai hari ini (rupiah). */
   newCredit: number;
   avgTicket: number;
-  /** Omzet penjualan selesai pada hari yang sama minggu lalu dari 00.00 sampai jam dan menit yang sama dengan saat ini (Asia/Jakarta), pembanding sepadan untuk omzet hari ini. */
+  /** Omzet penjualan selesai pada hari yang sama minggu lalu dari 00.00 sampai akhir menit saat ini (menit berjalan ikut dihitung) (Asia/Jakarta), pembanding sepadan untuk omzet hari ini. */
   lastWeekRevenue: number;
   /**
      * Tepat 24 bucket; indeks = jam lokal Asia/Jakarta (0-23).

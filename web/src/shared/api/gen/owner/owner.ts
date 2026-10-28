@@ -266,6 +266,7 @@ export const getOwnerLogoutUrl = () => {
 }
 
 /**
+ * Selalu 204 (idempoten), juga tanpa sesi.
  * @summary Keluar pemilik
  */
 export const ownerLogout = async ( options?: Parameters<typeof customFetch>[1]): Promise<void> => {

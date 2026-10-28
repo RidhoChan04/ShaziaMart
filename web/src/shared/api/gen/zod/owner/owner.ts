@@ -39,7 +39,7 @@ export const OwnerLoginResponse = zod.object({
   "name": zod.string(),
   "role": zod.enum(['kasir', 'pemilik'])
 })
-})
+}).describe('user.role selalu pemilik.')
 
 /**
  * @summary Sesi pemilik aktif
@@ -50,9 +50,10 @@ export const GetOwnerSessionResponse = zod.object({
   "name": zod.string(),
   "role": zod.enum(['kasir', 'pemilik'])
 })
-})
+}).describe('user.role selalu pemilik.')
 
 /**
+ * Selalu 204 (idempoten), juga tanpa sesi.
  * @summary Keluar pemilik
  */
 export const OwnerLogoutResponse = zod.void()
@@ -75,10 +76,10 @@ export const GetOwnerTodaySummaryResponse = zod.object({
   "weekdayLastWeek": zod.string().describe('Nama hari Bahasa Indonesia untuk hari yang sama minggu lalu, mis. "Jumat".'),
   "revenue": zod.int(),
   "grossProfit": zod.int().describe('Jumlah untuk penjualan selesai hari ini dari (total penjualan - HPP yang disalin saat penjualan terjadi) (rupiah); HPP saat ini tidak dipakai untuk penjualan lampau.'),
-  "salesCount": zod.int(),
+  "salesCount": zod.int().describe('Jumlah penjualan selesai hari ini.'),
   "newCredit": zod.int().describe('Jumlah bagian kasbon (metode pembayaran credit) dari penjualan selesai hari ini (rupiah).'),
   "avgTicket": zod.int(),
-  "lastWeekRevenue": zod.int().describe('Omzet penjualan selesai pada hari yang sama minggu lalu dari 00.00 sampai jam dan menit yang sama dengan saat ini (Asia/Jakarta), pembanding sepadan untuk omzet hari ini.'),
+  "lastWeekRevenue": zod.int().describe('Omzet penjualan selesai pada hari yang sama minggu lalu dari 00.00 sampai akhir menit saat ini (menit berjalan ikut dihitung) (Asia/Jakarta), pembanding sepadan untuk omzet hari ini.'),
   "hourly": zod.array(zod.object({
   "hour": zod.int().min(getOwnerTodaySummaryResponseHourlyItemHourMin).max(getOwnerTodaySummaryResponseHourlyItemHourMax).describe('Jam lokal Asia/Jakarta.'),
   "revenue": zod.int().describe('Omzet penjualan selesai hari ini pada jam ini (rupiah).'),
