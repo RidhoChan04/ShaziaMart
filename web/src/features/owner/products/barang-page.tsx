@@ -6,7 +6,6 @@ import {
   Plus,
   Search,
 } from "lucide-react";
-import { DropdownMenu } from "radix-ui";
 import {
   useDeferredValue,
   useEffect,
@@ -19,49 +18,67 @@ import { useListOwnerProducts } from "@/shared/api/gen/owner/owner";
 import { cn } from "@/shared/lib/cn";
 import { pesanError } from "@/shared/lib/error-messages";
 import { Button } from "@/shared/ui/button";
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetTitle,
+  SheetTrigger,
+} from "@/shared/ui/sheet";
 import { categoryChips, filterProducts } from "./product-model";
 import { ProductRow, priceColumnWidth } from "./product-row";
 
 const iconButton =
   "inline-flex size-11 shrink-0 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary";
 
-const menuItem =
-  "flex min-h-11 cursor-pointer items-center justify-between gap-6 px-4 text-[15px] outline-none data-[highlighted]:bg-primary-soft";
+const sheetItem =
+  "flex min-h-12 w-full items-center justify-between gap-6 rounded-lg bg-bg px-4 text-[17px] font-medium focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary";
 
+/** Action sheet ala iOS dari bawah; memakai Sheet yang sudah ada di bundel (tanpa popper/menu Radix). */
 function MoreMenu() {
   return (
-    <DropdownMenu.Root>
-      <DropdownMenu.Trigger
+    <Sheet>
+      <SheetTrigger
         aria-label="Menu lainnya"
         className={cn(iconButton, "bg-surface text-text shadow-sm")}
       >
         <Ellipsis aria-hidden="true" className="size-5" />
-      </DropdownMenu.Trigger>
-      <DropdownMenu.Portal>
-        <DropdownMenu.Content
-          align="end"
-          sideOffset={6}
-          className="z-40 min-w-56 overflow-hidden rounded-lg border border-border bg-surface py-1 shadow-lg"
-        >
-          <DropdownMenu.Item asChild>
-            <Link to="/owner/barang/impor" className={menuItem}>
+      </SheetTrigger>
+      <SheetContent
+        side="bottom"
+        showCloseButton={false}
+        className="gap-0 rounded-t-lg p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] lg:mx-auto lg:max-w-sm"
+      >
+        <SheetTitle className="sr-only">Menu lainnya</SheetTitle>
+        <SheetDescription className="sr-only">
+          Impor atau unduh template Excel
+        </SheetDescription>
+        <div className="grid gap-2">
+          <SheetClose asChild>
+            <Link to="/owner/barang/impor" className={sheetItem}>
               Impor dari Excel
-              <FileSpreadsheet aria-hidden="true" className="size-4" />
+              <FileSpreadsheet aria-hidden="true" className="size-5" />
             </Link>
-          </DropdownMenu.Item>
-          <DropdownMenu.Item asChild>
+          </SheetClose>
+          <SheetClose asChild>
             <a
               href="/templates/data-barang.xlsx"
               download="data-barang.xlsx"
-              className={menuItem}
+              className={sheetItem}
             >
               Unduh template Excel
-              <Download aria-hidden="true" className="size-4" />
+              <Download aria-hidden="true" className="size-5" />
             </a>
-          </DropdownMenu.Item>
-        </DropdownMenu.Content>
-      </DropdownMenu.Portal>
-    </DropdownMenu.Root>
+          </SheetClose>
+        </div>
+        <SheetClose asChild>
+          <Button variant="outline" className="mt-3 h-12 w-full text-[17px]">
+            Batal
+          </Button>
+        </SheetClose>
+      </SheetContent>
+    </Sheet>
   );
 }
 

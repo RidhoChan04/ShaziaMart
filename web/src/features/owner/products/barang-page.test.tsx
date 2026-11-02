@@ -106,21 +106,44 @@ test("tanda Menipis tampil dengan ikon aria-hidden + teks; barang belum dihitung
   expect(gula.queryByText(/^Stok \d/)).toBeNull();
 });
 
-test("Menu lainnya berisi Impor dari Excel (ke /owner/barang/impor) dan Unduh template Excel (href /templates/data-barang.xlsx, download)", async () => {
+test("Menu lainnya: action sheet berisi Impor dari Excel (ke /owner/barang/impor) dan Unduh template Excel (href /templates/data-barang.xlsx, download)", async () => {
   const user = userEvent.setup();
   const { router } = await openBarang();
 
   await user.click(screen.getByRole("button", { name: "Menu lainnya" }));
-  const template = await screen.findByRole("menuitem", {
+  const sheet = await screen.findByRole("dialog", { name: "Menu lainnya" });
+  const template = within(sheet).getByRole("link", {
     name: "Unduh template Excel",
   });
   expect(template).toHaveAttribute("href", "/templates/data-barang.xlsx");
   expect(template).toHaveAttribute("download", "data-barang.xlsx");
+  expect(sheet).toHaveClass("bottom-0");
+  expect(
+    within(sheet).getByRole("button", { name: "Batal" }),
+  ).toBeInTheDocument();
 
-  await user.click(screen.getByRole("menuitem", { name: "Impor dari Excel" }));
+  await user.click(
+    within(sheet).getByRole("link", { name: "Impor dari Excel" }),
+  );
   await waitFor(() =>
     expect(router.state.location.pathname).toBe("/owner/barang/impor"),
   );
+});
+
+test("Menu lainnya: Esc dan Batal menutup sheet dan mengembalikan fokus ke pemicu", async () => {
+  const user = userEvent.setup();
+  await openBarang();
+  const trigger = screen.getByRole("button", { name: "Menu lainnya" });
+  await user.click(trigger);
+  await screen.findByRole("dialog", { name: "Menu lainnya" });
+  await user.keyboard("{Escape}");
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  expect(trigger).toHaveFocus();
+
+  await user.click(trigger);
+  await user.click(await screen.findByRole("button", { name: "Batal" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  expect(trigger).toHaveFocus();
 });
 
 test("Tambah barang menuju /owner/barang/baru; kolom cari berlabel", async () => {
@@ -258,7 +281,7 @@ test("daftar barang punya role=list eksplisit (Safari membuang semantik ul tanpa
   expect(list).toHaveAttribute("role", "list");
 });
 
-test("Menu lainnya dengan keyboard: Tab ke pemicu, Enter, ArrowDown/ArrowUp, Enter → Impor dari Excel", async () => {
+test("Menu lainnya dengan keyboard: Tab ke pemicu, Enter, Tab ke Impor dari Excel, Enter → navigasi", async () => {
   const user = userEvent.setup();
   const { router } = await openBarang();
   const trigger = screen.getByRole("button", { name: "Menu lainnya" });
@@ -266,17 +289,10 @@ test("Menu lainnya dengan keyboard: Tab ke pemicu, Enter, ArrowDown/ArrowUp, Ent
     await user.tab();
   expect(trigger).toHaveFocus();
   await user.keyboard("{Enter}");
-  const template = await screen.findByRole("menuitem", {
-    name: "Unduh template Excel",
-  });
-  expect(template).toHaveAttribute("href", "/templates/data-barang.xlsx");
-  expect(template).toHaveAttribute("download");
-  // Radix memfokuskan butir pertama saat dibuka lewat keyboard.
-  const impor = screen.getByRole("menuitem", { name: "Impor dari Excel" });
-  expect(impor).toHaveFocus();
-  await user.keyboard("{ArrowDown}");
-  expect(template).toHaveFocus();
-  await user.keyboard("{ArrowUp}");
+  const sheet = await screen.findByRole("dialog", { name: "Menu lainnya" });
+  const impor = within(sheet).getByRole("link", { name: "Impor dari Excel" });
+  for (let i = 0; i < 5 && document.activeElement !== impor; i++)
+    await user.tab();
   expect(impor).toHaveFocus();
   await user.keyboard("{Enter}");
   await waitFor(() =>
