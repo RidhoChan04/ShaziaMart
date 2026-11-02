@@ -67,7 +67,11 @@ test("rute Barang: validateSearch menyimpan q, kategori, nonaktif; nonaktif=sala
 test("rute sub-halaman Barang: baru, impor, detail (lembar valid saja), ubah", async () => {
   await ownerLogin();
   const { router } = renderApp("/owner/barang/abc?lembar=harga");
-  await screen.findByRole("heading", { level: 1, name: "Segera hadir" });
+  // Detail sungguhan (id "abc" tidak ada → halaman tidak ditemukan), bukan placeholder.
+  await screen.findByRole("heading", {
+    level: 1,
+    name: "Barang tidak ditemukan",
+  });
   expect(router.state.matches.at(-1)?.search).toEqual({ lembar: "harga" });
 
   await router.navigate({

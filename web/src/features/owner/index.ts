@@ -9,3 +9,4 @@ export {
   SegeraHadirPage,
 } from "./pages";
 export { BarangPage } from "./products/barang-page";
+export { ProductDetailPage } from "./products/detail/product-detail-page";
