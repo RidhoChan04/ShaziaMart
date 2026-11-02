@@ -85,7 +85,7 @@ test("kasbon melebihi limit butuh PIN pemilik", async ({ page }) => {
   ).toContainText("0 BARANG");
 });
 
-test("harga-berubah: konfirmasi lalu tersimpan", async ({ page }) => {
+test("harga-berubah: harga diperbarui lalu tersimpan", async ({ page }) => {
   await openShift(page, { ...RINA, path: "/kasir?skenario=harga-berubah" });
   await scan(page, KAPAL_API);
   await page.getByRole("button", { name: "Bayar" }).click();
@@ -93,9 +93,12 @@ test("harga-berubah: konfirmasi lalu tersimpan", async ({ page }) => {
   await dialog.getByLabel("UANG DITERIMA").fill("50.000");
   await dialog.getByRole("button", { name: "Selesai" }).click();
 
-  const changed = page.getByRole("dialog", { name: "Harga berubah" });
+  const changed = page.getByRole("dialog", { name: "Harga diperbarui" });
   await expect(changed).toBeVisible();
-  await changed.getByRole("button", { name: "Konfirmasi & simpan" }).click();
+  await expect(changed).toContainText("Harga 1 barang diperbarui.");
+  await changed
+    .getByRole("button", { name: "Simpan dengan harga baru" })
+    .click();
 
   await expect(changed).toBeHidden();
   const total = page.getByRole("complementary", { name: "Total" });

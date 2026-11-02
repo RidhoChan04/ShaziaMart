@@ -226,8 +226,14 @@ describe("createSale", () => {
         unitId: unitOf("Indomie Goreng", "pcs").id,
         oldUnitPrice: 3100,
         newUnitPrice: 2800,
+        newWholesaleTiers: [{ minQty: 40, price: 2800 }],
       },
-      { unitId: unitOf(GULA).id, oldUnitPrice: 17000, newUnitPrice: 18000 },
+      {
+        unitId: unitOf(GULA).id,
+        oldUnitPrice: 17000,
+        newUnitPrice: 18000,
+        newWholesaleTiers: [],
+      },
     ]);
     expect(placedSales()).toHaveLength(0);
   });
@@ -241,7 +247,12 @@ describe("createSale", () => {
     const problem = await json<PriceChangedProblem>(first);
     expect(problem.code).toBe("PRICE_CHANGED");
     expect(problem.changes).toEqual([
-      { unitId: unitOf(BIMOLI).id, oldUnitPrice: 36000, newUnitPrice: 36500 },
+      {
+        unitId: unitOf(BIMOLI).id,
+        oldUnitPrice: 36000,
+        newUnitPrice: 36500,
+        newWholesaleTiers: [],
+      },
     ]);
     expect(unitOf(BIMOLI).price).toBe(36500);
     const retry = await post("/api/sales", {

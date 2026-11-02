@@ -66,10 +66,22 @@ export interface Problem {
   detail?: string;
 }
 
+/**
+ * Harga grosir per satuan jual. Berlaku hanya bila qtyBase kelipatan unitSize;
+ * jumlah = qtyBase / unitSize (dalam satuan jual) dan dipakai tier dengan minQty
+ * terbesar yang <= jumlah. minQty dalam satuan jual, bukan satuan dasar.
+ */
+export interface WholesaleTier {
+  minQty: number;
+  price: number;
+}
+
 export interface PriceChange {
   unitId: string;
   oldUnitPrice: number;
   newUnitPrice: number;
+  /** Seluruh tier grosir terbaru satuan ini; keranjang mengganti tier lama. */
+  newWholesaleTiers: WholesaleTier[];
 }
 
 export type ShiftClosedProblemCode = typeof ShiftClosedProblemCode[keyof typeof ShiftClosedProblemCode];
@@ -264,16 +276,6 @@ export interface KasirSettings {
   quickCurahProductIds: string[];
   qrisImageUrl: string;
   allowNegativeStock: boolean;
-}
-
-/**
- * Harga grosir per satuan jual. Berlaku hanya bila qtyBase kelipatan unitSize;
- * jumlah = qtyBase / unitSize (dalam satuan jual) dan dipakai tier dengan minQty
- * terbesar yang <= jumlah. minQty dalam satuan jual, bukan satuan dasar.
- */
-export interface WholesaleTier {
-  minQty: number;
-  price: number;
 }
 
 export interface ProductUnit {

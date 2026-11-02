@@ -39,7 +39,14 @@ test("priceChangedProblemSchema cocok dengan tipe hasil generate", () => {
     title: "Harga berubah",
     status: 409,
     code: "PRICE_CHANGED",
-    changes: [{ unitId: "u1", oldUnitPrice: 1000, newUnitPrice: 1200 }],
+    changes: [
+      {
+        unitId: "u1",
+        oldUnitPrice: 1000,
+        newUnitPrice: 1200,
+        newWholesaleTiers: [{ minQty: 10, price: 1100 }],
+      },
+    ],
   });
   expect(ok.success).toBe(true);
 });
@@ -121,7 +128,14 @@ test("409 dikunci oleh code: PRICE_CHANGED lolos skema harga, CREDIT_LIMIT tidak
     title: "Harga berubah",
     status: 409,
     code: "PRICE_CHANGED",
-    changes: [{ unitId: "u1", oldUnitPrice: 1000, newUnitPrice: 1200 }],
+    changes: [
+      {
+        unitId: "u1",
+        oldUnitPrice: 1000,
+        newUnitPrice: 1200,
+        newWholesaleTiers: [{ minQty: 10, price: 1100 }],
+      },
+    ],
   };
   expect(priceChangedProblemSchema.safeParse(price).success).toBe(true);
   expect(priceChangedProblemSchema.safeParse(credit).success).toBe(false);

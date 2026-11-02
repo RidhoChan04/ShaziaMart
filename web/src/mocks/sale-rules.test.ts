@@ -8,6 +8,7 @@ const priced = (
 ): PricedItem => ({
   productId: `p-${unitId}`,
   expectedUnitPrice,
+  wholesaleTiers: [{ minQty: 5, price: unitPrice - 100 }],
   item: {
     unitId,
     productName: unitId,
@@ -31,14 +32,31 @@ test.each([
       priced("gula", 18000, 18500),
       priced("beras", 13000, 13000),
     ],
-    [{ unitId: "gula", oldUnitPrice: 18000, newUnitPrice: 18500 }],
+    [
+      {
+        unitId: "gula",
+        oldUnitPrice: 18000,
+        newUnitPrice: 18500,
+        newWholesaleTiers: [{ minQty: 5, price: 18400 }],
+      },
+    ],
   ],
   [
     "dua satuan berbeda → dua perubahan",
     [priced("gula", 18000, 18500), priced("beras", 13000, 13500)],
     [
-      { unitId: "gula", oldUnitPrice: 18000, newUnitPrice: 18500 },
-      { unitId: "beras", oldUnitPrice: 13000, newUnitPrice: 13500 },
+      {
+        unitId: "gula",
+        oldUnitPrice: 18000,
+        newUnitPrice: 18500,
+        newWholesaleTiers: [{ minQty: 5, price: 18400 }],
+      },
+      {
+        unitId: "beras",
+        oldUnitPrice: 13000,
+        newUnitPrice: 13500,
+        newWholesaleTiers: [{ minQty: 5, price: 13400 }],
+      },
     ],
   ],
 ])("priceChanges: %s", (_name, items, expected) => {

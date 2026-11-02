@@ -1,4 +1,3 @@
-import type { PriceChange } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { formatRupiah } from "@/shared/lib/money";
 import { Button } from "@/shared/ui/button";
 import {
@@ -9,32 +8,20 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/shared/ui/dialog";
-import type { CartLine } from "../cart/cart-store";
 
-/** Satu baris per satuan walau server mengirim ganda (kontrak: satu per unitId). */
-const perUnit = (changes: readonly PriceChange[]) =>
-  changes.filter(
-    (c, i) => changes.findIndex((x) => x.unitId === c.unitId) === i,
-  );
-
-/** 409 PRICE_CHANGED: harga lama → baru dan total lama → baru; konfirmasi menerapkan harga baru. */
+/** 409 PRICE_CHANGED: keranjang sudah memakai harga baru; kasir hanya melihat ringkasan total. */
 export function PriceChangedDialog({
   prompt,
-  lines,
   pending,
   onConfirm,
   onCancel,
 }: {
-  /** Total dihitung saat 409 diterima, agar tidak bergeser setelah harga diterapkan. */
-  prompt: { changes: PriceChange[]; oldTotal: number; newTotal: number } | null;
-  lines: readonly CartLine[];
+  /** Total dihitung saat 409 diterima, sebelum dan sesudah harga baru diterapkan. */
+  prompt: { count: number; oldTotal: number; newTotal: number } | null;
   pending: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
-  const nameOf = (unitId: string) =>
-    lines.find((l) => l.unitId === unitId)?.productName ?? unitId;
-
   return (
     <Dialog
       open={prompt !== null}
@@ -44,32 +31,18 @@ export function PriceChangedDialog({
     >
       <DialogContent className="max-w-md" showCloseButton={!pending}>
         <DialogHeader>
-          <DialogTitle>Harga berubah</DialogTitle>
-          <DialogDescription>
-            Periksa harga baru, lalu simpan ulang transaksi.
+          <DialogTitle>Harga diperbarui</DialogTitle>
+          <DialogDescription className="tabular-nums">
+            {prompt &&
+              `Harga ${prompt.count} barang diperbarui. Total sekarang ${formatRupiah(prompt.newTotal)} (sebelumnya ${formatRupiah(prompt.oldTotal)}).`}
           </DialogDescription>
         </DialogHeader>
-        <ul className="grid gap-1 tabular-nums">
-          {prompt &&
-            perUnit(prompt.changes).map((c) => (
-              <li key={c.unitId}>
-                {`${nameOf(c.unitId)}: ${formatRupiah(c.oldUnitPrice)} → ${formatRupiah(c.newUnitPrice)}`}
-              </li>
-            ))}
-        </ul>
-        {prompt && (
-          <p className="flex flex-wrap gap-x-2 tabular-nums">
-            <span className="text-muted">{`Total lama ${formatRupiah(prompt.oldTotal)}`}</span>
-            <span aria-hidden>→</span>
-            <span className="font-bold">{`Total baru ${formatRupiah(prompt.newTotal)}`}</span>
-          </p>
-        )}
         <DialogFooter>
           <Button variant="outline" onClick={onCancel} disabled={pending}>
-            Batal
+            Kembali
           </Button>
           <Button onClick={onConfirm} disabled={pending} aria-busy={pending}>
-            Konfirmasi & simpan
+            Simpan dengan harga baru
           </Button>
         </DialogFooter>
       </DialogContent>

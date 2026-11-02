@@ -6,6 +6,7 @@ import type {
   PriceChange,
   Product,
   SaleItem,
+  WholesaleTier,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { cartTotal, priceLine } from "@/shared/lib/pricing";
 import { roundHalfUp } from "@/shared/lib/quantity";
@@ -20,6 +21,8 @@ export type Rejection = {
 export type PricedItem = {
   productId: string;
   expectedUnitPrice: number;
+  /** Tier grosir satuan saat ini, dikirim balik bila harga berubah. */
+  wholesaleTiers: WholesaleTier[];
   item: SaleItem;
 };
 
@@ -93,6 +96,7 @@ function priceItem(
   return {
     productId: product.id,
     expectedUnitPrice: raw.expectedUnitPrice,
+    wholesaleTiers: unit.wholesaleTiers,
     item: {
       unitId: unit.id,
       productName: product.name,
@@ -136,6 +140,7 @@ export function priceChanges(items: readonly PricedItem[]): PriceChange[] {
       unitId,
       oldUnitPrice: p.expectedUnitPrice,
       newUnitPrice: unitPrice,
+      newWholesaleTiers: p.wholesaleTiers,
     });
   }
   return changes;

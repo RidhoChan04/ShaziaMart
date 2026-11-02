@@ -5,14 +5,13 @@ import {
   getListTodaySalesQueryKey,
   useCreateSale,
 } from "@/shared/api/gen/sales/sales";
-import type { PriceChange, Sale } from "@/shared/api/gen/shaziaMartAPI.schemas";
+import type { Sale } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import {
   creditLimitProblemSchema,
   priceChangedProblemSchema,
   readProblem,
 } from "@/shared/api/problem";
 import { pesanError } from "@/shared/lib/error-messages";
-import { withPriceChanges } from "../cart/cart-helpers";
 import { useCart } from "../cart/cart-store";
 import { cartSummary } from "../cart/cart-view";
 import {
@@ -25,7 +24,8 @@ export type SubmitPrompt =
   | { kind: "none" }
   | {
       kind: "priceChanged";
-      changes: PriceChange[];
+      /** Jumlah satuan yang harganya berubah. */
+      count: number;
       oldTotal: number;
       newTotal: number;
     }
@@ -42,7 +42,8 @@ const TOTAL_CHANGED = "Total berubah — periksa pembayaran";
 /**
  * Kirim penjualan dari keranjang. Satu request sekaligus; `saleId` keranjang dipakai
  * ulang pada setiap percobaan sehingga retry tidak pernah membuat dua penjualan.
- * 409 PRICE_CHANGED / CREDIT_LIMIT membuka prompt; error lain jadi pesan di jendela bayar.
+ * 409 PRICE_CHANGED langsung menerapkan harga baru ke keranjang lalu meminta konfirmasi;
+ * 409 CREDIT_LIMIT membuka prompt PIN; error lain jadi pesan di jendela bayar.
  */
 export function useSubmitSale(onPaid: (sale: Sale) => void) {
   const client = useQueryClient();
@@ -58,12 +59,14 @@ export function useSubmitSale(onPaid: (sale: Sale) => void) {
     const priceChanged = readProblem(err, priceChangedProblemSchema);
     if (priceChanged) {
       const { changes } = priceChanged;
-      const { lines } = useCart.getState();
+      const cart = useCart.getState();
+      const oldTotal = cartSummary(cart.lines).total;
+      cart.applyPriceChanges(changes);
       setPrompt({
         kind: "priceChanged",
-        changes,
-        oldTotal: cartSummary(lines).total,
-        newTotal: cartSummary(withPriceChanges(lines, changes)).total,
+        count: new Set(changes.map((c) => c.unitId)).size,
+        oldTotal,
+        newTotal: cartSummary(useCart.getState().lines).total,
       });
       return;
     }
@@ -134,13 +137,12 @@ export function useSubmitSale(onPaid: (sale: Sale) => void) {
     pending: isPending,
     submit: (choice: PaymentChoice, print: boolean) => send({ choice, print }),
     /**
-     * Terapkan harga baru. Hanya tunai yang uangnya masih menutup total baru dikirim
-     * ulang otomatis (`rechoose` menilai ulang isian); QRIS, kasbon, dan campuran
-     * kembali ke jendela bayar agar kasir memeriksa pembayaran dengan total baru.
+     * Simpan dengan harga baru (sudah di keranjang). Hanya tunai yang uangnya masih
+     * menutup total baru dikirim ulang otomatis (`rechoose` menilai ulang isian); QRIS,
+     * kasbon, dan campuran kembali ke jendela bayar agar kasir memeriksa pembayaran.
      */
     confirmPrices(rechoose: () => PaymentChoice | null) {
       if (prompt.kind !== "priceChanged" || !last.current) return;
-      useCart.getState().applyPriceChanges(prompt.changes);
       const choice = last.current.choice.kind === "tunai" ? rechoose() : null;
       if (choice) {
         send({ ...last.current, choice });
@@ -157,7 +159,10 @@ export function useSubmitSale(onPaid: (sale: Sale) => void) {
       if (prompt.kind === "replayed") finish(prompt.sale);
     },
     dismissPrompt() {
-      if (!inFlight.current) setPrompt(NONE);
+      if (inFlight.current) return;
+      // Keranjang sudah memakai harga baru: kasir kembali ke total yang berubah.
+      if (prompt.kind === "priceChanged") setNotice(TOTAL_CHANGED);
+      setPrompt(NONE);
     },
   };
 }

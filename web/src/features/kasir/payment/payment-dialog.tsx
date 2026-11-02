@@ -230,7 +230,6 @@ function PaymentSession({ onClose, onPaid }: Props) {
       </Dialog>
       <SalePrompts
         sale={sale}
-        lines={lines}
         rechoose={() =>
           paymentState(
             cartSummary(useCart.getState().lines).total,

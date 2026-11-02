@@ -607,7 +607,7 @@ components:
           type: string
     PriceChange:
       type: object
-      required: [unitId, oldUnitPrice, newUnitPrice]
+      required: [unitId, oldUnitPrice, newUnitPrice, newWholesaleTiers]
       properties:
         unitId:
           type: string
@@ -615,6 +615,11 @@ components:
           type: integer
         newUnitPrice:
           type: integer
+        newWholesaleTiers:
+          type: array
+          description: Seluruh tier grosir terbaru satuan ini; keranjang mengganti tier lama.
+          items:
+            $ref: "#/components/schemas/WholesaleTier"
     ShiftClosedProblem:
       description: Problem SHIFT_CLOSED.
       allOf:

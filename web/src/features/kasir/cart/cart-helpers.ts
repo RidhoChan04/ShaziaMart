@@ -71,7 +71,10 @@ export function step(d: CartData, dir: 1 | -1): string | null {
   return d.lines[next]?.lineId ?? null;
 }
 
-/** Harga baru dari 409 PRICE_CHANGED. Baris grosir: tier tetap; listPrice berubah hanya bila harga lama cocok. */
+/**
+ * Harga baru dari 409 PRICE_CHANGED: tier grosir selalu diganti. `newUnitPrice` adalah
+ * harga efektif server, jadi hanya menjadi harga normal bila baris tidak kena tier baru.
+ */
 export function withPriceChanges(
   lines: readonly CartLine[],
   changes: readonly PriceChange[],
@@ -79,16 +82,14 @@ export function withPriceChanges(
   return lines.map((l) => {
     const c = changes.find((x) => x.unitId === l.unitId);
     if (!c) return l;
+    const wholesaleTiers = c.newWholesaleTiers;
     const { wholesale } = unitPriceFor(
-      {
-        price: l.listPrice,
-        unitSize: l.unitSize,
-        wholesaleTiers: l.wholesaleTiers,
-      },
+      { price: l.listPrice, unitSize: l.unitSize, wholesaleTiers },
       l.qtyBase,
     );
-    return !wholesale || c.oldUnitPrice === l.listPrice
-      ? { ...l, listPrice: c.newUnitPrice }
-      : l;
+    // Baris nominal tidak pernah kena tier (lihat priceLine).
+    return l.amount === null && wholesale
+      ? { ...l, wholesaleTiers }
+      : { ...l, wholesaleTiers, listPrice: c.newUnitPrice };
   });
 }

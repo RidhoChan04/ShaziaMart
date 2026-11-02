@@ -302,7 +302,12 @@ test("hold & resume: pilihan Cetak struk tidak terbawa ke keranjang lain", () =>
 test("applyPriceChanges pada baris nominal curah: qtyLabel mengikuti harga baru", () => {
   s().addCurah(gulaMatch, { amount: 20000 });
   s().applyPriceChanges([
-    { unitId: "u-gula", oldUnitPrice: 18000, newUnitPrice: 20000 },
+    {
+      unitId: "u-gula",
+      oldUnitPrice: 18000,
+      newUnitPrice: 20000,
+      newWholesaleTiers: [],
+    },
   ]);
   const v = cartLineView(at(s().lines, 0), 0);
   expect(v.subtotal).toBe(20000);
@@ -313,28 +318,75 @@ test("applyPriceChanges mengubah harga baris", () => {
   s().addUnit(dus);
   s().addUnit(pcs);
   s().applyPriceChanges([
-    { unitId: "u-dus", oldUnitPrice: 112000, newUnitPrice: 115000 },
+    {
+      unitId: "u-dus",
+      oldUnitPrice: 112000,
+      newUnitPrice: 115000,
+      newWholesaleTiers: [],
+    },
   ]);
   expect(at(s().lines, 0).listPrice).toBe(115000);
   expect(cartLineView(at(s().lines, 0), 0).subtotal).toBe(115000);
   expect(at(s().lines, 1).listPrice).toBe(3100);
 });
 
-test("applyPriceChanges pada baris grosir: tier tetap, listPrice hanya bila harga lama cocok", () => {
+function addPcs(count: number) {
   s().addUnit(pcs);
   const id = at(s().lines, 0).lineId;
-  for (let i = 0; i < 39; i++) s().increment(id);
+  for (let i = 1; i < count; i++) s().increment(id);
+}
+
+test("applyPriceChanges pada baris grosir: tier diganti, subtotal memakai harga tier baru", () => {
+  addPcs(40);
   s().applyPriceChanges([
-    { unitId: "u-pcs", oldUnitPrice: 9999, newUnitPrice: 4000 },
+    {
+      unitId: "u-pcs",
+      oldUnitPrice: 2800,
+      newUnitPrice: 2700,
+      newWholesaleTiers: [{ minQty: 40, price: 2700 }],
+    },
   ]);
-  expect(at(s().lines, 0).listPrice).toBe(3100);
+  const line = at(s().lines, 0);
+  expect(line.wholesaleTiers).toEqual([{ minQty: 40, price: 2700 }]);
+  expect(line.listPrice).toBe(3100);
+  const v = cartLineView(line, 0);
+  expect(v.wholesale).toBe(true);
+  expect(v.unitPrice).toBe(2700);
+  expect(v.subtotal).toBe(108000);
+});
+
+test("applyPriceChanges: tier grosir dihapus → harga baru jadi harga normal", () => {
+  addPcs(40);
   s().applyPriceChanges([
-    { unitId: "u-pcs", oldUnitPrice: 3100, newUnitPrice: 3300 },
+    {
+      unitId: "u-pcs",
+      oldUnitPrice: 2800,
+      newUnitPrice: 3200,
+      newWholesaleTiers: [],
+    },
   ]);
-  expect(at(s().lines, 0).listPrice).toBe(3300);
-  expect(at(s().lines, 0).wholesaleTiers).toEqual([
-    { minQty: 40, price: 2800 },
+  const line = at(s().lines, 0);
+  expect(line.wholesaleTiers).toEqual([]);
+  expect(line.listPrice).toBe(3200);
+  expect(cartLineView(line, 0).subtotal).toBe(128000);
+});
+
+test("applyPriceChanges: tier grosir baru berlaku → harga normal tetap, tier dipakai", () => {
+  addPcs(20);
+  s().applyPriceChanges([
+    {
+      unitId: "u-pcs",
+      oldUnitPrice: 3100,
+      newUnitPrice: 2900,
+      newWholesaleTiers: [
+        { minQty: 20, price: 2900 },
+        { minQty: 40, price: 2800 },
+      ],
+    },
   ]);
+  const line = at(s().lines, 0);
+  expect(line.listPrice).toBe(3100);
+  expect(cartLineView(line, 0).subtotal).toBe(58000);
 });
 
 test("useCart: store tunggal yang tahan di localStorage", () => {
