@@ -233,7 +233,7 @@ test("seed: 20 kategori template; setiap barang berkategori dari daftar; semua b
       "Susu Bendera Cokelat 200 ml",
       "Santan Kara 200 ml",
       "Tisu Paseo 250 Sheet",
-      "Teh Pucuk Harum 350 ml",
+      "Teh Gelas 350 ml",
     ].map(named),
   ).toEqual([
     "Beras",

@@ -118,5 +118,5 @@ export const CATALOG_NAMES: readonly CatalogName[] = [
   { name: "Fruit Tea Jasmine 350 ml", category: "Minuman" },
   { name: "Minuman Isotonik Mizone 500 ml", category: "Minuman" },
   { name: "Floridina Orange 360 ml", category: "Minuman" },
-  { name: "Teh Pucuk Harum 350 ml", category: "Minuman", pack: ["dus", 24] },
+  { name: "Teh Gelas 350 ml", category: "Minuman", pack: ["dus", 24] },
 ];
