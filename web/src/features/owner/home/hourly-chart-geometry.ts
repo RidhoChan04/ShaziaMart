@@ -16,7 +16,7 @@ const BAR_RATIO = 0.66;
 const TODAY_INSET = 3;
 const PEAK_GAP = 4;
 /** Perkiraan lebar satu karakter label puncak (font 9.5px). */
-const PEAK_CHAR_WIDTH = 5.5;
+export const PEAK_CHAR_WIDTH = 5.5;
 
 export const hourLabel = (hour: number) =>
   `${String(hour).padStart(2, "0")}.00`;
