@@ -6,8 +6,8 @@ export {
   KasbonPage,
   LainnyaPage,
   LaporanPage,
-  SegeraHadirPage,
 } from "./pages";
 export { BarangPage } from "./products/barang-page";
 export { ProductDetailPage } from "./products/detail/product-detail-page";
 export { ProductFormPage } from "./products/form/product-form-page";
+export { ImportPage } from "./products/import/import-page";

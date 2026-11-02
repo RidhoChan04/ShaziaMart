@@ -4,21 +4,10 @@ import { useOwnerLogout } from "@/shared/api/gen/owner/owner";
 import { pesanError } from "@/shared/lib/error-messages";
 import { Button } from "@/shared/ui/button";
 import { clearOwnerSession } from "./auth/owner-session";
-import { SubPageHeader } from "./common/sub-page-header";
 
 /** Isi halaman pemilik sementara; judulnya dari header kerangka, isi nyata menyusul. */
 function PlaceholderPage() {
   return <p className="text-muted">Segera hadir</p>;
-}
-
-/** Sub-halaman Barang yang belum ada (Task 8/9/12 menggantinya satu per satu). */
-export function SegeraHadirPage() {
-  return (
-    <SubPageHeader
-      title="Segera hadir"
-      back={{ label: "Barang", fallback: "/owner/barang" }}
-    />
-  );
 }
 
 export function LaporanPage() {

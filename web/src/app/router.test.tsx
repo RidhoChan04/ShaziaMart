@@ -95,7 +95,7 @@ test("rute sub-halaman Barang: baru, impor, detail (lembar valid saja), ubah", a
   await router.navigate({ to: "/owner/barang/impor" });
   expect(router.state.location.pathname).toBe("/owner/barang/impor");
   expect(
-    await screen.findByRole("heading", { level: 1, name: "Segera hadir" }),
+    await screen.findByRole("heading", { level: 1, name: "Impor dari Excel" }),
   ).toBeInTheDocument();
 
   await router.navigate({

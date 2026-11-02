@@ -51,3 +51,12 @@ test("registrasi dibatasi ke halaman pemilik", () => {
   expect(isOwnerPath("/ownerku")).toBe(false);
   expect(isOwnerPath("/")).toBe(false);
 });
+
+test("pwaOptions: navigateFallbackDenylist memuat /^\\/templates\\//", () => {
+  const denylist = pwaOptions.workbox?.navigateFallbackDenylist ?? [];
+  expect(denylist.map(String)).toContain(String(/^\/templates\//));
+  expect(denylist.some((r) => r.test("/templates/data-barang.xlsx"))).toBe(
+    true,
+  );
+  expect(denylist.some((r) => r.test("/owner/barang/impor"))).toBe(false);
+});

@@ -30,6 +30,8 @@ export default defineConfig(({ command, mode }) => {
     resolve: {
       alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
     },
+    // Fixture .xlsx di test dimuat lewat `?inline` (data URL).
+    assetsInclude: ["**/*.xlsx"],
     test: {
       environment: "jsdom",
       setupFiles: ["./vitest.setup.ts"],

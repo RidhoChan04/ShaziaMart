@@ -38,7 +38,8 @@ export const pwaOptions: Partial<VitePWAOptions> = {
     globPatterns: ["**/*.{js,css,html,woff2,svg,png}"],
     globIgnores: ["mockServiceWorker.js"],
     navigateFallback: "/index.html",
-    navigateFallbackDenylist: [/^\/api\//],
+    // Template Excel diunduh dari server, bukan diarahkan ke cangkang aplikasi.
+    navigateFallbackDenylist: [/^\/api\//, /^\/templates\//],
   },
   devOptions: { enabled: false },
 };
