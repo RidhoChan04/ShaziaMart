@@ -86,14 +86,24 @@ export function uniqueErrors(
   return errors;
 }
 
-/** Spec §12d: satuan dasar dan isi satuan yang pernah terjual dikunci. */
-export function lockErrors({ target, d, matched, sold }: Ctx): FieldError[] {
+/**
+ * Spec §12d: satuan dasar dan isi satuan yang pernah terjual dikunci. C11: satuan dasar
+ * juga dikunci bila stok ≠ 0, karena stok tersimpan dalam qtyBase satuan dasar lama.
+ */
+export function lockErrors({
+  state,
+  target,
+  d,
+  matched,
+  sold,
+}: Ctx): FieldError[] {
   const kind = sellUnitKind(d.sellUnit ?? "");
   if (target === null || kind === null) return [];
   const errors: FieldError[] = [];
   const eceran = eceranOf(target);
   if (
-    target.units.some((u) => sold.has(u.id)) &&
+    (target.units.some((u) => sold.has(u.id)) ||
+      (state.stock[target.id] ?? 0) !== 0) &&
     (kind.baseUnit !== target.baseUnit || kind.unitSize !== eceran.unitSize)
   ) {
     errors.push({

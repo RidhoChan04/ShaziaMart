@@ -372,10 +372,43 @@ describe("draftFromProduct + applyDraft", () => {
     ).toEqual([]);
   });
 
-  test("tidak terjual: 'Dijual per' boleh diubah (pcs → kg) dan isi satuan besar ikut satuan dasar", () => {
+  test("C11: belum terjual tetapi stok > 0 → 'Dijual per' terkunci (pcs → kg 422)", () => {
     const s = createSeedState(NOW);
     s.sales = [];
     const indomie = byName(s, "Indomie Goreng");
+    expect(s.stock[indomie.id]).toBeGreaterThan(0);
+    const r = applyDraft(
+      s,
+      indomie,
+      { ...draftFromProduct(s, indomie), sellUnit: "kg" },
+      { ...REPLACE, bigUnitId: indomie.units[1]?.id ?? null },
+    );
+    expect(r).toEqual({
+      ok: false,
+      errors: [
+        {
+          field: "sellUnit",
+          message: "'Dijual per' tidak bisa diubah — barang sudah terjual",
+        },
+      ],
+    });
+    // Stok minus juga mengunci.
+    s.stock[indomie.id] = -2;
+    expect(
+      applyDraft(
+        s,
+        indomie,
+        { ...draftFromProduct(s, indomie), sellUnit: "kg" },
+        REPLACE,
+      ).ok,
+    ).toBe(false);
+  });
+
+  test("belum terjual & stok 0: 'Dijual per' boleh diubah (pcs → kg) dan isi satuan besar ikut satuan dasar", () => {
+    const s = createSeedState(NOW);
+    s.sales = [];
+    const indomie = byName(s, "Indomie Goreng");
+    s.stock[indomie.id] = 0;
     const r = ok(
       applyDraft(
         s,

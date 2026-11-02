@@ -366,6 +366,47 @@ describe("barang pemilik", () => {
     expect(p.units[1]?.id).toBe(before?.units[1]?.id);
   });
 
+  test("C11: Dijual per terkunci bila stok ≠ 0 walau belum terjual; barang baru stok 0 boleh diubah", async () => {
+    // Barang seed tanpa penjualan (riwayat dibuang) tetapi stok > 0.
+    mockDb.update((s) => {
+      s.sales = [];
+    });
+    const id = productId("Kopi Kapal Api 165 g");
+    expect(mockDb.get().stock[id]).toBeGreaterThan(0);
+    const locked = await put(`/api/owner/products/${id}`, {
+      name: "Kopi Kapal Api 165 g",
+      category: "Kopi & Teh",
+      sellUnit: "kg",
+      barcode: "8991002105126",
+      cost: null,
+      price: 14500,
+      tier: null,
+      bigUnit: null,
+      minStock: 10,
+    });
+    expect(locked.status).toBe(422);
+    expect(await errorsOf(locked)).toEqual([
+      {
+        field: "sellUnit",
+        message: "'Dijual per' tidak bisa diubah — barang sudah terjual",
+      },
+    ]);
+
+    const teh = await create();
+    const changed = await put(`/api/owner/products/${teh.id}`, {
+      ...TEH,
+      sellUnit: "liter",
+      minStock: 2.5,
+    });
+    expect(changed.status).toBe(200);
+    const p = await json<OwnerProduct>(changed);
+    expect(p).toMatchObject({ isCurah: true, baseUnit: "ml", minStock: 2500 });
+    expect(p.units.map((u) => [u.name, u.unitSize])).toEqual([
+      ["liter", 1000],
+      ["dus", 24000],
+    ]);
+  });
+
   test("hapus satuan besar terjual → active false (kasir tidak melihatnya); belum terjual → dibuang", async () => {
     await sellIndomie();
     const id = productId(INDOMIE);
