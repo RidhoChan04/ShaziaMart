@@ -130,3 +130,11 @@ test("offline sebelum data apa pun dimuat → layar penuh tidak bisa terhubung +
   ).toBeInTheDocument();
   expect(screen.queryByText(OFFLINE_TEXT)).not.toBeInTheDocument();
 });
+
+test("OwnerLayout memasang data-app=owner dan melepasnya saat unmount", async () => {
+  const { unmount } = renderApp("/owner");
+  await screen.findByRole("heading", { name: "Beranda" });
+  expect(document.documentElement.dataset.app).toBe("owner");
+  unmount();
+  expect(document.documentElement.dataset.app).toBeUndefined();
+});

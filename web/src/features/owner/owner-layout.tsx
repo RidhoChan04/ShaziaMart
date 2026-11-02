@@ -11,6 +11,7 @@ import {
   Wifi,
   WifiOff,
 } from "lucide-react";
+import { useEffect } from "react";
 import { getGetOwnerSessionQueryKey } from "@/shared/api/gen/owner/owner";
 import { useBusinessDay } from "@/shared/hooks/use-business-day";
 import {
@@ -157,6 +158,13 @@ function OwnerShell() {
 }
 
 export function OwnerLayout() {
+  // Di <html> (bukan wrapper) agar portal Radix (dialog) ikut token pemilik.
+  useEffect(() => {
+    document.documentElement.dataset.app = "owner";
+    return () => {
+      delete document.documentElement.dataset.app;
+    };
+  }, []);
   return (
     <OwnerGate>
       <OwnerShell />

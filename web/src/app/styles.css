@@ -16,7 +16,9 @@
   --color-danger: #b42318;
   --color-warning: #b26b00;
   --color-chart-1: #1f7a4d;
-  --color-chart-2: #2a78d6;
+  --color-chart-1-now: #2e9a62;
+  --color-chart-2: #d1d1d6;
+  --color-glass: rgb(255 255 255 / 0.72);
 
   --font-sans: "Inter Variable", system-ui, sans-serif;
   --radius-md: 8px;
@@ -45,6 +47,35 @@
   :focus-visible {
     outline: 2px solid var(--color-primary);
     outline-offset: 2px;
+  }
+}
+
+/* Token gaya Apple khusus aplikasi pemilik; layar kasir tidak terpengaruh. */
+:root[data-app="owner"] {
+  --color-bg: #f2f2f7;
+  --color-muted: #6e6e73;
+  --color-border: #e5e5ea;
+  --radius-lg: 20px;
+
+  body {
+    font-size: 16px;
+  }
+}
+
+/* Liquid Glass: hanya tab bar, sidebar, dan bar judul kecil. */
+@utility glass {
+  background-color: var(--color-glass);
+  backdrop-filter: blur(22px) saturate(180%);
+  border: 0.5px solid rgb(255 255 255 / 0.7);
+  box-shadow: 0 1px 12px rgb(0 0 0 / 0.06);
+
+  @supports not (backdrop-filter: blur(1px)) {
+    background-color: var(--color-surface);
+  }
+
+  @media (prefers-reduced-transparency: reduce) {
+    background-color: var(--color-surface);
+    backdrop-filter: none;
   }
 }
 
