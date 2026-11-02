@@ -80,6 +80,8 @@ export interface PriceChange {
   unitId: string;
   oldUnitPrice: number;
   newUnitPrice: number;
+  /** Harga normal (non-grosir) terbaru satuan ini; keranjang mengganti harga normal dan tier sekaligus. */
+  newNormalPrice: number;
   /** Seluruh tier grosir terbaru satuan ini; keranjang mengganti tier lama. */
   newWholesaleTiers: WholesaleTier[];
 }

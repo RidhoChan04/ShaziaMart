@@ -226,12 +226,14 @@ describe("createSale", () => {
         unitId: unitOf("Indomie Goreng", "pcs").id,
         oldUnitPrice: 3100,
         newUnitPrice: 2800,
+        newNormalPrice: 3100,
         newWholesaleTiers: [{ minQty: 40, price: 2800 }],
       },
       {
         unitId: unitOf(GULA).id,
         oldUnitPrice: 17000,
         newUnitPrice: 18000,
+        newNormalPrice: 18000,
         newWholesaleTiers: [],
       },
     ]);
@@ -251,6 +253,7 @@ describe("createSale", () => {
         unitId: unitOf(BIMOLI).id,
         oldUnitPrice: 36000,
         newUnitPrice: 36500,
+        newNormalPrice: 36500,
         newWholesaleTiers: [],
       },
     ]);

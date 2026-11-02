@@ -8,6 +8,7 @@ const priced = (
 ): PricedItem => ({
   productId: `p-${unitId}`,
   expectedUnitPrice,
+  normalPrice: unitPrice + 200,
   wholesaleTiers: [{ minQty: 5, price: unitPrice - 100 }],
   item: {
     unitId,
@@ -37,6 +38,7 @@ test.each([
         unitId: "gula",
         oldUnitPrice: 18000,
         newUnitPrice: 18500,
+        newNormalPrice: 18700,
         newWholesaleTiers: [{ minQty: 5, price: 18400 }],
       },
     ],
@@ -49,12 +51,14 @@ test.each([
         unitId: "gula",
         oldUnitPrice: 18000,
         newUnitPrice: 18500,
+        newNormalPrice: 18700,
         newWholesaleTiers: [{ minQty: 5, price: 18400 }],
       },
       {
         unitId: "beras",
         oldUnitPrice: 13000,
         newUnitPrice: 13500,
+        newNormalPrice: 13700,
         newWholesaleTiers: [{ minQty: 5, price: 13400 }],
       },
     ],

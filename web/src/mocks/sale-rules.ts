@@ -21,7 +21,8 @@ export type Rejection = {
 export type PricedItem = {
   productId: string;
   expectedUnitPrice: number;
-  /** Tier grosir satuan saat ini, dikirim balik bila harga berubah. */
+  /** Harga normal & tier grosir satuan saat ini, dikirim balik bila harga berubah. */
+  normalPrice: number;
   wholesaleTiers: WholesaleTier[];
   item: SaleItem;
 };
@@ -96,6 +97,7 @@ function priceItem(
   return {
     productId: product.id,
     expectedUnitPrice: raw.expectedUnitPrice,
+    normalPrice: unit.price,
     wholesaleTiers: unit.wholesaleTiers,
     item: {
       unitId: unit.id,
@@ -140,6 +142,7 @@ export function priceChanges(items: readonly PricedItem[]): PriceChange[] {
       unitId,
       oldUnitPrice: p.expectedUnitPrice,
       newUnitPrice: unitPrice,
+      newNormalPrice: p.normalPrice,
       newWholesaleTiers: p.wholesaleTiers,
     });
   }

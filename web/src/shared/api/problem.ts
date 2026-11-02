@@ -27,6 +27,7 @@ export const priceChangedProblemSchema = z.object({
       unitId: z.string(),
       oldUnitPrice: z.number(),
       newUnitPrice: z.number(),
+      newNormalPrice: z.number(),
       newWholesaleTiers: z.array(
         z.object({ minQty: z.number(), price: z.number() }),
       ),

@@ -3,7 +3,6 @@ import type {
   PriceChange,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { newId } from "@/shared/lib/id";
-import { unitPriceFor } from "@/shared/lib/pricing";
 import type { CartData, CartLine } from "./cart-store";
 
 export function findUnit(match: CatalogMatch) {
@@ -72,8 +71,8 @@ export function step(d: CartData, dir: 1 | -1): string | null {
 }
 
 /**
- * Harga baru dari 409 PRICE_CHANGED: tier grosir selalu diganti. `newUnitPrice` adalah
- * harga efektif server, jadi hanya menjadi harga normal bila baris tidak kena tier baru.
+ * Harga baru dari 409 PRICE_CHANGED: harga normal dan seluruh tier grosir diganti sekaligus;
+ * harga yang ditagih diturunkan ulang dari keduanya oleh `priceLine` (lihat cart-view).
  */
 export function withPriceChanges(
   lines: readonly CartLine[],
@@ -81,15 +80,12 @@ export function withPriceChanges(
 ): CartLine[] {
   return lines.map((l) => {
     const c = changes.find((x) => x.unitId === l.unitId);
-    if (!c) return l;
-    const wholesaleTiers = c.newWholesaleTiers;
-    const { wholesale } = unitPriceFor(
-      { price: l.listPrice, unitSize: l.unitSize, wholesaleTiers },
-      l.qtyBase,
-    );
-    // Baris nominal tidak pernah kena tier (lihat priceLine).
-    return l.amount === null && wholesale
-      ? { ...l, wholesaleTiers }
-      : { ...l, wholesaleTiers, listPrice: c.newUnitPrice };
+    return c
+      ? {
+          ...l,
+          listPrice: c.newNormalPrice,
+          wholesaleTiers: c.newWholesaleTiers,
+        }
+      : l;
   });
 }

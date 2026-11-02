@@ -306,6 +306,7 @@ test("applyPriceChanges pada baris nominal curah: qtyLabel mengikuti harga baru"
       unitId: "u-gula",
       oldUnitPrice: 18000,
       newUnitPrice: 20000,
+      newNormalPrice: 20000,
       newWholesaleTiers: [],
     },
   ]);
@@ -322,6 +323,7 @@ test("applyPriceChanges mengubah harga baris", () => {
       unitId: "u-dus",
       oldUnitPrice: 112000,
       newUnitPrice: 115000,
+      newNormalPrice: 115000,
       newWholesaleTiers: [],
     },
   ]);
@@ -343,6 +345,7 @@ test("applyPriceChanges pada baris grosir: tier diganti, subtotal memakai harga 
       unitId: "u-pcs",
       oldUnitPrice: 2800,
       newUnitPrice: 2700,
+      newNormalPrice: 3100,
       newWholesaleTiers: [{ minQty: 40, price: 2700 }],
     },
   ]);
@@ -355,6 +358,28 @@ test("applyPriceChanges pada baris grosir: tier diganti, subtotal memakai harga 
   expect(v.subtotal).toBe(108000);
 });
 
+test("applyPriceChanges pada baris grosir: harga normal & tier berubah → keduanya diganti; turun di bawah tier memakai harga normal baru", () => {
+  addPcs(40);
+  s().applyPriceChanges([
+    {
+      unitId: "u-pcs",
+      oldUnitPrice: 2800,
+      newUnitPrice: 2700,
+      newNormalPrice: 3300,
+      newWholesaleTiers: [{ minQty: 40, price: 2700 }],
+    },
+  ]);
+  const line = at(s().lines, 0);
+  expect(line.listPrice).toBe(3300);
+  expect(line.wholesaleTiers).toEqual([{ minQty: 40, price: 2700 }]);
+  expect(cartLineView(line, 0).subtotal).toBe(108000);
+  s().decrement(line.lineId);
+  const below = cartLineView(at(s().lines, 0), 0);
+  expect(below.wholesale).toBe(false);
+  expect(below.unitPrice).toBe(3300);
+  expect(below.subtotal).toBe(128700);
+});
+
 test("applyPriceChanges: tier grosir dihapus → harga baru jadi harga normal", () => {
   addPcs(40);
   s().applyPriceChanges([
@@ -362,6 +387,7 @@ test("applyPriceChanges: tier grosir dihapus → harga baru jadi harga normal", 
       unitId: "u-pcs",
       oldUnitPrice: 2800,
       newUnitPrice: 3200,
+      newNormalPrice: 3200,
       newWholesaleTiers: [],
     },
   ]);
@@ -378,6 +404,7 @@ test("applyPriceChanges: tier grosir baru berlaku → harga normal tetap, tier d
       unitId: "u-pcs",
       oldUnitPrice: 3100,
       newUnitPrice: 2900,
+      newNormalPrice: 3100,
       newWholesaleTiers: [
         { minQty: 20, price: 2900 },
         { minQty: 40, price: 2800 },

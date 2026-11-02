@@ -59,7 +59,8 @@ test("tunai yang masih menutup total baru → ringkasan total; Simpan dengan har
   expect(panelChange()).toHaveTextContent("Rp13.500");
 });
 
-test("harga grosir berubah di server → satu 409, ringkasan total, simpan tersimpan tanpa berulang", async () => {
+/** 40 pcs Indomie (kena tier grosir) di keranjang, lalu harga satuan itu diubah di server. */
+function indomieGrosirChanged(change: { price?: number; tierPrice: number }) {
   setScenario("normal");
   const indomie = seedMatch("Indomie Goreng");
   act(() => {
@@ -68,10 +69,15 @@ test("harga grosir berubah di server → satu 409, ringkasan total, simpan tersi
   mockDb.update((s) => {
     for (const unit of s.products.flatMap((p) => p.units)) {
       if (unit.id === indomie.unitId) {
-        unit.wholesaleTiers = [{ minQty: 40, price: 2700 }];
+        unit.price = change.price ?? unit.price;
+        unit.wholesaleTiers = [{ minQty: 40, price: change.tierPrice }];
       }
     }
   });
+}
+
+test("harga grosir berubah di server → satu 409, ringkasan total, simpan tersimpan tanpa berulang", async () => {
+  indomieGrosirChanged({ tierPrice: 2700 });
   const bodies = trackSales();
   const { user, selesai, received } = await openPay(() => {});
   await user.type(received(), "120.000");
@@ -91,6 +97,41 @@ test("harga grosir berubah di server → satu 409, ringkasan total, simpan tersi
   expect(bodies[1]?.items[0]?.expectedUnitPrice).toBe(2700);
   expect(bodies[1]?.payments).toEqual([{ method: "cash", amount: 108000 }]);
   expect(panelChange()).toHaveTextContent("Rp12.000");
+});
+
+test("harga normal & tier grosir berubah → satu 409 + konfirmasi; turun di bawah tier memakai harga normal baru tanpa 409 lagi", async () => {
+  indomieGrosirChanged({ price: 3300, tierPrice: 2700 });
+  const bodies = trackSales();
+  const { user, ui } = await openPay(() => {});
+  await user.click(ui.getByRole("tab", { name: "QRIS" }));
+  await user.click(ui.getByRole("button", { name: "Sudah masuk" }));
+  const { confirm } = await priceUpdatedDialog();
+  await user.click(confirm());
+  await priceDialogGone();
+
+  const [line] = useCart.getState().lines;
+  expect(line?.listPrice).toBe(3300);
+  expect(line?.wholesaleTiers).toEqual([{ minQty: 40, price: 2700 }]);
+
+  await user.keyboard("{Escape}");
+  await waitFor(() => expect(payDialog()).toBeNull());
+  await user.click(screen.getByRole("button", { name: "Kurangi" }));
+  await user.click(screen.getByRole("button", { name: "Bayar" }));
+  const again = within(
+    await screen.findByRole("dialog", { name: "Pembayaran" }),
+  );
+  await user.click(again.getByRole("tab", { name: "QRIS" }));
+  await user.click(again.getByRole("button", { name: "Sudah masuk" }));
+
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  await new Promise((r) => setTimeout(r, 50));
+  expect(bodies).toHaveLength(2);
+  expect(bodies[1]?.saleId).toBe(bodies[0]?.saleId);
+  expect(bodies[1]?.items[0]).toMatchObject({
+    qtyBase: 39,
+    expectedUnitPrice: 3300,
+  });
+  expect(bodies[1]?.payments).toEqual([{ method: "qris", amount: 128700 }]);
 });
 
 test("Kembali → jendela bayar dengan total baru, keranjang tetap memakai harga baru, tidak dikirim ulang", async () => {

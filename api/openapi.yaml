@@ -607,7 +607,7 @@ components:
           type: string
     PriceChange:
       type: object
-      required: [unitId, oldUnitPrice, newUnitPrice, newWholesaleTiers]
+      required: [unitId, oldUnitPrice, newUnitPrice, newNormalPrice, newWholesaleTiers]
       properties:
         unitId:
           type: string
@@ -615,6 +615,9 @@ components:
           type: integer
         newUnitPrice:
           type: integer
+        newNormalPrice:
+          type: integer
+          description: Harga normal (non-grosir) terbaru satuan ini; keranjang mengganti harga normal dan tier sekaligus.
         newWholesaleTiers:
           type: array
           description: Seluruh tier grosir terbaru satuan ini; keranjang mengganti tier lama.
