@@ -1,0 +1,637 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mockup tab Barang (F3b-1)</title><style>body{margin:0;padding:24px;background:#e9ece9;font-family:Inter,system-ui,sans-serif}h2{margin:0 0 4px;font-size:18px}.subtitle{margin:0 0 16px;color:#5e6b65}</style></head><body><style>
+  @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+  .fb-row { display: flex; gap: 44px 34px; flex-wrap: wrap; justify-content: center; align-items: flex-start; padding: 10px 0 24px; }
+  .fb-col { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .fb-col > h3 { margin: 16px 0 0; }
+  .fb-col > p { margin: 0; max-width: 320px; text-align: center; font-size: 13px; opacity: .8; }
+  .fb-col.fb-wide > p { max-width: 640px; }
+
+  /* ---------- rangka HP ---------- */
+  .fb-phone { width: 330px; height: 690px; border-radius: 44px; overflow: hidden; position: relative; background: #f2f2f7;
+    box-shadow: 0 0 0 10px #1d1d1f, 0 24px 60px rgba(0,0,0,.28);
+    font-family: Inter, -apple-system, "SF Pro Text", system-ui, sans-serif; color: #1c2421; font-size: 16px;
+    letter-spacing: -.01em; line-height: 1.3; text-align: left; }
+  .fb-phone *, .fb-lap * { box-sizing: border-box; }
+  .fb-num { font-variant-numeric: tabular-nums; }
+  .fb-ic { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; display: block; }
+  .fb-ic.fb-s { width: 16px; height: 16px; }
+  .fb-ic.fb-xs { width: 13px; height: 13px; stroke-width: 2.4; }
+  .fb-c { padding: 14px 16px 120px; }
+  .fb-date { font-size: 13px; font-weight: 600; color: #6e6e73; }
+  .fb-tbar { display: flex; justify-content: space-between; align-items: center; margin: 2px 0 12px; }
+  .fb-tbar b { font-size: 32px; font-weight: 700; letter-spacing: -.025em; line-height: 1.15; }
+  .fb-acts { display: flex; gap: 8px; }
+  .fb-rbtn { width: 36px; height: 36px; border-radius: 50%; background: #fff; color: #1f7a4d; display: grid; place-items: center;
+    box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+  .fb-rbtn.fb-on { background: #e6f2ea; }
+  .fb-rbtn.fb-pri { background: #1f7a4d; color: #fff; }
+  .fb-sec { display: flex; justify-content: space-between; align-items: baseline; font-size: 20px; font-weight: 700;
+    letter-spacing: -.02em; margin: 20px 4px 8px; }
+  .fb-sec a, .fb-link { font-size: 15px; font-weight: 600; color: #1f7a4d; letter-spacing: -.01em; text-decoration: none; }
+  .fb-card { background: #fff; border-radius: 20px; overflow: hidden; }
+  .fb-hl { position: relative; }
+  .fb-hl + .fb-hl::before { content: ""; position: absolute; top: 0; left: 16px; right: 0; border-top: .5px solid #c6c6c8; }
+  .fb-muted { color: #6e6e73; }
+  .fb-green { color: #1f7a4d; }
+
+  /* badge status: selalu ikon + teks, teks gelap di atas warna muda */
+  .fb-badge { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; font-weight: 600; line-height: 1;
+    padding: 3px 7px 3px 5px; border-radius: 99px; white-space: nowrap; letter-spacing: 0; }
+  .fb-warn { background: #fff0d9; color: #8a4b00; }
+  .fb-bad { background: #fde8e6; color: #9b1c12; }
+  .fb-ok { background: #e6f2ea; color: #17603c; }
+
+  /* ---------- tab bar kaca ---------- */
+  .fb-glassbar { position: absolute; left: 14px; right: 14px; bottom: 22px; height: 62px; border-radius: 31px; z-index: 6;
+    display: flex; justify-content: space-around; align-items: center; padding: 0 6px;
+    background: rgba(255,255,255,.6); backdrop-filter: blur(22px) saturate(180%); -webkit-backdrop-filter: blur(22px) saturate(180%);
+    border: .5px solid rgba(255,255,255,.75); box-shadow: 0 10px 30px rgba(0,0,0,.14), inset 0 1px 0 rgba(255,255,255,.9); }
+  .fb-tab { flex: 1; height: 50px; border-radius: 25px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 2px; font-size: 11px; font-weight: 600; color: #3a3a3c; }
+  .fb-tab .fb-ic { width: 22px; height: 22px; }
+  .fb-tab.fb-on { color: #1f7a4d; background: rgba(31,122,77,.12); }
+
+  /* bar judul kecil kaca (saat tergulir) */
+  .fb-compact { position: absolute; top: 0; left: 0; right: 0; height: 52px; z-index: 6; display: flex; align-items: center; justify-content: center;
+    font-size: 17px; font-weight: 600; background: rgba(255,255,255,.72); backdrop-filter: blur(22px) saturate(180%);
+    -webkit-backdrop-filter: blur(22px) saturate(180%); border-bottom: .5px solid rgba(0,0,0,.08); }
+  .fb-compact .fb-back { position: absolute; left: 10px; top: 9px; }
+
+  /* ---------- 1 · daftar ---------- */
+  .fb-search { display: flex; align-items: center; gap: 8px; height: 40px; border-radius: 12px; background: #fff; padding: 0 10px; color: #6e6e73; font-size: 16px; }
+  .fb-search .fb-scan { margin-left: auto; color: #1f7a4d; }
+  .fb-chips { display: flex; gap: 8px; margin: 12px -16px 14px; padding: 0 16px; overflow: hidden;
+    -webkit-mask-image: linear-gradient(90deg, #000 82%, transparent); mask-image: linear-gradient(90deg, #000 82%, transparent); }
+  .fb-chip { flex: none; height: 34px; padding: 0 14px; border-radius: 17px; background: #fff; display: flex; align-items: center; gap: 6px;
+    font-size: 15px; font-weight: 500; white-space: nowrap; }
+  .fb-chip small { font-size: 13px; color: #6e6e73; font-weight: 500; }
+  .fb-chip.fb-on { background: #1f7a4d; color: #fff; font-weight: 600; }
+  .fb-chip.fb-on small { color: rgba(255,255,255,.85); }
+  .fb-count { font-size: 13px; font-weight: 600; color: #6e6e73; margin: 0 4px 6px; }
+  .fb-item { display: flex; align-items: center; gap: 8px; padding: 10px 10px 10px 16px; min-height: 62px; }
+  .fb-item .fb-txt { min-width: 0; flex: 1; }
+  .fb-nm { font-size: 16px; font-weight: 500; line-height: 1.25; }
+  .fb-l2 { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 3px; }
+  .fb-stk { font-size: 13px; color: #6e6e73; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .fb-price { text-align: right; white-space: nowrap; font-size: 15px; font-weight: 600; }
+  .fb-price small { font-size: 13px; color: #6e6e73; font-weight: 500; }
+  .fb-chev { color: #c4c4c7; }
+  .fb-menu { position: absolute; top: 72px; right: 14px; width: 240px; z-index: 7; border-radius: 16px; overflow: hidden;
+    background: rgba(255,255,255,.9); backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%);
+    box-shadow: 0 14px 44px rgba(0,0,0,.2), 0 0 0 .5px rgba(0,0,0,.08); }
+  .fb-menu div { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; font-size: 16px; position: relative; }
+  .fb-menu div + div::before { content: ""; position: absolute; top: 0; left: 0; right: 0; border-top: .5px solid rgba(60,60,67,.25); }
+  .fb-menu div.fb-hot { background: rgba(31,122,77,.1); }
+
+  /* ---------- 2 · detail ---------- */
+  .fb-nav { display: flex; align-items: center; justify-content: space-between; height: 40px; margin: 0 -4px 10px; }
+  .fb-pill { display: inline-flex; align-items: center; gap: 2px; height: 36px; padding: 0 14px 0 8px; border-radius: 18px; background: #fff;
+    color: #1f7a4d; font-size: 16px; font-weight: 500; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+  .fb-pill.fb-solo { padding: 0 16px; font-weight: 600; }
+  .fb-back { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; color: #1f7a4d; background: rgba(255,255,255,.9); }
+  .fb-eyebrow { font-size: 13px; font-weight: 600; color: #6e6e73; }
+  .fb-h1 { text-wrap: balance; font-size: 26px; font-weight: 700; letter-spacing: -.025em; line-height: 1.15; margin: 2px 0 0; }
+  .fb-prow { padding: 11px 16px 12px; }
+  .fb-prow .fb-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .fb-prow .fb-top span { font-size: 16px; font-weight: 500; }
+  .fb-prow .fb-top span em { font-style: normal; color: #6e6e73; font-weight: 400; }
+  .fb-prow .fb-top b { font-size: 17px; font-weight: 700; }
+  .fb-meta { font-size: 13px; color: #6e6e73; margin-top: 3px; }
+  .fb-stats { display: grid; grid-template-columns: 1fr 1fr; padding: 13px 16px 12px; gap: 8px; }
+  .fb-stats .fb-cap { font-size: 13px; font-weight: 600; color: #6e6e73; display: block; }
+  .fb-stats b { font-size: 24px; font-weight: 700; letter-spacing: -.02em; display: inline-block; margin: 2px 6px 0 0; }
+  .fb-stats .fb-badge { vertical-align: 4px; }
+  .fb-kv { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; font-size: 16px; }
+  .fb-kv span { color: #1c2421; }
+  .fb-kv b { font-weight: 600; }
+  .fb-subh { display: flex; justify-content: space-between; align-items: baseline; padding: 14px 16px 4px; font-size: 13px; font-weight: 600; color: #6e6e73; position: relative; }
+  .fb-subh::before { content: ""; position: absolute; top: 0; left: 16px; right: 0; border-top: .5px solid #c6c6c8; }
+  .fb-subh a { font-size: 15px; }
+  .fb-mv { display: flex; align-items: center; gap: 12px; padding: 9px 16px; }
+  .fb-mv .fb-tile { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; flex: none; color: #fff; }
+  .fb-mv .fb-txt { flex: 1; min-width: 0; }
+  .fb-mv .fb-txt div { font-size: 15px; }
+  .fb-mv .fb-txt small { font-size: 13px; color: #6e6e73; }
+  .fb-mv .fb-amt { font-size: 15px; font-weight: 600; white-space: nowrap; }
+  .fb-mv + .fb-mv::before { left: 58px; }
+  .fb-bcrow { display: flex; align-items: center; gap: 12px; padding: 11px 16px; }
+  .fb-bcrow svg.fb-bars { width: 60px; height: 30px; color: #1c2421; flex: none; }
+  .fb-bcrow div { flex: 1; }
+  .fb-bcrow div b { display: block; font-size: 16px; font-weight: 500; letter-spacing: .02em; }
+  .fb-bcrow div small { font-size: 13px; color: #6e6e73; }
+  .fb-ph { padding: 11px 16px; }
+  .fb-ph .fb-top { display: flex; justify-content: space-between; align-items: center; font-size: 16px; }
+  .fb-ph .fb-top b { font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
+  .fb-ph .fb-top b s { color: #6e6e73; font-weight: 400; text-decoration: none; }
+
+  /* ---------- 3 · lembar ubah harga ---------- */
+  .fb-dim { position: absolute; inset: 0; background: rgba(0,0,0,.36); z-index: 8; }
+  .fb-sheet { position: absolute; left: 0; right: 0; bottom: 0; top: 176px; z-index: 9; background: #f2f2f7; border-radius: 30px 30px 0 0;
+    padding: 8px 16px 20px; box-shadow: 0 -8px 30px rgba(0,0,0,.18); }
+  .fb-grab { width: 38px; height: 5px; border-radius: 3px; background: #c7c7cc; margin: 0 auto 8px; }
+  .fb-shead { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+  .fb-shead b { font-size: 21px; font-weight: 700; letter-spacing: -.02em; display: block; }
+  .fb-shead small { font-size: 14px; color: #6e6e73; display: block; margin-top: 1px; }
+  .fb-x { width: 32px; height: 32px; border-radius: 50%; background: #e3e3e8; color: #3a3a3c; display: grid; place-items: center; flex: none; }
+  .fb-cmp { display: flex; justify-content: space-between; align-items: center; padding: 9px 14px; gap: 10px; min-height: 46px; }
+  .fb-cmp > span { font-size: 15px; }
+  .fb-cmp .fb-r { text-align: right; }
+  .fb-cmp .fb-r b { font-size: 16px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
+  .fb-cmp .fb-r b s { text-decoration: none; color: #6e6e73; font-weight: 500; }
+  .fb-cmp .fb-r small { display: block; font-size: 12px; color: #6e6e73; margin-top: 1px; }
+  .fb-cmp .fb-r small.fb-dn { color: #9b1c12; font-weight: 600; display: inline-flex; align-items: center; gap: 3px; }
+  .fb-hint { display: flex; justify-content: center; align-items: center; padding: 8px 10px; border-radius: 99px; background: #e6f2ea; color: #17603c;
+    font-size: 13.5px; font-weight: 600; margin: 12px 0 8px; white-space: nowrap; letter-spacing: -.015em; }
+  .fb-btn { height: 50px; border-radius: 14px; background: #1f7a4d; color: #fff; display: grid; place-items: center; font-weight: 600; font-size: 17px;
+    box-shadow: 0 6px 16px rgba(31,122,77,.22); }
+  .fb-lbl { font-size: 13px; font-weight: 600; color: #6e6e73; margin: 14px 4px 6px; }
+  .fb-input { height: 46px; border-radius: 14px; background: #fff; display: flex; align-items: center; gap: 6px; padding: 0 14px; font-size: 17px; }
+  .fb-input i { font-style: normal; font-weight: 600; }
+  .fb-input .fb-place { color: #6e6e73; }
+  .fb-input .fb-after { margin-left: auto; font-size: 13px; color: #6e6e73; }
+  .fb-later { text-align: center; padding: 12px 0 0; font-size: 17px; font-weight: 600; color: #1f7a4d; }
+
+  /* ---------- 4 · form ---------- */
+  .fb-mnav { position: absolute; top: 0; left: 0; right: 0; height: 56px; z-index: 6; display: flex; align-items: center; justify-content: center;
+    font-size: 17px; font-weight: 600; background: rgba(242,242,247,.8); backdrop-filter: blur(22px) saturate(180%);
+    -webkit-backdrop-filter: blur(22px) saturate(180%); }
+  .fb-mnav.fb-line { border-bottom: .5px solid rgba(0,0,0,.1); }
+  .fb-mnav .fb-l { position: absolute; left: 12px; top: 10px; }
+  .fb-fc { padding: 58px 16px 130px; }
+  .fb-gh { font-size: 13px; font-weight: 600; color: #6e6e73; margin: 16px 16px 6px; display: flex; justify-content: space-between; }
+  .fb-gh em { font-style: normal; font-weight: 500; }
+  .fb-gf { font-size: 13px; color: #6e6e73; margin: 6px 16px 0; line-height: 1.35; }
+  .fb-gf b { color: #17603c; font-weight: 600; }
+  .fb-f { display: flex; align-items: center; gap: 10px; min-height: 46px; padding: 0 14px 0 16px; font-size: 16px; }
+  .fb-f > span:first-child { flex: none; }
+  .fb-f .fb-v { margin-left: auto; text-align: right; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+  .fb-f .fb-v.fb-sel { color: #6e6e73; }
+  .fb-f .fb-cam { width: 34px; height: 34px; border-radius: 50%; background: #e6f2ea; color: #1f7a4d; display: grid; place-items: center; flex: none; margin-right: -4px; }
+  .fb-f.fb-focus { box-shadow: inset 0 0 0 2px #1f7a4d; border-radius: 0; }
+  .fb-fbtn { position: absolute; left: 16px; right: 16px; bottom: 26px; z-index: 6; }
+  .fb-fade { position: absolute; left: 0; right: 0; bottom: 0; height: 110px; z-index: 5; background: linear-gradient(rgba(242,242,247,0), #f2f2f7 45%); }
+
+  /* ---------- 5 · kamera ---------- */
+  .fb-camv { background: #0b0b0c; color: #fff; }
+  .fb-scene { position: absolute; inset: 0; background:
+      radial-gradient(120% 60% at 50% 40%, #4a4036 0%, #2b241e 55%, #141110 100%); }
+  .fb-shelf { position: absolute; left: -10px; right: -10px; height: 16px; background: linear-gradient(#8a7660, #5b4a39); box-shadow: 0 6px 14px rgba(0,0,0,.5); }
+  .fb-prod { position: absolute; border-radius: 6px; filter: blur(2.5px); opacity: .9; }
+  .fb-box { position: absolute; left: 52px; top: 150px; width: 226px; height: 290px; border-radius: 10px; transform: rotate(-3deg);
+    background: linear-gradient(160deg, #f6cd4f 0%, #e9a925 60%, #c98a14 100%); box-shadow: 0 18px 40px rgba(0,0,0,.55); overflow: hidden; }
+  .fb-box .fb-brand { position: absolute; left: 0; right: 0; top: 12px; text-align: center; font-weight: 800; font-size: 22px; color: #8a2a12; letter-spacing: .02em; }
+  .fb-box .fb-brand small { display: block; font-size: 11px; font-weight: 700; letter-spacing: .12em; color: #7a3a12; }
+  .fb-box .fb-stripe { position: absolute; left: 0; right: 0; top: 92px; height: 26px; background: #2e7d3a; }
+  .fb-sticker { position: absolute; left: 38px; top: 150px; width: 150px; height: 88px; background: #fbfbf8; border-radius: 4px; padding: 8px 10px 4px; color: #111; }
+  .fb-sticker svg { width: 130px; height: 58px; display: block; }
+  .fb-sticker div { font-size: 11px; letter-spacing: .14em; text-align: center; font-weight: 500; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .fb-vf { position: absolute; left: 40px; top: 262px; width: 250px; height: 156px; border-radius: 24px; z-index: 2;
+    box-shadow: 0 0 0 1000px rgba(0,0,0,.52); }
+  .fb-vf i { position: absolute; width: 34px; height: 34px; border: 4px solid #fff; }
+  .fb-vf i:nth-child(1) { left: -2px; top: -2px; border-right: 0; border-bottom: 0; border-top-left-radius: 26px; }
+  .fb-vf i:nth-child(2) { right: -2px; top: -2px; border-left: 0; border-bottom: 0; border-top-right-radius: 26px; }
+  .fb-vf i:nth-child(3) { left: -2px; bottom: -2px; border-right: 0; border-top: 0; border-bottom-left-radius: 26px; }
+  .fb-vf i:nth-child(4) { right: -2px; bottom: -2px; border-left: 0; border-top: 0; border-bottom-right-radius: 26px; }
+  .fb-vf .fb-laser { position: absolute; left: 18px; right: 18px; top: 50%; height: 2px; background: #34c759; box-shadow: 0 0 10px 2px rgba(52,199,89,.7); border-radius: 1px; }
+  .fb-ctop { position: absolute; top: 0; left: 0; right: 0; z-index: 3; display: flex; justify-content: center; align-items: center; height: 60px; padding-top: 6px; }
+  .fb-ctop .fb-cancel { position: absolute; left: 14px; top: 16px; height: 36px; padding: 0 14px; border-radius: 18px; display: grid; place-items: center;
+    background: rgba(255,255,255,.18); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); font-size: 16px; font-weight: 500; }
+  .fb-ctop b { font-size: 17px; font-weight: 600; text-align: center; line-height: 1.2; }
+  .fb-ctop b small { display: block; font-size: 12px; font-weight: 500; color: rgba(255,255,255,.82); }
+  .fb-guide { position: absolute; left: 50%; transform: translateX(-50%); top: 202px; z-index: 3; white-space: nowrap; font-size: 16px; font-weight: 600;
+    padding: 8px 16px; border-radius: 99px; background: rgba(0,0,0,.6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+  .fb-cbot { position: absolute; left: 0; right: 0; bottom: 34px; z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 20px; }
+  .fb-torch { width: 62px; height: 62px; border-radius: 50%; display: grid; place-items: center; background: rgba(255,255,255,.2);
+    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: .5px solid rgba(255,255,255,.3); }
+  .fb-torch .fb-ic { width: 26px; height: 26px; }
+  .fb-tl { font-size: 12px; font-weight: 600; margin-top: -14px; color: rgba(255,255,255,.9); }
+  .fb-manual { display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 18px; border-radius: 22px; font-size: 16px; font-weight: 600;
+    background: rgba(255,255,255,.14); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+
+  /* ---------- 6 · laptop ---------- */
+  .fb-lapwrap { width: 896px; height: 560px; border-radius: 14px; overflow: hidden; position: relative; flex: none;
+    box-shadow: 0 0 0 8px #1d1d1f, 0 24px 60px rgba(0,0,0,.28); }
+  .fb-lap { width: 1280px; height: 800px; transform: scale(.7); transform-origin: 0 0; background: #f2f2f7; position: relative; overflow: hidden;
+    display: grid; grid-template-columns: 240px 1fr; font-family: Inter, -apple-system, system-ui, sans-serif; color: #1c2421; font-size: 16px;
+    letter-spacing: -.01em; line-height: 1.3; text-align: left; }
+  .fb-side { margin: 12px; height: 776px; border-radius: 20px; padding: 8px; display: flex; flex-direction: column; gap: 4px;
+    background: rgba(255,255,255,.72); backdrop-filter: blur(22px) saturate(180%); -webkit-backdrop-filter: blur(22px) saturate(180%);
+    border: .5px solid rgba(255,255,255,.7); box-shadow: 0 1px 12px rgba(0,0,0,.06); }
+  .fb-si { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 12px; border-radius: 8px; font-size: 15px; }
+  .fb-si.fb-on { background: #e6f2ea; color: #1f7a4d; font-weight: 600; }
+  .fb-main { padding: 24px 24px 0; min-width: 0; }
+  .fb-lhead { display: flex; justify-content: space-between; align-items: center; }
+  .fb-lhead .fb-tt { display: flex; align-items: center; gap: 12px; }
+  .fb-lhead b { font-size: 32px; font-weight: 700; letter-spacing: -.025em; line-height: 1.2; }
+  .fb-online { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: #1f7a4d; background: #e6f2ea; padding: 5px 10px; border-radius: 99px; }
+  .fb-online::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #1f7a4d; }
+  .fb-steps { display: flex; align-items: center; gap: 12px; margin: 14px 0 16px; font-size: 15px; }
+  .fb-step { display: flex; align-items: center; gap: 8px; color: #6e6e73; font-weight: 500; }
+  .fb-step i { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-size: 13px; font-weight: 700;
+    border: 1.5px solid #aeaeb2; color: #6e6e73; }
+  .fb-step.fb-done { color: #1c2421; }
+  .fb-step.fb-done i { background: #1f7a4d; border-color: #1f7a4d; color: #fff; }
+  .fb-step.fb-cur { color: #1c2421; font-weight: 700; }
+  .fb-step.fb-cur i { background: #1f7a4d; border-color: #1f7a4d; color: #fff; box-shadow: 0 0 0 4px rgba(31,122,77,.18); }
+  .fb-stepline { width: 48px; border-top: 2px solid #d1d1d6; }
+  .fb-stepline.fb-done { border-color: #1f7a4d; }
+  .fb-sum { display: grid; grid-template-columns: 1.9fr 1fr 1fr 1fr; gap: 12px; }
+  .fb-file { background: #fff; border-radius: 20px; padding: 16px; display: flex; align-items: center; gap: 14px; }
+  .fb-xl { width: 44px; height: 44px; border-radius: 12px; background: #1f7a4d; color: #fff; display: grid; place-items: center; flex: none; }
+  .fb-file .fb-txt { flex: 1; min-width: 0; }
+  .fb-file b { font-size: 17px; font-weight: 600; display: block; white-space: nowrap; }
+  .fb-file small { font-size: 13px; color: #6e6e73; }
+  .fb-sbtn { height: 36px; padding: 0 14px; border-radius: 10px; background: #f2f2f7; color: #1f7a4d; font-size: 15px; font-weight: 600; display: grid; place-items: center; white-space: nowrap; }
+  .fb-stile { background: #fff; border-radius: 20px; padding: 14px 16px; display: flex; gap: 12px; align-items: flex-start; }
+  .fb-stile .fb-dot { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; flex: none; }
+  .fb-stile b { font-size: 26px; font-weight: 700; letter-spacing: -.02em; display: block; line-height: 1.1; }
+  .fb-stile span { font-size: 14px; font-weight: 600; color: #1c2421; }
+  .fb-stile small { display: block; font-size: 12px; color: #6e6e73; margin-top: 1px; }
+  .fb-tcard { background: #fff; border-radius: 20px; margin-top: 12px; overflow: hidden; }
+  .fb-tool { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; }
+  .fb-seg { display: inline-flex; padding: 2px; border-radius: 10px; background: rgba(118,118,128,.12); }
+  .fb-seg span { padding: 6px 16px; border-radius: 8px; font-size: 14px; font-weight: 500; color: #1c2421; }
+  .fb-seg span.fb-on { background: #fff; font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,.12), 0 0 0 .5px rgba(0,0,0,.04); }
+  .fb-seg span em { font-style: normal; color: #6e6e73; font-weight: 500; margin-left: 4px; }
+  .fb-tbl { width: 100%; border-collapse: collapse; font-size: 15px; table-layout: fixed; }
+  .fb-tbl th { text-align: left; font-size: 13px; font-weight: 600; color: #6e6e73; padding: 8px 12px; background: #fafafc;
+    border-top: .5px solid #e5e5ea; border-bottom: .5px solid #e5e5ea; }
+  .fb-tbl td { padding: 10px 12px; border-bottom: .5px solid #e5e5ea; vertical-align: middle; }
+  .fb-tbl .fb-rn { color: #6e6e73; font-variant-numeric: tabular-nums; padding-left: 16px; }
+  .fb-tbl th:first-child { padding-left: 16px; }
+  .fb-tbl .fb-rt { text-align: right; font-variant-numeric: tabular-nums; }
+  .fb-tbl tr.fb-tbad td { background: #fff7f6; }
+  .fb-tbl tr.fb-twarn td { background: #fffaf1; }
+  .fb-st { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 14px; }
+  .fb-st.fb-sok { color: #1f7a4d; }
+  .fb-st.fb-sbad { color: #9b1c12; }
+  .fb-st.fb-swarn { color: #8a4b00; }
+  .fb-prob { font-size: 14px; line-height: 1.3; }
+  .fb-prob.fb-pbad { color: #9b1c12; font-weight: 500; }
+  .fb-prob.fb-pwarn { color: #8a4b00; font-weight: 500; }
+  .fb-empty { color: #6e6e73; }
+  .fb-miss { display: inline-block; padding: 1px 6px; border-radius: 6px; background: #fde8e6; color: #9b1c12; font-size: 13px; font-weight: 600; }
+  .fb-foot { position: absolute; left: 252px; right: 24px; bottom: 16px; height: 72px; border-radius: 20px; z-index: 4; display: flex; align-items: center; gap: 14px;
+    padding: 0 14px 0 20px; background: rgba(255,255,255,.78); backdrop-filter: blur(22px) saturate(180%); -webkit-backdrop-filter: blur(22px) saturate(180%);
+    border: .5px solid rgba(255,255,255,.7); box-shadow: 0 10px 30px rgba(0,0,0,.12); }
+  .fb-foot .fb-note { flex: 1; display: flex; align-items: center; gap: 10px; font-size: 15px; color: #3a3a3c; }
+  .fb-foot .fb-note .fb-ic { color: #6e6e73; }
+  .fb-lbtn { height: 46px; padding: 0 22px; border-radius: 12px; display: grid; place-items: center; font-size: 16px; font-weight: 600; white-space: nowrap; }
+  .fb-lbtn.fb-p { background: #1f7a4d; color: #fff; box-shadow: 0 6px 16px rgba(31,122,77,.22); }
+  .fb-lbtn.fb-g { color: #1f7a4d; }
+</style>
+<h2>Tab Barang (F3b-1) — layar-layar utama</h2>
+<p class="subtitle">Silakan beri komentar di terminal: layar mana yang pas, mana yang perlu diubah (sebut nomornya, misalnya "2a: harga grosir kurang jelas").</p>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="fb-i-house" viewBox="0 0 24 24"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+  <symbol id="fb-i-package" viewBox="0 0 24 24"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><path d="m3.3 7 7.703 4.734a2 2 0 0 0 1.994 0L20.7 7"/><path d="m7.5 4.27 9 5.15"/></symbol>
+  <symbol id="fb-i-chart" viewBox="0 0 24 24"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></symbol>
+  <symbol id="fb-i-notebook" viewBox="0 0 24 24"><path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"/><path d="M2 6h4"/><path d="M2 10h4"/><path d="M2 14h4"/><path d="M2 18h4"/><path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/></symbol>
+  <symbol id="fb-i-dots" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></symbol>
+  <symbol id="fb-i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+  <symbol id="fb-i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+  <symbol id="fb-i-chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+  <symbol id="fb-i-back" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+  <symbol id="fb-i-tri" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
+  <symbol id="fb-i-minus" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/></symbol>
+  <symbol id="fb-i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="fb-i-checkc" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="fb-i-xc" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></symbol>
+  <symbol id="fb-i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+  <symbol id="fb-i-scan" viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M8 7v10"/><path d="M12 7v10"/><path d="M17 7v10"/></symbol>
+  <symbol id="fb-i-sheet" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M8 13h2"/><path d="M14 13h2"/><path d="M8 17h2"/><path d="M14 17h2"/></symbol>
+  <symbol id="fb-i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></symbol>
+  <symbol id="fb-i-cart" viewBox="0 0 24 24"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></symbol>
+  <symbol id="fb-i-truck" viewBox="0 0 24 24"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/></symbol>
+  <symbol id="fb-i-arrow" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></symbol>
+  <symbol id="fb-i-down" viewBox="0 0 24 24"><path d="M16 17h6v-6"/><path d="m22 17-8.5-8.5-5 5L2 7"/></symbol>
+  <symbol id="fb-i-tag" viewBox="0 0 24 24"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5"/></symbol>
+  <symbol id="fb-i-spark" viewBox="0 0 24 24"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></symbol>
+  <symbol id="fb-i-torch" viewBox="0 0 24 24"><path d="M18 6c0 2-2 2-2 4v10a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2V10c0-2-2-2-2-4V2h12z"/><path d="M6 6h12"/><path d="M12 12v.01"/></symbol>
+  <symbol id="fb-i-kbd" viewBox="0 0 24 24"><path d="M10 8h.01"/><path d="M12 12h.01"/><path d="M14 8h.01"/><path d="M16 12h.01"/><path d="M18 8h.01"/><path d="M6 8h.01"/><path d="M7 16h10"/><path d="M8 12h.01"/><rect width="20" height="16" x="2" y="4" rx="2"/></symbol>
+  <symbol id="fb-i-copy" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></symbol>
+  <symbol id="fb-i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></symbol>
+  <symbol id="fb-bc" viewBox="0 0 95 40" preserveAspectRatio="none"><path style="fill:currentColor;stroke:none" d="M0 0h1v40h-1zM2 0h1v40h-1zM6 0h1v40h-1zM8 0h2v40h-2zM12 0h1v40h-1zM14 0h3v40h-3zM19 0h1v40h-1zM22 0h2v40h-2zM28 0h1v40h-1zM30 0h1v40h-1zM33 0h2v40h-2zM36 0h2v40h-2zM39 0h2v40h-2zM42 0h3v40h-3zM46 0h1v40h-1zM48 0h1v40h-1zM50 0h3v40h-3zM55 0h1v40h-1zM57 0h2v40h-2zM60 0h2v40h-2zM64 0h2v40h-2zM67 0h2v40h-2zM71 0h2v40h-2zM75 0h2v40h-2zM78 0h3v40h-3zM82 0h1v40h-1zM85 0h1v40h-1zM87 0h3v40h-3zM92 0h1v40h-1zM94 0h1v40h-1z"/></symbol>
+</defs></svg>
+
+<div class="fb-row">
+
+  <!-- ============ 1 · DAFTAR ============ -->
+  <div class="fb-col">
+    <div class="fb-phone"><div class="fb-c">
+      <div class="fb-date">Senin, 2 Nov</div>
+      <div class="fb-tbar"><b>Barang</b>
+        <div class="fb-acts">
+          <span class="fb-rbtn fb-on" aria-label="Menu lainnya"><svg class="fb-ic"><use href="#fb-i-dots"/></svg></span>
+          <span class="fb-rbtn fb-pri" aria-label="Tambah barang"><svg class="fb-ic"><use href="#fb-i-plus"/></svg></span>
+        </div>
+      </div>
+      <div class="fb-search"><svg class="fb-ic fb-s"><use href="#fb-i-search"/></svg>Cari nama atau barcode<svg class="fb-ic fb-scan"><use href="#fb-i-scan"/></svg></div>
+      <div class="fb-chips">
+        <span class="fb-chip fb-on">Semua <small>214</small></span>
+        <span class="fb-chip">Mie instan <small>18</small></span>
+        <span class="fb-chip">Minyak <small>9</small></span>
+        <span class="fb-chip">Beras &amp; gula</span>
+        <span class="fb-chip">Rokok</span>
+      </div>
+      <div class="fb-card">
+        <div class="fb-item fb-hl"><div class="fb-txt"><div class="fb-nm">Beras Pandan Wangi curah</div><div class="fb-l2"><div class="fb-stk fb-num">Stok 86,5 kg</div><div class="fb-price fb-num">Rp14.000<small>/kg</small></div></div></div>
+          <svg class="fb-ic fb-s fb-chev"><use href="#fb-i-chev"/></svg></div>
+        <div class="fb-item fb-hl"><div class="fb-txt"><div class="fb-nm">Gudang Garam Filter 12</div><div class="fb-l2"><div class="fb-stk fb-num">Stok 3 bungkus <span class="fb-badge fb-warn"><svg class="fb-ic fb-xs"><use href="#fb-i-tri"/></svg>Menipis</span></div><div class="fb-price fb-num">Rp27.000<small>/bks</small></div></div></div>
+          <svg class="fb-ic fb-s fb-chev"><use href="#fb-i-chev"/></svg></div>
+        <div class="fb-item fb-hl"><div class="fb-txt"><div class="fb-nm">Gula Pasir curah</div><div class="fb-l2"><div class="fb-stk fb-num">Stok −2,5 kg <span class="fb-badge fb-bad"><svg class="fb-ic fb-xs"><use href="#fb-i-minus"/></svg>Minus</span></div><div class="fb-price fb-num">Rp18.500<small>/kg</small></div></div></div>
+          <svg class="fb-ic fb-s fb-chev"><use href="#fb-i-chev"/></svg></div>
+        <div class="fb-item fb-hl"><div class="fb-txt"><div class="fb-nm">Indomie Goreng 85 g</div><div class="fb-l2"><div class="fb-stk fb-num">Stok 125 pcs</div><div class="fb-price fb-num">Rp3.500<small>/pcs</small></div></div></div>
+          <svg class="fb-ic fb-s fb-chev"><use href="#fb-i-chev"/></svg></div>
+        <div class="fb-item fb-hl"><div class="fb-txt"><div class="fb-nm">Kecap Bango 220 ml</div><div class="fb-l2"><div class="fb-stk fb-num">Stok 18 pcs</div><div class="fb-price fb-num">Rp11.500<small>/pcs</small></div></div></div>
+          <svg class="fb-ic fb-s fb-chev"><use href="#fb-i-chev"/></svg></div>
+        <div class="fb-item fb-hl"><div class="fb-txt"><div class="fb-nm">Minyak Goreng Bimoli 2 L</div><div class="fb-l2"><div class="fb-stk fb-num">Stok 4 pcs <span class="fb-badge fb-warn"><svg class="fb-ic fb-xs"><use href="#fb-i-tri"/></svg>Menipis</span></div><div class="fb-price fb-num">Rp36.000<small>/pcs</small></div></div></div>
+          <svg class="fb-ic fb-s fb-chev"><use href="#fb-i-chev"/></svg></div>
+        <div class="fb-item fb-hl"><div class="fb-txt"><div class="fb-nm">Telur ayam negeri</div><div class="fb-l2"><div class="fb-stk fb-num">Stok 9,2 kg</div><div class="fb-price fb-num">Rp29.000<small>/kg</small></div></div></div>
+          <svg class="fb-ic fb-s fb-chev"><use href="#fb-i-chev"/></svg></div>
+      </div>
+    </div>
+    <div class="fb-menu">
+      <div class="fb-hot">Impor dari Excel<svg class="fb-ic"><use href="#fb-i-sheet"/></svg></div>
+      <div>Unduh template Excel<svg class="fb-ic"><use href="#fb-i-download"/></svg></div>
+    </div>
+    <div class="fb-glassbar">
+      <div class="fb-tab"><svg class="fb-ic"><use href="#fb-i-house"/></svg>Beranda</div>
+      <div class="fb-tab fb-on"><svg class="fb-ic"><use href="#fb-i-package"/></svg>Barang</div>
+      <div class="fb-tab"><svg class="fb-ic"><use href="#fb-i-chart"/></svg>Laporan</div>
+      <div class="fb-tab"><svg class="fb-ic"><use href="#fb-i-notebook"/></svg>Kasbon</div>
+      <div class="fb-tab"><svg class="fb-ic"><use href="#fb-i-dots"/></svg>Lainnya</div>
+    </div></div>
+    <h3>1 · Daftar barang</h3>
+    <p>Cari, saring per kategori, harga per satuan terkecil dan stok; menu ⋯ sedang terbuka berisi "Impor dari Excel".</p>
+  </div>
+
+  <!-- ============ 2a · DETAIL (atas) ============ -->
+  <div class="fb-col">
+    <div class="fb-phone"><div class="fb-c">
+      <div class="fb-nav"><span class="fb-pill"><svg class="fb-ic"><use href="#fb-i-back"/></svg>Barang</span><span class="fb-pill fb-solo">Ubah</span></div>
+      <div class="fb-eyebrow">Minyak &amp; lemak · dijual per pcs</div>
+      <div class="fb-h1">Minyak Goreng Bimoli 2 L</div>
+      <div class="fb-sec">Harga</div>
+      <div class="fb-card">
+        <div class="fb-prow fb-hl"><div class="fb-top"><span>Eceran <em>· per pcs</em></span><b class="fb-num">Rp36.000</b></div>
+          <div class="fb-meta fb-num">Modal Rp34.000 · untung Rp2.000 (6%)</div></div>
+        <div class="fb-prow fb-hl"><div class="fb-top"><span>Grosir <em>· beli 10+ pcs</em></span><b class="fb-num">Rp35.500</b></div>
+          <div class="fb-meta fb-num">Modal Rp34.000 · untung Rp1.500 (4%)</div></div>
+        <div class="fb-prow fb-hl"><div class="fb-top"><span>Dus <em>· isi 6 pcs</em></span><b class="fb-num">Rp212.000</b></div>
+          <div class="fb-meta fb-num">Modal Rp201.000 · untung Rp11.000 (5%)</div></div>
+      </div>
+      <div class="fb-sec">Stok</div>
+      <div class="fb-card">
+        <div class="fb-stats">
+          <div><span class="fb-cap">Stok sekarang</span><b class="fb-num">4 pcs</b><span class="fb-badge fb-warn"><svg class="fb-ic fb-xs"><use href="#fb-i-tri"/></svg>Menipis</span></div>
+          <div><span class="fb-cap">Batas menipis</span><b class="fb-num">6 pcs</b></div>
+        </div>
+        <div class="fb-kv fb-hl"><span>HPP rata-rata</span><b class="fb-num">Rp33.850<span class="fb-muted" style="font-weight:400"> /pcs</span></b></div>
+        <div class="fb-subh">Riwayat stok<a class="fb-link">Lihat semua</a></div>
+        <div class="fb-mv fb-hl"><span class="fb-tile" style="background:#8e8e93"><svg class="fb-ic fb-s"><use href="#fb-i-cart"/></svg></span>
+          <div class="fb-txt"><div>Terjual 2 pcs</div><small>Hari ini 14.05 · Kasir Rina</small></div><span class="fb-amt fb-num">−2</span></div>
+        <div class="fb-mv fb-hl"><span class="fb-tile" style="background:#1f7a4d"><svg class="fb-ic fb-s"><use href="#fb-i-truck"/></svg></span>
+          <div class="fb-txt"><div>Barang masuk +12 pcs</div><small>CV Sumber Rejeki · kemarin</small></div><span class="fb-amt fb-num fb-green">+12</span></div>
+      </div>
+    </div>
+    <div class="fb-glassbar">
+      <div class="fb-tab"><svg class="fb-ic"><use href="#fb-i-house"/></svg>Beranda</div>
+      <div class="fb-tab fb-on"><svg class="fb-ic"><use href="#fb-i-package"/></svg>Barang</div>
+      <div class="fb-tab"><svg class="fb-ic"><use href="#fb-i-chart"/></svg>Laporan</div>
+      <div class="fb-tab"><svg class="fb-ic"><use href="#fb-i-notebook"/></svg>Kasbon</div>
+      <div class="fb-tab"><svg class="fb-ic"><use href="#fb-i-dots"/></svg>Lainnya</div>
+    </div></div>
+    <h3>2a · Detail barang</h3>
+    <p>Harga per satuan &amp; grosir dengan modal dan untung (hanya di aplikasi pemilik), lalu stok dan HPP rata-rata.</p>
+  </div>
+
+  <!-- ============ 2b · DETAIL (digulir) ============ -->
+  <div class="fb-col">
+    <div class="fb-phone">
+      <div class="fb-compact"><span class="fb-back"><svg class="fb-ic"><use href="#fb-i-back"/></svg></span>Minyak Goreng Bimoli 2 L</div>
+      <div class="fb-c" style="margin-top:28px">
+        <div class="fb-card">
+          <div class="fb-kv fb-hl"><span>HPP rata-rata</span><b class="fb-num">Rp33.850<span class="fb-muted" style="font-weight:400"> /pcs</span></b></div>
+          <div class="fb-subh">Riwayat stok<a class="fb-link">Lihat semua</a></div>
+          <div class="fb-mv fb-hl"><span class="fb-tile" style="background:#8e8e93"><svg class="fb-ic fb-s"><use href="#fb-i-cart"/></svg></span>
+            <div class="fb-txt"><div>Terjual 2 pcs</div><small>Hari ini 14.05 · Kasir Rina</small></div><span class="fb-amt fb-num">−2</span></div>
+          <div class="fb-mv fb-hl"><span class="fb-tile" style="background:#1f7a4d"><svg class="fb-ic fb-s"><use href="#fb-i-truck"/></svg></span>
+            <div class="fb-txt"><div>Barang masuk +12 pcs</div><small>CV Sumber Rejeki · kemarin</small></div><span class="fb-amt fb-num fb-green">+12</span></div>
+        </div>
+        <div class="fb-sec">Barcode</div>
+        <div class="fb-card">
+          <div class="fb-bcrow fb-hl"><svg class="fb-bars"><use href="#fb-bc"/></svg><div><b class="fb-num">8992628022194</b><small>Eceran · pcs</small></div></div>
+          <div class="fb-bcrow fb-hl"><svg class="fb-bars"><use href="#fb-bc"/></svg><div><b class="fb-num">18992628022191</b><small>Dus · isi 6 pcs</small></div></div>
+        </div>
+        <div class="fb-sec">Riwayat harga</div>
+        <div class="fb-card">
+          <div class="fb-ph fb-hl"><div class="fb-top"><span>Eceran</span><b class="fb-num"><s>Rp35.500</s><svg class="fb-ic fb-xs fb-muted"><use href="#fb-i-arrow"/></svg>Rp36.000</b></div>
+            <div class="fb-meta">28 Okt 2026 · oleh Pemilik</div></div>
+          <div class="fb-ph fb-hl"><div class="fb-top"><span>Eceran</span><b class="fb-num"><s>Rp34.500</s><svg class="fb-ic fb-xs fb-muted"><use href="#fb-i-arrow"/></svg>Rp35.500</b></div>
+            <div class="fb-meta">14 Sep 2026 · lewat Impor Excel</div></div>
+        </div>
+      </div>
+      <div class="fb-glassbar">
+        <div class="fb-tab"><svg class="fb-ic"><use href="#fb-i-house"/></svg>Beranda</div>
+        <div class="fb-tab fb-on"><svg class="fb-ic"><use href="#fb-i-package"/></svg>Barang</div>
+        <div class="fb-tab"><svg class="fb-ic"><use href="#fb-i-chart"/></svg>Laporan</div>
+        <div class="fb-tab"><svg class="fb-ic"><use href="#fb-i-notebook"/></svg>Kasbon</div>
+        <div class="fb-tab"><svg class="fb-ic"><use href="#fb-i-dots"/></svg>Lainnya</div>
+      </div></div>
+    <h3>2b · Detail barang (digulir)</h3>
+    <p>Lanjutan halaman yang sama: riwayat stok, barcode per satuan, dan riwayat harga beserta siapa yang mengubah.</p>
+  </div>
+
+  <!-- ============ 3 · NOTIFIKASI & UBAH HARGA ============ -->
+  <div class="fb-col">
+    <div class="fb-phone"><div class="fb-c">
+      <div class="fb-compact">Beranda</div>
+      <div class="fb-sec" style="margin-top:44px">Perlu perhatian</div>
+      <div class="fb-card">
+        <div class="fb-mv fb-hl" style="min-height:60px;background:#f4f9f6"><span class="fb-tile" style="background:#b26b00"><svg class="fb-ic fb-s"><use href="#fb-i-tag"/></svg></span>
+          <div class="fb-txt"><div>Harga beli Minyak Bimoli naik Rp2.000</div><small>Untung jadi Rp0</small></div><svg class="fb-ic fb-s fb-chev"><use href="#fb-i-chev"/></svg></div>
+        <div class="fb-mv fb-hl" style="min-height:56px"><span class="fb-tile" style="background:#b26b00"><svg class="fb-ic fb-s"><use href="#fb-i-tri"/></svg></span>
+          <div class="fb-txt"><div>6 barang stok menipis</div><small>Bimoli, Gudang Garam Filter 12, …</small></div><svg class="fb-ic fb-s fb-chev"><use href="#fb-i-chev"/></svg></div>
+      </div>
+    </div>
+    <div class="fb-dim"></div>
+    <div class="fb-sheet">
+      <div class="fb-grab"></div>
+      <div class="fb-shead"><div><b>Harga beli naik</b><small>Minyak Goreng Bimoli 2 L · per pcs</small></div>
+        <span class="fb-x" aria-label="Tutup"><svg class="fb-ic fb-s"><use href="#fb-i-x"/></svg></span></div>
+      <div class="fb-card" style="margin-top:12px">
+        <div class="fb-cmp fb-hl"><span>Modal</span><div class="fb-r"><b class="fb-num"><s>Rp34.000</s><svg class="fb-ic fb-xs fb-muted"><use href="#fb-i-arrow"/></svg>Rp36.000</b>
+          <small>+Rp2.000 · CV Sumber Rejeki, 15.20</small></div></div>
+        <div class="fb-cmp fb-hl"><span>Harga jual sekarang</span><div class="fb-r"><b class="fb-num">Rp36.000</b></div></div>
+        <div class="fb-cmp fb-hl"><span>Untung</span><div class="fb-r"><b class="fb-num"><s>6%</s><svg class="fb-ic fb-xs fb-muted"><use href="#fb-i-arrow"/></svg>0%</b>
+          <small class="fb-dn fb-num"><svg class="fb-ic fb-xs"><use href="#fb-i-down"/></svg>Turun: Rp2.000 → Rp0</small></div></div>
+      </div>
+      <div class="fb-hint fb-num">Harga saran Rp38.500 · untung tetap 6%</div>
+      <div class="fb-btn">Pakai harga ini</div>
+      <div class="fb-lbl">atau ketik harga sendiri</div>
+      <div class="fb-input fb-num"><i>Rp</i><span class="fb-place">38.000</span><span class="fb-after">untung dihitung otomatis</span></div>
+      <div class="fb-later">Nanti saja</div>
+    </div></div>
+    <h3>3 · Notifikasi &amp; ubah harga</h3>
+    <p>Dibuka dari "Perlu perhatian": modal naik, untung menyusut, harga saran sekali ketuk — harga tidak pernah berubah sendiri.</p>
+  </div>
+
+  <!-- ============ 4a · TAMBAH BARANG (atas) ============ -->
+  <div class="fb-col">
+    <div class="fb-phone">
+      <div class="fb-mnav"><span class="fb-pill fb-solo fb-l" style="font-weight:500">Batal</span>Barang baru</div>
+      <div class="fb-fc">
+        <div class="fb-gh">Barang</div>
+        <div class="fb-card">
+          <div class="fb-f fb-hl"><span>Nama</span><span class="fb-v">Teh Pucuk Harum 350 ml</span></div>
+          <div class="fb-f fb-hl"><span>Kategori</span><span class="fb-v fb-sel">Minuman<svg class="fb-ic fb-s fb-chev"><use href="#fb-i-chev"/></svg></span></div>
+          <div class="fb-f fb-hl"><span>Dijual per</span><span class="fb-v fb-sel">botol<svg class="fb-ic fb-s fb-chev"><use href="#fb-i-chev"/></svg></span></div>
+        </div>
+        <div class="fb-gf">Satuan terkecil yang dijual kasir. Barang timbang: pilih kg, ons, atau liter.</div>
+        <div class="fb-gh">Eceran</div>
+        <div class="fb-card">
+          <div class="fb-f fb-hl"><span>Barcode</span><span class="fb-v fb-num">8996001600269</span><span class="fb-cam" aria-label="Scan dengan kamera"><svg class="fb-ic fb-s"><use href="#fb-i-scan"/></svg></span></div>
+          <div class="fb-f fb-hl"><span>Harga modal</span><span class="fb-v fb-num">Rp3.000</span></div>
+          <div class="fb-f fb-hl"><span>Harga jual</span><span class="fb-v fb-num">Rp4.000</span></div>
+        </div>
+        <div class="fb-gf fb-num">Untung <b>Rp1.000 (25%)</b> per botol</div>
+        <div class="fb-gh">Grosir <em>opsional</em></div>
+        <div class="fb-card">
+          <div class="fb-f fb-hl"><span>Beli minimal</span><span class="fb-v fb-num">12 botol</span></div>
+          <div class="fb-f fb-hl"><span>Harga per botol</span><span class="fb-v fb-num">Rp3.750</span></div>
+        </div>
+        <div class="fb-gf fb-num">Untung <b>Rp750 (20%)</b> per botol</div>
+      </div>
+      <div class="fb-fade"></div>
+      <div class="fb-btn fb-fbtn">Simpan</div>
+    </div>
+    <h3>4a · Tambah barang</h3>
+    <p>Urutan bagian sama dengan template Excel; barcode bisa diketik atau di-scan lewat tombol kamera.</p>
+  </div>
+
+  <!-- ============ 4b · TAMBAH BARANG (digulir) ============ -->
+  <div class="fb-col">
+    <div class="fb-phone">
+      <div class="fb-mnav fb-line"><span class="fb-pill fb-solo fb-l" style="font-weight:500">Batal</span>Barang baru</div>
+      <div class="fb-fc" style="padding-top:44px">
+        <div class="fb-gh">Satuan besar <em>opsional</em></div>
+        <div class="fb-card">
+          <div class="fb-f fb-hl"><span>Satuan</span><span class="fb-v fb-sel">Dus<svg class="fb-ic fb-s fb-chev"><use href="#fb-i-chev"/></svg></span></div>
+          <div class="fb-f fb-hl"><span>Isi</span><span class="fb-v fb-num">24 botol</span></div>
+          <div class="fb-f fb-hl"><span>Barcode</span><span class="fb-v fb-num">18996001600266</span><span class="fb-cam" aria-label="Scan dengan kamera"><svg class="fb-ic fb-s"><use href="#fb-i-scan"/></svg></span></div>
+          <div class="fb-f fb-hl"><span>Harga modal</span><span class="fb-v fb-num">Rp70.000</span></div>
+          <div class="fb-f fb-hl"><span>Harga jual</span><span class="fb-v fb-num">Rp84.000</span></div>
+        </div>
+        <div class="fb-gf fb-num">Untung <b>Rp14.000 (17%)</b> per dus · setara Rp3.500 per botol</div>
+        <div class="fb-gh">Batas stok menipis</div>
+        <div class="fb-card">
+          <div class="fb-f fb-hl"><span>Ingatkan bila stok di bawah</span><span class="fb-v fb-num">24 botol</span></div>
+        </div>
+        <div class="fb-gf">Barang muncul di "Perlu perhatian" di Beranda.</div>
+      </div>
+      <div class="fb-fade"></div>
+      <div class="fb-btn fb-fbtn">Simpan</div>
+    </div>
+    <h3>4b · Tambah barang (digulir)</h3>
+    <p>Satuan besar (dus/slop/renceng/karung) dengan isi, barcode, modal dan harga sendiri, lalu batas stok menipis.</p>
+  </div>
+
+  <!-- ============ 5 · SCAN KAMERA ============ -->
+  <div class="fb-col">
+    <div class="fb-phone fb-camv">
+      <div class="fb-scene">
+        <div class="fb-shelf" style="top:120px"></div>
+        <div class="fb-prod" style="left:-20px;top:30px;width:90px;height:90px;background:#c8302a"></div>
+        <div class="fb-prod" style="left:80px;top:40px;width:70px;height:80px;background:#e8e2d0"></div>
+        <div class="fb-prod" style="left:160px;top:20px;width:80px;height:100px;background:#2f6db5"></div>
+        <div class="fb-prod" style="left:250px;top:36px;width:90px;height:84px;background:#d6a21f"></div>
+        <div class="fb-prod" style="left:-30px;top:150px;width:70px;height:300px;background:#7b1f1a"></div>
+        <div class="fb-prod" style="left:290px;top:160px;width:70px;height:290px;background:#2a6a3a"></div>
+        <div class="fb-shelf" style="top:450px"></div>
+        <div class="fb-prod" style="left:-10px;top:480px;width:110px;height:130px;background:#c63a2f"></div>
+        <div class="fb-prod" style="left:110px;top:470px;width:100px;height:140px;background:#f0e6c8"></div>
+        <div class="fb-prod" style="left:220px;top:486px;width:120px;height:120px;background:#3c5aa8"></div>
+        <div class="fb-box">
+          <div class="fb-brand"><small>MINYAK GORENG</small>2 LITER</div>
+          <div class="fb-stripe"></div>
+          <div class="fb-sticker"><svg><use href="#fb-bc"/></svg><div>8 992628 022194</div></div>
+        </div>
+      </div>
+      <div class="fb-vf"><i></i><i></i><i></i><i></i><span class="fb-laser"></span></div>
+      <div class="fb-ctop"><span class="fb-cancel">Batal</span><b>Scan barcode<small>Barcode eceran</small></b></div>
+      <div class="fb-guide">Arahkan kamera ke barcode</div>
+      <div class="fb-cbot">
+        <span class="fb-torch" aria-label="Nyalakan senter"><svg class="fb-ic"><use href="#fb-i-torch"/></svg></span>
+        <span class="fb-tl">Senter</span>
+        <span class="fb-manual"><svg class="fb-ic"><use href="#fb-i-kbd"/></svg>Ketik manual</span>
+      </div>
+    </div>
+    <h3>5 · Scan kamera</h3>
+    <p>Layar penuh gelap; begitu barcode terbaca, HP bergetar dan kembali ke form dengan angka terisi.</p>
+  </div>
+
+  <!-- ============ 6 · IMPOR EXCEL (laptop) ============ -->
+  <div class="fb-col fb-wide">
+    <div class="fb-lapwrap"><div class="fb-lap">
+      <nav class="fb-side">
+        <div class="fb-si"><svg class="fb-ic"><use href="#fb-i-house"/></svg>Beranda</div>
+        <div class="fb-si fb-on"><svg class="fb-ic"><use href="#fb-i-package"/></svg>Barang</div>
+        <div class="fb-si"><svg class="fb-ic"><use href="#fb-i-chart"/></svg>Laporan</div>
+        <div class="fb-si"><svg class="fb-ic"><use href="#fb-i-notebook"/></svg>Kasbon</div>
+        <div class="fb-si"><svg class="fb-ic"><use href="#fb-i-dots"/></svg>Lainnya</div>
+      </nav>
+      <div class="fb-main">
+        <div class="fb-date">Senin, 2 Nov</div>
+        <div class="fb-lhead"><div class="fb-tt"><span class="fb-back" style="background:#fff"><svg class="fb-ic"><use href="#fb-i-back"/></svg></span><b>Impor dari Excel</b></div><span class="fb-online">Toko online</span></div>
+        <div class="fb-steps">
+          <span class="fb-step fb-done"><i><svg class="fb-ic fb-xs" style="stroke-width:3"><use href="#fb-i-check"/></svg></i>Pilih file</span>
+          <span class="fb-stepline fb-done"></span>
+          <span class="fb-step fb-cur"><i>2</i>Periksa</span>
+          <span class="fb-stepline"></span>
+          <span class="fb-step"><i>3</i>Impor</span>
+        </div>
+        <div class="fb-sum">
+          <div class="fb-file"><span class="fb-xl"><svg class="fb-ic"><use href="#fb-i-sheet"/></svg></span>
+            <div class="fb-txt"><b>data-barang.xlsx</b><small class="fb-num">220 baris · 48 KB</small></div><span class="fb-sbtn">Ganti file</span></div>
+          <div class="fb-stile"><span class="fb-dot" style="background:#e6f2ea;color:#1f7a4d"><svg class="fb-ic fb-s"><use href="#fb-i-check"/></svg></span>
+            <div><b class="fb-num">212</b><span>baris siap</span><small>akan diimpor</small></div></div>
+          <div class="fb-stile"><span class="fb-dot" style="background:#fde8e6;color:#9b1c12"><svg class="fb-ic fb-s"><use href="#fb-i-x"/></svg></span>
+            <div><b class="fb-num">3</b><span>perlu diperbaiki</span><small>dilewati</small></div></div>
+          <div class="fb-stile"><span class="fb-dot" style="background:#fff0d9;color:#8a4b00"><svg class="fb-ic fb-s"><use href="#fb-i-copy"/></svg></span>
+            <div><b class="fb-num">5</b><span>barcode sudah ada</span><small>dilewati</small></div></div>
+        </div>
+        <div class="fb-tcard">
+          <div class="fb-tool">
+            <span class="fb-seg"><span class="fb-on">Semua<em>220</em></span><span>Perlu diperbaiki<em>8</em></span></span>
+            <span class="fb-muted" style="font-size:14px">Urut sesuai baris di Excel</span>
+          </div>
+          <table class="fb-tbl">
+            <colgroup><col style="width:58px"><col style="width:124px"><col style="width:220px"><col style="width:92px"><col style="width:100px"><col style="width:214px"><col></colgroup>
+            <thead><tr><th>Baris</th><th>Status</th><th>Nama</th><th>Dijual per</th><th style="text-align:right">Harga jual</th><th>Satuan besar</th><th>Masalah</th></tr></thead>
+            <tbody>
+              <tr><td class="fb-rn">2</td><td><span class="fb-st fb-sok"><svg class="fb-ic fb-s"><use href="#fb-i-checkc"/></svg>Siap</span></td><td>Indomie Goreng 85 g</td><td>pcs</td><td class="fb-rt">Rp3.500</td><td class="fb-num">Dus isi 40 · Rp132.000</td><td class="fb-empty">—</td></tr>
+              <tr><td class="fb-rn">3</td><td><span class="fb-st fb-sok"><svg class="fb-ic fb-s"><use href="#fb-i-checkc"/></svg>Siap</span></td><td>Gula Pasir curah</td><td>kg</td><td class="fb-rt">Rp18.500</td><td class="fb-num">Karung isi 50 kg · Rp850.000</td><td class="fb-empty">—</td></tr>
+              <tr class="fb-tbad"><td class="fb-rn">4</td><td><span class="fb-st fb-sbad"><svg class="fb-ic fb-s"><use href="#fb-i-xc"/></svg>Perbaiki</span></td><td>Minyak Goreng Bimoli 2 L</td><td>pcs</td><td class="fb-rt">Rp33.000</td><td class="fb-num">Dus isi 6 · Rp212.000</td><td><span class="fb-prob fb-pbad fb-num">Harga jual di bawah modal (Rp34.000)</span></td></tr>
+              <tr><td class="fb-rn">5</td><td><span class="fb-st fb-sok"><svg class="fb-ic fb-s"><use href="#fb-i-checkc"/></svg>Siap</span></td><td>Gudang Garam Filter 12</td><td>bungkus</td><td class="fb-rt">Rp27.000</td><td class="fb-num">Slop isi 10 · Rp262.000</td><td class="fb-empty">—</td></tr>
+              <tr class="fb-twarn"><td class="fb-rn">6</td><td><span class="fb-st fb-swarn"><svg class="fb-ic fb-s"><use href="#fb-i-copy"/></svg>Sudah ada</span></td><td>Mie Sedaap Goreng 90 g</td><td>pcs</td><td class="fb-rt">Rp3.300</td><td class="fb-num">Dus isi 40 · Rp126.000</td><td><span class="fb-prob fb-pwarn">Barcode sudah dipakai: Indomie Goreng</span></td></tr>
+              <tr class="fb-tbad"><td class="fb-rn">7</td><td><span class="fb-st fb-sbad"><svg class="fb-ic fb-s"><use href="#fb-i-xc"/></svg>Perbaiki</span></td><td>Beras Pandan Wangi curah</td><td><span class="fb-miss">kosong</span></td><td class="fb-rt">Rp14.000</td><td class="fb-empty">—</td><td><span class="fb-prob fb-pbad">Kolom "Dijual per" kosong</span></td></tr>
+              <tr><td class="fb-rn">8</td><td><span class="fb-st fb-sok"><svg class="fb-ic fb-s"><use href="#fb-i-checkc"/></svg>Siap</span></td><td>Kopi Kapal Api Special Mix</td><td>sachet</td><td class="fb-rt">Rp1.500</td><td class="fb-num">Renceng isi 10 · Rp14.000</td><td class="fb-empty">—</td></tr>
+              <tr><td class="fb-rn">9</td><td><span class="fb-st fb-sok"><svg class="fb-ic fb-s"><use href="#fb-i-checkc"/></svg>Siap</span></td><td>Teh Pucuk Harum 350 ml</td><td>botol</td><td class="fb-rt">Rp4.000</td><td class="fb-num">Dus isi 24 · Rp84.000</td><td class="fb-empty">—</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="fb-foot">
+        <div class="fb-note"><svg class="fb-ic"><use href="#fb-i-info"/></svg>Baris bermasalah dilewati — perbaiki di Excel lalu impor ulang</div>
+        <span class="fb-lbtn fb-g">Batal</span>
+        <span class="fb-lbtn fb-p">Impor 212 barang</span>
+      </div>
+    </div></div>
+    <h3>6 · Impor dari Excel — pratinjau (laptop)</h3>
+    <p>Langkah 2 dari 3: semua baris diperiksa dulu; baris siap diimpor sekaligus, baris bermasalah dilewati dengan alasan yang jelas.</p>
+  </div>
+
+</div>
+</body></html>
