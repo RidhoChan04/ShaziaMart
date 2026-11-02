@@ -31,15 +31,15 @@ test("Beranda menampilkan omzet, grafik, empat tile, dan perlu perhatian", async
     page.getByRole("group", { name: /Omzet per jam hari ini dan .+ lalu/ }),
   ).toBeVisible();
   for (const tile of [
-    "LABA KOTOR",
-    "TRANSAKSI",
-    "KASBON BARU",
-    "RATA-RATA / STRUK",
+    "Laba kotor",
+    "Transaksi",
+    "Kasbon baru",
+    "Rata-rata / struk",
   ]) {
     await expect(page.getByText(tile, { exact: true })).toBeVisible();
   }
   await expect(
-    page.getByRole("heading", { name: "PERLU PERHATIAN" }),
+    page.getByRole("heading", { name: "Perlu perhatian" }),
   ).toBeVisible();
 });
 

@@ -86,20 +86,24 @@ test("omzet, perbandingan, grafik, tile, dan perlu perhatian tampil dari mock", 
     chart.querySelector('path[stroke="var(--color-chart-2)"]'),
   ).not.toBeNull();
 
-  expect(card("TRANSAKSI").getByText("1")).toBeInTheDocument();
-  expect(card("LABA KOTOR").getByText(/^Rp[\d.]+$/)).toBeInTheDocument();
-  expect(card("KASBON BARU").getByText("Rp0")).toBeInTheDocument();
-  expect(card("RATA-RATA / STRUK").getByText("Rp36.000")).toBeInTheDocument();
+  expect(card("Transaksi").getByText("1")).toBeInTheDocument();
+  expect(card("Laba kotor").getByText(/^Rp[\d.]+$/)).toBeInTheDocument();
+  expect(card("Kasbon baru").getByText("Rp0")).toBeInTheDocument();
+  expect(card("Rata-rata / struk").getByText("Rp36.000")).toBeInTheDocument();
 
-  expect(screen.getByText("PERLU PERHATIAN")).toBeInTheDocument();
   expect(
-    screen.getByRole("link", { name: "7 barang stok menipis" }),
+    screen.getByRole("heading", { name: "Perlu perhatian" }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole("link", { name: /^Stok menipis\s*7 barang$/ }),
   ).toHaveAttribute("href", "/owner/barang");
   expect(
-    screen.getByRole("link", { name: "Selisih kas shift Rina -Rp5.000" }),
+    screen.getByRole("link", { name: /^Selisih kas -Rp5\.000\s*Shift Rina$/ }),
   ).toHaveAttribute("href", "/owner/lainnya");
   expect(
-    screen.getByRole("link", { name: /^\d+ kasbon > 30 hari · Rp[\d.]+$/ }),
+    screen.getByRole("link", {
+      name: /^Kasbon > 30 hari\s*\d+ pelanggan · Rp[\d.]+$/,
+    }),
   ).toHaveAttribute("href", "/owner/kasbon");
   expect(screen.queryByText("Semua aman hari ini")).not.toBeInTheDocument();
 });
@@ -229,4 +233,16 @@ test("tarik untuk refresh di layar sentuh memuat ulang ringkasan", async () => {
   expect(await screen.findByText("Memuat…")).toBeInTheDocument();
   expect(fetches).toHaveBeenCalled();
   await waitFor(() => expect(screen.queryByText("Memuat…")).toBeNull());
+});
+
+test("keterangan perhatian dengan nama kasir panjang dipotong (truncate), bukan meluber", async () => {
+  await sellAndCloseShiftShort();
+  const longName = "K".repeat(40);
+  mockDb.update((s) => {
+    for (const c of s.closedShifts) c.kasirName = longName;
+  });
+  await ownerLogin();
+  renderApp("/owner");
+  const detail = await screen.findByText(`Shift ${longName}`);
+  expect(detail).toHaveClass("truncate");
 });

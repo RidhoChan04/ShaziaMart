@@ -1,21 +1,21 @@
 import type { OwnerTodaySummary } from "@/shared/api/gen/shaziaMartAPI.schemas";
-import { cn } from "@/shared/lib/cn";
 import { formatRupiah } from "@/shared/lib/money";
-import { CARD } from "./card-style";
 
 export function KpiTiles({ summary }: { summary: OwnerTodaySummary }) {
   const tiles = [
-    ["LABA KOTOR", formatRupiah(summary.grossProfit)],
-    ["TRANSAKSI", String(summary.salesCount)],
-    ["KASBON BARU", formatRupiah(summary.newCredit)],
-    ["RATA-RATA / STRUK", formatRupiah(summary.avgTicket)],
+    ["Laba kotor", formatRupiah(summary.grossProfit)],
+    ["Transaksi", String(summary.salesCount)],
+    ["Kasbon baru", formatRupiah(summary.newCredit)],
+    ["Rata-rata / struk", formatRupiah(summary.avgTicket)],
   ] as const;
   return (
     <dl className="grid grid-cols-2 gap-2 lg:gap-3">
       {tiles.map(([label, value]) => (
-        <div key={label} className={cn(CARD, "min-w-0")}>
-          <dt className="text-[11px] text-muted">{label}</dt>
-          <dd className="num truncate text-base font-bold">{value}</dd>
+        <div key={label} className="min-w-0 rounded-lg bg-surface px-3.5 py-3">
+          <dt className="truncate text-[13px] font-semibold text-muted">
+            {label}
+          </dt>
+          <dd className="num truncate text-[21px] font-bold">{value}</dd>
         </div>
       ))}
     </dl>

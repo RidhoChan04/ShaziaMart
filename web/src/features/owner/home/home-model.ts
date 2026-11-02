@@ -53,7 +53,8 @@ export function hourWindow(
 
 export type AttentionItem = {
   key: string;
-  text: string;
+  title: string;
+  detail: string;
   tone: "warning" | "critical";
   to: "/owner/barang" | "/owner/lainnya" | "/owner/kasbon";
 };
@@ -63,7 +64,8 @@ export function attentionItems(a: Attention): AttentionItem[] {
   if (a.negativeStockCount > 0) {
     items.push({
       key: "negative-stock",
-      text: `${a.negativeStockCount} barang stok minus`,
+      title: "Stok minus",
+      detail: `${a.negativeStockCount} barang`,
       tone: "critical",
       to: "/owner/barang",
     });
@@ -71,7 +73,8 @@ export function attentionItems(a: Attention): AttentionItem[] {
   if (a.lowStockCount > 0) {
     items.push({
       key: "low-stock",
-      text: `${a.lowStockCount} barang stok menipis`,
+      title: "Stok menipis",
+      detail: `${a.lowStockCount} barang`,
       tone: "warning",
       to: "/owner/barang",
     });
@@ -84,7 +87,8 @@ export function attentionItems(a: Attention): AttentionItem[] {
         : formatRupiah(c.difference);
     items.push({
       key: `cash-${c.shiftId}`,
-      text: `Selisih kas shift ${c.kasirName} ${signed}`,
+      title: `Selisih kas ${signed}`,
+      detail: `Shift ${c.kasirName}`,
       tone: c.difference < 0 ? "critical" : "warning",
       to: "/owner/lainnya",
     });
@@ -92,7 +96,8 @@ export function attentionItems(a: Attention): AttentionItem[] {
   if (a.overdueCredit.count > 0) {
     items.push({
       key: "overdue-credit",
-      text: `${a.overdueCredit.count} kasbon > 30 hari · ${formatRupiah(a.overdueCredit.total)}`,
+      title: "Kasbon > 30 hari",
+      detail: `${a.overdueCredit.count} pelanggan · ${formatRupiah(a.overdueCredit.total)}`,
       tone: "warning",
       to: "/owner/kasbon",
     });

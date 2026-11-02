@@ -109,31 +109,36 @@ describe("attentionItems", () => {
     expect(attentionItems(a)).toEqual([
       {
         key: "negative-stock",
-        text: "1 barang stok minus",
+        title: "Stok minus",
+        detail: "1 barang",
         tone: "critical",
         to: "/owner/barang",
       },
       {
         key: "low-stock",
-        text: "3 barang stok menipis",
+        title: "Stok menipis",
+        detail: "3 barang",
         tone: "warning",
         to: "/owner/barang",
       },
       {
         key: "cash-s1",
-        text: "Selisih kas shift Rina -Rp5.000",
+        title: "Selisih kas -Rp5.000",
+        detail: "Shift Rina",
         tone: "critical",
         to: "/owner/lainnya",
       },
       {
         key: "cash-s2",
-        text: "Selisih kas shift Budi +Rp2.500",
+        title: "Selisih kas +Rp2.500",
+        detail: "Shift Budi",
         tone: "warning",
         to: "/owner/lainnya",
       },
       {
         key: "overdue-credit",
-        text: "2 kasbon > 30 hari · Rp1.250.000",
+        title: "Kasbon > 30 hari",
+        detail: "2 pelanggan · Rp1.250.000",
         tone: "warning",
         to: "/owner/kasbon",
       },
@@ -154,7 +159,8 @@ describe("attentionItems", () => {
     expect(attentionItems({ ...none, lowStockCount: 4 })).toEqual([
       {
         key: "low-stock",
-        text: "4 barang stok menipis",
+        title: "Stok menipis",
+        detail: "4 barang",
         tone: "warning",
         to: "/owner/barang",
       },
