@@ -1,6 +1,8 @@
 import { HttpResponse, http } from "msw";
 import {
   type FieldError,
+  type ImportResult,
+  type ImportRow,
   type PriceLineInput,
   ProductStatus,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
@@ -12,6 +14,7 @@ import {
   saveApplied,
 } from "../products/apply";
 import { draftFromInput } from "../products/drafts";
+import { checkImport, commitImport, readImportRows } from "../products/import";
 import { applyPriceLines } from "../products/prices";
 import {
   movementsOf,
@@ -91,6 +94,18 @@ function readPriceLines(
     });
   }
   return out;
+}
+
+type ImportInput = { state: Readonly<MockState>; rows: ImportRow[] };
+
+/** Sesi pemilik lalu body `ImportRequest`; selain itu 401/422. */
+async function importInput(request: Request): Promise<ImportInput | Response> {
+  const state = mockDb.get();
+  const user = requireOwnerSession(state);
+  if (user instanceof Response) return user;
+  const rows = readImportRows(await readJson(request));
+  if (rows === null) return invalid("Baris impor tidak valid (1–5000 baris)");
+  return { state, rows };
 }
 
 export const ownerProductHandlers = [
@@ -228,6 +243,28 @@ export const ownerProductHandlers = [
       const found = findProduct(String(params.productId));
       if (found instanceof Response) return found;
       return HttpResponse.json(movementsOf(found.state, found.product.id));
+    }),
+  ),
+  http.post(
+    "/api/owner/product-imports/check",
+    withScenario(async ({ request }) => {
+      const input = await importInput(request);
+      if (input instanceof Response) return input;
+      const { check } = checkImport(input.state, input.rows, Date.now());
+      return HttpResponse.json(check);
+    }),
+  ),
+  http.post(
+    "/api/owner/product-imports",
+    withScenario(async ({ request }) => {
+      const input = await importInput(request);
+      if (input instanceof Response) return input;
+      const now = Date.now();
+      let result: ImportResult = { created: 0, updated: 0, skipped: 0 };
+      mockDb.update((s) => {
+        result = commitImport(s, input.rows, now);
+      });
+      return HttpResponse.json(result);
     }),
   ),
   http.get(
