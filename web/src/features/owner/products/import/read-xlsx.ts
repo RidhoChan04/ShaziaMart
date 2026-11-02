@@ -14,6 +14,14 @@ export type SheetRow = {
 
 const NOT_XLSX = "File ini bukan file .xlsx yang bisa dibaca";
 const notXlsx = () => new ImportFileError(NOT_XLSX);
+const tooBig = () => new ImportFileError("File terlalu besar atau rusak");
+
+/** Total hasil ekstrak part yang dibaca (template 2000 baris ±6 MB); menahan bom dekompresi. */
+const MAX_EXTRACTED_BYTES = 20 * 1024 * 1024;
+/** Sama dengan batas kontrak impor (`rows` maks. 5000). */
+const MAX_DATA_ROWS = 5000;
+/** Data barang mulai baris 3 (baris 1–2 judul template). */
+const FIRST_DATA_ROW = 3;
 
 const EOCD_SIG = 0x06054b50;
 const CENTRAL_SIG = 0x02014b50;
@@ -21,7 +29,8 @@ const LOCAL_SIG = 0x04034b50;
 // EOCD 22 byte + komentar zip maks. 65.535 byte.
 const EOCD_SEARCH = 22 + 0xffff;
 
-type Entry = { method: number; size: number; offset: number };
+/** `size` = ukuran terkompresi, `declared` = ukuran ekstrak menurut central directory. */
+type Entry = { method: number; size: number; declared: number; offset: number };
 
 /** Nama part OPC tanpa "/" depan, huruf kecil (nama part tidak peka huruf). */
 const partKey = (name: string) => name.replace(/^\/+/, "").toLowerCase();
@@ -50,6 +59,7 @@ function readCentralDirectory(bytes: Uint8Array): Map<string, Entry> {
     entries.set(partKey(name), {
       method: view.getUint16(p + 10, true),
       size: view.getUint32(p + 20, true),
+      declared: view.getUint32(p + 24, true),
       offset: view.getUint32(p + 42, true),
     });
     p +=
@@ -61,20 +71,46 @@ function readCentralDirectory(bytes: Uint8Array): Map<string, Entry> {
   return entries;
 }
 
-async function inflateRaw(data: Uint8Array<ArrayBuffer>): Promise<Uint8Array> {
-  const stream = new ReadableStream<BufferSource>({
+/** Inflate potong demi potong; berhenti begitu hasil melewati `limit` (header bisa berbohong). */
+async function inflateRaw(
+  data: Uint8Array<ArrayBuffer>,
+  limit: number,
+): Promise<Uint8Array> {
+  const reader = new ReadableStream<BufferSource>({
     start(controller) {
       controller.enqueue(data);
       controller.close();
     },
-  }).pipeThrough(new DecompressionStream("deflate-raw"));
-  return new Uint8Array(await new Response(stream).arrayBuffer());
+  })
+    .pipeThrough(new DecompressionStream("deflate-raw"))
+    .getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.length;
+    if (total > limit) {
+      await reader.cancel().catch(() => {});
+      throw tooBig();
+    }
+    chunks.push(value);
+  }
+  const out = new Uint8Array(total);
+  let at = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, at);
+    at += chunk.length;
+  }
+  return out;
 }
 
 class Zip {
   private readonly bytes: Uint8Array<ArrayBuffer>;
   private readonly view: DataView;
   private readonly entries: Map<string, Entry>;
+  /** Byte hasil ekstrak yang sudah dipakai dari `MAX_EXTRACTED_BYTES`. */
+  private extracted = 0;
 
   constructor(data: ArrayBuffer) {
     this.bytes = new Uint8Array(data);
@@ -86,10 +122,21 @@ class Zip {
     return this.entries.has(partKey(name));
   }
 
+  /** Tolak sebelum inflate bila ukuran yang diakui header untuk part yang akan dibaca terlalu besar. */
+  checkDeclared(names: string[]): void {
+    const total = names.reduce(
+      (sum, name) => sum + (this.entries.get(partKey(name))?.declared ?? 0),
+      0,
+    );
+    if (total > MAX_EXTRACTED_BYTES) throw tooBig();
+  }
+
   async text(name: string): Promise<string> {
     const entry = this.entries.get(partKey(name));
     if (!entry) throw notXlsx();
     const { offset, size, method } = entry;
+    const budget = MAX_EXTRACTED_BYTES - this.extracted;
+    if (entry.declared > budget) throw tooBig();
     if (
       offset + 30 > this.bytes.length ||
       this.view.getUint32(offset, true) !== LOCAL_SIG
@@ -105,9 +152,12 @@ class Zip {
     if (start + size > this.bytes.length) throw notXlsx();
     const data = this.bytes.subarray(start, start + size);
     let raw: Uint8Array;
-    if (method === 0) raw = data;
-    else if (method === 8) raw = await inflateRaw(data);
+    if (method === 0) {
+      if (data.length > budget) throw tooBig();
+      raw = data;
+    } else if (method === 8) raw = await inflateRaw(data, budget);
     else throw notXlsx();
+    this.extracted += raw.length;
     return new TextDecoder().decode(raw);
   }
 
@@ -240,6 +290,23 @@ function readRow(rowEl: Element, row: number, shared: string[]): SheetRow {
   return out;
 }
 
+/** Baris berisi; lebih dari `MAX_DATA_ROWS` baris data → ditolak. */
+function readRows(sheet: Document, shared: string[]): SheetRow[] {
+  const out: SheetRow[] = [];
+  let rowNumber = 0;
+  let dataRows = 0;
+  for (const rowEl of all(sheet, "row")) {
+    rowNumber = Number(rowEl.getAttribute("r") ?? rowNumber + 1);
+    const row = readRow(rowEl, rowNumber, shared);
+    if (Object.keys(row.cells).length === 0) continue;
+    if (row.row >= FIRST_DATA_ROW && ++dataRows > MAX_DATA_ROWS) {
+      throw tooBig();
+    }
+    out.push(row);
+  }
+  return out;
+}
+
 /** Baris sheet `sheetName` yang berisi; sel kosong dan rumus kolom A (Status) dilewati. */
 export async function readSheet(
   data: ArrayBuffer,
@@ -248,16 +315,14 @@ export async function readSheet(
   try {
     const zip = new Zip(data);
     const paths = await sheetPaths(zip, sheetName);
+    zip.checkDeclared([
+      "xl/workbook.xml",
+      "xl/_rels/workbook.xml.rels",
+      paths.sheet,
+      ...(paths.shared === null ? [] : [paths.shared]),
+    ]);
     const shared = await readSharedStrings(zip, paths.shared);
-    const sheet = await zip.xml(paths.sheet);
-    const out: SheetRow[] = [];
-    let rowNumber = 0;
-    for (const rowEl of all(sheet, "row")) {
-      rowNumber = Number(rowEl.getAttribute("r") ?? rowNumber + 1);
-      const row = readRow(rowEl, rowNumber, shared);
-      if (Object.keys(row.cells).length > 0) out.push(row);
-    }
-    return out;
+    return readRows(await zip.xml(paths.sheet), shared);
   } catch (err) {
     if (err instanceof ImportFileError) throw err;
     throw notXlsx();

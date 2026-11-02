@@ -241,3 +241,71 @@ test("file rusak → 'File ini bukan file .xlsx yang bisa dibaca': zip terpotong
     expect((err as Error).message).toBe(NOT_XLSX);
   }
 });
+
+const TOO_BIG = "File terlalu besar atau rusak";
+const MB = 1024 * 1024;
+
+/** Workbook satu sheet "Barang" + shared strings, dengan ukuran header yang bisa ditimpa. */
+function bomb(
+  sheetData: string,
+  declared: Record<string, number> = {},
+): Promise<ArrayBuffer> {
+  return makeZip(
+    {
+      "xl/workbook.xml": `<workbook xmlns="${MAIN}" xmlns:r="${REL}"><sheets><sheet name="Barang" sheetId="1" r:id="rId1"/></sheets></workbook>`,
+      "xl/_rels/workbook.xml.rels": `<Relationships xmlns="${PKG}"><Relationship Id="rId1" Type="${REL}/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="${REL}/sharedStrings" Target="sharedStrings.xml"/></Relationships>`,
+      "xl/sharedStrings.xml": `<sst xmlns="${MAIN}"/>`,
+      "xl/worksheets/sheet1.xml": `<worksheet xmlns="${MAIN}"><sheetData>${sheetData}</sheetData></worksheet>`,
+    },
+    { declared },
+  );
+}
+
+async function expectTooBig(data: ArrayBuffer) {
+  const err = await readError(data);
+  expect(err).toBeInstanceOf(ImportFileError);
+  expect((err as Error).message).toBe(TOO_BIG);
+}
+
+test("bom dekompresi: header berbohong (mengaku 1 KB, isi 21 MB) → dihentikan saat inflate dengan 'File terlalu besar atau rusak'", async () => {
+  const lying = await bomb(" ".repeat(21 * MB), {
+    "xl/worksheets/sheet1.xml": 1024,
+  });
+  // File zip-nya sendiri kecil: hanya hasil ekstraknya yang besar.
+  expect(lying.byteLength).toBeLessThan(200 * 1024);
+  await expectTooBig(lying);
+});
+
+test("ukuran di central directory > 20 MB untuk satu entri, atau total entri yang dibaca > 20 MB → ditolak sebelum inflate", async () => {
+  const row = `<row r="3"><c r="B3" t="inlineStr"><is><t>Gula</t></is></c></row>`;
+  await expectTooBig(await bomb(row, { "xl/worksheets/sheet1.xml": 21 * MB }));
+  await expectTooBig(
+    await bomb(row, {
+      "xl/sharedStrings.xml": 11 * MB,
+      "xl/worksheets/sheet1.xml": 11 * MB,
+    }),
+  );
+  // Ukuran jujur di bawah batas tetap terbaca.
+  expect(await readSheet(await bomb(row), "Barang")).toEqual([
+    { row: 3, cells: { B: "Gula" }, numbers: [] },
+  ]);
+});
+
+const dataRows = (count: number) =>
+  Array.from(
+    { length: count },
+    (_, i) =>
+      `<row r="${i + 3}"><c r="B${i + 3}" t="inlineStr"><is><t>B${i}</t></is></c></row>`,
+  ).join("");
+
+test("lebih dari 5000 baris data → 'File terlalu besar atau rusak'; tepat 5000 baris data (+ judul baris 2) masih terbaca", async () => {
+  const header = `<row r="2"><c r="B2" t="inlineStr"><is><t>Nama barang *</t></is></c></row>`;
+  await expectTooBig(await bomb(header + dataRows(5001)));
+  const ok = await readSheet(await bomb(header + dataRows(5000)), "Barang");
+  expect(ok).toHaveLength(5001);
+  expect(ok.at(-1)).toEqual({
+    row: 5002,
+    cells: { B: "B4999" },
+    numbers: [],
+  });
+});

@@ -20,11 +20,18 @@ async function deflateRaw(data: Uint8Array<ArrayBuffer>): Promise<Uint8Array> {
 
 /**
  * Zip minimal untuk test pembaca xlsx: entri `stored` (metode 0) atau dikompres
- * (metode 8). CRC diisi 0 karena pembaca tidak memeriksanya.
+ * (metode 8). CRC diisi 0 karena pembaca tidak memeriksanya. `declared` menimpa
+ * ukuran tak terkompresi di header (untuk meniru header yang berbohong).
  */
 export async function makeZip(
   files: Record<string, string>,
-  { stored = false }: { stored?: boolean | undefined } = {},
+  {
+    stored = false,
+    declared = {},
+  }: {
+    stored?: boolean | undefined;
+    declared?: Record<string, number>;
+  } = {},
 ): Promise<ArrayBuffer> {
   const encoder = new TextEncoder();
   const locals: Uint8Array[] = [];
@@ -35,6 +42,7 @@ export async function makeZip(
     const raw = encoder.encode(text);
     const data = stored ? raw : await deflateRaw(raw);
     const method = stored ? 0 : 8;
+    const size = declared[name] ?? raw.length;
 
     const local = new Uint8Array(30 + nameBytes.length + data.length);
     const lv = new DataView(local.buffer);
@@ -42,7 +50,7 @@ export async function makeZip(
     lv.setUint16(4, 20, true);
     lv.setUint16(8, method, true);
     lv.setUint32(18, data.length, true);
-    lv.setUint32(22, raw.length, true);
+    lv.setUint32(22, size, true);
     lv.setUint16(26, nameBytes.length, true);
     local.set(nameBytes, 30);
     local.set(data, 30 + nameBytes.length);
@@ -54,7 +62,7 @@ export async function makeZip(
     cv.setUint16(6, 20, true);
     cv.setUint16(10, method, true);
     cv.setUint32(20, data.length, true);
-    cv.setUint32(24, raw.length, true);
+    cv.setUint32(24, size, true);
     cv.setUint16(28, nameBytes.length, true);
     cv.setUint32(42, offset, true);
     central.set(nameBytes, 46);
