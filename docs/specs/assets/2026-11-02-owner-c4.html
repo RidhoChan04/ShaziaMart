@@ -1,0 +1,98 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mockup Beranda pemilik C4</title><style>body{margin:0;padding:24px;background:#e9ece9;font-family:Inter,system-ui,sans-serif}h2{margin:0 0 4px;font-size:18px}.subtitle{margin:0 0 16px;color:#5e6b65}</style></head><body><style>
+  @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+  .phones { display: flex; gap: 30px; flex-wrap: wrap; justify-content: center; }
+  .pick { display: flex; flex-direction: column; align-items: center; gap: 10px; cursor: pointer; }
+  .pick h3 { margin: 0; }
+  .pick p { margin: 0; max-width: 310px; text-align: center; font-size: 13px; opacity: .75; }
+  .pick.selected .phone { outline: 3px solid #0a84ff; outline-offset: 6px; }
+  .phone { width: 330px; height: 690px; border-radius: 44px; overflow: hidden; position: relative;
+    box-shadow: 0 0 0 10px #1d1d1f, 0 24px 60px rgba(0,0,0,.28);
+    font-family: Inter, -apple-system, "SF Pro Text", system-ui, sans-serif; color: #1d1d1f; font-size: 16px; letter-spacing: -.01em; }
+  .phone * { box-sizing: border-box; }
+  .num { font-variant-numeric: tabular-nums; }
+  .content { padding: 14px 16px 120px; }
+  .date { font-size: 13px; font-weight: 600; color: #8e8e93; }
+  .titlebar { display: flex; justify-content: space-between; align-items: center; margin: 2px 0 14px; }
+  .titlebar b { font-size: 32px; font-weight: 700; letter-spacing: -.025em; }
+  .status { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: #1f7a4d;
+    background: #e3f1e9; padding: 5px 10px; border-radius: 99px; }
+  .status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #34c759; }
+  .up { color: #1f7a4d; font-weight: 600; font-size: 15px; }
+  .legend { display: flex; gap: 14px; font-size: 12px; color: #8e8e93; margin-top: 8px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend i { width: 16px; border-top: 2px solid #1f7a4d; display: inline-block; }
+  .legend i.dash { border-top: 2px dashed #2a78d6; }
+
+  .glassbar { position: absolute; left: 14px; right: 14px; bottom: 22px; height: 62px; border-radius: 31px;
+    display: flex; justify-content: space-around; align-items: center; padding: 0 6px;
+    background: rgba(255,255,255,.6); backdrop-filter: blur(22px) saturate(180%); -webkit-backdrop-filter: blur(22px) saturate(180%);
+    border: .5px solid rgba(255,255,255,.75); box-shadow: 0 10px 30px rgba(0,0,0,.14), inset 0 1px 0 rgba(255,255,255,.9); }
+  .tab { flex: 1; height: 50px; border-radius: 25px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 2px; font-size: 11px; font-weight: 600; color: #3a3a3c; }
+  .tab svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .tab.on { color: #1f7a4d; background: rgba(31,122,77,.12); }
+
+  .list { background: #fff; border-radius: 20px; overflow: hidden; }
+  .row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; position: relative; font-size: 15px; }
+  .row + .row::before { content: ""; position: absolute; top: 0; left: 56px; right: 0; border-top: .5px solid #c6c6c8; }
+  .ico { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; flex: none; }
+  .ico svg { width: 17px; height: 17px; stroke: #fff; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+  .chev { margin-left: auto; color: #c4c4c7; font-size: 20px; line-height: 1; }
+  .sec { font-size: 20px; font-weight: 700; letter-spacing: -.02em; margin: 0 4px 8px; }
+
+  /* A — grouped */
+  .a { background: #f2f2f7; }
+  .a .card { background: #fff; border-radius: 20px; padding: 16px; }
+  .a .cap { font-size: 13px; font-weight: 600; color: #8e8e93; }
+  .a .big { font-size: 34px; font-weight: 700; letter-spacing: -.03em; margin: 2px 0 2px; }
+  .a .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0 20px; }
+  .a .tile { background: #fff; border-radius: 20px; padding: 13px 14px; }
+  .a .tile span { font-size: 13px; font-weight: 600; color: #8e8e93; }
+  .a .tile b { display: block; font-size: 21px; font-weight: 700; letter-spacing: -.02em; margin-top: 3px; }
+
+  /* B — airy */
+  .b { background: #fff; }
+  .b .big { font-size: 44px; font-weight: 700; letter-spacing: -.04em; line-height: 1.05; margin: 18px 0 6px; }
+  .b .cap { font-size: 15px; font-weight: 600; color: #6e6e73; margin-top: 6px; }
+  .b .sep { border-top: .5px solid #d2d2d7; margin: 18px 0; }
+  .b .stats { display: grid; grid-template-columns: 1fr 1fr; row-gap: 16px; }
+  .b .stats span { font-size: 13px; color: #6e6e73; font-weight: 500; }
+  .b .stats b { display: block; font-size: 22px; font-weight: 600; letter-spacing: -.02em; }
+  .b .item { display: flex; align-items: center; gap: 10px; padding: 11px 0; border-bottom: .5px solid #e5e5ea; font-size: 15px; }
+  .b .item em { font-style: normal; color: #1f7a4d; margin-left: auto; font-weight: 600; }
+
+  /* C — highlight card */
+  .c { background: #f2f2f7; }
+  .c .hero { background: linear-gradient(155deg, #23895a 0%, #1f7a4d 45%, #155c3b 100%); color: #fff; border-radius: 24px;
+    padding: 16px 16px 12px; box-shadow: 0 10px 28px rgba(31,122,77,.28); }
+  .c .hero .cap { font-size: 13px; font-weight: 600; opacity: .85; }
+  .c .hero .big { font-size: 34px; font-weight: 700; letter-spacing: -.03em; margin: 2px 0 8px; }
+  .c .pill { display: inline-flex; background: rgba(255,255,255,.2); border-radius: 99px; padding: 4px 10px; font-size: 13px; font-weight: 600; }
+  .c .legend { color: rgba(255,255,255,.85); }
+  .c .legend i { border-top-color: #fff; } .c .legend i.dash { border-top-color: rgba(255,255,255,.6); }
+  .c .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0 20px; }
+  .c .tile { background: #fff; border-radius: 20px; padding: 13px 14px; }
+  .c .tile span { font-size: 13px; font-weight: 600; color: #8e8e93; }
+  .c .tile b { display: block; font-size: 21px; font-weight: 700; letter-spacing: -.02em; margin-top: 3px; }
+</style>
+<h2>Beranda pemilik — gaya C4 (disetujui 2 Nov 2026)</h2>
+<p class="subtitle">Pita hijau hanya di angka omzet; grafik batang ala Health di bagian putih; tab bar kaca mengambang di bawah.</p>
+<div class="phones"><div class="pick" data-choice="c3-band" >
+    <div class="phone c"><div class="content"><div class="date">Jumat, 23 Okt</div><div class="titlebar"><b>Beranda</b><span class="status">Toko online</span></div><div style="background:#fff;border-radius:24px;overflow:hidden">
+  <div style="background:linear-gradient(155deg,#23895a,#1f7a4d 50%,#155c3b);color:#fff;padding:16px 16px 14px">
+    <div style="font-size:13px;font-weight:600;opacity:.85">Omzet hari ini</div>
+    <div class="num" style="font-size:34px;font-weight:700;letter-spacing:-.03em;margin:2px 0 8px">Rp4.872.500</div>
+    <span style="background:rgba(255,255,255,.2);border-radius:99px;padding:4px 10px;font-size:13px;font-weight:600">▲ 12% dari Jumat lalu</span></div>
+  <div style="padding:4px 16px 14px"><div style="font-size:13px;color:#6e6e73;margin:10px 0 6px">Paling ramai jam <b style="color:#1d1d1f">13.00</b> · Rp880 rb</div><svg viewBox="0 0 300 104" width="100%" height="104" style="display:block"><line x1="2" x2="266" y1="86.0" y2="86.0" stroke="#e5e5ea"/><text x="271" y="89.5" font-size="9.5" fill="#8e8e93">0</text><line x1="2" x2="266" y1="50.0" y2="50.0" stroke="#e5e5ea"/><text x="271" y="53.5" font-size="9.5" fill="#8e8e93">500 rb</text><line x1="2" x2="266" y1="14.0" y2="14.0" stroke="#e5e5ea"/><text x="271" y="17.5" font-size="9.5" fill="#8e8e93">1 jt</text><rect x="4.8" y="81.7" width="10.9" height="4.3" rx="2.5" fill="rgba(60,60,67,.14)"/><rect x="21.3" y="75.2" width="10.9" height="10.8" rx="2.5" fill="rgba(60,60,67,.14)"/><rect x="37.8" y="58.6" width="10.9" height="27.4" rx="2.5" fill="rgba(60,60,67,.14)"/><rect x="54.3" y="48.6" width="10.9" height="37.4" rx="2.5" fill="rgba(60,60,67,.14)"/><rect x="70.8" y="45.7" width="10.9" height="40.3" rx="2.5" fill="rgba(60,60,67,.14)"/><rect x="87.3" y="55.0" width="10.9" height="31.0" rx="2.5" fill="rgba(60,60,67,.14)"/><rect x="103.8" y="42.1" width="10.9" height="43.9" rx="2.5" fill="rgba(60,60,67,.14)"/><rect x="120.3" y="35.6" width="10.9" height="50.4" rx="2.5" fill="rgba(60,60,67,.14)"/><rect x="136.8" y="39.9" width="10.9" height="46.1" rx="2.5" fill="rgba(60,60,67,.14)"/><rect x="153.3" y="45.7" width="10.9" height="40.3" rx="2.5" fill="rgba(60,60,67,.14)"/><rect x="169.8" y="51.4" width="10.9" height="34.6" rx="2.5" fill="rgba(60,60,67,.14)"/><rect x="186.3" y="48.6" width="10.9" height="37.4" rx="2.5" fill="rgba(60,60,67,.14)"/><rect x="202.8" y="42.1" width="10.9" height="43.9" rx="2.5" fill="rgba(60,60,67,.14)"/><rect x="219.3" y="53.6" width="10.9" height="32.4" rx="2.5" fill="rgba(60,60,67,.14)"/><rect x="235.8" y="64.4" width="10.9" height="21.6" rx="2.5" fill="rgba(60,60,67,.14)"/><rect x="252.3" y="74.5" width="10.9" height="11.5" rx="2.5" fill="rgba(60,60,67,.14)"/><rect x="6.3" y="83.1" width="7.9" height="2.9" rx="2.5" fill="#1f7a4d"/><rect x="22.8" y="73.0" width="7.9" height="13.0" rx="2.5" fill="#1f7a4d"/><rect x="39.3" y="55.8" width="7.9" height="30.2" rx="2.5" fill="#1f7a4d"/><rect x="55.8" y="42.1" width="7.9" height="43.9" rx="2.5" fill="#1f7a4d"/><rect x="72.3" y="47.8" width="7.9" height="38.2" rx="2.5" fill="#1f7a4d"/><rect x="88.8" y="52.2" width="7.9" height="33.8" rx="2.5" fill="#1f7a4d"/><rect x="105.3" y="36.3" width="7.9" height="49.7" rx="2.5" fill="#1f7a4d"/><rect x="121.8" y="22.6" width="7.9" height="63.4" rx="2.5" fill="#1f7a4d"/><rect x="138.3" y="48.6" width="7.9" height="37.4" rx="2.5" fill="#34a46b"/><text x="125.8" y="18.6" font-size="9.5" font-weight="600" fill="#1d1d1f" text-anchor="middle">880 rb</text><text x="10.2" y="100" font-size="9.5" fill="#8e8e93" text-anchor="middle">06.00</text><text x="59.8" y="100" font-size="9.5" fill="#8e8e93" text-anchor="middle">09.00</text><text x="109.2" y="100" font-size="9.5" fill="#8e8e93" text-anchor="middle">12.00</text><text x="158.8" y="100" font-size="9.5" fill="#8e8e93" text-anchor="middle">15.00</text><text x="208.2" y="100" font-size="9.5" fill="#8e8e93" text-anchor="middle">18.00</text><text x="257.8" y="100" font-size="9.5" fill="#8e8e93" text-anchor="middle">21.00</text></svg><div class="legend" style="color:#6e6e73"><span><b style="width:10px;height:10px;border-radius:3px;background:#1f7a4d;display:inline-block"></b>Hari ini</span><span><b style="width:10px;height:10px;border-radius:3px;background:rgba(60,60,67,.18);display:inline-block"></b>Jumat lalu</span></div></div></div><div class="tiles">
+        <div class="tile"><span>Laba kotor</span><b class="num">Rp961.300</b></div>
+        <div class="tile"><span>Transaksi</span><b class="num">142</b></div>
+        <div class="tile"><span>Kasbon baru</span><b class="num">Rp185.000</b></div>
+        <div class="tile"><span>Rata-rata / struk</span><b class="num">Rp34.300</b></div>
+      </div></div><div class="glassbar">
+      <div class="tab on"><svg viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Beranda</div>
+      <div class="tab"><svg viewBox="0 0 24 24"><path d="M21 8 12 3 3 8v8l9 5 9-5zM3 8l9 5 9-5M12 13v8"/></svg>Barang</div>
+      <div class="tab"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Laporan</div>
+        <div class="tab"><svg viewBox="0 0 24 24"><path d="M4 4h12a2 2 0 0 1 2 2v14H6a2 2 0 0 1-2-2zM8 8h6M8 12h6"/></svg>Kasbon</div>
+      <div class="tab"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/></svg>Lainnya</div>
+    </div></div>
+    <h3>C4 · Pita hijau di atas</h3><p>Hijau hanya di bagian angka omzet; grafik di bagian putih kartu yang sama.</p></div></div></body></html>

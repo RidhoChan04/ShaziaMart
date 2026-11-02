@@ -348,6 +348,34 @@ web/
   <tr><td>Ekspor (F3c)</td><td>Excel: library dimuat hanya saat tombol ekspor diklik. PDF: tampilan cetak browser (stylesheet cetak), tanpa library PDF.</td></tr>
 </table></div>
 
+<h2 id="owner-gaya">12b. Aplikasi pemilik — gaya Apple (disetujui 2 Nov 2026)</h2>
+<p><strong>Kenapa:</strong> pemilik ingin aplikasinya terasa simple dan elegan seperti app Apple. Acuan: Apple Human Interface Guidelines terbaru (Typography, Color, Layout, Materials/Liquid Glass, Charts). Dikerjakan <strong>setelah F3a dan sebelum F3b</strong>, supaya layar pemilik berikutnya langsung dibangun dengan gaya ini. Mockup: <a href="assets/2026-11-02-owner-c4.html">assets/2026-11-02-owner-c4.html</a> (angka contoh; jumlah tab mengikuti aplikasi: 5).</p>
+<div class="table-wrap"><table>
+  <tr><th>Topik</th><th>Keputusan</th></tr>
+  <tr><td>Cakupan</td><td>Hanya aplikasi pemilik: kerangka (login, header, tab bar/sidebar, banner offline, memuat) dan Beranda. Layar kasir <strong>tidak berubah</strong>. Tab lain (Barang, Laporan, Kasbon, Lainnya) baru ikut kerangka &amp; judul besar; isinya dibangun di F3b/F3c dengan gaya ini.</td></tr>
+  <tr><td>Dasar visual</td><td>Latar "grouped" abu sangat muda (±<code>#f2f2f7</code>); kartu putih tanpa garis tepi, sudut bulat besar (±20 px), bayangan sangat halus atau tanpa bayangan; pemisah daftar setipis rambut. Warna hemat: hijau toko <code>#1f7a4d</code> hanya untuk penekanan (angka utama, data hari ini, tab aktif); merah/oranye hanya untuk status, selalu dengan ikon + teks.</td></tr>
+  <tr><td>Tipografi</td><td>Inter (pengganti SF yang sah untuk web/Android; SF hanya berlisensi untuk platform Apple). Teks dasar pemilik 16 px, judul besar halaman 32 px tebal, angka utama ±34 px tebal, keterangan 13 px; minimal 11 px; tanpa ketebalan tipis (light/thin). Label kartu memakai huruf kalimat ("Laba kotor"), bukan HURUF BESAR.</td></tr>
+  <tr><td>Ikon</td><td>Lucide (MIT), garis ±1,75–2 agar mirip SF Symbols. SF Symbols tidak boleh dipakai (lisensi hanya untuk platform Apple).</td></tr>
+  <tr><td>Header</td><td>Tanggal kecil di atas, judul besar nama halaman ("Beranda"), dan pil status "Toko online"/"Toko offline" (titik warna + teks). Saat digulir, judul pindah ke bar atas kecil berbahan kaca.</td></tr>
+  <tr><td>Kartu omzet (C4)</td><td>Satu kartu dua bagian: <strong>pita hijau</strong> di atas berisi label, angka omzet, dan pil perbandingan ("▲ 12% dari Jumat lalu", aturan R4/R6 tetap); <strong>bagian putih</strong> di bawah berisi kalimat ringkas lalu grafik. Hijau tidak dipakai di bawah pita agar grafik terbaca.</td></tr>
+  <tr><td>Grafik per jam</td><td>Gaya app Health, menggantikan grafik dua garis: batang per jam membulat, hari ini hijau dengan jam berjalan sedikit lebih terang, Jumat lalu batang abu netral samar di belakang; jam tersibuk diberi label angka; sumbu nilai di kanan (3 garis bantu samar), label jam tiap 3 jam. Kalimat ringkas di atas grafik: "Paling ramai jam HH.00 · Rp…" (tanpa penjualan: kalimat netral). Jendela jam, aturan "berhenti di jam data terakhir", dan kontrak aksesibilitas tetap (grup fokus berlabel "Omzet per jam hari ini dan {Hari} lalu", pembacaan langsung, tabel sr-only); sentuh/geser/panah memunculkan angka per jam. Palet divalidasi ulang dengan validator dataviz.</td></tr>
+  <tr><td>Angka kunci</td><td>4 kartu putih 2×2: Laba kotor, Transaksi, Kasbon baru, Rata-rata / struk.</td></tr>
+  <tr><td>Perlu perhatian</td><td>Daftar berkelompok ala Settings: ikon dalam kotak berwarna, judul + keterangan kecil, panah ›, pemisah tipis; kosong → "Semua aman hari ini".</td></tr>
+  <tr><td>Navigasi (Liquid Glass)</td><td>HP: tab bar mengambang berbentuk kapsul di atas konten, kaca buram (blur + saturasi), tab aktif diberi latar hijau tipis; konten terlihat samar di baliknya. Kaca hanya untuk navigasi/kontrol, tidak untuk kartu konten. Laptop (≥ 1024 px): tetap dua kolom dengan sidebar bergaya kaca. Bila <code>backdrop-filter</code> tak didukung atau pengguna memilih kurangi transparansi → latar padat. Teks di atas kaca tetap kontras ≥ 4,5:1.</td></tr>
+  <tr><td>Kasir (menyusul)</td><td>Setelah penyegaran pemilik selesai, layar kasir ikut gaya Apple dengan acuan <strong>macOS</strong> (PC 1366×768, mouse + keyboard): panel putih bersudut di latar abu lembut, segmented control untuk tab bayar, sheet yang lebih halus; tabel tetap padat, kontras tinggi, tombol besar, kaca seminimal mungkin. Mockup &amp; rencana terpisah.</td></tr>
+  <tr><td>Bukan tujuan</td><td>Mode gelap; mengubah layar kasir dalam pekerjaan ini; meniru iOS sampai membingungkan pengguna Android; mengorbankan keterbacaan demi gaya (kontras teks ≥ 4,5:1, elemen UI ≥ 3:1 tetap berlaku); menambah dependensi baru.</td></tr>
+  <tr><td>Detail yang diputuskan saat review desain <em>(keputusan pembangun, boleh dikoreksi)</em></td><td><ul>
+    <li><strong>Token khusus pemilik:</strong> nilai gaya pemilik (latar, radius, ukuran teks 16 px) ditimpa hanya di dalam pembungkus aplikasi pemilik lewat variabel CSS; token global dan layar kasir tidak berubah.</li>
+    <li><strong>Gulir:</strong> halaman tetap menggulir dokumen seperti sekarang; judul besar diamati (IntersectionObserver) untuk memunculkan bar atas kecil. Tab bar <code>fixed</code> dengan jarak aman bawah (<code>safe-area-inset-bottom</code>) dan ruang bawah konten secukupnya.</li>
+    <li><strong>Judul per tab:</strong> komponen header bersama di kerangka; judulnya nama tab aktif. Di laptop judul besar tetap di atas kolom konten dan bar atas kecil tidak dipakai.</li>
+    <li><strong>Pil status &amp; banner:</strong> pil "Toko online/offline" memakai sumber yang sama seperti sekarang (cek server toko). Banner "Tidak terhubung ke toko — data terakhir ditampilkan" tetap ada saat offline.</li>
+    <li><strong>Label jam tersibuk:</strong> jam dengan omzet tertinggi hari ini; bila seri, jam paling awal; tanpa penjualan → tanpa label. Label digeser agar tidak menabrak sumbu kanan atau label jam. Jam berjalan selalu sedikit lebih terang.</li>
+    <li><strong>Warna ikon Perlu perhatian:</strong> mengikuti tingkat yang sudah ada: kritis (stok minus, selisih kas kurang) merah, peringatan (stok menipis, selisih kas lebih, kasbon &gt; 30 hari) oranye. Semua butir adalah status.</li>
+    <li><strong>Kontras kaca:</strong> opasitas kaca dipilih agar teks tab tetap ≥ 4,5:1 di atas latar halaman, kartu putih, maupun pita hijau yang lewat di bawahnya.</li>
+  </ul></td></tr>
+  <tr><td>Diserahkan ke pembangun</td><td>Cara menerapkan token khusus pemilik tanpa memengaruhi kasir; nilai pasti bayangan/blur/radius; animasi judul saat digulir; tampilan layar login pemilik agar serasi.</td></tr>
+</table></div>
+
 <h2 id="nanti">12. Di luar cakupan (dicatat untuk nanti)</h2>
 <ul>
   <li>Tema gelap (gaya B) sebagai opsi.</li>
