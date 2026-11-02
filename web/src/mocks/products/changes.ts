@@ -34,6 +34,30 @@ function facts(p: MockProduct, minStock: number | null): string[] {
   ];
 }
 
+/**
+ * HPP berubah tetapi modal eceran terbulatkan sama (mis. dus 104000 → 104010, isi 40):
+ * tampilkan modal di satuan sumber HPP baru, lalu lama, yang bedanya terlihat.
+ */
+function exactCostChange(before: MockProduct, after: MockProduct): string[] {
+  const a = before.cost;
+  const b = after.cost;
+  if (a === null || b === null || a.amount * b.qtyBase === b.amount * a.qtyBase)
+    return [];
+  for (const size of [b.qtyBase, a.qtyBase]) {
+    const from = unitCost(a, size);
+    const to = unitCost(b, size);
+    const unit = [after, before]
+      .flatMap((p) => p.units)
+      .find((u) => u.active && u.unitSize === size);
+    if (unit === undefined || from === to) continue;
+    const eceran =
+      unit.id === eceranOf(after).id || unit.id === eceranOf(before).id;
+    const label = eceran ? "Harga modal" : `Harga modal ${unit.name}`;
+    return [`${label} ${rp(from)} → ${rp(to)}`];
+  }
+  return [];
+}
+
 /** "{Label} {lama} → {baru}" untuk setiap nilai yang berbeda. */
 export function changesOf(
   before: MockProduct,
@@ -55,9 +79,10 @@ export function changesOf(
   ];
   const old = facts(before, beforeMin);
   const next = facts(after, afterMin);
-  return labels.flatMap((label, i) =>
-    old[i] === next[i] ? [] : [`${label} ${old[i]} → ${next[i]}`],
-  );
+  return labels.flatMap((label, i) => {
+    if (old[i] !== next[i]) return [`${label} ${old[i]} → ${next[i]}`];
+    return label === "Harga modal" ? exactCostChange(before, after) : [];
+  });
 }
 
 type PriceLine = {

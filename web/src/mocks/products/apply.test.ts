@@ -63,10 +63,13 @@ describe("draftFromProduct + applyDraft", () => {
           bigUnitId: big?.id ?? null,
         }),
       );
+      // HPP dari modal dus (Indomie) selalu disebut di pratinjau impor.
+      const fromBig =
+        p.cost !== null && p.cost.qtyBase !== p.units[0]?.unitSize;
       expect(r).toMatchObject({
         isNew: false,
         changes: [],
-        notes: [],
+        notes: fromBig ? ["Modal dihitung dari modal satuan besar ÷ isi"] : [],
         priceEntries: [],
         costChanged: false,
         minStock: s.minStock[p.id] ?? null,
@@ -131,6 +134,23 @@ describe("draftFromProduct + applyDraft", () => {
       newPrice: 3200,
       source: "impor",
     });
+  });
+
+  test("modal berubah di bawah Rp1 per eceran: baris modal memakai satuan sumber HPP baru, lalu lama", () => {
+    const s = createSeedState(NOW);
+    const indomie = byName(s, "Indomie Goreng");
+    indomie.cost = { amount: 104010, qtyBase: 40 };
+    const r = ok(
+      applyDraft(
+        s,
+        indomie,
+        { ...draftFromProduct(s, indomie), cost: 2600, bigCost: null },
+        { ...REPLACE, bigUnitId: indomie.units[1]?.id ?? null },
+      ),
+    );
+    expect(r.product.cost).toEqual({ amount: 2600, qtyBase: 1 });
+    expect(r.costChanged).toBe(true);
+    expect(r.changes).toEqual(["Harga modal dus Rp104.010 → Rp104.000"]);
   });
 
   test("changes berurutan dan notes", () => {

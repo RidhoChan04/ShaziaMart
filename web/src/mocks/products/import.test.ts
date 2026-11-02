@@ -24,6 +24,7 @@ const NOW = Date.UTC(2026, 10, 2, 7);
 const CHECK = "/api/owner/product-imports/check";
 const COMMIT = "/api/owner/product-imports";
 const BIG_COST_NOTE = "Modal eceran diabaikan — memakai modal satuan besar";
+const FROM_BIG_NOTE = "Modal dihitung dari modal satuan besar ÷ isi";
 
 const check = async (rows: ImportRow[]) => {
   const res = await post(CHECK, { rows });
@@ -272,7 +273,7 @@ describe("impor barang", () => {
       importRow(4, { name: "Kopi Kapal Api 165 g", price: "15.000" }),
     ];
     expect((await check(rows)).rows).toEqual([
-      ok(3, "diperbarui", ["Harga jual Rp3.100 → Rp3.300"]),
+      ok(3, "diperbarui", ["Harga jual Rp3.100 → Rp3.300"], [FROM_BIG_NOTE]),
       ok(4, "diperbarui", ["Harga jual Rp14.500 → Rp15.000"]),
     ]);
     expect(await commit(rows)).toEqual({ created: 0, updated: 2, skipped: 0 });
@@ -298,6 +299,45 @@ describe("impor barang", () => {
       }),
     ]);
     expect(await costChanges()).toEqual([]);
+  });
+
+  test("modal dus 104000 → 104010 (isi 40, eceran tetap Rp2.600) → diperbarui dengan baris modal dus; satu butir modal 'impor'; impor ulang → tidak_berubah", async () => {
+    const rows = [
+      importRow(3, { name: "Indomie Goreng", bigCost: "104010" }),
+      importRow(4, {
+        name: "Gas Elpiji 3 kg",
+        sellUnit: "buah",
+        price: "22000",
+        bigName: "slop",
+        bigSize: "10",
+        bigCost: "190000",
+        bigPrice: "220000",
+      }),
+    ];
+    expect((await check(rows)).rows).toEqual([
+      ok(
+        3,
+        "diperbarui",
+        ["Harga modal dus Rp104.000 → Rp104.010"],
+        [FROM_BIG_NOTE],
+      ),
+      ok(4, "baru", [], [FROM_BIG_NOTE]),
+    ]);
+    expect(await commit(rows)).toEqual({ created: 1, updated: 1, skipped: 0 });
+    const indomie = product("Indomie Goreng");
+    expect(indomie.cost).toEqual({ amount: 104010, qtyBase: 40 });
+    expect(mockDb.get().costAlerts).toEqual({
+      [indomie.id]: {
+        fromCost: { amount: 104000, qtyBase: 40 },
+        changedAt: expect.any(Number),
+        source: "impor",
+      },
+    });
+
+    expect((await check(rows)).rows).toEqual([
+      ok(3, "tidak_berubah", [], [FROM_BIG_NOTE]),
+      ok(4, "tidak_berubah", [], [FROM_BIG_NOTE]),
+    ]);
   });
 
   test("barcode bentrok: dua pemilik → nama pertama yang bukan bernama sama; barcode dobel di file (E ∪ L)", async () => {

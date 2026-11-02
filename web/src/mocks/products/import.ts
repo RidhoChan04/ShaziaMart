@@ -239,7 +239,7 @@ export function checkImport(
     if (problems.length > 0) return fix([]);
     const status = r.isNew
       ? "baru"
-      : r.changes.length > 0
+      : r.changes.length > 0 || r.costChanged
         ? "diperbarui"
         : "tidak_berubah";
     if (status !== "tidak_berubah") {

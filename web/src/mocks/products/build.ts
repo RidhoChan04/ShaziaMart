@@ -71,8 +71,13 @@ function categoryOf(
 
 export function notesOf(d: ProductDraft, newCategory: string | null): string[] {
   const notes: string[] = [];
-  if (d.cost !== null && d.bigCost !== null) {
-    notes.push("Modal eceran diabaikan — memakai modal satuan besar");
+  // Draft sudah lolos validasi: modal besar terisi berarti isi valid, jadi HPP dari satuan besar.
+  if (d.bigCost !== null) {
+    notes.push(
+      d.cost !== null
+        ? "Modal eceran diabaikan — memakai modal satuan besar"
+        : "Modal dihitung dari modal satuan besar ÷ isi",
+    );
   }
   if (newCategory !== null) notes.push(`Kategori baru: ${newCategory}`);
   return notes;
