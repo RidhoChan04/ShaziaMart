@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Galeri desain ShaziaMart</title>
+<style>
+  :root { --bg: #f6f7f5; --surface: #fff; --text: #1c2421; --muted: #5e6b65; --border: #e3e7e4; --primary: #1f7a4d; --warn: #b26b00; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 Inter, system-ui, sans-serif; }
+  main { max-width: 1100px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { margin: 0; font-size: 26px; }
+  .lead { margin: 4px 0 24px; color: var(--muted); }
+  nav { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 28px; }
+  nav a { padding: 6px 12px; border: 1px solid var(--border); border-radius: 99px; background: var(--surface); color: var(--text); text-decoration: none; font-size: 14px; }
+  section { margin-bottom: 36px; }
+  h2 { margin: 0 0 4px; font-size: 19px; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; color: var(--muted); font-size: 14px; }
+  .tag { padding: 2px 8px; border-radius: 99px; font-size: 12px; font-weight: 600; background: #e6f2ea; color: var(--primary); }
+  .tag.old { background: #fdf3e2; color: var(--warn); }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  iframe { display: block; width: 100%; border: 0; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Galeri desain ShaziaMart</h1>
+  <p class="lead">Semua mockup yang disetujui, di satu tempat. Rinciannya di <a href="specs/2026-10-17-frontend-design.html">spec frontend</a>. Angka di mockup hanya contoh; desain sebenarnya adalah aplikasinya sendiri (<code>npm run dev</code>).</p>
+
+  <nav>
+    <a href="#pemilik-beranda">Pemilik · Beranda</a>
+    <a href="#kasir-layar">Kasir · Layar utama</a>
+    <a href="#kasir-bayar">Kasir · Jendela bayar</a>
+    <a href="#kasir-curah">Kasir · Jendela curah</a>
+  </nav>
+
+  <section id="pemilik-beranda">
+    <h2>Pemilik · Beranda</h2>
+    <div class="meta"><span class="tag">Gaya Apple C4 · disetujui 2 Nov 2026</span>Spec §12b · dikerjakan di rencana G1</div>
+    <div class="card"><iframe src="specs/assets/2026-11-02-owner-c4.html" title="Mockup Beranda pemilik C4" style="height:900px"></iframe></div>
+  </section>
+
+  <section id="kasir-layar">
+    <h2>Kasir · Layar utama</h2>
+    <div class="meta"><span class="tag old">Gaya awal · akan diganti gaya macOS</span>Spec §4 · 1366×768</div>
+    <div class="card"><iframe src="specs/assets/2026-10-17-kasir-layar.html" title="Mockup layar kasir" style="height:390px"></iframe></div>
+  </section>
+
+  <section id="kasir-bayar">
+    <h2>Kasir · Jendela bayar</h2>
+    <div class="meta"><span class="tag old">Gaya awal · akan diganti gaya macOS</span>Spec §5</div>
+    <div class="card"><iframe src="specs/assets/2026-10-17-kasir-bayar.html" title="Mockup jendela bayar" style="height:460px"></iframe></div>
+  </section>
+
+  <section id="kasir-curah">
+    <h2>Kasir · Jendela curah</h2>
+    <div class="meta"><span class="tag old">Gaya awal · akan diganti gaya macOS</span>Spec §6</div>
+    <div class="card"><iframe src="specs/assets/2026-10-17-kasir-curah.html" title="Mockup jendela curah" style="height:362px"></iframe></div>
+  </section>
+</main>
+</body>
+</html>
