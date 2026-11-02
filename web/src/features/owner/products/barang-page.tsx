@@ -7,13 +7,20 @@ import {
   Search,
 } from "lucide-react";
 import { DropdownMenu } from "radix-ui";
-import { useMemo, useState } from "react";
+import {
+  useDeferredValue,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useListOwnerProducts } from "@/shared/api/gen/owner/owner";
 import { cn } from "@/shared/lib/cn";
 import { pesanError } from "@/shared/lib/error-messages";
 import { Button } from "@/shared/ui/button";
 import { categoryChips, filterProducts } from "./product-model";
-import { ProductRow } from "./product-row";
+import { ProductRow, priceColumnWidth } from "./product-row";
 
 const iconButton =
   "inline-flex size-11 shrink-0 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary";
@@ -82,11 +89,40 @@ function Chip({
   );
 }
 
+/** Lebar elemen daftar, diamati satu kali (bukan satu observer per baris). */
+function useElementWidth() {
+  const [el, setEl] = useState<HTMLElement | null>(null);
+  const [width, setWidth] = useState(0);
+  useLayoutEffect(() => {
+    if (!el) return;
+    setWidth(Math.floor(el.clientWidth));
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(([entry]) =>
+      setWidth(Math.floor(entry?.contentRect.width ?? 0)),
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [el]);
+  return [setEl, width] as const;
+}
+
 export function BarangPage() {
   const { q = "", kategori, nonaktif } = useSearch({ from: "/owner/barang" });
   const navigate = useNavigate({ from: "/owner/barang" });
   // Kolom cari memegang teksnya sendiri; URL hanya cermin (replace) agar kursor tidak melompat.
   const [text, setText] = useState(q);
+  // Sinkron dari URL (tombol kembali/maju, tautan) tanpa menimpa ketikan yang sudah tercermin.
+  const pushed = useRef<string[]>([]);
+  useEffect(() => {
+    const own = pushed.current.indexOf(q);
+    if (own >= 0) pushed.current.splice(0, own + 1);
+    else {
+      pushed.current = [];
+      setText(q);
+    }
+  }, [q]);
+  const deferredText = useDeferredValue(text);
+  const [listRef, listWidth] = useElementWidth();
   const products = useListOwnerProducts();
   const rows = products.data;
 
@@ -95,12 +131,12 @@ export function BarangPage() {
     () =>
       rows
         ? filterProducts(rows, {
-            q: text,
+            q: deferredText,
             kategori: kategori ?? null,
             nonaktif: isNonaktif,
           })
         : [],
-    [rows, text, kategori, isNonaktif],
+    [rows, deferredText, kategori, isNonaktif],
   );
   const chips = useMemo(() => (rows ? categoryChips(rows) : []), [rows]);
   const activeCount = chips.reduce((sum, c) => sum + c.count, 0);
@@ -137,6 +173,7 @@ export function BarangPage() {
             value={text}
             onChange={(e) => {
               setText(e.target.value);
+              pushed.current.push(e.target.value);
               setSearch({ q: e.target.value, kategori, nonaktif });
             }}
             className="h-11 w-full rounded-full bg-surface pr-4 pl-9 text-base shadow-sm outline-none placeholder:text-muted focus-visible:ring-2 focus-visible:ring-primary"
@@ -160,12 +197,12 @@ export function BarangPage() {
           >{`Semua ${activeCount}`}</Chip>
           {chips.map((c) => (
             <Chip
-              key={c.label}
-              active={kategori === c.label && !nonaktif}
-              onClick={() => setSearch({ q: text, kategori: c.label })}
+              key={c.key}
+              active={kategori === c.key && !nonaktif}
+              onClick={() => setSearch({ q: text, kategori: c.key })}
             >{`${c.label} ${c.count}`}</Chip>
           ))}
-          {inactiveCount > 0 && (
+          {(inactiveCount > 0 || isNonaktif) && (
             <Chip
               active={nonaktif === true}
               onClick={() => setSearch({ q: text, nonaktif: true })}
@@ -192,9 +229,18 @@ export function BarangPage() {
           Tidak ada barang yang cocok
         </p>
       ) : (
-        <ul className="overflow-hidden rounded-lg bg-surface">
+        <ul
+          ref={listRef}
+          // biome-ignore lint/a11y/noRedundantRoles: Safari/VoiceOver membuang semantik daftar bila list-style none
+          role="list"
+          className="overflow-hidden rounded-lg bg-surface"
+        >
           {visible.map((row) => (
-            <ProductRow key={row.id} row={row} />
+            <ProductRow
+              key={row.id}
+              row={row}
+              priceWidth={priceColumnWidth(listWidth)}
+            />
           ))}
         </ul>
       )}

@@ -63,3 +63,24 @@ test("FitAmount: di ukuran min teks boleh membungkus, tidak pernah dipotong", ()
   expect(el).not.toHaveClass("truncate");
   expect(el).not.toHaveClass("whitespace-nowrap");
 });
+
+test("FitAmount: width dari pemanggil dipakai tanpa membuat ResizeObserver", () => {
+  const created = vi.fn();
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      constructor() {
+        created();
+      }
+      observe() {}
+      disconnect() {}
+    },
+  );
+  render(
+    <div>
+      <FitAmount text="Rp12.345.678" max={21} min={13} width={132} />
+    </div>,
+  );
+  expect(screen.getByText("Rp12.345.678").style.fontSize).toBe("18px");
+  expect(created).not.toHaveBeenCalled();
+});

@@ -7,10 +7,12 @@ export type ProductFilter = {
   nonaktif: boolean;
 };
 
-const NO_CATEGORY = "Tanpa kategori";
+const NO_CATEGORY_LABEL = "Tanpa kategori";
+/** Kunci URL/filter untuk barang tanpa kategori; terpisah dari label agar tak bentrok dengan kategori asli bernama sama. */
+export const NO_CATEGORY_KEY = "_tanpa";
 
-const categoryLabel = (row: Pick<OwnerProductRow, "category">): string =>
-  row.category ?? NO_CATEGORY;
+const categoryKey = (row: Pick<OwnerProductRow, "category">): string =>
+  row.category ?? NO_CATEGORY_KEY;
 
 /** q: tanpa beda huruf pada nama, kode toko, dan tiap barcode; nonaktif memisahkan dua daftar. */
 export function filterProducts(
@@ -20,7 +22,7 @@ export function filterProducts(
   const q = f.q.trim().toLowerCase();
   return rows.filter((r) => {
     if ((r.status === "nonaktif") !== f.nonaktif) return false;
-    if (f.kategori !== null && categoryLabel(r) !== f.kategori) return false;
+    if (f.kategori !== null && categoryKey(r) !== f.kategori) return false;
     if (q === "") return true;
     return (
       r.name.toLowerCase().includes(q) ||
@@ -33,15 +35,19 @@ export function filterProducts(
 /** Chip kategori dari barang yang tidak nonaktif, urut abjad label. */
 export function categoryChips(
   rows: OwnerProductRow[],
-): { label: string; count: number }[] {
+): { key: string; label: string; count: number }[] {
   const counts = new Map<string, number>();
   for (const r of rows) {
     if (r.status === "nonaktif") continue;
-    const label = categoryLabel(r);
-    counts.set(label, (counts.get(label) ?? 0) + 1);
+    const key = categoryKey(r);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
   }
   return [...counts]
-    .map(([label, count]) => ({ label, count }))
+    .map(([key, count]) => ({
+      key,
+      label: key === NO_CATEGORY_KEY ? NO_CATEGORY_LABEL : key,
+      count,
+    }))
     .sort((a, b) => a.label.localeCompare(b.label, "id"));
 }
 

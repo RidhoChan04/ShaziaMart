@@ -3,6 +3,7 @@ import type { OwnerProductRow } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import {
   categoryChips,
   filterProducts,
+  NO_CATEGORY_KEY,
   productBadges,
   stockText,
 } from "./product-model";
@@ -80,16 +81,32 @@ test("filterProducts: kategori memakai label, 'Tanpa kategori' untuk null", () =
     "Minyak Goreng Bimoli 2 L",
   ]);
   expect(
-    names(filterProducts(ROWS, { ...F, kategori: "Tanpa kategori" })),
+    names(filterProducts(ROWS, { ...F, kategori: NO_CATEGORY_KEY })),
   ).toEqual(["Gula Pasir"]);
 });
 
 test("categoryChips: barang bukan-nonaktif, urut label, null → Tanpa kategori", () => {
   expect(categoryChips(ROWS)).toEqual([
-    { label: "Mi Instan", count: 1 },
-    { label: "Minyak", count: 1 },
-    { label: "Tanpa kategori", count: 1 },
+    { key: "Mi Instan", label: "Mi Instan", count: 1 },
+    { key: "Minyak", label: "Minyak", count: 1 },
+    { key: NO_CATEGORY_KEY, label: "Tanpa kategori", count: 1 },
   ]);
+});
+
+test("kategori asli bernama 'Tanpa kategori' tidak bertabrakan dengan barang tanpa kategori", () => {
+  const rows = [
+    row({ id: "a", name: "A", category: "Tanpa kategori" }),
+    row({ id: "b", name: "B", category: null }),
+  ];
+  const chips = categoryChips(rows);
+  expect(chips).toHaveLength(2);
+  expect(new Set(chips.map((c) => c.key)).size).toBe(2);
+  expect(
+    names(filterProducts(rows, { ...F, kategori: "Tanpa kategori" })),
+  ).toEqual(["A"]);
+  expect(
+    names(filterProducts(rows, { ...F, kategori: NO_CATEGORY_KEY })),
+  ).toEqual(["B"]);
 });
 
 test.each([

@@ -1,6 +1,6 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, expect, test } from "vitest";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { mockDb } from "@/mocks/db";
 import { ownerLogin } from "@/mocks/handlers/test-helpers";
 import { renderApp } from "@/test/render-app";
@@ -8,6 +8,31 @@ import { renderApp } from "@/test/render-app";
 beforeEach(async () => {
   await ownerLogin();
 });
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+/** ResizeObserver palsu yang langsung melaporkan lebar tertentu saat observe(). */
+function stubWidth(width: number) {
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      cb: ResizeObserverCallback;
+      constructor(cb: ResizeObserverCallback) {
+        this.cb = cb;
+      }
+      observe() {
+        this.cb(
+          [{ contentRect: { width } } as ResizeObserverEntry],
+          this as unknown as ResizeObserver,
+        );
+      }
+      disconnect() {}
+      unobserve() {}
+    },
+  );
+}
 
 const main = () => within(screen.getByRole("main"));
 
@@ -215,4 +240,67 @@ test("sub-halaman dibuka langsung (tanpa riwayat): kembali = tautan ke /owner/ba
   await screen.findByRole("heading", { level: 1, name: "Segera hadir" });
   const back = main().getByRole("link", { name: "Barang" });
   expect(back).toHaveAttribute("href", "/owner/barang");
+});
+
+test("harga baris mengecil bertahap (FitAmount), tidak dipotong", async () => {
+  // Lebar daftar 300 → kolom harga floor((300 - 60) x 0,38) = 91px.
+  stubWidth(300);
+  await openBarang();
+  const price = listRow("Indomie Goreng").getByText("Rp3.100/pcs");
+  expect(price.style.fontSize).toBe("13px");
+  expect(price).not.toHaveClass("truncate");
+});
+
+test("daftar barang punya role=list eksplisit (Safari membuang semantik ul tanpa bullet)", async () => {
+  await openBarang();
+  const list = main().getByRole("list");
+  expect(list.tagName).toBe("UL");
+  expect(list).toHaveAttribute("role", "list");
+});
+
+test("Menu lainnya dengan keyboard: Tab ke pemicu, Enter, ArrowDown/ArrowUp, Enter → Impor dari Excel", async () => {
+  const user = userEvent.setup();
+  const { router } = await openBarang();
+  const trigger = screen.getByRole("button", { name: "Menu lainnya" });
+  for (let i = 0; i < 10 && document.activeElement !== trigger; i++)
+    await user.tab();
+  expect(trigger).toHaveFocus();
+  await user.keyboard("{Enter}");
+  const template = await screen.findByRole("menuitem", {
+    name: "Unduh template Excel",
+  });
+  expect(template).toHaveAttribute("href", "/templates/data-barang.xlsx");
+  expect(template).toHaveAttribute("download");
+  // Radix memfokuskan butir pertama saat dibuka lewat keyboard.
+  const impor = screen.getByRole("menuitem", { name: "Impor dari Excel" });
+  expect(impor).toHaveFocus();
+  await user.keyboard("{ArrowDown}");
+  expect(template).toHaveFocus();
+  await user.keyboard("{ArrowUp}");
+  expect(impor).toHaveFocus();
+  await user.keyboard("{Enter}");
+  await waitFor(() =>
+    expect(router.state.location.pathname).toBe("/owner/barang/impor"),
+  );
+});
+
+test("chip Nonaktif tetap tampil dan tertekan saat ?nonaktif=true walau jumlahnya 0", async () => {
+  await openBarang("/owner/barang?nonaktif=true");
+  const chip = screen.getByRole("button", { name: "Nonaktif 0" });
+  expect(chip).toHaveAttribute("aria-pressed", "true");
+  expect(
+    await screen.findByText("Tidak ada barang yang cocok"),
+  ).toBeInTheDocument();
+});
+
+test("kolom cari ikut berubah saat ?q= di URL berubah tanpa remount", async () => {
+  const { router } = await openBarang("/owner/barang?q=indomie");
+  const search = screen.getByRole("searchbox", {
+    name: "Cari nama atau barcode",
+  });
+  expect(search).toHaveValue("indomie");
+  await router.navigate({ to: "/owner/barang", search: { q: "bimoli" } });
+  await waitFor(() => expect(search).toHaveValue("bimoli"));
+  await router.navigate({ to: "/owner/barang" });
+  await waitFor(() => expect(search).toHaveValue(""));
 });

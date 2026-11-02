@@ -20,17 +20,21 @@ export function FitAmount({
   text,
   max,
   min,
+  width: givenWidth,
   className,
 }: {
   text: string;
   max: number;
   min: number;
+  /** Lebar tersedia yang sudah diketahui pemanggil (0 = belum terukur); tanpa ini FitAmount mengukur induknya sendiri. */
+  width?: number;
   className?: string;
 }) {
   const ref = useRef<HTMLSpanElement>(null);
   const [width, setWidth] = useState(0);
   // Ukur sebelum dilukis agar frame pertama tidak sempat memakai ukuran max.
   useLayoutEffect(() => {
+    if (givenWidth !== undefined) return;
     const parent = ref.current?.parentElement;
     if (!parent) return;
     setWidth(Math.floor(contentWidth(parent)));
@@ -40,9 +44,9 @@ export function FitAmount({
     );
     observer.observe(parent);
     return () => observer.disconnect();
-  }, []);
+  }, [givenWidth]);
 
-  const size = fitFontSize(text, width, { max, min });
+  const size = fitFontSize(text, givenWidth ?? width, { max, min });
   return (
     <span
       ref={ref}
