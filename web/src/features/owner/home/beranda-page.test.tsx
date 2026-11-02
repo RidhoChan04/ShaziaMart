@@ -32,6 +32,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.unstubAllGlobals();
   vi.useRealTimers();
 });
 
@@ -114,21 +115,61 @@ test("omzet, perbandingan, grafik, tile, dan perlu perhatian tampil dari mock", 
   expect(screen.queryByText("Semua aman hari ini")).not.toBeInTheDocument();
 });
 
-test("omzet >= Rp100 jt di pita: satu baris, tidak meluber", async () => {
+/** ResizeObserver palsu yang langsung melaporkan lebar tertentu saat observe(). */
+function stubWidth(width: number) {
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      cb: ResizeObserverCallback;
+      constructor(cb: ResizeObserverCallback) {
+        this.cb = cb;
+      }
+      observe() {
+        this.cb(
+          [{ contentRect: { width } } as ResizeObserverEntry],
+          this as unknown as ResizeObserver,
+        );
+      }
+      disconnect() {}
+      unobserve() {}
+    },
+  );
+}
+
+test("omzet sangat besar di pita: ukuran huruf turun (30px di 296px), tidak dipotong", async () => {
   server.use(
     http.get("/api/owner/summary/today", () =>
       HttpResponse.json({
         ...ownerTodaySummary(mockDb.get(), Date.now()),
-        revenue: 123_456_789,
+        revenue: 123_456_789_012,
       }),
     ),
   );
+  stubWidth(296);
   await ownerLogin();
   renderApp("/owner");
-  const amount = await screen.findByText("Rp123.456.789");
-  // truncate = nowrap + overflow hidden + ellipsis; min-w-0 agar bisa menyusut di flex/grid.
-  expect(amount).toHaveClass("num", "truncate");
-  expect(amount.parentElement).toHaveClass("min-w-0");
+  const amount = await screen.findByText("Rp123.456.789.012");
+  expect(amount).toHaveClass("num");
+  expect(amount).not.toHaveClass("truncate");
+  expect(amount.style.fontSize).toBe("30px");
+});
+
+test("tile Laba kotor Rp12.345.678 tidak memakai truncate dan font-size < 21px", async () => {
+  server.use(
+    http.get("/api/owner/summary/today", () =>
+      HttpResponse.json({
+        ...ownerTodaySummary(mockDb.get(), Date.now()),
+        grossProfit: 12_345_678,
+      }),
+    ),
+  );
+  stubWidth(132);
+  await ownerLogin();
+  renderApp("/owner");
+  const amount = await screen.findByText("Rp12.345.678");
+  expect(amount).not.toHaveClass("truncate");
+  expect(Number.parseInt(amount.style.fontSize, 10)).toBeLessThan(21);
+  expect(amount.style.fontSize).toBe("18px");
 });
 
 test("tanpa penjualan dan tanpa perhatian: belum ada pembanding dan semua aman", async () => {
@@ -224,7 +265,9 @@ test("kunci query memuat tanggal bisnis; ganti hari → kunci baru", async () =>
   await vi.waitFor(() => expect(has("2026-10-17")).toBe(true));
   expect(has("2026-10-18")).toBe(false);
   await vi.waitFor(() =>
-    expect(screen.getByText("Rp36.000", { selector: "p" })).toBeInTheDocument(),
+    expect(
+      screen.getByText("Rp36.000", { selector: "p > span" }),
+    ).toBeInTheDocument(),
   );
 
   await act(() => vi.advanceTimersByTimeAsync(1000));

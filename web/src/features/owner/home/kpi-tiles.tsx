@@ -1,5 +1,6 @@
 import type { OwnerTodaySummary } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { formatRupiah } from "@/shared/lib/money";
+import { FitAmount } from "../common/fit-amount";
 
 export function KpiTiles({ summary }: { summary: OwnerTodaySummary }) {
   const tiles = [
@@ -15,7 +16,9 @@ export function KpiTiles({ summary }: { summary: OwnerTodaySummary }) {
           <dt className="truncate text-[13px] font-semibold text-muted">
             {label}
           </dt>
-          <dd className="num truncate text-[21px] font-bold">{value}</dd>
+          <dd className="font-bold">
+            <FitAmount text={value} max={21} min={13} className="num" />
+          </dd>
         </div>
       ))}
     </dl>

@@ -10,6 +10,7 @@ import { cn } from "@/shared/lib/cn";
 import { pesanError } from "@/shared/lib/error-messages";
 import { formatRupiah } from "@/shared/lib/money";
 import { Button } from "@/shared/ui/button";
+import { FitAmount } from "../common/fit-amount";
 import { AttentionList } from "./attention-list";
 import { comparisonText } from "./home-model";
 import { HourlyChart } from "./hourly-chart";
@@ -34,9 +35,14 @@ function RevenueCard({
     <div className="min-w-0 overflow-hidden rounded-lg bg-surface">
       <div className="min-w-0 bg-linear-155 from-primary to-primary-deep px-4 pt-4 pb-3.5 text-primary-foreground">
         <p className="text-[13px] font-semibold">Omzet hari ini</p>
-        {/* Satu baris: angka panjang dipotong, bukan meluber dari kartu. */}
-        <p className="num mt-0.5 truncate text-[34px] leading-tight font-bold tracking-[-0.03em]">
-          {formatRupiah(summary.revenue)}
+        {/* Angka panjang mengecil (34 → 22px) agar muat, tidak dipotong. */}
+        <p className="mt-0.5 leading-tight font-bold tracking-[-0.03em]">
+          <FitAmount
+            text={formatRupiah(summary.revenue)}
+            max={34}
+            min={22}
+            className="num"
+          />
         </p>
         <p className="mt-2">
           <span className="inline-flex rounded-full bg-primary-foreground/12 px-2.5 py-1 text-[13px] font-semibold">
