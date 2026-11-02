@@ -57,6 +57,33 @@ export function formatApproxKg(gram: number, unit: "kg" | "L" = "kg"): string {
   return `≈ ${formatGram(gram, unit)}`;
 }
 
+function groupDigits(whole: number): string {
+  return String(whole).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+}
+
+/**
+ * Jumlah dasar dalam satuan tampilan: `86500, 1000, "kg"` -> `86,5 kg`.
+ * Minus memakai U+2212; maks. 3 desimal (setengah ke atas).
+ */
+export function formatQty(
+  qtyBase: number,
+  unitSize: number,
+  unitName: string,
+): string {
+  assertNonNegativeInteger(Math.abs(qtyBase), "Jumlah");
+  const abs = Math.abs(qtyBase);
+  let whole = Math.floor(abs / unitSize);
+  let thousandths = roundHalfUp((abs - whole * unitSize) * 1000, unitSize);
+  if (thousandths === 1000) {
+    whole += 1;
+    thousandths = 0;
+  }
+  const frac = String(thousandths).padStart(3, "0").replace(/0+$/, "");
+  const sign = qtyBase < 0 ? "−" : "";
+  const number = frac ? `${groupDigits(whole)},${frac}` : groupDigits(whole);
+  return `${sign}${number} ${unitName}`;
+}
+
 /** Subtotal baris: `roundHalfUp(price x qtyBase, unitSize)`. */
 export function lineSubtotal(
   price: number,

@@ -2,6 +2,7 @@ import { expect, test } from "vitest";
 import {
   formatApproxKg,
   formatGram,
+  formatQty,
   lineSubtotal,
   parseKg,
   qtyBaseFromAmount,
@@ -65,3 +66,16 @@ test("roundHalfUp menolak input tidak valid", () => {
 test("lineSubtotal melempar RangeError bila di luar batas aman", () => {
   expect(() => lineSubtotal(9007199254740991, 2, 1)).toThrow(RangeError);
 });
+
+test.each([
+  [86500, 1000, "kg", "86,5 kg"],
+  [-2500, 1000, "kg", "−2,5 kg"],
+  [4, 1, "pcs", "4 pcs"],
+  [2500, 100, "ons", "25 ons"],
+  [0, 1000, "kg", "0 kg"],
+  [1234567, 1, "pcs", "1.234.567 pcs"],
+  [1, 1000, "kg", "0,001 kg"],
+  [1500, 1000, "liter", "1,5 liter"],
+])("formatQty(%i, %i, %s) = %s", (q, size, unit, text) =>
+  expect(formatQty(q, size, unit)).toBe(text),
+);
