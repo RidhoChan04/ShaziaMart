@@ -55,6 +55,20 @@ test("Beranda menampilkan omzet, grafik, empat tile, dan perlu perhatian", async
   expect(scrollWidth).toBeLessThanOrEqual(page.viewportSize()?.width ?? 0);
 });
 
+test("ikon Perlu perhatian berglif putih di atas kotak berwarna", async ({
+  page,
+}) => {
+  await loginOwner(page);
+  const box = page
+    .getByRole("region", { name: "Perlu perhatian" })
+    .getByRole("listitem")
+    .first()
+    .locator("span[aria-hidden='true']")
+    .first();
+  await expect(box).toBeVisible();
+  await expect(box).toHaveCSS("color", "rgb(255, 255, 255)");
+});
+
 test("butir terakhir Perlu perhatian bisa digulir penuh di atas tab bar", async ({
   page,
 }, info) => {

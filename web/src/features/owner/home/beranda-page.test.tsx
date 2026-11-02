@@ -101,14 +101,14 @@ test("omzet, perbandingan, grafik, tile, dan perlu perhatian tampil dari mock", 
     screen.getByRole("heading", { name: "Perlu perhatian" }),
   ).toBeInTheDocument();
   expect(
-    screen.getByRole("link", { name: /^Stok menipis\s*7 barang$/ }),
+    screen.getByRole("link", { name: /^Stok menipis\s7 barang$/ }),
   ).toHaveAttribute("href", "/owner/barang");
   expect(
-    screen.getByRole("link", { name: /^Selisih kas -Rp5\.000\s*Shift Rina$/ }),
+    screen.getByRole("link", { name: /^Selisih kas -Rp5\.000\sShift Rina$/ }),
   ).toHaveAttribute("href", "/owner/lainnya");
   expect(
     screen.getByRole("link", {
-      name: /^Kasbon > 30 hari\s*\d+ pelanggan · Rp[\d.]+$/,
+      name: /^Kasbon > 30 hari\s\d+ pelanggan · Rp[\d.]+$/,
     }),
   ).toHaveAttribute("href", "/owner/kasbon");
   expect(screen.queryByText("Semua aman hari ini")).not.toBeInTheDocument();

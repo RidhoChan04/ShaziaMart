@@ -40,7 +40,7 @@ export function AttentionList({ attention }: { attention: Attention }) {
             return (
               <li
                 key={key}
-                className="relative [&:not(:first-child)]:before:absolute [&:not(:first-child)]:before:inset-x-0 [&:not(:first-child)]:before:top-0 [&:not(:first-child)]:before:left-14 [&:not(:first-child)]:before:border-t [&:not(:first-child)]:before:border-border"
+                className="relative [&:not(:first-child)]:before:absolute [&:not(:first-child)]:before:inset-x-0 [&:not(:first-child)]:before:top-0 [&:not(:first-child)]:before:left-[58px] [&:not(:first-child)]:before:border-t [&:not(:first-child)]:before:border-border"
               >
                 <Link
                   to={to}
@@ -49,14 +49,14 @@ export function AttentionList({ attention }: { attention: Attention }) {
                   <span
                     aria-hidden="true"
                     className={cn(
-                      "grid size-[30px] shrink-0 place-items-center rounded-[8px] text-white",
+                      "grid size-[30px] shrink-0 place-items-center rounded-[8px] text-primary-foreground",
                       tone === "critical" ? "bg-danger" : "bg-warning",
                     )}
                   >
                     <Icon className="size-[18px]" strokeWidth={2} />
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block text-base">{title}</span>
+                    <span className="block text-base">{title}</span>{" "}
                     <span className="block truncate text-[13px] text-muted">
                       {detail}
                     </span>
