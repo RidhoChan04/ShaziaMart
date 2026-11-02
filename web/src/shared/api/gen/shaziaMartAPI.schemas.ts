@@ -532,7 +532,7 @@ export interface OwnerProduct {
   /** Stok dalam qtyBase. */
   stock: number;
   /**
-     * Batas stok menipis dalam qtyBase; null = tanpa batas.
+     * Batas stok menipis dalam qtyBase (satuan dasar); null = tanpa batas.
      * @nullable
      */
   minStock: number | null;
@@ -562,7 +562,10 @@ export interface BigUnitInput {
      * @minimum 2
      */
   size: number;
-  /** @nullable */
+  /**
+     * EAN-13, UPC-A, EAN-8, atau GTIN-14 (ITF-14 di dus); check digit GS1 mod-10; unik di semua satuan semua barang termasuk nonaktif.
+     * @nullable
+     */
   barcode: string | null;
   /**
      * @minimum 0
@@ -591,7 +594,10 @@ export interface ProductInput {
      * @maxLength 20
      */
   sellUnit: string;
-  /** @nullable */
+  /**
+     * EAN-13, UPC-A, EAN-8, atau GTIN-14 (ITF-14 di dus); check digit GS1 mod-10; unik di semua satuan semua barang termasuk nonaktif.
+     * @nullable
+     */
   barcode: string | null;
   /**
      * Modal eceran; diabaikan bila bigUnit.cost terisi.
@@ -603,7 +609,10 @@ export interface ProductInput {
   price: number;
   tier: WholesaleTier | null;
   bigUnit: BigUnitInput | null;
-  /** @nullable */
+  /**
+     * dalam satuan eceran; ≥ 0; untuk pcs harus bulat; server mengonversi ke qtyBase
+     * @nullable
+     */
   minStock: number | null;
 }
 
@@ -686,7 +695,10 @@ export interface ImportRow {
   category: string | null;
   /** @nullable */
   sellUnit: string | null;
-  /** @nullable */
+  /**
+     * EAN-13, UPC-A, EAN-8, atau GTIN-14 (ITF-14 di dus); check digit GS1 mod-10; unik di semua satuan semua barang termasuk nonaktif.
+     * @nullable
+     */
   barcode: string | null;
   /** @nullable */
   cost: string | null;
@@ -700,7 +712,10 @@ export interface ImportRow {
   bigName: string | null;
   /** @nullable */
   bigSize: string | null;
-  /** @nullable */
+  /**
+     * EAN-13, UPC-A, EAN-8, atau GTIN-14 (ITF-14 di dus); check digit GS1 mod-10; unik di semua satuan semua barang termasuk nonaktif.
+     * @nullable
+     */
   bigBarcode: string | null;
   /** @nullable */
   bigCost: string | null;

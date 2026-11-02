@@ -557,6 +557,7 @@ export const getCreateOwnerProductUrl = () => {
 
 /**
  * Barang baru dimulai dengan stok 0, stockCounted false, status aktif.
+ * Batas min/max di skema adalah panduan klien; server selalu memvalidasi isi mentah dan mengembalikan ProductValidationFailed dengan pesan per field.
  * @summary Tambah barang
  */
 export const createOwnerProduct = async (productInput: ProductInput, options?: Parameters<typeof customFetch>[1]): Promise<OwnerProduct> => {
@@ -746,6 +747,7 @@ export const getUpdateOwnerProductUrl = (productId: string,) => {
 /**
  * Field null menghapus nilainya. Barang yang sudah terjual: 'Dijual per' dan isi satuan
  * yang sudah terjual dikunci (422); satuan besar terjual yang diganti dinonaktifkan.
+ * Batas min/max di skema adalah panduan klien; server selalu memvalidasi isi mentah dan mengembalikan ProductValidationFailed dengan pesan per field.
  * @summary Ubah barang
  */
 export const updateOwnerProduct = async (productId: string,

@@ -521,7 +521,9 @@ paths:
       tags: [owner]
       operationId: createOwnerProduct
       summary: Tambah barang
-      description: Barang baru dimulai dengan stok 0, stockCounted false, status aktif.
+      description: |
+        Barang baru dimulai dengan stok 0, stockCounted false, status aktif.
+        Batas min/max di skema adalah panduan klien; server selalu memvalidasi isi mentah dan mengembalikan ProductValidationFailed dengan pesan per field.
       security:
         - ownerCookieAuth: []
       requestBody:
@@ -568,6 +570,7 @@ paths:
       description: |
         Field null menghapus nilainya. Barang yang sudah terjual: 'Dijual per' dan isi satuan
         yang sudah terjual dikunci (422); satuan besar terjual yang diganti dinonaktifkan.
+        Batas min/max di skema adalah panduan klien; server selalu memvalidasi isi mentah dan mengembalikan ProductValidationFailed dengan pesan per field.
       security:
         - ownerCookieAuth: []
       parameters:
@@ -1431,7 +1434,7 @@ components:
         minStock:
           type: integer
           nullable: true
-          description: Batas stok menipis dalam qtyBase; null = tanpa batas.
+          description: Batas stok menipis dalam qtyBase (satuan dasar); null = tanpa batas.
         stockAlert:
           $ref: "#/components/schemas/StockAlert"
         hasSales:
@@ -1535,6 +1538,7 @@ components:
         barcode:
           type: string
           nullable: true
+          description: "EAN-13, UPC-A, EAN-8, atau GTIN-14 (ITF-14 di dus); check digit GS1 mod-10; unik di semua satuan semua barang termasuk nonaktif."
         cost:
           type: integer
           nullable: true
@@ -1554,6 +1558,7 @@ components:
         minStock:
           type: number
           nullable: true
+          description: "dalam satuan eceran; ≥ 0; untuk pcs harus bulat; server mengonversi ke qtyBase"
     BigUnitInput:
       type: object
       required: [unitId, name, size, barcode, cost, price]
@@ -1571,6 +1576,7 @@ components:
         barcode:
           type: string
           nullable: true
+          description: "EAN-13, UPC-A, EAN-8, atau GTIN-14 (ITF-14 di dus); check digit GS1 mod-10; unik di semua satuan semua barang termasuk nonaktif."
         cost:
           type: integer
           nullable: true
@@ -1655,6 +1661,7 @@ components:
         barcode:
           type: string
           nullable: true
+          description: "EAN-13, UPC-A, EAN-8, atau GTIN-14 (ITF-14 di dus); check digit GS1 mod-10; unik di semua satuan semua barang termasuk nonaktif."
         cost:
           type: string
           nullable: true
@@ -1676,6 +1683,7 @@ components:
         bigBarcode:
           type: string
           nullable: true
+          description: "EAN-13, UPC-A, EAN-8, atau GTIN-14 (ITF-14 di dus); check digit GS1 mod-10; unik di semua satuan semua barang termasuk nonaktif."
         bigCost:
           type: string
           nullable: true

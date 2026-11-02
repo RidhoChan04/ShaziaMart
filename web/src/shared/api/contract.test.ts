@@ -4,10 +4,14 @@ import type {
   Attention,
   CostChangeItem,
   CreditLimitProblem,
+  ImportRowResult,
+  OwnerProduct,
+  OwnerProductRow,
   OwnerProductUnit,
   OwnerTodaySummary,
   PriceChangedProblem,
   Product,
+  ProductInput,
   StockOutItem,
 } from "./gen/shaziaMartAPI.schemas";
 import { ErrorCode } from "./gen/shaziaMartAPI.schemas";
@@ -182,6 +186,79 @@ test("UpdateOwnerProductPricesBody menolak lines kosong dan harga 0", () => {
 test("Attention memuat costChanges dan stockOuts", () => {
   expectTypeOf<Attention["costChanges"]>().toEqualTypeOf<CostChangeItem[]>();
   expectTypeOf<Attention["stockOuts"]>().toEqualTypeOf<StockOutItem[]>();
+});
+
+test("bentuk OwnerProduct, OwnerProductRow, ProductInput, ImportRowResult: key lengkap & semua wajib", () => {
+  expectTypeOf<keyof OwnerProduct>().toEqualTypeOf<
+    | "id"
+    | "name"
+    | "storeCode"
+    | "category"
+    | "status"
+    | "scarce"
+    | "stockCounted"
+    | "isCurah"
+    | "baseUnit"
+    | "units"
+    | "cost"
+    | "stock"
+    | "minStock"
+    | "stockAlert"
+    | "hasSales"
+    | "costAlert"
+    | "recentMovements"
+    | "priceHistory"
+  >();
+  expectTypeOf<Required<OwnerProduct>>().toEqualTypeOf<OwnerProduct>();
+  expectTypeOf<keyof OwnerProductRow>().toEqualTypeOf<
+    | "id"
+    | "name"
+    | "storeCode"
+    | "category"
+    | "status"
+    | "scarce"
+    | "stockCounted"
+    | "isCurah"
+    | "baseUnit"
+    | "unitName"
+    | "unitSize"
+    | "price"
+    | "barcodes"
+    | "stock"
+    | "stockAlert"
+  >();
+  expectTypeOf<Required<OwnerProductRow>>().toEqualTypeOf<OwnerProductRow>();
+  expectTypeOf<keyof ProductInput>().toEqualTypeOf<
+    | "name"
+    | "category"
+    | "sellUnit"
+    | "barcode"
+    | "cost"
+    | "price"
+    | "tier"
+    | "bigUnit"
+    | "minStock"
+  >();
+  expectTypeOf<Required<ProductInput>>().toEqualTypeOf<ProductInput>();
+  expectTypeOf<keyof ImportRowResult>().toEqualTypeOf<
+    "row" | "status" | "problems" | "changes" | "notes"
+  >();
+  expectTypeOf<Required<ImportRowResult>>().toEqualTypeOf<ImportRowResult>();
+});
+
+test("deskripsi barcode (K3) dan minStock ada di skema zod", () => {
+  const barcode =
+    "EAN-13, UPC-A, EAN-8, atau GTIN-14 (ITF-14 di dus); check digit GS1 mod-10; unik di semua satuan semua barang termasuk nonaktif.";
+  const input = CreateOwnerProductBody.shape;
+  const big = input.bigUnit.options[0];
+  const row = CheckOwnerProductImportBody.shape.rows.element.shape;
+  expect(input.barcode.description).toBe(barcode);
+  expect(big.shape.barcode.description).toBe(barcode);
+  expect(row.barcode.description).toBe(barcode);
+  expect(row.bigBarcode.description).toBe(barcode);
+  expect(input.minStock.description).toBe(
+    "dalam satuan eceran; ≥ 0; untuk pcs harus bulat; server mengonversi ke qtyBase",
+  );
 });
 
 test("OwnerLogin menolak nama kosong dan password kosong", () => {
