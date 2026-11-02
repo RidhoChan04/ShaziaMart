@@ -3,6 +3,7 @@ import type {
   ImportCheck,
   ImportResult,
   ImportRow,
+  OwnerProduct,
   OwnerTodaySummary,
   Problem,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
@@ -338,6 +339,33 @@ describe("impor barang", () => {
       ok(3, "tidak_berubah", [], [FROM_BIG_NOTE]),
       ok(4, "tidak_berubah", [], [FROM_BIG_NOTE]),
     ]);
+
+    // C12: butir tampil di Beranda walau modal eceran terbulatkan sama; detail sepakat.
+    const [item, ...others] = await costChanges();
+    expect(others).toEqual([]);
+    expect(item).toMatchObject({
+      productId: indomie.id,
+      oldCost: 2600,
+      newCost: 2600,
+      source: "impor",
+    });
+    const detail = await json<OwnerProduct>(
+      await fetch(`/api/owner/products/${indomie.id}`),
+    );
+    expect(detail.costAlert).toEqual({
+      fromCost: { amount: 104000, qtyBase: 40 },
+      changedAt: item?.changedAt,
+      source: "impor",
+    });
+
+    // Modal kembali ke semula → butir dihapus, tidak tampil di mana pun.
+    await commit([importRow(3, { name: "Indomie Goreng", bigCost: "104000" })]);
+    expect(mockDb.get().costAlerts).toEqual({});
+    expect(await costChanges()).toEqual([]);
+    const back = await json<OwnerProduct>(
+      await fetch(`/api/owner/products/${indomie.id}`),
+    );
+    expect(back.costAlert).toBeNull();
   });
 
   test("barcode bentrok: dua pemilik → nama pertama yang bukan bernama sama; barcode dobel di file (E ∪ L)", async () => {

@@ -19,6 +19,7 @@ import {
   otherUnits,
   uniqueErrors,
 } from "./checks";
+import { sameCost } from "./cost-alert";
 import { draftFromProduct } from "./drafts";
 import { soldUnitIds } from "./views";
 
@@ -42,15 +43,6 @@ export type ApplyOk = {
   minStock: number | null;
 };
 export type ApplyResult = ApplyOk | { ok: false; errors: FieldError[] };
-
-/** Rasio HPP sama (amount/qtyBase), bukan bentuk penulisannya. */
-export function sameCost(
-  a: ProductCost | null,
-  b: ProductCost | null,
-): boolean {
-  if (a === null || b === null) return a === b;
-  return a.amount * b.qtyBase === b.amount * a.qtyBase;
-}
 
 function mergeDraft(draft: ProductDraft, old: ProductDraft): ProductDraft {
   const out = { ...old };

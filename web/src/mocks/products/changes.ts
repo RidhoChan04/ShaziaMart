@@ -7,6 +7,7 @@ import { formatRupiah } from "@/shared/lib/money";
 import { activeBigUnit, unitCost } from "@/shared/lib/product-rules";
 import { formatQty } from "@/shared/lib/quantity";
 import type { MockProduct, MockUnit } from "../db";
+import { sameCost } from "./cost-alert";
 import { eceranOf } from "./views";
 
 const NONE = "—";
@@ -41,8 +42,7 @@ function facts(p: MockProduct, minStock: number | null): string[] {
 function exactCostChange(before: MockProduct, after: MockProduct): string[] {
   const a = before.cost;
   const b = after.cost;
-  if (a === null || b === null || a.amount * b.qtyBase === b.amount * a.qtyBase)
-    return [];
+  if (a === null || b === null || sameCost(a, b)) return [];
   for (const size of [b.qtyBase, a.qtyBase]) {
     const from = unitCost(a, size);
     const to = unitCost(b, size);

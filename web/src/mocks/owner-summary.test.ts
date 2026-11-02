@@ -6,7 +6,7 @@ import type {
 import { businessDay, DAY_MS, HOUR_MS } from "@/shared/lib/business-day";
 import type { MockSale, MockState } from "./db";
 import { ownerTodaySummary } from "./owner-summary";
-import { stockAlertOf } from "./products/views";
+import { stockAlertOf, toOwnerProduct } from "./products/views";
 import { formatSaleNumber } from "./sale-number";
 import { createSeedState } from "./seed-data";
 
@@ -210,7 +210,7 @@ describe("Perlu perhatian: stok (K5), modal berubah, dan habis", () => {
     expect(stockAlertOf(s, p)).toBe("none");
   });
 
-  test("costChanges: modal eceran lama → baru, terbaru dulu; modal eceran sama atau kosong dilewati", () => {
+  test("costChanges: modal eceran lama → baru, terbaru dulu; HPP sama (rasio) atau kosong dilewati", () => {
     const s = fresh();
     const named = (name: string) => {
       const p = s.products.find((x) => x.name === name);
@@ -233,7 +233,7 @@ describe("Perlu perhatian: stok (K5), modal berubah, dan habis", () => {
       changedAt: NOW - HOUR_MS,
       source: "impor",
     };
-    // Peringatan dengan modal eceran sama (Beras) atau modal kosong (Kopi) tidak tampil.
+    // Peringatan dengan HPP sama (Beras) atau modal kosong (Kopi) tidak tampil.
     beras.cost = { amount: 71000, qtyBase: 1 };
     s.costAlerts[beras.id] = {
       fromCost: { amount: 71000, qtyBase: 1 },
@@ -268,10 +268,21 @@ describe("Perlu perhatian: stok (K5), modal berubah, dan habis", () => {
         source: "pemilik",
       },
     ]);
+    // C12: HPP berbeda walau modal eceran terbulatkan sama → tetap tampil, sama dengan detail.
     indomie.cost = { amount: 104010, qtyBase: 40 };
-    expect(
-      ownerTodaySummary(s, NOW).attention.costChanges.map((c) => c.productName),
-    ).toEqual(["Gula Pasir"]);
+    const shown = () =>
+      ownerTodaySummary(s, NOW).attention.costChanges.map((c) => c.productName);
+    expect(shown()).toEqual(["Gula Pasir", "Indomie Goreng"]);
+    expect(toOwnerProduct(s, indomie).costAlert).toEqual(
+      s.costAlerts[indomie.id],
+    );
+    // Rasio sama dengan fromCost dalam bentuk lain ({2600,1} = {104000,40}) → tidak tampil di mana pun.
+    indomie.cost = { amount: 2600, qtyBase: 1 };
+    expect(shown()).toEqual(["Gula Pasir"]);
+    expect(toOwnerProduct(s, indomie).costAlert).toBeNull();
+    expect(toOwnerProduct(s, beras).costAlert).toBeNull();
+    expect(toOwnerProduct(s, kopi).costAlert).toBeNull();
+    expect(toOwnerProduct(s, gula).costAlert).toEqual(s.costAlerts[gula.id]);
   });
 
   test("stockOuts: tidak_diambil, sudah dihitung, stok ≤ 0; urut nama", () => {

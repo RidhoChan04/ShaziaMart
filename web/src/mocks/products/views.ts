@@ -7,6 +7,7 @@ import type {
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { unitCost } from "@/shared/lib/product-rules";
 import type { MockProduct, MockState, MockUnit } from "../db";
+import { meaningfulCostAlert } from "./cost-alert";
 
 const RECENT_MOVEMENTS = 5;
 
@@ -145,7 +146,7 @@ export function toOwnerProduct(
     minStock: state.minStock[p.id] ?? null,
     stockAlert: stockAlertOf(state, p),
     hasSales: p.units.some((u) => sold.has(u.id)),
-    costAlert: state.costAlerts[p.id] ?? null,
+    costAlert: meaningfulCostAlert(state, p),
     recentMovements: movementsOf(state, p.id).slice(0, RECENT_MOVEMENTS),
     priceHistory: state.priceHistory
       .filter((e) => e.productId === p.id)

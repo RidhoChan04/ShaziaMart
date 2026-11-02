@@ -15,6 +15,7 @@ import { unitCost } from "@/shared/lib/product-rules";
 import { roundHalfUp } from "@/shared/lib/quantity";
 import type { MockState } from "./db";
 import { oldestUnpaidAt } from "./ledger";
+import { meaningfulCostAlert } from "./products/cost-alert";
 import { eceranOf, stockAlertOf } from "./products/views";
 
 const WEEKDAYS = [
@@ -70,17 +71,16 @@ function attention(state: Readonly<MockState>, now: number): Attention {
   };
 }
 
-/** Butir modal berubah: modal eceran saat butir dibuat → sekarang; sama atau kosong → tidak tampil. */
+/** Butir modal berubah (C12, sama dengan detail): modal eceran saat butir dibuat → sekarang. */
 function costChanges(state: Readonly<MockState>): CostChangeItem[] {
   return state.products
     .flatMap((p): CostChangeItem[] => {
-      const alert = state.costAlerts[p.id];
-      if (!alert) return [];
+      const alert = meaningfulCostAlert(state, p);
+      if (alert === null) return [];
       const eceran = eceranOf(p);
       const oldCost = unitCost(alert.fromCost, eceran.unitSize);
       const newCost = unitCost(p.cost, eceran.unitSize);
-      if (oldCost === null || newCost === null || oldCost === newCost)
-        return [];
+      if (oldCost === null || newCost === null) return [];
       return [
         {
           productId: p.id,
