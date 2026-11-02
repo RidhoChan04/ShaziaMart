@@ -92,6 +92,8 @@ describe("attentionItems", () => {
     negativeStockCount: 0,
     cashDifferences: [],
     overdueCredit: { count: 0, total: 0 },
+    costChanges: [],
+    stockOuts: [],
   };
 
   test("semua nol -> kosong", () => expect(attentionItems(none)).toEqual([]));
@@ -105,6 +107,8 @@ describe("attentionItems", () => {
         { shiftId: "s2", kasirName: "Budi", closedAt: 2, difference: 2500 },
       ],
       overdueCredit: { count: 2, total: 1250000 },
+      costChanges: [],
+      stockOuts: [],
     };
     expect(attentionItems(a)).toEqual([
       {

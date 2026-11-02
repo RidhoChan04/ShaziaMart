@@ -12,6 +12,7 @@
  * Endpoint pemilik berada di bawah /api/owner dengan realm cookie terpisah total dari kasir:
  * owner_session (berlaku 30 hari). Sesi kasir tidak berlaku di sana dan sebaliknya.
  * HPP dan laba hanya muncul di endpoint /api/owner; endpoint kasir tidak pernah memuatnya.
+ * Data barang: kategori, status, stok, dan modal hanya di /api/owner.
  * Hari bisnis memakai zona Asia/Jakarta.
  *
  * OpenAPI spec version: 0.1.0
@@ -36,6 +37,7 @@ import type {
   LookupCatalogParams,
   NotFoundResponse,
   Problem,
+  ProductInactiveResponse,
   SearchCatalogParams
 } from '../shaziaMartAPI.schemas';
 
@@ -78,6 +80,8 @@ export const getLookupCatalogUrl = (params: LookupCatalogParams,) => {
 }
 
 /**
+ * PRODUCT_INACTIVE (410) bila kode cocok dengan barang nonaktif atau satuan nonaktif.
+ * Penjualan yang sudah ada di keranjang tetap diterima createSale.
  * @summary Cari satu barang dari barcode atau kode toko
  */
 export const lookupCatalog = async (params: LookupCatalogParams, options?: Parameters<typeof customFetch>[1]): Promise<CatalogMatch> => {
@@ -102,7 +106,7 @@ export const getLookupCatalogQueryKey = (params?: LookupCatalogParams,) => {
     }
 
 
-export const getLookupCatalogQueryOptions = <TData = Awaited<ReturnType<typeof lookupCatalog>>, TError = ErrorType<NotFoundResponse | Problem>>(params: LookupCatalogParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof lookupCatalog>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+export const getLookupCatalogQueryOptions = <TData = Awaited<ReturnType<typeof lookupCatalog>>, TError = ErrorType<NotFoundResponse | ProductInactiveResponse | Problem>>(params: LookupCatalogParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof lookupCatalog>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -121,10 +125,10 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type LookupCatalogQueryResult = NonNullable<Awaited<ReturnType<typeof lookupCatalog>>>
-export type LookupCatalogQueryError = ErrorType<NotFoundResponse | Problem>
+export type LookupCatalogQueryError = ErrorType<NotFoundResponse | ProductInactiveResponse | Problem>
 
 
-export function useLookupCatalog<TData = Awaited<ReturnType<typeof lookupCatalog>>, TError = ErrorType<NotFoundResponse | Problem>>(
+export function useLookupCatalog<TData = Awaited<ReturnType<typeof lookupCatalog>>, TError = ErrorType<NotFoundResponse | ProductInactiveResponse | Problem>>(
  params: LookupCatalogParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof lookupCatalog>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof lookupCatalog>>,
@@ -134,7 +138,7 @@ export function useLookupCatalog<TData = Awaited<ReturnType<typeof lookupCatalog
       >, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useLookupCatalog<TData = Awaited<ReturnType<typeof lookupCatalog>>, TError = ErrorType<NotFoundResponse | Problem>>(
+export function useLookupCatalog<TData = Awaited<ReturnType<typeof lookupCatalog>>, TError = ErrorType<NotFoundResponse | ProductInactiveResponse | Problem>>(
  params: LookupCatalogParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof lookupCatalog>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof lookupCatalog>>,
@@ -144,7 +148,7 @@ export function useLookupCatalog<TData = Awaited<ReturnType<typeof lookupCatalog
       >, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useLookupCatalog<TData = Awaited<ReturnType<typeof lookupCatalog>>, TError = ErrorType<NotFoundResponse | Problem>>(
+export function useLookupCatalog<TData = Awaited<ReturnType<typeof lookupCatalog>>, TError = ErrorType<NotFoundResponse | ProductInactiveResponse | Problem>>(
  params: LookupCatalogParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof lookupCatalog>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
@@ -152,7 +156,7 @@ export function useLookupCatalog<TData = Awaited<ReturnType<typeof lookupCatalog
  * @summary Cari satu barang dari barcode atau kode toko
  */
 
-export function useLookupCatalog<TData = Awaited<ReturnType<typeof lookupCatalog>>, TError = ErrorType<NotFoundResponse | Problem>>(
+export function useLookupCatalog<TData = Awaited<ReturnType<typeof lookupCatalog>>, TError = ErrorType<NotFoundResponse | ProductInactiveResponse | Problem>>(
  params: LookupCatalogParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof lookupCatalog>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -186,7 +190,8 @@ export const getSearchCatalogUrl = (params: SearchCatalogParams,) => {
 
 /**
  * Mencari menurut nama saja (barcode / kode toko lewat lookupCatalog); q kurang dari
- * 2 karakter atau hanya angka menghasilkan daftar kosong. Mengembalikan paling banyak 8 hasil.
+ * 2 karakter atau hanya angka menghasilkan daftar kosong. Mengembalikan paling banyak 8 hasil,
+ * tanpa barang nonaktif dan satuan nonaktif.
  * @summary Cari barang menurut nama
  */
 export const searchCatalog = async (params: SearchCatalogParams, options?: Parameters<typeof customFetch>[1]): Promise<CatalogMatch[]> => {
@@ -287,6 +292,7 @@ export const getListQuickCurahUrl = () => {
 }
 
 /**
+ * Sesuai quickCurahProductIds, tanpa barang nonaktif dan satuan nonaktif.
  * @summary Barang curah pilihan cepat
  */
 export const listQuickCurah = async ( options?: Parameters<typeof customFetch>[1]): Promise<CatalogMatch[]> => {

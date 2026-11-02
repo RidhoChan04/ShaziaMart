@@ -12,6 +12,7 @@
  * Endpoint pemilik berada di bawah /api/owner dengan realm cookie terpisah total dari kasir:
  * owner_session (berlaku 30 hari). Sesi kasir tidak berlaku di sana dan sebaliknya.
  * HPP dan laba hanya muncul di endpoint /api/owner; endpoint kasir tidak pernah memuatnya.
+ * Data barang: kategori, status, stok, dan modal hanya di /api/owner.
  * Hari bisnis memakai zona Asia/Jakarta.
  *
  * OpenAPI spec version: 0.1.0
@@ -86,8 +87,8 @@ export const GetOwnerTodaySummaryResponse = zod.object({
   "lastWeekRevenue": zod.int().describe('Omzet penjualan selesai pada jam ini sepanjang jam penuh di hari yang sama minggu lalu (rupiah); grafik menampilkan seluruh hari minggu lalu.')
 })).min(getOwnerTodaySummaryResponseHourlyMin).max(getOwnerTodaySummaryResponseHourlyMax).describe('Tepat 24 bucket; indeks = jam lokal Asia/Jakarta (0-23).'),
   "attention": zod.object({
-  "lowStockCount": zod.int().describe('Jumlah barang dengan 0 <= stok < stok minimum.'),
-  "negativeStockCount": zod.int().describe('Jumlah barang dengan stok < 0; dihitung terpisah, tidak termasuk di lowStockCount.'),
+  "lowStockCount": zod.int().describe('Jumlah barang dengan stockAlert menipis (0 <= stok < minStock). Aturan penanda diam:\ntidak termasuk barang stockCounted false, Sedang langka (scarce), tidak_diambil, atau nonaktif.\n'),
+  "negativeStockCount": zod.int().describe('Jumlah barang dengan stockAlert minus (stok < 0); dihitung terpisah, tidak termasuk di\nlowStockCount. Aturan penanda diam: tidak termasuk barang stockCounted false atau\nnonaktif; Sedang langka (scarce) dan tidak_diambil tetap dihitung.\n'),
   "cashDifferences": zod.array(zod.object({
   "shiftId": zod.string(),
   "kasirName": zod.string(),
@@ -97,7 +98,673 @@ export const GetOwnerTodaySummaryResponse = zod.object({
   "overdueCredit": zod.object({
   "count": zod.int().describe('Jumlah pelanggan bersaldo kasbon > 0 yang entri kasbon belum lunas tertuanya lebih dari 30 hari.'),
   "total": zod.int().describe('Jumlah saldo kasbon seluruh pelanggan tersebut (rupiah).')
-})
+}),
+  "costChanges": zod.array(zod.object({
+  "productId": zod.string(),
+  "productName": zod.string(),
+  "unitName": zod.string().describe('Nama satuan eceran.'),
+  "oldCost": zod.int(),
+  "newCost": zod.int(),
+  "price": zod.int(),
+  "changedAt": zod.int().describe('Waktu perubahan modal terakhir (epoch ms UTC).'),
+  "source": zod.enum(['pemilik', 'impor']).describe('pemilik = diubah di aplikasi pemilik; impor = lewat Impor Excel.')
+}).describe('Satu butir per barang. oldCost = modal satuan eceran saat butir dibuat; newCost = modal\nsatuan eceran sekarang; price = harga jual eceran sekarang (semua rupiah).\n')).describe('Barang yang modal satuan ecerannya berubah dan belum ditindaklanjuti pemilik; terbaru dulu.'),
+  "stockOuts": zod.array(zod.object({
+  "productId": zod.string(),
+  "productName": zod.string()
+})).describe('Barang tidak_diambil yang stoknya sudah dihitung dan habis (stok <= 0); urut nama.')
 })
 }).describe('Semua uang integer rupiah. revenue, grossProfit, newCredit, dan avgTicket hanya menghitung\npenjualan berstatus selesai (semua field bertipe omzet hanya menghitung penjualan selesai). avgTicket = round_half_up(revenue / salesCount), 0 bila tidak ada penjualan.\n')
+
+/**
+ * Semua barang, termasuk nonaktif; urut nama.
+ * @summary Daftar semua barang untuk pemilik
+ */
+
+
+
+export const ListOwnerProductsResponseItem = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "storeCode": zod.string(),
+  "category": zod.string().nullable(),
+  "status": zod.enum(['aktif', 'tidak_diambil', 'nonaktif']).describe('aktif; tidak_diambil = tetap dijual sampai habis, tanpa peringatan menipis;\nnonaktif = tidak muncul di kasir (pencarian, scan, curah cepat), riwayat tetap.\n'),
+  "scarce": zod.boolean().describe('Tanda Sedang langka.'),
+  "stockCounted": zod.boolean().describe('false = Stok belum dihitung (belum pernah opname atau barang masuk).'),
+  "isCurah": zod.boolean(),
+  "baseUnit": zod.enum(['pcs', 'gram', 'ml']),
+  "unitName": zod.string(),
+  "unitSize": zod.int().min(1),
+  "price": zod.int(),
+  "barcodes": zod.array(zod.string()).describe('Barcode semua satuan (untuk pencarian).'),
+  "stock": zod.int().describe('Stok dalam qtyBase.'),
+  "stockAlert": zod.enum(['none', 'menipis', 'minus']).describe('minus bila stok < 0; menipis bila 0 <= stok < minStock (minStock null = tanpa batas);\nselain itu none. Penanda diam: stockCounted false (Stok belum dihitung) → none, tidak\nmenipis maupun minus; scarce (Sedang langka) dan status tidak_diambil hanya membungkam\nmenipis (minus tetap muncul); status nonaktif → none.\n')
+}).describe('Baris daftar barang pemilik; unitName, unitSize, dan price = satuan eceran.')
+export const ListOwnerProductsResponse = zod.array(ListOwnerProductsResponseItem)
+
+/**
+ * Barang baru dimulai dengan stok 0, stockCounted false, status aktif.
+ * @summary Tambah barang
+ */
+export const createOwnerProductBodyNameMax = 100;
+
+export const createOwnerProductBodySellUnitMax = 20;
+
+export const createOwnerProductBodyCostMin = 0;
+
+
+export const createOwnerProductBodyBigUnitOneSizeMin = 2;
+
+export const createOwnerProductBodyBigUnitOneCostMin = 0;
+
+
+
+
+export const CreateOwnerProductBody = zod.object({
+  "name": zod.string().min(1).max(createOwnerProductBodyNameMax),
+  "category": zod.string().nullable(),
+  "sellUnit": zod.string().min(1).max(createOwnerProductBodySellUnitMax).describe('Dijual per; kg, ons, liter, dan l = barang curah.'),
+  "barcode": zod.string().nullable(),
+  "cost": zod.int().min(createOwnerProductBodyCostMin).nullable().describe('Modal eceran; diabaikan bila bigUnit.cost terisi.'),
+  "price": zod.int().min(1),
+  "tier": zod.union([zod.object({
+  "minQty": zod.int(),
+  "price": zod.int()
+}).describe('Harga grosir per satuan jual. Berlaku hanya bila qtyBase kelipatan unitSize;\njumlah = qtyBase / unitSize (dalam satuan jual) dan dipakai tier dengan minQty\nterbesar yang <= jumlah. minQty dalam satuan jual, bukan satuan dasar.\n'),zod.null()]),
+  "bigUnit": zod.union([zod.object({
+  "unitId": zod.string().nullable().describe('Satuan besar yang diubah; null = satuan besar baru.'),
+  "name": zod.string(),
+  "size": zod.int().min(createOwnerProductBodyBigUnitOneSizeMin).describe('Isi dalam satuan eceran.'),
+  "barcode": zod.string().nullable(),
+  "cost": zod.int().min(createOwnerProductBodyBigUnitOneCostMin).nullable(),
+  "price": zod.int().min(1)
+}),zod.null()]),
+  "minStock": zod.number().nullable()
+}).describe('Isi form barang, mengikuti template Excel. Uang integer rupiah. minStock dan bigUnit.size\ndalam satuan eceran (minStock boleh pecahan untuk kg, ons, dan liter).\n')
+
+
+
+export const createOwnerProductResponseCostOneAmountMin = 0;
+
+
+export const createOwnerProductResponseCostAlertOneFromCostAmountMin = 0;
+
+
+export const createOwnerProductResponseRecentMovementsMax = 5;
+
+
+
+export const CreateOwnerProductResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "storeCode": zod.string(),
+  "category": zod.string().nullable(),
+  "status": zod.enum(['aktif', 'tidak_diambil', 'nonaktif']).describe('aktif; tidak_diambil = tetap dijual sampai habis, tanpa peringatan menipis;\nnonaktif = tidak muncul di kasir (pencarian, scan, curah cepat), riwayat tetap.\n'),
+  "scarce": zod.boolean().describe('Tanda Sedang langka.'),
+  "stockCounted": zod.boolean().describe('false = Stok belum dihitung (belum pernah opname atau barang masuk).'),
+  "isCurah": zod.boolean(),
+  "baseUnit": zod.enum(['pcs', 'gram', 'ml']),
+  "units": zod.array(zod.object({
+  "id": zod.string(),
+  "productId": zod.string(),
+  "name": zod.string(),
+  "unitSize": zod.int().min(1).describe('Jumlah satuan dasar per satuan jual.'),
+  "price": zod.int(),
+  "wholesaleTiers": zod.array(zod.object({
+  "minQty": zod.int(),
+  "price": zod.int()
+}).describe('Harga grosir per satuan jual. Berlaku hanya bila qtyBase kelipatan unitSize;\njumlah = qtyBase / unitSize (dalam satuan jual) dan dipakai tier dengan minQty\nterbesar yang <= jumlah. minQty dalam satuan jual, bukan satuan dasar.\n')),
+  "barcodes": zod.array(zod.string())
+}).and(zod.object({
+  "cost": zod.int().nullable().describe('Modal satuan ini (rupiah) dari HPP barang; null bila HPP belum diisi.'),
+  "active": zod.boolean().describe('false = satuan nonaktif (tidak dijual di kasir; barcodenya tetap terpakai).'),
+  "sold": zod.boolean().describe('Satuan pernah terjual (isi dikunci; bila diganti dinonaktifkan, bukan dihapus).')
+})).describe('Satuan jual versi pemilik (field ProductUnit ditambah modal dan status satuan).')).min(1).describe('Semua satuan termasuk nonaktif; units[0] = satuan eceran.'),
+  "cost": zod.union([zod.object({
+  "amount": zod.int().min(createOwnerProductResponseCostOneAmountMin),
+  "qtyBase": zod.int().min(1)
+}).describe('HPP: amount rupiah per qtyBase satuan dasar.\nModal satuan = round_half_up(amount × unitSize ÷ qtyBase).\n'),zod.null()]).describe('HPP barang; null bila modal belum diisi.'),
+  "stock": zod.int().describe('Stok dalam qtyBase.'),
+  "minStock": zod.int().nullable().describe('Batas stok menipis dalam qtyBase; null = tanpa batas.'),
+  "stockAlert": zod.enum(['none', 'menipis', 'minus']).describe('minus bila stok < 0; menipis bila 0 <= stok < minStock (minStock null = tanpa batas);\nselain itu none. Penanda diam: stockCounted false (Stok belum dihitung) → none, tidak\nmenipis maupun minus; scarce (Sedang langka) dan status tidak_diambil hanya membungkam\nmenipis (minus tetap muncul); status nonaktif → none.\n'),
+  "hasSales": zod.boolean().describe('Barang pernah terjual (tidak bisa dihapus).'),
+  "costAlert": zod.union([zod.object({
+  "fromCost": zod.object({
+  "amount": zod.int().min(createOwnerProductResponseCostAlertOneFromCostAmountMin),
+  "qtyBase": zod.int().min(1)
+}).describe('HPP: amount rupiah per qtyBase satuan dasar.\nModal satuan = round_half_up(amount × unitSize ÷ qtyBase).\n'),
+  "changedAt": zod.int(),
+  "source": zod.enum(['pemilik', 'impor']).describe('pemilik = diubah di aplikasi pemilik; impor = lewat Impor Excel.')
+}).describe('fromCost = HPP saat peringatan dibuat; changedAt dan source = perubahan modal terakhir.'),zod.null()]).describe('Peringatan modal berubah yang belum ditindaklanjuti.'),
+  "recentMovements": zod.array(zod.object({
+  "id": zod.string(),
+  "at": zod.int(),
+  "kind": zod.enum(['jual', 'batal']),
+  "qtyBase": zod.int().describe('Bertanda; jual negatif, batal positif.'),
+  "kasirName": zod.string()
+})).max(createOwnerProductResponseRecentMovementsMax).describe('Mutasi stok, terbaru dulu.'),
+  "priceHistory": zod.array(zod.object({
+  "id": zod.string(),
+  "at": zod.int(),
+  "unitId": zod.string(),
+  "unitName": zod.string(),
+  "isEceran": zod.boolean(),
+  "unitSize": zod.int(),
+  "tierMinQty": zod.int().nullable().describe('null = harga normal satuan; terisi = harga tier grosir dengan minQty ini.'),
+  "oldPrice": zod.int().nullable().describe('null = baris harga baru ditambah.'),
+  "newPrice": zod.int().nullable().describe('null = baris harga dihapus.'),
+  "source": zod.enum(['pemilik', 'impor']).describe('pemilik = diubah di aplikasi pemilik; impor = lewat Impor Excel.')
+})).describe('Riwayat harga jual, terbaru dulu.')
+})
+
+/**
+ * @summary Detail barang
+ */
+export const GetOwnerProductParams = zod.object({
+  "productId": zod.string()
+})
+
+
+
+export const getOwnerProductResponseCostOneAmountMin = 0;
+
+
+export const getOwnerProductResponseCostAlertOneFromCostAmountMin = 0;
+
+
+export const getOwnerProductResponseRecentMovementsMax = 5;
+
+
+
+export const GetOwnerProductResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "storeCode": zod.string(),
+  "category": zod.string().nullable(),
+  "status": zod.enum(['aktif', 'tidak_diambil', 'nonaktif']).describe('aktif; tidak_diambil = tetap dijual sampai habis, tanpa peringatan menipis;\nnonaktif = tidak muncul di kasir (pencarian, scan, curah cepat), riwayat tetap.\n'),
+  "scarce": zod.boolean().describe('Tanda Sedang langka.'),
+  "stockCounted": zod.boolean().describe('false = Stok belum dihitung (belum pernah opname atau barang masuk).'),
+  "isCurah": zod.boolean(),
+  "baseUnit": zod.enum(['pcs', 'gram', 'ml']),
+  "units": zod.array(zod.object({
+  "id": zod.string(),
+  "productId": zod.string(),
+  "name": zod.string(),
+  "unitSize": zod.int().min(1).describe('Jumlah satuan dasar per satuan jual.'),
+  "price": zod.int(),
+  "wholesaleTiers": zod.array(zod.object({
+  "minQty": zod.int(),
+  "price": zod.int()
+}).describe('Harga grosir per satuan jual. Berlaku hanya bila qtyBase kelipatan unitSize;\njumlah = qtyBase / unitSize (dalam satuan jual) dan dipakai tier dengan minQty\nterbesar yang <= jumlah. minQty dalam satuan jual, bukan satuan dasar.\n')),
+  "barcodes": zod.array(zod.string())
+}).and(zod.object({
+  "cost": zod.int().nullable().describe('Modal satuan ini (rupiah) dari HPP barang; null bila HPP belum diisi.'),
+  "active": zod.boolean().describe('false = satuan nonaktif (tidak dijual di kasir; barcodenya tetap terpakai).'),
+  "sold": zod.boolean().describe('Satuan pernah terjual (isi dikunci; bila diganti dinonaktifkan, bukan dihapus).')
+})).describe('Satuan jual versi pemilik (field ProductUnit ditambah modal dan status satuan).')).min(1).describe('Semua satuan termasuk nonaktif; units[0] = satuan eceran.'),
+  "cost": zod.union([zod.object({
+  "amount": zod.int().min(getOwnerProductResponseCostOneAmountMin),
+  "qtyBase": zod.int().min(1)
+}).describe('HPP: amount rupiah per qtyBase satuan dasar.\nModal satuan = round_half_up(amount × unitSize ÷ qtyBase).\n'),zod.null()]).describe('HPP barang; null bila modal belum diisi.'),
+  "stock": zod.int().describe('Stok dalam qtyBase.'),
+  "minStock": zod.int().nullable().describe('Batas stok menipis dalam qtyBase; null = tanpa batas.'),
+  "stockAlert": zod.enum(['none', 'menipis', 'minus']).describe('minus bila stok < 0; menipis bila 0 <= stok < minStock (minStock null = tanpa batas);\nselain itu none. Penanda diam: stockCounted false (Stok belum dihitung) → none, tidak\nmenipis maupun minus; scarce (Sedang langka) dan status tidak_diambil hanya membungkam\nmenipis (minus tetap muncul); status nonaktif → none.\n'),
+  "hasSales": zod.boolean().describe('Barang pernah terjual (tidak bisa dihapus).'),
+  "costAlert": zod.union([zod.object({
+  "fromCost": zod.object({
+  "amount": zod.int().min(getOwnerProductResponseCostAlertOneFromCostAmountMin),
+  "qtyBase": zod.int().min(1)
+}).describe('HPP: amount rupiah per qtyBase satuan dasar.\nModal satuan = round_half_up(amount × unitSize ÷ qtyBase).\n'),
+  "changedAt": zod.int(),
+  "source": zod.enum(['pemilik', 'impor']).describe('pemilik = diubah di aplikasi pemilik; impor = lewat Impor Excel.')
+}).describe('fromCost = HPP saat peringatan dibuat; changedAt dan source = perubahan modal terakhir.'),zod.null()]).describe('Peringatan modal berubah yang belum ditindaklanjuti.'),
+  "recentMovements": zod.array(zod.object({
+  "id": zod.string(),
+  "at": zod.int(),
+  "kind": zod.enum(['jual', 'batal']),
+  "qtyBase": zod.int().describe('Bertanda; jual negatif, batal positif.'),
+  "kasirName": zod.string()
+})).max(getOwnerProductResponseRecentMovementsMax).describe('Mutasi stok, terbaru dulu.'),
+  "priceHistory": zod.array(zod.object({
+  "id": zod.string(),
+  "at": zod.int(),
+  "unitId": zod.string(),
+  "unitName": zod.string(),
+  "isEceran": zod.boolean(),
+  "unitSize": zod.int(),
+  "tierMinQty": zod.int().nullable().describe('null = harga normal satuan; terisi = harga tier grosir dengan minQty ini.'),
+  "oldPrice": zod.int().nullable().describe('null = baris harga baru ditambah.'),
+  "newPrice": zod.int().nullable().describe('null = baris harga dihapus.'),
+  "source": zod.enum(['pemilik', 'impor']).describe('pemilik = diubah di aplikasi pemilik; impor = lewat Impor Excel.')
+})).describe('Riwayat harga jual, terbaru dulu.')
+})
+
+/**
+ * Field null menghapus nilainya. Barang yang sudah terjual: 'Dijual per' dan isi satuan
+ * yang sudah terjual dikunci (422); satuan besar terjual yang diganti dinonaktifkan.
+ * @summary Ubah barang
+ */
+export const UpdateOwnerProductParams = zod.object({
+  "productId": zod.string()
+})
+
+export const updateOwnerProductBodyNameMax = 100;
+
+export const updateOwnerProductBodySellUnitMax = 20;
+
+export const updateOwnerProductBodyCostMin = 0;
+
+
+export const updateOwnerProductBodyBigUnitOneSizeMin = 2;
+
+export const updateOwnerProductBodyBigUnitOneCostMin = 0;
+
+
+
+
+export const UpdateOwnerProductBody = zod.object({
+  "name": zod.string().min(1).max(updateOwnerProductBodyNameMax),
+  "category": zod.string().nullable(),
+  "sellUnit": zod.string().min(1).max(updateOwnerProductBodySellUnitMax).describe('Dijual per; kg, ons, liter, dan l = barang curah.'),
+  "barcode": zod.string().nullable(),
+  "cost": zod.int().min(updateOwnerProductBodyCostMin).nullable().describe('Modal eceran; diabaikan bila bigUnit.cost terisi.'),
+  "price": zod.int().min(1),
+  "tier": zod.union([zod.object({
+  "minQty": zod.int(),
+  "price": zod.int()
+}).describe('Harga grosir per satuan jual. Berlaku hanya bila qtyBase kelipatan unitSize;\njumlah = qtyBase / unitSize (dalam satuan jual) dan dipakai tier dengan minQty\nterbesar yang <= jumlah. minQty dalam satuan jual, bukan satuan dasar.\n'),zod.null()]),
+  "bigUnit": zod.union([zod.object({
+  "unitId": zod.string().nullable().describe('Satuan besar yang diubah; null = satuan besar baru.'),
+  "name": zod.string(),
+  "size": zod.int().min(updateOwnerProductBodyBigUnitOneSizeMin).describe('Isi dalam satuan eceran.'),
+  "barcode": zod.string().nullable(),
+  "cost": zod.int().min(updateOwnerProductBodyBigUnitOneCostMin).nullable(),
+  "price": zod.int().min(1)
+}),zod.null()]),
+  "minStock": zod.number().nullable()
+}).describe('Isi form barang, mengikuti template Excel. Uang integer rupiah. minStock dan bigUnit.size\ndalam satuan eceran (minStock boleh pecahan untuk kg, ons, dan liter).\n')
+
+
+
+export const updateOwnerProductResponseCostOneAmountMin = 0;
+
+
+export const updateOwnerProductResponseCostAlertOneFromCostAmountMin = 0;
+
+
+export const updateOwnerProductResponseRecentMovementsMax = 5;
+
+
+
+export const UpdateOwnerProductResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "storeCode": zod.string(),
+  "category": zod.string().nullable(),
+  "status": zod.enum(['aktif', 'tidak_diambil', 'nonaktif']).describe('aktif; tidak_diambil = tetap dijual sampai habis, tanpa peringatan menipis;\nnonaktif = tidak muncul di kasir (pencarian, scan, curah cepat), riwayat tetap.\n'),
+  "scarce": zod.boolean().describe('Tanda Sedang langka.'),
+  "stockCounted": zod.boolean().describe('false = Stok belum dihitung (belum pernah opname atau barang masuk).'),
+  "isCurah": zod.boolean(),
+  "baseUnit": zod.enum(['pcs', 'gram', 'ml']),
+  "units": zod.array(zod.object({
+  "id": zod.string(),
+  "productId": zod.string(),
+  "name": zod.string(),
+  "unitSize": zod.int().min(1).describe('Jumlah satuan dasar per satuan jual.'),
+  "price": zod.int(),
+  "wholesaleTiers": zod.array(zod.object({
+  "minQty": zod.int(),
+  "price": zod.int()
+}).describe('Harga grosir per satuan jual. Berlaku hanya bila qtyBase kelipatan unitSize;\njumlah = qtyBase / unitSize (dalam satuan jual) dan dipakai tier dengan minQty\nterbesar yang <= jumlah. minQty dalam satuan jual, bukan satuan dasar.\n')),
+  "barcodes": zod.array(zod.string())
+}).and(zod.object({
+  "cost": zod.int().nullable().describe('Modal satuan ini (rupiah) dari HPP barang; null bila HPP belum diisi.'),
+  "active": zod.boolean().describe('false = satuan nonaktif (tidak dijual di kasir; barcodenya tetap terpakai).'),
+  "sold": zod.boolean().describe('Satuan pernah terjual (isi dikunci; bila diganti dinonaktifkan, bukan dihapus).')
+})).describe('Satuan jual versi pemilik (field ProductUnit ditambah modal dan status satuan).')).min(1).describe('Semua satuan termasuk nonaktif; units[0] = satuan eceran.'),
+  "cost": zod.union([zod.object({
+  "amount": zod.int().min(updateOwnerProductResponseCostOneAmountMin),
+  "qtyBase": zod.int().min(1)
+}).describe('HPP: amount rupiah per qtyBase satuan dasar.\nModal satuan = round_half_up(amount × unitSize ÷ qtyBase).\n'),zod.null()]).describe('HPP barang; null bila modal belum diisi.'),
+  "stock": zod.int().describe('Stok dalam qtyBase.'),
+  "minStock": zod.int().nullable().describe('Batas stok menipis dalam qtyBase; null = tanpa batas.'),
+  "stockAlert": zod.enum(['none', 'menipis', 'minus']).describe('minus bila stok < 0; menipis bila 0 <= stok < minStock (minStock null = tanpa batas);\nselain itu none. Penanda diam: stockCounted false (Stok belum dihitung) → none, tidak\nmenipis maupun minus; scarce (Sedang langka) dan status tidak_diambil hanya membungkam\nmenipis (minus tetap muncul); status nonaktif → none.\n'),
+  "hasSales": zod.boolean().describe('Barang pernah terjual (tidak bisa dihapus).'),
+  "costAlert": zod.union([zod.object({
+  "fromCost": zod.object({
+  "amount": zod.int().min(updateOwnerProductResponseCostAlertOneFromCostAmountMin),
+  "qtyBase": zod.int().min(1)
+}).describe('HPP: amount rupiah per qtyBase satuan dasar.\nModal satuan = round_half_up(amount × unitSize ÷ qtyBase).\n'),
+  "changedAt": zod.int(),
+  "source": zod.enum(['pemilik', 'impor']).describe('pemilik = diubah di aplikasi pemilik; impor = lewat Impor Excel.')
+}).describe('fromCost = HPP saat peringatan dibuat; changedAt dan source = perubahan modal terakhir.'),zod.null()]).describe('Peringatan modal berubah yang belum ditindaklanjuti.'),
+  "recentMovements": zod.array(zod.object({
+  "id": zod.string(),
+  "at": zod.int(),
+  "kind": zod.enum(['jual', 'batal']),
+  "qtyBase": zod.int().describe('Bertanda; jual negatif, batal positif.'),
+  "kasirName": zod.string()
+})).max(updateOwnerProductResponseRecentMovementsMax).describe('Mutasi stok, terbaru dulu.'),
+  "priceHistory": zod.array(zod.object({
+  "id": zod.string(),
+  "at": zod.int(),
+  "unitId": zod.string(),
+  "unitName": zod.string(),
+  "isEceran": zod.boolean(),
+  "unitSize": zod.int(),
+  "tierMinQty": zod.int().nullable().describe('null = harga normal satuan; terisi = harga tier grosir dengan minQty ini.'),
+  "oldPrice": zod.int().nullable().describe('null = baris harga baru ditambah.'),
+  "newPrice": zod.int().nullable().describe('null = baris harga dihapus.'),
+  "source": zod.enum(['pemilik', 'impor']).describe('pemilik = diubah di aplikasi pemilik; impor = lewat Impor Excel.')
+})).describe('Riwayat harga jual, terbaru dulu.')
+})
+
+/**
+ * Hanya barang yang belum pernah terjual; selain itu 409 PRODUCT_HAS_SALES (gunakan nonaktif).
+ * @summary Hapus barang permanen
+ */
+export const DeleteOwnerProductParams = zod.object({
+  "productId": zod.string()
+})
+
+export const DeleteOwnerProductResponse = zod.void()
+
+/**
+ * @summary Ubah status barang dan tanda Sedang langka
+ */
+export const SetOwnerProductStatusParams = zod.object({
+  "productId": zod.string()
+})
+
+export const SetOwnerProductStatusBody = zod.object({
+  "status": zod.enum(['aktif', 'tidak_diambil', 'nonaktif']).describe('aktif; tidak_diambil = tetap dijual sampai habis, tanpa peringatan menipis;\nnonaktif = tidak muncul di kasir (pencarian, scan, curah cepat), riwayat tetap.\n'),
+  "scarce": zod.boolean()
+})
+
+
+
+export const setOwnerProductStatusResponseCostOneAmountMin = 0;
+
+
+export const setOwnerProductStatusResponseCostAlertOneFromCostAmountMin = 0;
+
+
+export const setOwnerProductStatusResponseRecentMovementsMax = 5;
+
+
+
+export const SetOwnerProductStatusResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "storeCode": zod.string(),
+  "category": zod.string().nullable(),
+  "status": zod.enum(['aktif', 'tidak_diambil', 'nonaktif']).describe('aktif; tidak_diambil = tetap dijual sampai habis, tanpa peringatan menipis;\nnonaktif = tidak muncul di kasir (pencarian, scan, curah cepat), riwayat tetap.\n'),
+  "scarce": zod.boolean().describe('Tanda Sedang langka.'),
+  "stockCounted": zod.boolean().describe('false = Stok belum dihitung (belum pernah opname atau barang masuk).'),
+  "isCurah": zod.boolean(),
+  "baseUnit": zod.enum(['pcs', 'gram', 'ml']),
+  "units": zod.array(zod.object({
+  "id": zod.string(),
+  "productId": zod.string(),
+  "name": zod.string(),
+  "unitSize": zod.int().min(1).describe('Jumlah satuan dasar per satuan jual.'),
+  "price": zod.int(),
+  "wholesaleTiers": zod.array(zod.object({
+  "minQty": zod.int(),
+  "price": zod.int()
+}).describe('Harga grosir per satuan jual. Berlaku hanya bila qtyBase kelipatan unitSize;\njumlah = qtyBase / unitSize (dalam satuan jual) dan dipakai tier dengan minQty\nterbesar yang <= jumlah. minQty dalam satuan jual, bukan satuan dasar.\n')),
+  "barcodes": zod.array(zod.string())
+}).and(zod.object({
+  "cost": zod.int().nullable().describe('Modal satuan ini (rupiah) dari HPP barang; null bila HPP belum diisi.'),
+  "active": zod.boolean().describe('false = satuan nonaktif (tidak dijual di kasir; barcodenya tetap terpakai).'),
+  "sold": zod.boolean().describe('Satuan pernah terjual (isi dikunci; bila diganti dinonaktifkan, bukan dihapus).')
+})).describe('Satuan jual versi pemilik (field ProductUnit ditambah modal dan status satuan).')).min(1).describe('Semua satuan termasuk nonaktif; units[0] = satuan eceran.'),
+  "cost": zod.union([zod.object({
+  "amount": zod.int().min(setOwnerProductStatusResponseCostOneAmountMin),
+  "qtyBase": zod.int().min(1)
+}).describe('HPP: amount rupiah per qtyBase satuan dasar.\nModal satuan = round_half_up(amount × unitSize ÷ qtyBase).\n'),zod.null()]).describe('HPP barang; null bila modal belum diisi.'),
+  "stock": zod.int().describe('Stok dalam qtyBase.'),
+  "minStock": zod.int().nullable().describe('Batas stok menipis dalam qtyBase; null = tanpa batas.'),
+  "stockAlert": zod.enum(['none', 'menipis', 'minus']).describe('minus bila stok < 0; menipis bila 0 <= stok < minStock (minStock null = tanpa batas);\nselain itu none. Penanda diam: stockCounted false (Stok belum dihitung) → none, tidak\nmenipis maupun minus; scarce (Sedang langka) dan status tidak_diambil hanya membungkam\nmenipis (minus tetap muncul); status nonaktif → none.\n'),
+  "hasSales": zod.boolean().describe('Barang pernah terjual (tidak bisa dihapus).'),
+  "costAlert": zod.union([zod.object({
+  "fromCost": zod.object({
+  "amount": zod.int().min(setOwnerProductStatusResponseCostAlertOneFromCostAmountMin),
+  "qtyBase": zod.int().min(1)
+}).describe('HPP: amount rupiah per qtyBase satuan dasar.\nModal satuan = round_half_up(amount × unitSize ÷ qtyBase).\n'),
+  "changedAt": zod.int(),
+  "source": zod.enum(['pemilik', 'impor']).describe('pemilik = diubah di aplikasi pemilik; impor = lewat Impor Excel.')
+}).describe('fromCost = HPP saat peringatan dibuat; changedAt dan source = perubahan modal terakhir.'),zod.null()]).describe('Peringatan modal berubah yang belum ditindaklanjuti.'),
+  "recentMovements": zod.array(zod.object({
+  "id": zod.string(),
+  "at": zod.int(),
+  "kind": zod.enum(['jual', 'batal']),
+  "qtyBase": zod.int().describe('Bertanda; jual negatif, batal positif.'),
+  "kasirName": zod.string()
+})).max(setOwnerProductStatusResponseRecentMovementsMax).describe('Mutasi stok, terbaru dulu.'),
+  "priceHistory": zod.array(zod.object({
+  "id": zod.string(),
+  "at": zod.int(),
+  "unitId": zod.string(),
+  "unitName": zod.string(),
+  "isEceran": zod.boolean(),
+  "unitSize": zod.int(),
+  "tierMinQty": zod.int().nullable().describe('null = harga normal satuan; terisi = harga tier grosir dengan minQty ini.'),
+  "oldPrice": zod.int().nullable().describe('null = baris harga baru ditambah.'),
+  "newPrice": zod.int().nullable().describe('null = baris harga dihapus.'),
+  "source": zod.enum(['pemilik', 'impor']).describe('pemilik = diubah di aplikasi pemilik; impor = lewat Impor Excel.')
+})).describe('Riwayat harga jual, terbaru dulu.')
+})
+
+/**
+ * Satu baris = harga normal satu satuan (tierMinQty null) atau satu tier grosirnya.
+ * Sukses juga menghapus peringatan modal barang ini.
+ * @summary Ubah harga jual beberapa baris harga sekaligus
+ */
+export const UpdateOwnerProductPricesParams = zod.object({
+  "productId": zod.string()
+})
+
+
+
+
+
+export const UpdateOwnerProductPricesBody = zod.object({
+  "lines": zod.array(zod.object({
+  "unitId": zod.string(),
+  "tierMinQty": zod.int().nullable().describe('null = harga normal satuan; terisi = tier grosir dengan minQty ini.'),
+  "price": zod.int().min(1)
+})).min(1)
+})
+
+
+
+export const updateOwnerProductPricesResponseCostOneAmountMin = 0;
+
+
+export const updateOwnerProductPricesResponseCostAlertOneFromCostAmountMin = 0;
+
+
+export const updateOwnerProductPricesResponseRecentMovementsMax = 5;
+
+
+
+export const UpdateOwnerProductPricesResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "storeCode": zod.string(),
+  "category": zod.string().nullable(),
+  "status": zod.enum(['aktif', 'tidak_diambil', 'nonaktif']).describe('aktif; tidak_diambil = tetap dijual sampai habis, tanpa peringatan menipis;\nnonaktif = tidak muncul di kasir (pencarian, scan, curah cepat), riwayat tetap.\n'),
+  "scarce": zod.boolean().describe('Tanda Sedang langka.'),
+  "stockCounted": zod.boolean().describe('false = Stok belum dihitung (belum pernah opname atau barang masuk).'),
+  "isCurah": zod.boolean(),
+  "baseUnit": zod.enum(['pcs', 'gram', 'ml']),
+  "units": zod.array(zod.object({
+  "id": zod.string(),
+  "productId": zod.string(),
+  "name": zod.string(),
+  "unitSize": zod.int().min(1).describe('Jumlah satuan dasar per satuan jual.'),
+  "price": zod.int(),
+  "wholesaleTiers": zod.array(zod.object({
+  "minQty": zod.int(),
+  "price": zod.int()
+}).describe('Harga grosir per satuan jual. Berlaku hanya bila qtyBase kelipatan unitSize;\njumlah = qtyBase / unitSize (dalam satuan jual) dan dipakai tier dengan minQty\nterbesar yang <= jumlah. minQty dalam satuan jual, bukan satuan dasar.\n')),
+  "barcodes": zod.array(zod.string())
+}).and(zod.object({
+  "cost": zod.int().nullable().describe('Modal satuan ini (rupiah) dari HPP barang; null bila HPP belum diisi.'),
+  "active": zod.boolean().describe('false = satuan nonaktif (tidak dijual di kasir; barcodenya tetap terpakai).'),
+  "sold": zod.boolean().describe('Satuan pernah terjual (isi dikunci; bila diganti dinonaktifkan, bukan dihapus).')
+})).describe('Satuan jual versi pemilik (field ProductUnit ditambah modal dan status satuan).')).min(1).describe('Semua satuan termasuk nonaktif; units[0] = satuan eceran.'),
+  "cost": zod.union([zod.object({
+  "amount": zod.int().min(updateOwnerProductPricesResponseCostOneAmountMin),
+  "qtyBase": zod.int().min(1)
+}).describe('HPP: amount rupiah per qtyBase satuan dasar.\nModal satuan = round_half_up(amount × unitSize ÷ qtyBase).\n'),zod.null()]).describe('HPP barang; null bila modal belum diisi.'),
+  "stock": zod.int().describe('Stok dalam qtyBase.'),
+  "minStock": zod.int().nullable().describe('Batas stok menipis dalam qtyBase; null = tanpa batas.'),
+  "stockAlert": zod.enum(['none', 'menipis', 'minus']).describe('minus bila stok < 0; menipis bila 0 <= stok < minStock (minStock null = tanpa batas);\nselain itu none. Penanda diam: stockCounted false (Stok belum dihitung) → none, tidak\nmenipis maupun minus; scarce (Sedang langka) dan status tidak_diambil hanya membungkam\nmenipis (minus tetap muncul); status nonaktif → none.\n'),
+  "hasSales": zod.boolean().describe('Barang pernah terjual (tidak bisa dihapus).'),
+  "costAlert": zod.union([zod.object({
+  "fromCost": zod.object({
+  "amount": zod.int().min(updateOwnerProductPricesResponseCostAlertOneFromCostAmountMin),
+  "qtyBase": zod.int().min(1)
+}).describe('HPP: amount rupiah per qtyBase satuan dasar.\nModal satuan = round_half_up(amount × unitSize ÷ qtyBase).\n'),
+  "changedAt": zod.int(),
+  "source": zod.enum(['pemilik', 'impor']).describe('pemilik = diubah di aplikasi pemilik; impor = lewat Impor Excel.')
+}).describe('fromCost = HPP saat peringatan dibuat; changedAt dan source = perubahan modal terakhir.'),zod.null()]).describe('Peringatan modal berubah yang belum ditindaklanjuti.'),
+  "recentMovements": zod.array(zod.object({
+  "id": zod.string(),
+  "at": zod.int(),
+  "kind": zod.enum(['jual', 'batal']),
+  "qtyBase": zod.int().describe('Bertanda; jual negatif, batal positif.'),
+  "kasirName": zod.string()
+})).max(updateOwnerProductPricesResponseRecentMovementsMax).describe('Mutasi stok, terbaru dulu.'),
+  "priceHistory": zod.array(zod.object({
+  "id": zod.string(),
+  "at": zod.int(),
+  "unitId": zod.string(),
+  "unitName": zod.string(),
+  "isEceran": zod.boolean(),
+  "unitSize": zod.int(),
+  "tierMinQty": zod.int().nullable().describe('null = harga normal satuan; terisi = harga tier grosir dengan minQty ini.'),
+  "oldPrice": zod.int().nullable().describe('null = baris harga baru ditambah.'),
+  "newPrice": zod.int().nullable().describe('null = baris harga dihapus.'),
+  "source": zod.enum(['pemilik', 'impor']).describe('pemilik = diubah di aplikasi pemilik; impor = lewat Impor Excel.')
+})).describe('Riwayat harga jual, terbaru dulu.')
+})
+
+/**
+ * Idempoten; 204 juga bila tidak ada peringatan.
+ * @summary Harga tetap — hapus peringatan modal berubah
+ */
+export const DismissOwnerCostAlertParams = zod.object({
+  "productId": zod.string()
+})
+
+export const DismissOwnerCostAlertResponse = zod.void()
+
+/**
+ * @summary Riwayat stok barang
+ */
+export const ListOwnerProductMovementsParams = zod.object({
+  "productId": zod.string()
+})
+
+export const ListOwnerProductMovementsResponseItem = zod.object({
+  "id": zod.string(),
+  "at": zod.int(),
+  "kind": zod.enum(['jual', 'batal']),
+  "qtyBase": zod.int().describe('Bertanda; jual negatif, batal positif.'),
+  "kasirName": zod.string()
+})
+export const ListOwnerProductMovementsResponse = zod.array(ListOwnerProductMovementsResponseItem)
+
+/**
+ * Kategori yang dikelola; kategori baru dari form atau impor ditambahkan di akhir.
+ * @summary Daftar kategori barang
+ */
+export const ListOwnerCategoriesResponseItem = zod.string()
+export const ListOwnerCategoriesResponse = zod.array(ListOwnerCategoriesResponseItem)
+
+/**
+ * Baris yang semua selnya null diabaikan.
+ * @summary Periksa baris impor Excel tanpa menyimpan
+ */
+export const checkOwnerProductImportBodyRowsItemRowMin = 3;
+
+export const checkOwnerProductImportBodyRowsMax = 5000;
+
+
+
+export const CheckOwnerProductImportBody = zod.object({
+  "rows": zod.array(zod.object({
+  "row": zod.int().min(checkOwnerProductImportBodyRowsItemRowMin).describe('Nomor baris Excel (data mulai baris 3).'),
+  "name": zod.string().nullable(),
+  "category": zod.string().nullable(),
+  "sellUnit": zod.string().nullable(),
+  "barcode": zod.string().nullable(),
+  "cost": zod.string().nullable(),
+  "price": zod.string().nullable(),
+  "tierMinQty": zod.string().nullable(),
+  "tierPrice": zod.string().nullable(),
+  "bigName": zod.string().nullable(),
+  "bigSize": zod.string().nullable(),
+  "bigBarcode": zod.string().nullable(),
+  "bigCost": zod.string().nullable(),
+  "bigPrice": zod.string().nullable(),
+  "minStock": zod.string().nullable()
+}).describe('Satu baris sheet Barang; sel B–O berupa teks yang di-trim, null = kosong.')).min(1).max(checkOwnerProductImportBodyRowsMax)
+})
+
+export const CheckOwnerProductImportResponse = zod.object({
+  "rows": zod.array(zod.object({
+  "row": zod.int(),
+  "status": zod.enum(['baru', 'diperbarui', 'tidak_berubah', 'perbaiki']).describe('baru = Siap; diperbarui = Akan diperbarui; tidak_berubah = Sudah ada, tidak berubah;\nperbaiki = Perbaiki (dilewati saat impor).\n'),
+  "problems": zod.array(zod.string()).describe('Masalah yang harus diperbaiki di Excel (status perbaiki).'),
+  "changes": zod.array(zod.string()).describe('Apa yang berubah (status diperbarui).'),
+  "notes": zod.array(zod.string()).describe('Catatan yang tidak menghalangi impor, mis. modal eceran diabaikan atau kategori baru.')
+})).describe('Urut nomor baris Excel.'),
+  "summary": zod.object({
+  "ready": zod.int(),
+  "update": zod.int(),
+  "unchanged": zod.int(),
+  "invalid": zod.int()
+}).describe('Jumlah baris per status (ready = baru, update = diperbarui, unchanged = tidak_berubah, invalid = perbaiki).')
+})
+
+/**
+ * Memvalidasi ulang lalu menyimpan baris baru dan diperbarui sekaligus (atomik); baris tidak
+ * berubah dan baris bermasalah dilewati. Sel kosong tidak menghapus data lama.
+ * @summary Impor baris Excel
+ */
+export const commitOwnerProductImportBodyRowsItemRowMin = 3;
+
+export const commitOwnerProductImportBodyRowsMax = 5000;
+
+
+
+export const CommitOwnerProductImportBody = zod.object({
+  "rows": zod.array(zod.object({
+  "row": zod.int().min(commitOwnerProductImportBodyRowsItemRowMin).describe('Nomor baris Excel (data mulai baris 3).'),
+  "name": zod.string().nullable(),
+  "category": zod.string().nullable(),
+  "sellUnit": zod.string().nullable(),
+  "barcode": zod.string().nullable(),
+  "cost": zod.string().nullable(),
+  "price": zod.string().nullable(),
+  "tierMinQty": zod.string().nullable(),
+  "tierPrice": zod.string().nullable(),
+  "bigName": zod.string().nullable(),
+  "bigSize": zod.string().nullable(),
+  "bigBarcode": zod.string().nullable(),
+  "bigCost": zod.string().nullable(),
+  "bigPrice": zod.string().nullable(),
+  "minStock": zod.string().nullable()
+}).describe('Satu baris sheet Barang; sel B–O berupa teks yang di-trim, null = kosong.')).min(1).max(commitOwnerProductImportBodyRowsMax)
+})
+
+export const CommitOwnerProductImportResponse = zod.object({
+  "created": zod.int(),
+  "updated": zod.int(),
+  "skipped": zod.int()
+}).describe('skipped = baris tidak berubah ditambah baris bermasalah.')
 

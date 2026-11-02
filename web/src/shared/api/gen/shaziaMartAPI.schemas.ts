@@ -12,6 +12,7 @@
  * Endpoint pemilik berada di bawah /api/owner dengan realm cookie terpisah total dari kasir:
  * owner_session (berlaku 30 hari). Sesi kasir tidak berlaku di sana dan sebaliknya.
  * HPP dan laba hanya muncul di endpoint /api/owner; endpoint kasir tidak pernah memuatnya.
+ * Data barang: kategori, status, stok, dan modal hanya di /api/owner.
  * Hari bisnis memakai zona Asia/Jakarta.
  *
  * OpenAPI spec version: 0.1.0
@@ -56,6 +57,8 @@ export const ErrorCode = {
   CREDIT_LIMIT: 'CREDIT_LIMIT',
   INVALID_QUANTITY: 'INVALID_QUANTITY',
   LOGIN_INVALID: 'LOGIN_INVALID',
+  PRODUCT_INACTIVE: 'PRODUCT_INACTIVE',
+  PRODUCT_HAS_SALES: 'PRODUCT_HAS_SALES',
 } as const;
 
 export interface Problem {
@@ -190,14 +193,58 @@ export interface OverdueCredit {
   total: number;
 }
 
+/**
+ * pemilik = diubah di aplikasi pemilik; impor = lewat Impor Excel.
+ */
+export type PriceSource = typeof PriceSource[keyof typeof PriceSource];
+
+
+export const PriceSource = {
+  pemilik: 'pemilik',
+  impor: 'impor',
+} as const;
+
+/**
+ * Satu butir per barang. oldCost = modal satuan eceran saat butir dibuat; newCost = modal
+ * satuan eceran sekarang; price = harga jual eceran sekarang (semua rupiah).
+ */
+export interface CostChangeItem {
+  productId: string;
+  productName: string;
+  /** Nama satuan eceran. */
+  unitName: string;
+  oldCost: number;
+  newCost: number;
+  price: number;
+  /** Waktu perubahan modal terakhir (epoch ms UTC). */
+  changedAt: number;
+  source: PriceSource;
+}
+
+export interface StockOutItem {
+  productId: string;
+  productName: string;
+}
+
 export interface Attention {
-  /** Jumlah barang dengan 0 <= stok < stok minimum. */
+  /**
+     * Jumlah barang dengan stockAlert menipis (0 <= stok < minStock). Aturan penanda diam:
+     * tidak termasuk barang stockCounted false, Sedang langka (scarce), tidak_diambil, atau nonaktif.
+     */
   lowStockCount: number;
-  /** Jumlah barang dengan stok < 0; dihitung terpisah, tidak termasuk di lowStockCount. */
+  /**
+     * Jumlah barang dengan stockAlert minus (stok < 0); dihitung terpisah, tidak termasuk di
+     * lowStockCount. Aturan penanda diam: tidak termasuk barang stockCounted false atau
+     * nonaktif; Sedang langka (scarce) dan tidak_diambil tetap dihitung.
+     */
   negativeStockCount: number;
   /** Shift yang sudah ditutup dengan selisih kas tidak nol, dengan closedAt jatuh pada hari ini (Asia/Jakarta); terbaru dulu. */
   cashDifferences: CashDifference[];
   overdueCredit: OverdueCredit;
+  /** Barang yang modal satuan ecerannya berubah dan belum ditindaklanjuti pemilik; terbaru dulu. */
+  costChanges: CostChangeItem[];
+  /** Barang tidak_diambil yang stoknya sudah dihitung dan habis (stok <= 0); urut nama. */
+  stockOuts: StockOutItem[];
 }
 
 /**
@@ -310,6 +357,415 @@ export interface Product {
   isCurah: boolean;
   baseUnit: ProductBaseUnit;
   units: ProductUnit[];
+}
+
+/**
+ * aktif; tidak_diambil = tetap dijual sampai habis, tanpa peringatan menipis;
+ * nonaktif = tidak muncul di kasir (pencarian, scan, curah cepat), riwayat tetap.
+ */
+export type ProductStatus = typeof ProductStatus[keyof typeof ProductStatus];
+
+
+export const ProductStatus = {
+  aktif: 'aktif',
+  tidak_diambil: 'tidak_diambil',
+  nonaktif: 'nonaktif',
+} as const;
+
+/**
+ * minus bila stok < 0; menipis bila 0 <= stok < minStock (minStock null = tanpa batas);
+ * selain itu none. Penanda diam: stockCounted false (Stok belum dihitung) → none, tidak
+ * menipis maupun minus; scarce (Sedang langka) dan status tidak_diambil hanya membungkam
+ * menipis (minus tetap muncul); status nonaktif → none.
+ */
+export type StockAlert = typeof StockAlert[keyof typeof StockAlert];
+
+
+export const StockAlert = {
+  none: 'none',
+  menipis: 'menipis',
+  minus: 'minus',
+} as const;
+
+/**
+ * HPP: amount rupiah per qtyBase satuan dasar.
+ * Modal satuan = round_half_up(amount × unitSize ÷ qtyBase).
+ */
+export interface ProductCost {
+  /** @minimum 0 */
+  amount: number;
+  /** @minimum 1 */
+  qtyBase: number;
+}
+
+/**
+ * Satuan jual versi pemilik (field ProductUnit ditambah modal dan status satuan).
+ */
+export type OwnerProductUnit = ProductUnit & ({
+  /**
+     * Modal satuan ini (rupiah) dari HPP barang; null bila HPP belum diisi.
+     * @nullable
+     */
+  cost: number | null;
+  /** false = satuan nonaktif (tidak dijual di kasir; barcodenya tetap terpakai). */
+  active: boolean;
+  /** Satuan pernah terjual (isi dikunci; bila diganti dinonaktifkan, bukan dihapus). */
+  sold: boolean;
+});
+
+export type OwnerProductRowBaseUnit = typeof OwnerProductRowBaseUnit[keyof typeof OwnerProductRowBaseUnit];
+
+
+export const OwnerProductRowBaseUnit = {
+  pcs: 'pcs',
+  gram: 'gram',
+  ml: 'ml',
+} as const;
+
+/**
+ * Baris daftar barang pemilik; unitName, unitSize, dan price = satuan eceran.
+ */
+export interface OwnerProductRow {
+  id: string;
+  name: string;
+  storeCode: string;
+  /** @nullable */
+  category: string | null;
+  status: ProductStatus;
+  /** Tanda Sedang langka. */
+  scarce: boolean;
+  /** false = Stok belum dihitung (belum pernah opname atau barang masuk). */
+  stockCounted: boolean;
+  isCurah: boolean;
+  baseUnit: OwnerProductRowBaseUnit;
+  unitName: string;
+  /** @minimum 1 */
+  unitSize: number;
+  price: number;
+  /** Barcode semua satuan (untuk pencarian). */
+  barcodes: string[];
+  /** Stok dalam qtyBase. */
+  stock: number;
+  stockAlert: StockAlert;
+}
+
+export type OwnerProductBaseUnit = typeof OwnerProductBaseUnit[keyof typeof OwnerProductBaseUnit];
+
+
+export const OwnerProductBaseUnit = {
+  pcs: 'pcs',
+  gram: 'gram',
+  ml: 'ml',
+} as const;
+
+/**
+ * fromCost = HPP saat peringatan dibuat; changedAt dan source = perubahan modal terakhir.
+ */
+export interface CostAlert {
+  fromCost: ProductCost;
+  changedAt: number;
+  source: PriceSource;
+}
+
+export type StockMovementKind = typeof StockMovementKind[keyof typeof StockMovementKind];
+
+
+export const StockMovementKind = {
+  jual: 'jual',
+  batal: 'batal',
+} as const;
+
+export interface StockMovement {
+  id: string;
+  at: number;
+  kind: StockMovementKind;
+  /** Bertanda; jual negatif, batal positif. */
+  qtyBase: number;
+  kasirName: string;
+}
+
+export interface PriceHistoryEntry {
+  id: string;
+  at: number;
+  unitId: string;
+  unitName: string;
+  isEceran: boolean;
+  unitSize: number;
+  /**
+     * null = harga normal satuan; terisi = harga tier grosir dengan minQty ini.
+     * @nullable
+     */
+  tierMinQty: number | null;
+  /**
+     * null = baris harga baru ditambah.
+     * @nullable
+     */
+  oldPrice: number | null;
+  /**
+     * null = baris harga dihapus.
+     * @nullable
+     */
+  newPrice: number | null;
+  source: PriceSource;
+}
+
+export interface OwnerProduct {
+  id: string;
+  name: string;
+  storeCode: string;
+  /** @nullable */
+  category: string | null;
+  status: ProductStatus;
+  /** Tanda Sedang langka. */
+  scarce: boolean;
+  /** false = Stok belum dihitung (belum pernah opname atau barang masuk). */
+  stockCounted: boolean;
+  isCurah: boolean;
+  baseUnit: OwnerProductBaseUnit;
+  /**
+     * Semua satuan termasuk nonaktif; units[0] = satuan eceran.
+     * @minItems 1
+     */
+  units: OwnerProductUnit[];
+  /** HPP barang; null bila modal belum diisi. */
+  cost: ProductCost | null;
+  /** Stok dalam qtyBase. */
+  stock: number;
+  /**
+     * Batas stok menipis dalam qtyBase; null = tanpa batas.
+     * @nullable
+     */
+  minStock: number | null;
+  stockAlert: StockAlert;
+  /** Barang pernah terjual (tidak bisa dihapus). */
+  hasSales: boolean;
+  /** Peringatan modal berubah yang belum ditindaklanjuti. */
+  costAlert: CostAlert | null;
+  /**
+     * Mutasi stok, terbaru dulu.
+     * @maxItems 5
+     */
+  recentMovements: StockMovement[];
+  /** Riwayat harga jual, terbaru dulu. */
+  priceHistory: PriceHistoryEntry[];
+}
+
+export interface BigUnitInput {
+  /**
+     * Satuan besar yang diubah; null = satuan besar baru.
+     * @nullable
+     */
+  unitId: string | null;
+  name: string;
+  /**
+     * Isi dalam satuan eceran.
+     * @minimum 2
+     */
+  size: number;
+  /** @nullable */
+  barcode: string | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  cost: number | null;
+  /** @minimum 1 */
+  price: number;
+}
+
+/**
+ * Isi form barang, mengikuti template Excel. Uang integer rupiah. minStock dan bigUnit.size
+ * dalam satuan eceran (minStock boleh pecahan untuk kg, ons, dan liter).
+ */
+export interface ProductInput {
+  /**
+     * @minLength 1
+     * @maxLength 100
+     */
+  name: string;
+  /** @nullable */
+  category: string | null;
+  /**
+     * Dijual per; kg, ons, liter, dan l = barang curah.
+     * @minLength 1
+     * @maxLength 20
+     */
+  sellUnit: string;
+  /** @nullable */
+  barcode: string | null;
+  /**
+     * Modal eceran; diabaikan bila bigUnit.cost terisi.
+     * @minimum 0
+     * @nullable
+     */
+  cost: number | null;
+  /** @minimum 1 */
+  price: number;
+  tier: WholesaleTier | null;
+  bigUnit: BigUnitInput | null;
+  /** @nullable */
+  minStock: number | null;
+}
+
+export interface ProductStatusInput {
+  status: ProductStatus;
+  scarce: boolean;
+}
+
+export interface PriceLineInput {
+  unitId: string;
+  /**
+     * null = harga normal satuan; terisi = tier grosir dengan minQty ini.
+     * @nullable
+     */
+  tierMinQty: number | null;
+  /** @minimum 1 */
+  price: number;
+}
+
+export interface PriceUpdate {
+  /** @minItems 1 */
+  lines: PriceLineInput[];
+}
+
+/**
+ * Field form barang (= kolom template Excel B–O).
+ */
+export type ProductField = typeof ProductField[keyof typeof ProductField];
+
+
+export const ProductField = {
+  name: 'name',
+  category: 'category',
+  sellUnit: 'sellUnit',
+  barcode: 'barcode',
+  cost: 'cost',
+  price: 'price',
+  tierMinQty: 'tierMinQty',
+  tierPrice: 'tierPrice',
+  bigName: 'bigName',
+  bigSize: 'bigSize',
+  bigBarcode: 'bigBarcode',
+  bigCost: 'bigCost',
+  bigPrice: 'bigPrice',
+  minStock: 'minStock',
+} as const;
+
+export interface FieldError {
+  field: ProductField;
+  message: string;
+}
+
+export type ProductValidationProblemCode = typeof ProductValidationProblemCode[keyof typeof ProductValidationProblemCode];
+
+
+export const ProductValidationProblemCode = {
+  VALIDATION: 'VALIDATION',
+} as const;
+
+/**
+ * Problem VALIDATION dengan pesan per field form barang.
+ */
+export type ProductValidationProblem = Problem & {
+  code: ProductValidationProblemCode;
+  errors: FieldError[];
+};
+
+/**
+ * Satu baris sheet Barang; sel B–O berupa teks yang di-trim, null = kosong.
+ */
+export interface ImportRow {
+  /**
+     * Nomor baris Excel (data mulai baris 3).
+     * @minimum 3
+     */
+  row: number;
+  /** @nullable */
+  name: string | null;
+  /** @nullable */
+  category: string | null;
+  /** @nullable */
+  sellUnit: string | null;
+  /** @nullable */
+  barcode: string | null;
+  /** @nullable */
+  cost: string | null;
+  /** @nullable */
+  price: string | null;
+  /** @nullable */
+  tierMinQty: string | null;
+  /** @nullable */
+  tierPrice: string | null;
+  /** @nullable */
+  bigName: string | null;
+  /** @nullable */
+  bigSize: string | null;
+  /** @nullable */
+  bigBarcode: string | null;
+  /** @nullable */
+  bigCost: string | null;
+  /** @nullable */
+  bigPrice: string | null;
+  /** @nullable */
+  minStock: string | null;
+}
+
+export interface ImportRequest {
+  /**
+     * @minItems 1
+     * @maxItems 5000
+     */
+  rows: ImportRow[];
+}
+
+/**
+ * baru = Siap; diperbarui = Akan diperbarui; tidak_berubah = Sudah ada, tidak berubah;
+ * perbaiki = Perbaiki (dilewati saat impor).
+ */
+export type ImportRowStatus = typeof ImportRowStatus[keyof typeof ImportRowStatus];
+
+
+export const ImportRowStatus = {
+  baru: 'baru',
+  diperbarui: 'diperbarui',
+  tidak_berubah: 'tidak_berubah',
+  perbaiki: 'perbaiki',
+} as const;
+
+export interface ImportRowResult {
+  row: number;
+  status: ImportRowStatus;
+  /** Masalah yang harus diperbaiki di Excel (status perbaiki). */
+  problems: string[];
+  /** Apa yang berubah (status diperbarui). */
+  changes: string[];
+  /** Catatan yang tidak menghalangi impor, mis. modal eceran diabaikan atau kategori baru. */
+  notes: string[];
+}
+
+/**
+ * Jumlah baris per status (ready = baru, update = diperbarui, unchanged = tidak_berubah, invalid = perbaiki).
+ */
+export interface ImportSummary {
+  ready: number;
+  update: number;
+  unchanged: number;
+  invalid: number;
+}
+
+export interface ImportCheck {
+  /** Urut nomor baris Excel. */
+  rows: ImportRowResult[];
+  summary: ImportSummary;
+}
+
+/**
+ * skipped = baris tidak berubah ditambah baris bermasalah.
+ */
+export interface ImportResult {
+  created: number;
+  updated: number;
+  skipped: number;
 }
 
 export interface CatalogMatch {
@@ -498,6 +954,21 @@ export type ShiftClosedResponse = Problem;
  * Input tidak valid (VALIDATION atau INVALID_QUANTITY)
  */
 export type ValidationFailedResponse = Problem;
+
+/**
+ * Data barang tidak valid (VALIDATION) dengan pesan per field
+ */
+export type ProductValidationFailedResponse = ProductValidationProblem;
+
+/**
+ * Barang sudah pernah terjual sehingga tidak bisa dihapus (PRODUCT_HAS_SALES)
+ */
+export type ProductHasSalesResponse = Problem;
+
+/**
+ * Kode cocok dengan barang/satuan nonaktif (PRODUCT_INACTIVE)
+ */
+export type ProductInactiveResponse = Problem;
 
 export type LookupCatalogParams = {
 /**

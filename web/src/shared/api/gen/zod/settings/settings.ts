@@ -12,6 +12,7 @@
  * Endpoint pemilik berada di bawah /api/owner dengan realm cookie terpisah total dari kasir:
  * owner_session (berlaku 30 hari). Sesi kasir tidak berlaku di sana dan sebaliknya.
  * HPP dan laba hanya muncul di endpoint /api/owner; endpoint kasir tidak pernah memuatnya.
+ * Data barang: kategori, status, stok, dan modal hanya di /api/owner.
  * Hari bisnis memakai zona Asia/Jakarta.
  *
  * OpenAPI spec version: 0.1.0

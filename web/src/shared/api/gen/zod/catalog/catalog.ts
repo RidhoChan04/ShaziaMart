@@ -12,6 +12,7 @@
  * Endpoint pemilik berada di bawah /api/owner dengan realm cookie terpisah total dari kasir:
  * owner_session (berlaku 30 hari). Sesi kasir tidak berlaku di sana dan sebaliknya.
  * HPP dan laba hanya muncul di endpoint /api/owner; endpoint kasir tidak pernah memuatnya.
+ * Data barang: kategori, status, stok, dan modal hanya di /api/owner.
  * Hari bisnis memakai zona Asia/Jakarta.
  *
  * OpenAPI spec version: 0.1.0
@@ -20,6 +21,8 @@ import * as zod from 'zod';
 
 
 /**
+ * PRODUCT_INACTIVE (410) bila kode cocok dengan barang nonaktif atau satuan nonaktif.
+ * Penjualan yang sudah ada di keranjang tetap diterima createSale.
  * @summary Cari satu barang dari barcode atau kode toko
  */
 export const LookupCatalogQueryParams = zod.object({
@@ -54,7 +57,8 @@ export const LookupCatalogResponse = zod.object({
 
 /**
  * Mencari menurut nama saja (barcode / kode toko lewat lookupCatalog); q kurang dari
- * 2 karakter atau hanya angka menghasilkan daftar kosong. Mengembalikan paling banyak 8 hasil.
+ * 2 karakter atau hanya angka menghasilkan daftar kosong. Mengembalikan paling banyak 8 hasil,
+ * tanpa barang nonaktif dan satuan nonaktif.
  * @summary Cari barang menurut nama
  */
 export const SearchCatalogQueryParams = zod.object({
@@ -89,6 +93,7 @@ export const SearchCatalogResponseItem = zod.object({
 export const SearchCatalogResponse = zod.array(SearchCatalogResponseItem).max(8)
 
 /**
+ * Sesuai quickCurahProductIds, tanpa barang nonaktif dan satuan nonaktif.
  * @summary Barang curah pilihan cepat
  */
 

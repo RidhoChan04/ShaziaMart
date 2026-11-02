@@ -13,6 +13,7 @@ info:
     Endpoint pemilik berada di bawah /api/owner dengan realm cookie terpisah total dari kasir:
     owner_session (berlaku 30 hari). Sesi kasir tidak berlaku di sana dan sebaliknya.
     HPP dan laba hanya muncul di endpoint /api/owner; endpoint kasir tidak pernah memuatnya.
+    Data barang: kategori, status, stok, dan modal hanya di /api/owner.
     Hari bisnis memakai zona Asia/Jakarta.
 tags:
   - name: system
@@ -191,6 +192,9 @@ paths:
       tags: [catalog]
       operationId: lookupCatalog
       summary: Cari satu barang dari barcode atau kode toko
+      description: |
+        PRODUCT_INACTIVE (410) bila kode cocok dengan barang nonaktif atau satuan nonaktif.
+        Penjualan yang sudah ada di keranjang tetap diterima createSale.
       parameters:
         - name: code
           in: query
@@ -207,6 +211,8 @@ paths:
                 $ref: "#/components/schemas/CatalogMatch"
         "404":
           $ref: "#/components/responses/NotFound"
+        "410":
+          $ref: "#/components/responses/ProductInactive"
         "422":
           description: Parameter code kosong atau tidak ada (VALIDATION)
           content:
@@ -220,7 +226,8 @@ paths:
       summary: Cari barang menurut nama
       description: |
         Mencari menurut nama saja (barcode / kode toko lewat lookupCatalog); q kurang dari
-        2 karakter atau hanya angka menghasilkan daftar kosong. Mengembalikan paling banyak 8 hasil.
+        2 karakter atau hanya angka menghasilkan daftar kosong. Mengembalikan paling banyak 8 hasil,
+        tanpa barang nonaktif dan satuan nonaktif.
       parameters:
         - name: q
           in: query
@@ -243,6 +250,7 @@ paths:
       tags: [catalog]
       operationId: listQuickCurah
       summary: Barang curah pilihan cepat
+      description: Sesuai quickCurahProductIds, tanpa barang nonaktif dan satuan nonaktif.
       responses:
         "200":
           description: Kecocokan sesuai quickCurahProductIds
@@ -490,7 +498,292 @@ paths:
                 $ref: "#/components/schemas/OwnerTodaySummary"
         "401":
           $ref: "#/components/responses/Unauthorized"
+  /api/owner/products:
+    get:
+      tags: [owner]
+      operationId: listOwnerProducts
+      summary: Daftar semua barang untuk pemilik
+      description: Semua barang, termasuk nonaktif; urut nama.
+      security:
+        - ownerCookieAuth: []
+      responses:
+        "200":
+          description: Barang
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OwnerProductRow"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [owner]
+      operationId: createOwnerProduct
+      summary: Tambah barang
+      description: Barang baru dimulai dengan stok 0, stockCounted false, status aktif.
+      security:
+        - ownerCookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductInput"
+      responses:
+        "201":
+          description: Barang dibuat
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnerProduct"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ProductValidationFailed"
+  /api/owner/products/{productId}:
+    get:
+      tags: [owner]
+      operationId: getOwnerProduct
+      summary: Detail barang
+      security:
+        - ownerCookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ProductId"
+      responses:
+        "200":
+          description: Barang
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnerProduct"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [owner]
+      operationId: updateOwnerProduct
+      summary: Ubah barang
+      description: |
+        Field null menghapus nilainya. Barang yang sudah terjual: 'Dijual per' dan isi satuan
+        yang sudah terjual dikunci (422); satuan besar terjual yang diganti dinonaktifkan.
+      security:
+        - ownerCookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ProductId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductInput"
+      responses:
+        "200":
+          description: Barang diubah
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnerProduct"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ProductValidationFailed"
+    delete:
+      tags: [owner]
+      operationId: deleteOwnerProduct
+      summary: Hapus barang permanen
+      description: Hanya barang yang belum pernah terjual; selain itu 409 PRODUCT_HAS_SALES (gunakan nonaktif).
+      security:
+        - ownerCookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ProductId"
+      responses:
+        "204":
+          description: Barang dihapus
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/ProductHasSales"
+  /api/owner/products/{productId}/status:
+    put:
+      tags: [owner]
+      operationId: setOwnerProductStatus
+      summary: Ubah status barang dan tanda Sedang langka
+      security:
+        - ownerCookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ProductId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductStatusInput"
+      responses:
+        "200":
+          description: Status diubah
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnerProduct"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /api/owner/products/{productId}/prices:
+    put:
+      tags: [owner]
+      operationId: updateOwnerProductPrices
+      summary: Ubah harga jual beberapa baris harga sekaligus
+      description: |
+        Satu baris = harga normal satu satuan (tierMinQty null) atau satu tier grosirnya.
+        Sukses juga menghapus peringatan modal barang ini.
+      security:
+        - ownerCookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ProductId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PriceUpdate"
+      responses:
+        "200":
+          description: Harga diubah
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnerProduct"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ProductValidationFailed"
+  /api/owner/products/{productId}/cost-alert:
+    delete:
+      tags: [owner]
+      operationId: dismissOwnerCostAlert
+      summary: Harga tetap — hapus peringatan modal berubah
+      description: Idempoten; 204 juga bila tidak ada peringatan.
+      security:
+        - ownerCookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ProductId"
+      responses:
+        "204":
+          description: Peringatan dihapus
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /api/owner/products/{productId}/movements:
+    get:
+      tags: [owner]
+      operationId: listOwnerProductMovements
+      summary: Riwayat stok barang
+      security:
+        - ownerCookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ProductId"
+      responses:
+        "200":
+          description: Mutasi stok, terbaru dulu
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StockMovement"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /api/owner/categories:
+    get:
+      tags: [owner]
+      operationId: listOwnerCategories
+      summary: Daftar kategori barang
+      description: Kategori yang dikelola; kategori baru dari form atau impor ditambahkan di akhir.
+      security:
+        - ownerCookieAuth: []
+      responses:
+        "200":
+          description: Kategori
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/owner/product-imports/check:
+    post:
+      tags: [owner]
+      operationId: checkOwnerProductImport
+      summary: Periksa baris impor Excel tanpa menyimpan
+      description: Baris yang semua selnya null diabaikan.
+      security:
+        - ownerCookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImportRequest"
+      responses:
+        "200":
+          description: Hasil pemeriksaan per baris
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportCheck"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+  /api/owner/product-imports:
+    post:
+      tags: [owner]
+      operationId: commitOwnerProductImport
+      summary: Impor baris Excel
+      description: |
+        Memvalidasi ulang lalu menyimpan baris baru dan diperbarui sekaligus (atomik); baris tidak
+        berubah dan baris bermasalah dilewati. Sel kosong tidak menghapus data lama.
+      security:
+        - ownerCookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImportRequest"
+      responses:
+        "200":
+          description: Impor selesai
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
 components:
+  parameters:
+    ProductId:
+      name: productId
+      in: path
+      required: true
+      schema:
+        type: string
   securitySchemes:
     cookieAuth:
       type: apiKey
@@ -561,6 +854,24 @@ components:
         application/problem+json:
           schema:
             $ref: "#/components/schemas/Problem"
+    ProductValidationFailed:
+      description: Data barang tidak valid (VALIDATION) dengan pesan per field
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProductValidationProblem"
+    ProductHasSales:
+      description: Barang sudah pernah terjual sehingga tidak bisa dihapus (PRODUCT_HAS_SALES)
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    ProductInactive:
+      description: Kode cocok dengan barang/satuan nonaktif (PRODUCT_INACTIVE)
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
   schemas:
     Health:
       type: object
@@ -591,6 +902,8 @@ components:
         - CREDIT_LIMIT
         - INVALID_QUANTITY
         - LOGIN_INVALID
+        - PRODUCT_INACTIVE
+        - PRODUCT_HAS_SALES
     Problem:
       type: object
       required: [type, title, status, code]
@@ -734,14 +1047,19 @@ components:
           description: Jumlah saldo kasbon seluruh pelanggan tersebut (rupiah).
     Attention:
       type: object
-      required: [lowStockCount, negativeStockCount, cashDifferences, overdueCredit]
+      required: [lowStockCount, negativeStockCount, cashDifferences, overdueCredit, costChanges, stockOuts]
       properties:
         lowStockCount:
           type: integer
-          description: Jumlah barang dengan 0 <= stok < stok minimum.
+          description: |
+            Jumlah barang dengan stockAlert menipis (0 <= stok < minStock). Aturan penanda diam:
+            tidak termasuk barang stockCounted false, Sedang langka (scarce), tidak_diambil, atau nonaktif.
         negativeStockCount:
           type: integer
-          description: Jumlah barang dengan stok < 0; dihitung terpisah, tidak termasuk di lowStockCount.
+          description: |
+            Jumlah barang dengan stockAlert minus (stok < 0); dihitung terpisah, tidak termasuk di
+            lowStockCount. Aturan penanda diam: tidak termasuk barang stockCounted false atau
+            nonaktif; Sedang langka (scarce) dan tidak_diambil tetap dihitung.
         cashDifferences:
           type: array
           description: Shift yang sudah ditutup dengan selisih kas tidak nol, dengan closedAt jatuh pada hari ini (Asia/Jakarta); terbaru dulu.
@@ -749,6 +1067,50 @@ components:
             $ref: "#/components/schemas/CashDifference"
         overdueCredit:
           $ref: "#/components/schemas/OverdueCredit"
+        costChanges:
+          type: array
+          description: Barang yang modal satuan ecerannya berubah dan belum ditindaklanjuti pemilik; terbaru dulu.
+          items:
+            $ref: "#/components/schemas/CostChangeItem"
+        stockOuts:
+          type: array
+          description: Barang tidak_diambil yang stoknya sudah dihitung dan habis (stok <= 0); urut nama.
+          items:
+            $ref: "#/components/schemas/StockOutItem"
+    CostChangeItem:
+      type: object
+      description: |
+        Satu butir per barang. oldCost = modal satuan eceran saat butir dibuat; newCost = modal
+        satuan eceran sekarang; price = harga jual eceran sekarang (semua rupiah).
+      required: [productId, productName, unitName, oldCost, newCost, price, changedAt, source]
+      properties:
+        productId:
+          type: string
+        productName:
+          type: string
+        unitName:
+          type: string
+          description: Nama satuan eceran.
+        oldCost:
+          type: integer
+        newCost:
+          type: integer
+        price:
+          type: integer
+        changedAt:
+          type: integer
+          format: int64
+          description: Waktu perubahan modal terakhir (epoch ms UTC).
+        source:
+          $ref: "#/components/schemas/PriceSource"
+    StockOutItem:
+      type: object
+      required: [productId, productName]
+      properties:
+        productId:
+          type: string
+        productName:
+          type: string
     OwnerTodaySummary:
       type: object
       description: |
@@ -934,6 +1296,469 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ProductUnit"
+    ProductStatus:
+      type: string
+      description: |
+        aktif; tidak_diambil = tetap dijual sampai habis, tanpa peringatan menipis;
+        nonaktif = tidak muncul di kasir (pencarian, scan, curah cepat), riwayat tetap.
+      enum: [aktif, tidak_diambil, nonaktif]
+    StockAlert:
+      type: string
+      description: |
+        minus bila stok < 0; menipis bila 0 <= stok < minStock (minStock null = tanpa batas);
+        selain itu none. Penanda diam: stockCounted false (Stok belum dihitung) → none, tidak
+        menipis maupun minus; scarce (Sedang langka) dan status tidak_diambil hanya membungkam
+        menipis (minus tetap muncul); status nonaktif → none.
+      enum: [none, menipis, minus]
+    PriceSource:
+      type: string
+      description: pemilik = diubah di aplikasi pemilik; impor = lewat Impor Excel.
+      enum: [pemilik, impor]
+    ProductCost:
+      type: object
+      description: |
+        HPP: amount rupiah per qtyBase satuan dasar.
+        Modal satuan = round_half_up(amount × unitSize ÷ qtyBase).
+      required: [amount, qtyBase]
+      properties:
+        amount:
+          type: integer
+          minimum: 0
+        qtyBase:
+          type: integer
+          minimum: 1
+    OwnerProductUnit:
+      description: Satuan jual versi pemilik (field ProductUnit ditambah modal dan status satuan).
+      allOf:
+        - $ref: "#/components/schemas/ProductUnit"
+        - type: object
+          required: [cost, active, sold]
+          properties:
+            cost:
+              type: integer
+              nullable: true
+              description: Modal satuan ini (rupiah) dari HPP barang; null bila HPP belum diisi.
+            active:
+              type: boolean
+              description: false = satuan nonaktif (tidak dijual di kasir; barcodenya tetap terpakai).
+            sold:
+              type: boolean
+              description: Satuan pernah terjual (isi dikunci; bila diganti dinonaktifkan, bukan dihapus).
+    OwnerProductRow:
+      type: object
+      description: Baris daftar barang pemilik; unitName, unitSize, dan price = satuan eceran.
+      required: [id, name, storeCode, category, status, scarce, stockCounted, isCurah, baseUnit, unitName, unitSize, price, barcodes, stock, stockAlert]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        storeCode:
+          type: string
+        category:
+          type: string
+          nullable: true
+        status:
+          $ref: "#/components/schemas/ProductStatus"
+        scarce:
+          type: boolean
+          description: Tanda Sedang langka.
+        stockCounted:
+          type: boolean
+          description: false = Stok belum dihitung (belum pernah opname atau barang masuk).
+        isCurah:
+          type: boolean
+        baseUnit:
+          type: string
+          enum: [pcs, gram, ml]
+        unitName:
+          type: string
+        unitSize:
+          type: integer
+          minimum: 1
+        price:
+          type: integer
+        barcodes:
+          type: array
+          description: Barcode semua satuan (untuk pencarian).
+          items:
+            type: string
+        stock:
+          type: integer
+          description: Stok dalam qtyBase.
+        stockAlert:
+          $ref: "#/components/schemas/StockAlert"
+    OwnerProduct:
+      type: object
+      required: [id, name, storeCode, category, status, scarce, stockCounted, isCurah, baseUnit, units, cost, stock, minStock, stockAlert, hasSales, costAlert, recentMovements, priceHistory]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        storeCode:
+          type: string
+        category:
+          type: string
+          nullable: true
+        status:
+          $ref: "#/components/schemas/ProductStatus"
+        scarce:
+          type: boolean
+          description: Tanda Sedang langka.
+        stockCounted:
+          type: boolean
+          description: false = Stok belum dihitung (belum pernah opname atau barang masuk).
+        isCurah:
+          type: boolean
+        baseUnit:
+          type: string
+          enum: [pcs, gram, ml]
+        units:
+          type: array
+          description: Semua satuan termasuk nonaktif; units[0] = satuan eceran.
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/OwnerProductUnit"
+        cost:
+          nullable: true
+          description: HPP barang; null bila modal belum diisi.
+          allOf:
+            - $ref: "#/components/schemas/ProductCost"
+        stock:
+          type: integer
+          description: Stok dalam qtyBase.
+        minStock:
+          type: integer
+          nullable: true
+          description: Batas stok menipis dalam qtyBase; null = tanpa batas.
+        stockAlert:
+          $ref: "#/components/schemas/StockAlert"
+        hasSales:
+          type: boolean
+          description: Barang pernah terjual (tidak bisa dihapus).
+        costAlert:
+          nullable: true
+          description: Peringatan modal berubah yang belum ditindaklanjuti.
+          allOf:
+            - $ref: "#/components/schemas/CostAlert"
+        recentMovements:
+          type: array
+          description: Mutasi stok, terbaru dulu.
+          maxItems: 5
+          items:
+            $ref: "#/components/schemas/StockMovement"
+        priceHistory:
+          type: array
+          description: Riwayat harga jual, terbaru dulu.
+          items:
+            $ref: "#/components/schemas/PriceHistoryEntry"
+    CostAlert:
+      type: object
+      description: fromCost = HPP saat peringatan dibuat; changedAt dan source = perubahan modal terakhir.
+      required: [fromCost, changedAt, source]
+      properties:
+        fromCost:
+          $ref: "#/components/schemas/ProductCost"
+        changedAt:
+          type: integer
+          format: int64
+        source:
+          $ref: "#/components/schemas/PriceSource"
+    StockMovement:
+      type: object
+      required: [id, at, kind, qtyBase, kasirName]
+      properties:
+        id:
+          type: string
+        at:
+          type: integer
+          format: int64
+        kind:
+          type: string
+          enum: [jual, batal]
+        qtyBase:
+          type: integer
+          description: Bertanda; jual negatif, batal positif.
+        kasirName:
+          type: string
+    PriceHistoryEntry:
+      type: object
+      required: [id, at, unitId, unitName, isEceran, unitSize, tierMinQty, oldPrice, newPrice, source]
+      properties:
+        id:
+          type: string
+        at:
+          type: integer
+          format: int64
+        unitId:
+          type: string
+        unitName:
+          type: string
+        isEceran:
+          type: boolean
+        unitSize:
+          type: integer
+        tierMinQty:
+          type: integer
+          nullable: true
+          description: null = harga normal satuan; terisi = harga tier grosir dengan minQty ini.
+        oldPrice:
+          type: integer
+          nullable: true
+          description: null = baris harga baru ditambah.
+        newPrice:
+          type: integer
+          nullable: true
+          description: null = baris harga dihapus.
+        source:
+          $ref: "#/components/schemas/PriceSource"
+    ProductInput:
+      type: object
+      description: |
+        Isi form barang, mengikuti template Excel. Uang integer rupiah. minStock dan bigUnit.size
+        dalam satuan eceran (minStock boleh pecahan untuk kg, ons, dan liter).
+      required: [name, category, sellUnit, barcode, cost, price, tier, bigUnit, minStock]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        category:
+          type: string
+          nullable: true
+        sellUnit:
+          type: string
+          minLength: 1
+          maxLength: 20
+          description: Dijual per; kg, ons, liter, dan l = barang curah.
+        barcode:
+          type: string
+          nullable: true
+        cost:
+          type: integer
+          nullable: true
+          minimum: 0
+          description: Modal eceran; diabaikan bila bigUnit.cost terisi.
+        price:
+          type: integer
+          minimum: 1
+        tier:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/WholesaleTier"
+        bigUnit:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/BigUnitInput"
+        minStock:
+          type: number
+          nullable: true
+    BigUnitInput:
+      type: object
+      required: [unitId, name, size, barcode, cost, price]
+      properties:
+        unitId:
+          type: string
+          nullable: true
+          description: Satuan besar yang diubah; null = satuan besar baru.
+        name:
+          type: string
+        size:
+          type: integer
+          minimum: 2
+          description: Isi dalam satuan eceran.
+        barcode:
+          type: string
+          nullable: true
+        cost:
+          type: integer
+          nullable: true
+          minimum: 0
+        price:
+          type: integer
+          minimum: 1
+    ProductStatusInput:
+      type: object
+      required: [status, scarce]
+      properties:
+        status:
+          $ref: "#/components/schemas/ProductStatus"
+        scarce:
+          type: boolean
+    PriceUpdate:
+      type: object
+      required: [lines]
+      properties:
+        lines:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/PriceLineInput"
+    PriceLineInput:
+      type: object
+      required: [unitId, tierMinQty, price]
+      properties:
+        unitId:
+          type: string
+        tierMinQty:
+          type: integer
+          nullable: true
+          description: null = harga normal satuan; terisi = tier grosir dengan minQty ini.
+        price:
+          type: integer
+          minimum: 1
+    ProductField:
+      type: string
+      description: Field form barang (= kolom template Excel B–O).
+      enum: [name, category, sellUnit, barcode, cost, price, tierMinQty, tierPrice, bigName, bigSize, bigBarcode, bigCost, bigPrice, minStock]
+    FieldError:
+      type: object
+      required: [field, message]
+      properties:
+        field:
+          $ref: "#/components/schemas/ProductField"
+        message:
+          type: string
+    ProductValidationProblem:
+      description: Problem VALIDATION dengan pesan per field form barang.
+      allOf:
+        - $ref: "#/components/schemas/Problem"
+        - type: object
+          required: [code, errors]
+          properties:
+            code:
+              type: string
+              enum: [VALIDATION]
+            errors:
+              type: array
+              items:
+                $ref: "#/components/schemas/FieldError"
+    ImportRow:
+      type: object
+      description: Satu baris sheet Barang; sel B–O berupa teks yang di-trim, null = kosong.
+      required: [row, name, category, sellUnit, barcode, cost, price, tierMinQty, tierPrice, bigName, bigSize, bigBarcode, bigCost, bigPrice, minStock]
+      properties:
+        row:
+          type: integer
+          minimum: 3
+          description: Nomor baris Excel (data mulai baris 3).
+        name:
+          type: string
+          nullable: true
+        category:
+          type: string
+          nullable: true
+        sellUnit:
+          type: string
+          nullable: true
+        barcode:
+          type: string
+          nullable: true
+        cost:
+          type: string
+          nullable: true
+        price:
+          type: string
+          nullable: true
+        tierMinQty:
+          type: string
+          nullable: true
+        tierPrice:
+          type: string
+          nullable: true
+        bigName:
+          type: string
+          nullable: true
+        bigSize:
+          type: string
+          nullable: true
+        bigBarcode:
+          type: string
+          nullable: true
+        bigCost:
+          type: string
+          nullable: true
+        bigPrice:
+          type: string
+          nullable: true
+        minStock:
+          type: string
+          nullable: true
+    ImportRequest:
+      type: object
+      required: [rows]
+      properties:
+        rows:
+          type: array
+          minItems: 1
+          maxItems: 5000
+          items:
+            $ref: "#/components/schemas/ImportRow"
+    ImportRowStatus:
+      type: string
+      description: |
+        baru = Siap; diperbarui = Akan diperbarui; tidak_berubah = Sudah ada, tidak berubah;
+        perbaiki = Perbaiki (dilewati saat impor).
+      enum: [baru, diperbarui, tidak_berubah, perbaiki]
+    ImportRowResult:
+      type: object
+      required: [row, status, problems, changes, notes]
+      properties:
+        row:
+          type: integer
+        status:
+          $ref: "#/components/schemas/ImportRowStatus"
+        problems:
+          type: array
+          description: Masalah yang harus diperbaiki di Excel (status perbaiki).
+          items:
+            type: string
+        changes:
+          type: array
+          description: Apa yang berubah (status diperbarui).
+          items:
+            type: string
+        notes:
+          type: array
+          description: Catatan yang tidak menghalangi impor, mis. modal eceran diabaikan atau kategori baru.
+          items:
+            type: string
+    ImportSummary:
+      type: object
+      description: Jumlah baris per status (ready = baru, update = diperbarui, unchanged = tidak_berubah, invalid = perbaiki).
+      required: [ready, update, unchanged, invalid]
+      properties:
+        ready:
+          type: integer
+        update:
+          type: integer
+        unchanged:
+          type: integer
+        invalid:
+          type: integer
+    ImportCheck:
+      type: object
+      required: [rows, summary]
+      properties:
+        rows:
+          type: array
+          description: Urut nomor baris Excel.
+          items:
+            $ref: "#/components/schemas/ImportRowResult"
+        summary:
+          $ref: "#/components/schemas/ImportSummary"
+    ImportResult:
+      type: object
+      description: skipped = baris tidak berubah ditambah baris bermasalah.
+      required: [created, updated, skipped]
+      properties:
+        created:
+          type: integer
+        updated:
+          type: integer
+        skipped:
+          type: integer
     CatalogMatch:
       type: object
       required: [product, unitId]

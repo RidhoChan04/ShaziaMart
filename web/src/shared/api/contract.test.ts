@@ -1,15 +1,23 @@
 import { expect, expectTypeOf, test } from "vitest";
 import type { z } from "zod";
 import type {
+  Attention,
+  CostChangeItem,
   CreditLimitProblem,
+  OwnerProductUnit,
   OwnerTodaySummary,
   PriceChangedProblem,
+  Product,
+  StockOutItem,
 } from "./gen/shaziaMartAPI.schemas";
 import { ErrorCode } from "./gen/shaziaMartAPI.schemas";
 import { LookupCatalogResponse } from "./gen/zod/catalog/catalog";
 import {
+  CheckOwnerProductImportBody,
+  CreateOwnerProductBody,
   GetOwnerTodaySummaryResponse,
   OwnerLoginBody,
+  UpdateOwnerProductPricesBody,
 } from "./gen/zod/owner/owner";
 import { CreateSaleBody, VoidSaleBody } from "./gen/zod/sales/sales";
 import { creditLimitProblemSchema, priceChangedProblemSchema } from "./problem";
@@ -68,9 +76,112 @@ test("creditLimitProblemSchema cocok dengan tipe hasil generate", () => {
   expect(ok.success).toBe(true);
 });
 
-test("ErrorCode berisi 14 kode termasuk LOGIN_INVALID", () => {
-  expect(Object.values(ErrorCode)).toHaveLength(14);
+test("ErrorCode 16 nilai termasuk PRODUCT_INACTIVE dan PRODUCT_HAS_SALES", () => {
+  expect(Object.values(ErrorCode)).toHaveLength(16);
+  expect(Object.values(ErrorCode)).toEqual(
+    expect.arrayContaining(["PRODUCT_INACTIVE", "PRODUCT_HAS_SALES"]),
+  );
   expect(ErrorCode.LOGIN_INVALID).toBe("LOGIN_INVALID");
+});
+
+test("Product kasir tanpa field pemilik; OwnerProductUnit punya cost", () => {
+  expectTypeOf<keyof Product>().toEqualTypeOf<
+    "id" | "name" | "storeCode" | "isCurah" | "baseUnit" | "units"
+  >();
+  expectTypeOf<OwnerProductUnit["cost"]>().toEqualTypeOf<number | null>();
+});
+
+test("CreateOwnerProductBody menolak price 0 dan menerima contoh Teh Pucuk", () => {
+  const teh = {
+    name: "Teh Pucuk Harum 350 ml",
+    category: "Minuman",
+    sellUnit: "botol",
+    barcode: "8996001600269",
+    cost: 3000,
+    price: 4000,
+    tier: { minQty: 12, price: 3750 },
+    bigUnit: {
+      unitId: null,
+      name: "dus",
+      size: 24,
+      barcode: null,
+      cost: 70000,
+      price: 84000,
+    },
+    minStock: 24,
+  };
+  expect(CreateOwnerProductBody.safeParse(teh).success).toBe(true);
+  expect(CreateOwnerProductBody.safeParse({ ...teh, price: 0 }).success).toBe(
+    false,
+  );
+  const minimal = {
+    ...teh,
+    category: null,
+    barcode: null,
+    cost: null,
+    tier: null,
+    bigUnit: null,
+    minStock: 2.5,
+  };
+  expect(CreateOwnerProductBody.safeParse(minimal).success).toBe(true);
+  expect(CreateOwnerProductBody.safeParse({ ...teh, name: "" }).success).toBe(
+    false,
+  );
+  expect(
+    CreateOwnerProductBody.safeParse({
+      ...teh,
+      bigUnit: { ...teh.bigUnit, size: 1 },
+    }).success,
+  ).toBe(false);
+});
+
+test("CheckOwnerProductImportBody menolak rows kosong; menerima baris semua null", () => {
+  const empty = {
+    row: 3,
+    name: null,
+    category: null,
+    sellUnit: null,
+    barcode: null,
+    cost: null,
+    price: null,
+    tierMinQty: null,
+    tierPrice: null,
+    bigName: null,
+    bigSize: null,
+    bigBarcode: null,
+    bigCost: null,
+    bigPrice: null,
+    minStock: null,
+  };
+  expect(CheckOwnerProductImportBody.safeParse({ rows: [] }).success).toBe(
+    false,
+  );
+  expect(CheckOwnerProductImportBody.safeParse({ rows: [empty] }).success).toBe(
+    true,
+  );
+  expect(
+    CheckOwnerProductImportBody.safeParse({ rows: [{ ...empty, row: 2 }] })
+      .success,
+  ).toBe(false);
+});
+
+test("UpdateOwnerProductPricesBody menolak lines kosong dan harga 0", () => {
+  const line = { unitId: "u1", tierMinQty: null, price: 3500 };
+  expect(
+    UpdateOwnerProductPricesBody.safeParse({ lines: [line] }).success,
+  ).toBe(true);
+  expect(UpdateOwnerProductPricesBody.safeParse({ lines: [] }).success).toBe(
+    false,
+  );
+  expect(
+    UpdateOwnerProductPricesBody.safeParse({ lines: [{ ...line, price: 0 }] })
+      .success,
+  ).toBe(false);
+});
+
+test("Attention memuat costChanges dan stockOuts", () => {
+  expectTypeOf<Attention["costChanges"]>().toEqualTypeOf<CostChangeItem[]>();
+  expectTypeOf<Attention["stockOuts"]>().toEqualTypeOf<StockOutItem[]>();
 });
 
 test("OwnerLogin menolak nama kosong dan password kosong", () => {
@@ -107,6 +218,19 @@ test("fixture OwnerTodaySummary valid terhadap skema respons dan tipe", () => {
         },
       ],
       overdueCredit: { count: 1, total: 75000 },
+      costChanges: [
+        {
+          productId: "p1",
+          productName: "Gula Pasir",
+          unitName: "kg",
+          oldCost: 16500,
+          newCost: 17000,
+          price: 18000,
+          changedAt: 1790000000000,
+          source: "impor",
+        },
+      ],
+      stockOuts: [{ productId: "p2", productName: "Teh Kotak" }],
     },
   } satisfies OwnerTodaySummary;
   expect(GetOwnerTodaySummaryResponse.safeParse(summary).success).toBe(true);

@@ -15,6 +15,9 @@ const MESSAGES: Record<string, string> = {
   CREDIT_LIMIT: "Kasbon melebihi limit pelanggan",
   INVALID_QUANTITY: "Jumlah tidak valid",
   NOT_FOUND: "Data tidak ditemukan",
+  PRODUCT_INACTIVE: "Barang ini tidak dijual lagi",
+  PRODUCT_HAS_SALES:
+    "Barang yang sudah pernah terjual tidak bisa dihapus — gunakan Nonaktif.",
   INTERNAL: GENERIC,
 };
 

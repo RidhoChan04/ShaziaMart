@@ -15,6 +15,11 @@ test.each([
   ["CREDIT_LIMIT", "Kasbon melebihi limit pelanggan"],
   ["INVALID_QUANTITY", "Jumlah tidak valid"],
   ["NOT_FOUND", "Data tidak ditemukan"],
+  ["PRODUCT_INACTIVE", "Barang ini tidak dijual lagi"],
+  [
+    "PRODUCT_HAS_SALES",
+    "Barang yang sudah pernah terjual tidak bisa dihapus — gunakan Nonaktif.",
+  ],
   ["INTERNAL", "Terjadi kesalahan di server"],
 ] as const)("pesanError(%s)", (code, msg) =>
   expect(pesanError(new ApiError({ status: 0, code }))).toBe(msg),

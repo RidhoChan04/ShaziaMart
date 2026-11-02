@@ -57,6 +57,8 @@ function attention(state: Readonly<MockState>, now: number): Attention {
       count: overdue.length,
       total: sum(overdue.map((c) => c.balance)),
     },
+    costChanges: [],
+    stockOuts: [],
   };
 }
 

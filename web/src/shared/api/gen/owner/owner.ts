@@ -12,6 +12,7 @@
  * Endpoint pemilik berada di bawah /api/owner dengan realm cookie terpisah total dari kasir:
  * owner_session (berlaku 30 hari). Sesi kasir tidak berlaku di sana dan sebaliknya.
  * HPP dan laba hanya muncul di endpoint /api/owner; endpoint kasir tidak pernah memuatnya.
+ * Data barang: kategori, status, stok, dan modal hanya di /api/owner.
  * Hari bisnis memakai zona Asia/Jakarta.
  *
  * OpenAPI spec version: 0.1.0
@@ -36,11 +37,23 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  ImportCheck,
+  ImportRequest,
+  ImportResult,
   LockedOutResponse,
   LoginInvalidResponse,
+  NotFoundResponse,
   OwnerLogin,
+  OwnerProduct,
+  OwnerProductRow,
   OwnerSession,
   OwnerTodaySummary,
+  PriceUpdate,
+  ProductHasSalesResponse,
+  ProductInput,
+  ProductStatusInput,
+  ProductValidationFailedResponse,
+  StockMovement,
   UnauthorizedResponse,
   ValidationFailedResponse
 } from '../shaziaMartAPI.schemas';
@@ -433,3 +446,1086 @@ export function useGetOwnerTodaySummary<TData = Awaited<ReturnType<typeof getOwn
 
 
 
+export const getListOwnerProductsUrl = () => {
+
+
+
+
+  return `/api/owner/products`
+}
+
+/**
+ * Semua barang, termasuk nonaktif; urut nama.
+ * @summary Daftar semua barang untuk pemilik
+ */
+export const listOwnerProducts = async ( options?: Parameters<typeof customFetch>[1]): Promise<OwnerProductRow[]> => {
+
+  return customFetch<OwnerProductRow[]>(getListOwnerProductsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListOwnerProductsQueryKey = () => {
+    return [
+    `/api/owner/products`
+    ] as const;
+    }
+
+
+export const getListOwnerProductsQueryOptions = <TData = Awaited<ReturnType<typeof listOwnerProducts>>, TError = ErrorType<UnauthorizedResponse>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOwnerProducts>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListOwnerProductsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listOwnerProducts>>> = ({ signal }) => listOwnerProducts({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listOwnerProducts>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListOwnerProductsQueryResult = NonNullable<Awaited<ReturnType<typeof listOwnerProducts>>>
+export type ListOwnerProductsQueryError = ErrorType<UnauthorizedResponse>
+
+
+export function useListOwnerProducts<TData = Awaited<ReturnType<typeof listOwnerProducts>>, TError = ErrorType<UnauthorizedResponse>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOwnerProducts>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listOwnerProducts>>,
+          TError,
+          Awaited<ReturnType<typeof listOwnerProducts>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListOwnerProducts<TData = Awaited<ReturnType<typeof listOwnerProducts>>, TError = ErrorType<UnauthorizedResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOwnerProducts>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listOwnerProducts>>,
+          TError,
+          Awaited<ReturnType<typeof listOwnerProducts>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListOwnerProducts<TData = Awaited<ReturnType<typeof listOwnerProducts>>, TError = ErrorType<UnauthorizedResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOwnerProducts>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Daftar semua barang untuk pemilik
+ */
+
+export function useListOwnerProducts<TData = Awaited<ReturnType<typeof listOwnerProducts>>, TError = ErrorType<UnauthorizedResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOwnerProducts>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListOwnerProductsQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+export const getCreateOwnerProductUrl = () => {
+
+
+
+
+  return `/api/owner/products`
+}
+
+/**
+ * Barang baru dimulai dengan stok 0, stockCounted false, status aktif.
+ * @summary Tambah barang
+ */
+export const createOwnerProduct = async (productInput: ProductInput, options?: Parameters<typeof customFetch>[1]): Promise<OwnerProduct> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<OwnerProduct>(getCreateOwnerProductUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(productInput)
+  }
+);}
+
+
+
+
+
+export const getCreateOwnerProductMutationKey = () => ['createOwnerProduct'] as const;
+
+export const getCreateOwnerProductMutationOptions = <TError = ErrorType<UnauthorizedResponse | ProductValidationFailedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createOwnerProduct>>, TError,CreateOwnerProductMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createOwnerProduct>>, TError,CreateOwnerProductMutationVariables, TContext> => {
+
+const mutationKey = getCreateOwnerProductMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createOwnerProduct>>, CreateOwnerProductMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  createOwnerProduct(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateOwnerProductMutationResult = NonNullable<Awaited<ReturnType<typeof createOwnerProduct>>>
+    export type CreateOwnerProductMutationBody = ProductInput
+    export type CreateOwnerProductMutationError = ErrorType<UnauthorizedResponse | ProductValidationFailedResponse>
+    export type CreateOwnerProductMutationVariables = {data: ProductInput}
+
+    /**
+ * @summary Tambah barang
+ */
+export const useCreateOwnerProduct = <TError = ErrorType<UnauthorizedResponse | ProductValidationFailedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createOwnerProduct>>, TError,CreateOwnerProductMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof createOwnerProduct>>,
+        TError,
+        CreateOwnerProductMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateOwnerProductMutationOptions(options), queryClient);
+    }
+    export const getGetOwnerProductUrl = (productId: string,) => {
+
+
+
+
+  return `/api/owner/products/${productId}`
+}
+
+/**
+ * @summary Detail barang
+ */
+export const getOwnerProduct = async (productId: string, options?: Parameters<typeof customFetch>[1]): Promise<OwnerProduct> => {
+
+  return customFetch<OwnerProduct>(getGetOwnerProductUrl(productId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetOwnerProductQueryKey = (productId: string,) => {
+    return [
+    `/api/owner/products/${productId}`
+    ] as const;
+    }
+
+
+export const getGetOwnerProductQueryOptions = <TData = Awaited<ReturnType<typeof getOwnerProduct>>, TError = ErrorType<UnauthorizedResponse | NotFoundResponse>>(productId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerProduct>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetOwnerProductQueryKey(productId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOwnerProduct>>> = ({ signal }) => getOwnerProduct(productId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: productId !== null && productId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getOwnerProduct>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetOwnerProductQueryResult = NonNullable<Awaited<ReturnType<typeof getOwnerProduct>>>
+export type GetOwnerProductQueryError = ErrorType<UnauthorizedResponse | NotFoundResponse>
+
+
+export function useGetOwnerProduct<TData = Awaited<ReturnType<typeof getOwnerProduct>>, TError = ErrorType<UnauthorizedResponse | NotFoundResponse>>(
+ productId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerProduct>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getOwnerProduct>>,
+          TError,
+          Awaited<ReturnType<typeof getOwnerProduct>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetOwnerProduct<TData = Awaited<ReturnType<typeof getOwnerProduct>>, TError = ErrorType<UnauthorizedResponse | NotFoundResponse>>(
+ productId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerProduct>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getOwnerProduct>>,
+          TError,
+          Awaited<ReturnType<typeof getOwnerProduct>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetOwnerProduct<TData = Awaited<ReturnType<typeof getOwnerProduct>>, TError = ErrorType<UnauthorizedResponse | NotFoundResponse>>(
+ productId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerProduct>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Detail barang
+ */
+
+export function useGetOwnerProduct<TData = Awaited<ReturnType<typeof getOwnerProduct>>, TError = ErrorType<UnauthorizedResponse | NotFoundResponse>>(
+ productId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerProduct>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetOwnerProductQueryOptions(productId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+export const getUpdateOwnerProductUrl = (productId: string,) => {
+
+
+
+
+  return `/api/owner/products/${productId}`
+}
+
+/**
+ * Field null menghapus nilainya. Barang yang sudah terjual: 'Dijual per' dan isi satuan
+ * yang sudah terjual dikunci (422); satuan besar terjual yang diganti dinonaktifkan.
+ * @summary Ubah barang
+ */
+export const updateOwnerProduct = async (productId: string,
+    productInput: ProductInput, options?: Parameters<typeof customFetch>[1]): Promise<OwnerProduct> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<OwnerProduct>(getUpdateOwnerProductUrl(productId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(productInput)
+  }
+);}
+
+
+
+
+
+export const getUpdateOwnerProductMutationKey = () => ['updateOwnerProduct'] as const;
+
+export const getUpdateOwnerProductMutationOptions = <TError = ErrorType<UnauthorizedResponse | NotFoundResponse | ProductValidationFailedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateOwnerProduct>>, TError,UpdateOwnerProductMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateOwnerProduct>>, TError,UpdateOwnerProductMutationVariables, TContext> => {
+
+const mutationKey = getUpdateOwnerProductMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateOwnerProduct>>, UpdateOwnerProductMutationVariables> = (props) => {
+          const {productId,data} = props ?? {};
+
+          return  updateOwnerProduct(productId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateOwnerProductMutationResult = NonNullable<Awaited<ReturnType<typeof updateOwnerProduct>>>
+    export type UpdateOwnerProductMutationBody = ProductInput
+    export type UpdateOwnerProductMutationError = ErrorType<UnauthorizedResponse | NotFoundResponse | ProductValidationFailedResponse>
+    export type UpdateOwnerProductMutationVariables = {productId: string;data: ProductInput}
+
+    /**
+ * @summary Ubah barang
+ */
+export const useUpdateOwnerProduct = <TError = ErrorType<UnauthorizedResponse | NotFoundResponse | ProductValidationFailedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateOwnerProduct>>, TError,UpdateOwnerProductMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof updateOwnerProduct>>,
+        TError,
+        UpdateOwnerProductMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateOwnerProductMutationOptions(options), queryClient);
+    }
+    export const getDeleteOwnerProductUrl = (productId: string,) => {
+
+
+
+
+  return `/api/owner/products/${productId}`
+}
+
+/**
+ * Hanya barang yang belum pernah terjual; selain itu 409 PRODUCT_HAS_SALES (gunakan nonaktif).
+ * @summary Hapus barang permanen
+ */
+export const deleteOwnerProduct = async (productId: string, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getDeleteOwnerProductUrl(productId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteOwnerProductMutationKey = () => ['deleteOwnerProduct'] as const;
+
+export const getDeleteOwnerProductMutationOptions = <TError = ErrorType<UnauthorizedResponse | NotFoundResponse | ProductHasSalesResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteOwnerProduct>>, TError,DeleteOwnerProductMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteOwnerProduct>>, TError,DeleteOwnerProductMutationVariables, TContext> => {
+
+const mutationKey = getDeleteOwnerProductMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteOwnerProduct>>, DeleteOwnerProductMutationVariables> = (props) => {
+          const {productId} = props ?? {};
+
+          return  deleteOwnerProduct(productId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteOwnerProductMutationResult = NonNullable<Awaited<ReturnType<typeof deleteOwnerProduct>>>
+
+    export type DeleteOwnerProductMutationError = ErrorType<UnauthorizedResponse | NotFoundResponse | ProductHasSalesResponse>
+    export type DeleteOwnerProductMutationVariables = {productId: string}
+
+    /**
+ * @summary Hapus barang permanen
+ */
+export const useDeleteOwnerProduct = <TError = ErrorType<UnauthorizedResponse | NotFoundResponse | ProductHasSalesResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteOwnerProduct>>, TError,DeleteOwnerProductMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deleteOwnerProduct>>,
+        TError,
+        DeleteOwnerProductMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeleteOwnerProductMutationOptions(options), queryClient);
+    }
+    export const getSetOwnerProductStatusUrl = (productId: string,) => {
+
+
+
+
+  return `/api/owner/products/${productId}/status`
+}
+
+/**
+ * @summary Ubah status barang dan tanda Sedang langka
+ */
+export const setOwnerProductStatus = async (productId: string,
+    productStatusInput: ProductStatusInput, options?: Parameters<typeof customFetch>[1]): Promise<OwnerProduct> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<OwnerProduct>(getSetOwnerProductStatusUrl(productId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(productStatusInput)
+  }
+);}
+
+
+
+
+
+export const getSetOwnerProductStatusMutationKey = () => ['setOwnerProductStatus'] as const;
+
+export const getSetOwnerProductStatusMutationOptions = <TError = ErrorType<UnauthorizedResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setOwnerProductStatus>>, TError,SetOwnerProductStatusMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setOwnerProductStatus>>, TError,SetOwnerProductStatusMutationVariables, TContext> => {
+
+const mutationKey = getSetOwnerProductStatusMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setOwnerProductStatus>>, SetOwnerProductStatusMutationVariables> = (props) => {
+          const {productId,data} = props ?? {};
+
+          return  setOwnerProductStatus(productId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetOwnerProductStatusMutationResult = NonNullable<Awaited<ReturnType<typeof setOwnerProductStatus>>>
+    export type SetOwnerProductStatusMutationBody = ProductStatusInput
+    export type SetOwnerProductStatusMutationError = ErrorType<UnauthorizedResponse | NotFoundResponse>
+    export type SetOwnerProductStatusMutationVariables = {productId: string;data: ProductStatusInput}
+
+    /**
+ * @summary Ubah status barang dan tanda Sedang langka
+ */
+export const useSetOwnerProductStatus = <TError = ErrorType<UnauthorizedResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setOwnerProductStatus>>, TError,SetOwnerProductStatusMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof setOwnerProductStatus>>,
+        TError,
+        SetOwnerProductStatusMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSetOwnerProductStatusMutationOptions(options), queryClient);
+    }
+    export const getUpdateOwnerProductPricesUrl = (productId: string,) => {
+
+
+
+
+  return `/api/owner/products/${productId}/prices`
+}
+
+/**
+ * Satu baris = harga normal satu satuan (tierMinQty null) atau satu tier grosirnya.
+ * Sukses juga menghapus peringatan modal barang ini.
+ * @summary Ubah harga jual beberapa baris harga sekaligus
+ */
+export const updateOwnerProductPrices = async (productId: string,
+    priceUpdate: PriceUpdate, options?: Parameters<typeof customFetch>[1]): Promise<OwnerProduct> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<OwnerProduct>(getUpdateOwnerProductPricesUrl(productId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(priceUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateOwnerProductPricesMutationKey = () => ['updateOwnerProductPrices'] as const;
+
+export const getUpdateOwnerProductPricesMutationOptions = <TError = ErrorType<UnauthorizedResponse | NotFoundResponse | ProductValidationFailedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateOwnerProductPrices>>, TError,UpdateOwnerProductPricesMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateOwnerProductPrices>>, TError,UpdateOwnerProductPricesMutationVariables, TContext> => {
+
+const mutationKey = getUpdateOwnerProductPricesMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateOwnerProductPrices>>, UpdateOwnerProductPricesMutationVariables> = (props) => {
+          const {productId,data} = props ?? {};
+
+          return  updateOwnerProductPrices(productId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateOwnerProductPricesMutationResult = NonNullable<Awaited<ReturnType<typeof updateOwnerProductPrices>>>
+    export type UpdateOwnerProductPricesMutationBody = PriceUpdate
+    export type UpdateOwnerProductPricesMutationError = ErrorType<UnauthorizedResponse | NotFoundResponse | ProductValidationFailedResponse>
+    export type UpdateOwnerProductPricesMutationVariables = {productId: string;data: PriceUpdate}
+
+    /**
+ * @summary Ubah harga jual beberapa baris harga sekaligus
+ */
+export const useUpdateOwnerProductPrices = <TError = ErrorType<UnauthorizedResponse | NotFoundResponse | ProductValidationFailedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateOwnerProductPrices>>, TError,UpdateOwnerProductPricesMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof updateOwnerProductPrices>>,
+        TError,
+        UpdateOwnerProductPricesMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateOwnerProductPricesMutationOptions(options), queryClient);
+    }
+    export const getDismissOwnerCostAlertUrl = (productId: string,) => {
+
+
+
+
+  return `/api/owner/products/${productId}/cost-alert`
+}
+
+/**
+ * Idempoten; 204 juga bila tidak ada peringatan.
+ * @summary Harga tetap — hapus peringatan modal berubah
+ */
+export const dismissOwnerCostAlert = async (productId: string, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getDismissOwnerCostAlertUrl(productId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDismissOwnerCostAlertMutationKey = () => ['dismissOwnerCostAlert'] as const;
+
+export const getDismissOwnerCostAlertMutationOptions = <TError = ErrorType<UnauthorizedResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof dismissOwnerCostAlert>>, TError,DismissOwnerCostAlertMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof dismissOwnerCostAlert>>, TError,DismissOwnerCostAlertMutationVariables, TContext> => {
+
+const mutationKey = getDismissOwnerCostAlertMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof dismissOwnerCostAlert>>, DismissOwnerCostAlertMutationVariables> = (props) => {
+          const {productId} = props ?? {};
+
+          return  dismissOwnerCostAlert(productId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DismissOwnerCostAlertMutationResult = NonNullable<Awaited<ReturnType<typeof dismissOwnerCostAlert>>>
+
+    export type DismissOwnerCostAlertMutationError = ErrorType<UnauthorizedResponse | NotFoundResponse>
+    export type DismissOwnerCostAlertMutationVariables = {productId: string}
+
+    /**
+ * @summary Harga tetap — hapus peringatan modal berubah
+ */
+export const useDismissOwnerCostAlert = <TError = ErrorType<UnauthorizedResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof dismissOwnerCostAlert>>, TError,DismissOwnerCostAlertMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof dismissOwnerCostAlert>>,
+        TError,
+        DismissOwnerCostAlertMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDismissOwnerCostAlertMutationOptions(options), queryClient);
+    }
+    export const getListOwnerProductMovementsUrl = (productId: string,) => {
+
+
+
+
+  return `/api/owner/products/${productId}/movements`
+}
+
+/**
+ * @summary Riwayat stok barang
+ */
+export const listOwnerProductMovements = async (productId: string, options?: Parameters<typeof customFetch>[1]): Promise<StockMovement[]> => {
+
+  return customFetch<StockMovement[]>(getListOwnerProductMovementsUrl(productId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListOwnerProductMovementsQueryKey = (productId: string,) => {
+    return [
+    `/api/owner/products/${productId}/movements`
+    ] as const;
+    }
+
+
+export const getListOwnerProductMovementsQueryOptions = <TData = Awaited<ReturnType<typeof listOwnerProductMovements>>, TError = ErrorType<UnauthorizedResponse | NotFoundResponse>>(productId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOwnerProductMovements>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListOwnerProductMovementsQueryKey(productId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listOwnerProductMovements>>> = ({ signal }) => listOwnerProductMovements(productId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: productId !== null && productId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listOwnerProductMovements>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListOwnerProductMovementsQueryResult = NonNullable<Awaited<ReturnType<typeof listOwnerProductMovements>>>
+export type ListOwnerProductMovementsQueryError = ErrorType<UnauthorizedResponse | NotFoundResponse>
+
+
+export function useListOwnerProductMovements<TData = Awaited<ReturnType<typeof listOwnerProductMovements>>, TError = ErrorType<UnauthorizedResponse | NotFoundResponse>>(
+ productId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOwnerProductMovements>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listOwnerProductMovements>>,
+          TError,
+          Awaited<ReturnType<typeof listOwnerProductMovements>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListOwnerProductMovements<TData = Awaited<ReturnType<typeof listOwnerProductMovements>>, TError = ErrorType<UnauthorizedResponse | NotFoundResponse>>(
+ productId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOwnerProductMovements>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listOwnerProductMovements>>,
+          TError,
+          Awaited<ReturnType<typeof listOwnerProductMovements>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListOwnerProductMovements<TData = Awaited<ReturnType<typeof listOwnerProductMovements>>, TError = ErrorType<UnauthorizedResponse | NotFoundResponse>>(
+ productId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOwnerProductMovements>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Riwayat stok barang
+ */
+
+export function useListOwnerProductMovements<TData = Awaited<ReturnType<typeof listOwnerProductMovements>>, TError = ErrorType<UnauthorizedResponse | NotFoundResponse>>(
+ productId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOwnerProductMovements>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListOwnerProductMovementsQueryOptions(productId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+export const getListOwnerCategoriesUrl = () => {
+
+
+
+
+  return `/api/owner/categories`
+}
+
+/**
+ * Kategori yang dikelola; kategori baru dari form atau impor ditambahkan di akhir.
+ * @summary Daftar kategori barang
+ */
+export const listOwnerCategories = async ( options?: Parameters<typeof customFetch>[1]): Promise<string[]> => {
+
+  return customFetch<string[]>(getListOwnerCategoriesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListOwnerCategoriesQueryKey = () => {
+    return [
+    `/api/owner/categories`
+    ] as const;
+    }
+
+
+export const getListOwnerCategoriesQueryOptions = <TData = Awaited<ReturnType<typeof listOwnerCategories>>, TError = ErrorType<UnauthorizedResponse>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOwnerCategories>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListOwnerCategoriesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listOwnerCategories>>> = ({ signal }) => listOwnerCategories({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listOwnerCategories>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListOwnerCategoriesQueryResult = NonNullable<Awaited<ReturnType<typeof listOwnerCategories>>>
+export type ListOwnerCategoriesQueryError = ErrorType<UnauthorizedResponse>
+
+
+export function useListOwnerCategories<TData = Awaited<ReturnType<typeof listOwnerCategories>>, TError = ErrorType<UnauthorizedResponse>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOwnerCategories>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listOwnerCategories>>,
+          TError,
+          Awaited<ReturnType<typeof listOwnerCategories>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListOwnerCategories<TData = Awaited<ReturnType<typeof listOwnerCategories>>, TError = ErrorType<UnauthorizedResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOwnerCategories>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listOwnerCategories>>,
+          TError,
+          Awaited<ReturnType<typeof listOwnerCategories>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListOwnerCategories<TData = Awaited<ReturnType<typeof listOwnerCategories>>, TError = ErrorType<UnauthorizedResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOwnerCategories>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Daftar kategori barang
+ */
+
+export function useListOwnerCategories<TData = Awaited<ReturnType<typeof listOwnerCategories>>, TError = ErrorType<UnauthorizedResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOwnerCategories>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListOwnerCategoriesQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+export const getCheckOwnerProductImportUrl = () => {
+
+
+
+
+  return `/api/owner/product-imports/check`
+}
+
+/**
+ * Baris yang semua selnya null diabaikan.
+ * @summary Periksa baris impor Excel tanpa menyimpan
+ */
+export const checkOwnerProductImport = async (importRequest: ImportRequest, options?: Parameters<typeof customFetch>[1]): Promise<ImportCheck> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<ImportCheck>(getCheckOwnerProductImportUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(importRequest)
+  }
+);}
+
+
+
+
+
+export const getCheckOwnerProductImportMutationKey = () => ['checkOwnerProductImport'] as const;
+
+export const getCheckOwnerProductImportMutationOptions = <TError = ErrorType<UnauthorizedResponse | ValidationFailedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof checkOwnerProductImport>>, TError,CheckOwnerProductImportMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof checkOwnerProductImport>>, TError,CheckOwnerProductImportMutationVariables, TContext> => {
+
+const mutationKey = getCheckOwnerProductImportMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof checkOwnerProductImport>>, CheckOwnerProductImportMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  checkOwnerProductImport(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CheckOwnerProductImportMutationResult = NonNullable<Awaited<ReturnType<typeof checkOwnerProductImport>>>
+    export type CheckOwnerProductImportMutationBody = ImportRequest
+    export type CheckOwnerProductImportMutationError = ErrorType<UnauthorizedResponse | ValidationFailedResponse>
+    export type CheckOwnerProductImportMutationVariables = {data: ImportRequest}
+
+    /**
+ * @summary Periksa baris impor Excel tanpa menyimpan
+ */
+export const useCheckOwnerProductImport = <TError = ErrorType<UnauthorizedResponse | ValidationFailedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof checkOwnerProductImport>>, TError,CheckOwnerProductImportMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof checkOwnerProductImport>>,
+        TError,
+        CheckOwnerProductImportMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCheckOwnerProductImportMutationOptions(options), queryClient);
+    }
+    export const getCommitOwnerProductImportUrl = () => {
+
+
+
+
+  return `/api/owner/product-imports`
+}
+
+/**
+ * Memvalidasi ulang lalu menyimpan baris baru dan diperbarui sekaligus (atomik); baris tidak
+ * berubah dan baris bermasalah dilewati. Sel kosong tidak menghapus data lama.
+ * @summary Impor baris Excel
+ */
+export const commitOwnerProductImport = async (importRequest: ImportRequest, options?: Parameters<typeof customFetch>[1]): Promise<ImportResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<ImportResult>(getCommitOwnerProductImportUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(importRequest)
+  }
+);}
+
+
+
+
+
+export const getCommitOwnerProductImportMutationKey = () => ['commitOwnerProductImport'] as const;
+
+export const getCommitOwnerProductImportMutationOptions = <TError = ErrorType<UnauthorizedResponse | ValidationFailedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof commitOwnerProductImport>>, TError,CommitOwnerProductImportMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof commitOwnerProductImport>>, TError,CommitOwnerProductImportMutationVariables, TContext> => {
+
+const mutationKey = getCommitOwnerProductImportMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof commitOwnerProductImport>>, CommitOwnerProductImportMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  commitOwnerProductImport(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CommitOwnerProductImportMutationResult = NonNullable<Awaited<ReturnType<typeof commitOwnerProductImport>>>
+    export type CommitOwnerProductImportMutationBody = ImportRequest
+    export type CommitOwnerProductImportMutationError = ErrorType<UnauthorizedResponse | ValidationFailedResponse>
+    export type CommitOwnerProductImportMutationVariables = {data: ImportRequest}
+
+    /**
+ * @summary Impor baris Excel
+ */
+export const useCommitOwnerProductImport = <TError = ErrorType<UnauthorizedResponse | ValidationFailedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof commitOwnerProductImport>>, TError,CommitOwnerProductImportMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof commitOwnerProductImport>>,
+        TError,
+        CommitOwnerProductImportMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCommitOwnerProductImportMutationOptions(options), queryClient);
+    }
