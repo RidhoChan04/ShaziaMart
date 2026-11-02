@@ -1,6 +1,7 @@
 import type {
   Attention,
   CashDifference,
+  CostChangeItem,
   HourBucket,
   OwnerTodaySummary,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
@@ -10,9 +11,11 @@ import {
   daysBefore,
   HOUR_MS,
 } from "@/shared/lib/business-day";
+import { unitCost } from "@/shared/lib/product-rules";
 import { roundHalfUp } from "@/shared/lib/quantity";
 import type { MockState } from "./db";
 import { oldestUnpaidAt } from "./ledger";
+import { eceranOf, stockAlertOf } from "./products/views";
 
 const WEEKDAYS = [
   "Minggu",
@@ -30,10 +33,7 @@ const sum = (xs: readonly number[]): number => xs.reduce((a, b) => a + b, 0);
 
 function attention(state: Readonly<MockState>, now: number): Attention {
   const today = businessDay(now);
-  const levels = state.products.map((p) => ({
-    stock: state.stock[p.id] ?? 0,
-    min: state.minStock[p.id] ?? 0,
-  }));
+  const alerts = state.products.map((p) => stockAlertOf(state, p));
   const cashDifferences: CashDifference[] = state.closedShifts
     .filter(
       (c) => c.difference !== 0 && businessDay(c.closedAt).key === today.key,
@@ -50,16 +50,51 @@ function attention(state: Readonly<MockState>, now: number): Attention {
     return c.balance > 0 && oldest !== null && now - oldest > OVERDUE_MS;
   });
   return {
-    lowStockCount: levels.filter((l) => l.stock >= 0 && l.stock < l.min).length,
-    negativeStockCount: levels.filter((l) => l.stock < 0).length,
+    lowStockCount: alerts.filter((a) => a === "menipis").length,
+    negativeStockCount: alerts.filter((a) => a === "minus").length,
     cashDifferences,
     overdueCredit: {
       count: overdue.length,
       total: sum(overdue.map((c) => c.balance)),
     },
-    costChanges: [],
-    stockOuts: [],
+    costChanges: costChanges(state),
+    stockOuts: state.products
+      .filter(
+        (p) =>
+          p.status === "tidak_diambil" &&
+          p.stockCounted &&
+          (state.stock[p.id] ?? 0) <= 0,
+      )
+      .map((p) => ({ productId: p.id, productName: p.name }))
+      .sort((a, b) => a.productName.localeCompare(b.productName, "id")),
   };
+}
+
+/** Butir modal berubah: modal eceran saat butir dibuat → sekarang; sama atau kosong → tidak tampil. */
+function costChanges(state: Readonly<MockState>): CostChangeItem[] {
+  return state.products
+    .flatMap((p): CostChangeItem[] => {
+      const alert = state.costAlerts[p.id];
+      if (!alert) return [];
+      const eceran = eceranOf(p);
+      const oldCost = unitCost(alert.fromCost, eceran.unitSize);
+      const newCost = unitCost(p.cost, eceran.unitSize);
+      if (oldCost === null || newCost === null || oldCost === newCost)
+        return [];
+      return [
+        {
+          productId: p.id,
+          productName: p.name,
+          unitName: eceran.name,
+          oldCost,
+          newCost,
+          price: eceran.price,
+          changedAt: alert.changedAt,
+          source: alert.source,
+        },
+      ];
+    })
+    .sort((a, b) => b.changedAt - a.changedAt);
 }
 
 /**

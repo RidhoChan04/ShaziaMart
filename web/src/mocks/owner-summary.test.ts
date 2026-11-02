@@ -1,7 +1,12 @@
 import { describe, expect, test } from "vitest";
+import type {
+  ProductStatus,
+  StockAlert,
+} from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { businessDay, DAY_MS, HOUR_MS } from "@/shared/lib/business-day";
 import type { MockSale, MockState } from "./db";
 import { ownerTodaySummary } from "./owner-summary";
+import { stockAlertOf } from "./products/views";
 import { formatSaleNumber } from "./sale-number";
 import { createSeedState } from "./seed-data";
 
@@ -156,5 +161,132 @@ describe("ownerTodaySummary", () => {
       ["sore", 2_000],
       ["pagi", -5_000],
     ]);
+  });
+});
+
+describe("Perlu perhatian: stok (K5), modal berubah, dan habis", () => {
+  type Flags = {
+    status: ProductStatus;
+    scarce: boolean;
+    stockCounted: boolean;
+  };
+  const AKTIF: Flags = { status: "aktif", scarce: false, stockCounted: true };
+
+  test.each<[Partial<Flags>, number, StockAlert]>([
+    [{}, -1, "minus"],
+    [{}, 0, "menipis"],
+    [{}, 9, "menipis"],
+    [{}, 10, "none"],
+    [{ scarce: true }, 5, "none"],
+    [{ scarce: true }, -1, "minus"],
+    [{ status: "tidak_diambil" }, 5, "none"],
+    [{ status: "tidak_diambil" }, -1, "minus"],
+    [{ stockCounted: false }, 5, "none"],
+    [{ stockCounted: false }, -3, "none"],
+    [{ status: "nonaktif" }, 5, "none"],
+    [{ status: "nonaktif" }, -1, "none"],
+  ])("stockAlertOf %o stok %i (batas 10) → %s", (flags, stock, alert) => {
+    const s = fresh();
+    const p = s.products.find((x) => x.name === "Kopi Kapal Api 165 g");
+    if (!p) throw new Error("seed tanpa Kapal Api");
+    Object.assign(p, AKTIF, flags);
+    s.stock[p.id] = stock;
+    expect(s.minStock[p.id]).toBe(10);
+    expect(stockAlertOf(s, p)).toBe(alert);
+    const before = ownerTodaySummary(fresh(), NOW).attention;
+    const after = ownerTodaySummary(s, NOW).attention;
+    expect([
+      after.lowStockCount - before.lowStockCount,
+      after.negativeStockCount - before.negativeStockCount,
+    ]).toEqual([alert === "menipis" ? 1 : 0, alert === "minus" ? 1 : 0]);
+  });
+
+  test("tanpa batas (minStock tidak ada) → tidak pernah menipis", () => {
+    const s = fresh();
+    const p = s.products[0];
+    if (!p) throw new Error("seed kosong");
+    delete s.minStock[p.id];
+    s.stock[p.id] = 0;
+    expect(stockAlertOf(s, p)).toBe("none");
+  });
+
+  test("costChanges: modal eceran lama → baru, terbaru dulu; modal eceran sama atau kosong dilewati", () => {
+    const s = fresh();
+    const named = (name: string) => {
+      const p = s.products.find((x) => x.name === name);
+      if (!p) throw new Error(`seed tanpa ${name}`);
+      return p;
+    };
+    const indomie = named("Indomie Goreng");
+    const gula = named("Gula Pasir");
+    const beras = named("Beras Pandan Wangi 5 kg");
+    const kopi = named("Kopi Kapal Api 165 g");
+    indomie.cost = { amount: 108000, qtyBase: 40 };
+    s.costAlerts[indomie.id] = {
+      fromCost: { amount: 104000, qtyBase: 40 },
+      changedAt: NOW - 2 * HOUR_MS,
+      source: "pemilik",
+    };
+    gula.cost = { amount: 16000, qtyBase: 1000 };
+    s.costAlerts[gula.id] = {
+      fromCost: { amount: 16500, qtyBase: 1000 },
+      changedAt: NOW - HOUR_MS,
+      source: "impor",
+    };
+    // Peringatan dengan modal eceran sama (Beras) atau modal kosong (Kopi) tidak tampil.
+    beras.cost = { amount: 71000, qtyBase: 1 };
+    s.costAlerts[beras.id] = {
+      fromCost: { amount: 71000, qtyBase: 1 },
+      changedAt: NOW,
+      source: "pemilik",
+    };
+    kopi.cost = null;
+    s.costAlerts[kopi.id] = {
+      fromCost: { amount: 12000, qtyBase: 1 },
+      changedAt: NOW,
+      source: "pemilik",
+    };
+    expect(ownerTodaySummary(s, NOW).attention.costChanges).toEqual([
+      {
+        productId: gula.id,
+        productName: "Gula Pasir",
+        unitName: "kg",
+        oldCost: 16500,
+        newCost: 16000,
+        price: 18000,
+        changedAt: NOW - HOUR_MS,
+        source: "impor",
+      },
+      {
+        productId: indomie.id,
+        productName: "Indomie Goreng",
+        unitName: "pcs",
+        oldCost: 2600,
+        newCost: 2700,
+        price: 3100,
+        changedAt: NOW - 2 * HOUR_MS,
+        source: "pemilik",
+      },
+    ]);
+    indomie.cost = { amount: 104010, qtyBase: 40 };
+    expect(
+      ownerTodaySummary(s, NOW).attention.costChanges.map((c) => c.productName),
+    ).toEqual(["Gula Pasir"]);
+  });
+
+  test("stockOuts: tidak_diambil, sudah dihitung, stok ≤ 0; urut nama", () => {
+    const s = fresh();
+    const [a, b, c, d] = s.products.slice(4, 8);
+    if (!a || !b || !c || !d) throw new Error("seed kurang");
+    for (const p of [a, b, c, d]) p.status = "tidak_diambil";
+    s.stock[a.id] = 0;
+    s.stock[b.id] = -2;
+    s.stock[c.id] = 0;
+    c.stockCounted = false;
+    s.stock[d.id] = 1;
+    const expected = [a, b]
+      .map((p) => ({ productId: p.id, productName: p.name }))
+      .sort((x, y) => x.productName.localeCompare(y.productName, "id"));
+    expect(ownerTodaySummary(s, NOW).attention.stockOuts).toEqual(expected);
   });
 });

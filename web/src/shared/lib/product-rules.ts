@@ -117,9 +117,9 @@ export function suggestedPrice(
 }
 
 /** Satuan besar aktif pertama (units[0] = eceran dilewati); tidak ada -> null. */
-export function activeBigUnit(product: {
-  units: readonly OwnerProductUnit[];
-}): OwnerProductUnit | null {
+export function activeBigUnit<
+  U extends Pick<OwnerProductUnit, "active">,
+>(product: { units: readonly U[] }): U | null {
   return product.units.slice(1).find((u) => u.active) ?? null;
 }
 
