@@ -25,7 +25,7 @@ export function OwnerLoginScreen() {
     <main className="flex min-h-dvh items-center justify-center bg-bg p-4">
       <form
         onSubmit={submit}
-        className="grid w-full max-w-sm gap-4 rounded-xl border border-border bg-surface p-6 shadow-sm"
+        className="grid w-full max-w-sm gap-4 rounded-lg bg-surface p-6 shadow-sm"
       >
         <div className="text-center">
           <p className="text-base font-bold text-primary">ShaziaMart</p>
@@ -61,7 +61,12 @@ export function OwnerLoginScreen() {
               : pesanError(login.error)}
           </p>
         )}
-        <Button type="submit" size="lg" disabled={!filled || login.isPending}>
+        <Button
+          type="submit"
+          size="lg"
+          className="w-full"
+          disabled={!filled || login.isPending}
+        >
           Masuk
         </Button>
       </form>

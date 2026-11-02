@@ -42,10 +42,12 @@ test.describe("owner", () => {
     const box = await nav.boundingBox();
     if (!box) throw new Error("nav tidak punya bounding box");
     if (info.project.name === "owner-hp") {
+      // Kapsul mengambang: 12px dari tepi bawah dan sisi.
       expect(box.y).toBeGreaterThan(600);
-      expect(Math.abs(box.y + box.height - 800)).toBeLessThanOrEqual(2);
+      expect(Math.abs(box.y + box.height - (800 - 12))).toBeLessThanOrEqual(2);
+      expect(box.x).toBeGreaterThanOrEqual(11);
     } else {
-      expect(box.x).toBe(0);
+      expect(box.x).toBeGreaterThanOrEqual(11);
       expect(box.height).toBeGreaterThanOrEqual(600);
     }
     await expectNoA11yViolations(page);
@@ -57,5 +59,19 @@ test.describe("owner", () => {
     await loginOwner(page, "/owner/laporan");
     await expect(page.getByRole("heading", { name: "Laporan" })).toBeVisible();
     await expect(page.getByText("Tidak bisa terhubung ke toko")).toHaveCount(0);
+  });
+
+  test("owner HP: Tab ke tautan Kasbon memberi fokus dengan outline terlihat", async ({
+    page,
+  }, info) => {
+    test.skip(info.project.name !== "owner-hp", "tab bar hanya di HP");
+    await loginOwner(page);
+    const kasbon = page
+      .getByRole("navigation", { name: "Navigasi utama" })
+      .getByRole("link", { name: "Kasbon" });
+    // Urutan DOM: nav sebelum main → Beranda, Barang, Laporan, Kasbon.
+    for (let i = 0; i < 4; i++) await page.keyboard.press("Tab");
+    await expect(kasbon).toBeFocused();
+    await expect(kasbon).toHaveCSS("outline-style", "solid");
   });
 });

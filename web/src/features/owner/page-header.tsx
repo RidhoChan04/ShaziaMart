@@ -41,7 +41,7 @@ function CompactTitle({ title, visible }: { title: string; visible: boolean }) {
       aria-hidden="true"
       data-testid="compact-title"
       className={cn(
-        "glass fixed inset-x-0 top-0 z-20 flex h-13 items-center justify-center px-4 text-[17px] font-semibold transition-opacity duration-200 motion-reduce:transition-none lg:hidden",
+        "glass fixed inset-x-0 top-0 z-20 flex h-[calc(52px+env(safe-area-inset-top))] items-center justify-center px-4 pt-[env(safe-area-inset-top)] text-[17px] font-semibold transition-opacity duration-200 motion-reduce:transition-none lg:hidden",
         visible ? "opacity-100" : "pointer-events-none opacity-0",
       )}
     >

@@ -252,3 +252,12 @@ test("401 dari mutasi kasir diabaikan walau kuncinya berawalan 'owner'", async (
   expect(screen.getByRole("heading", { name: "Beranda" })).toBeInTheDocument();
   expect(screen.queryByRole("heading", { name: "Masuk pemilik" })).toBeNull();
 });
+
+test("login: kartu putih bulat di latar grouped", async () => {
+  renderApp("/owner");
+  await loginHeading();
+  const form = screen.getByRole("button", { name: "Masuk" }).closest("form");
+  expect(form).toHaveClass("rounded-lg", "bg-surface");
+  expect(screen.getByText("ShaziaMart")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Masuk" })).toHaveClass("w-full");
+});

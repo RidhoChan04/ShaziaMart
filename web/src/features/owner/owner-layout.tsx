@@ -46,15 +46,15 @@ function OwnerNav() {
   return (
     <nav
       aria-label="Navigasi utama"
-      className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-surface pb-[env(safe-area-inset-bottom)] lg:sticky lg:top-0 lg:col-start-1 lg:row-span-2 lg:row-start-1 lg:h-dvh lg:border-t-0 lg:border-r lg:p-3"
+      className="glass fixed inset-x-3 bottom-[calc(12px+env(safe-area-inset-bottom))] z-30 rounded-full p-1 lg:sticky lg:inset-x-auto lg:top-3 lg:bottom-auto lg:col-start-1 lg:row-span-2 lg:row-start-1 lg:m-3 lg:h-[calc(100dvh-24px)] lg:rounded-lg lg:p-2"
     >
-      <ul className="flex lg:flex-col lg:gap-1">
+      <ul className="flex gap-1 lg:flex-col">
         {navItems.map(({ to, label, icon: Icon, exact }) => (
           <li key={to} className="flex-1 lg:flex-none">
             <Link
               to={to}
               activeOptions={{ exact }}
-              className="flex min-h-14 flex-col items-center justify-center gap-0.5 text-xs text-muted hover:text-text data-[status=active]:font-semibold data-[status=active]:text-primary lg:min-h-11 lg:flex-row lg:justify-start lg:gap-3 lg:rounded-md lg:px-3 lg:text-[15px] lg:hover:bg-primary-soft lg:data-[status=active]:bg-primary-soft"
+              className="flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-full text-xs text-muted hover:text-text focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary data-[status=active]:bg-primary-soft data-[status=active]:font-semibold data-[status=active]:text-primary lg:min-h-11 lg:flex-row lg:justify-start lg:gap-3 lg:rounded-md lg:px-3 lg:text-[15px] lg:hover:bg-primary-soft"
             >
               <Icon aria-hidden="true" className="size-5" />
               {label}
@@ -70,7 +70,7 @@ function OfflineBanner() {
   return (
     <div
       role="status"
-      className="mb-4 flex items-center gap-2 rounded-md border border-warning bg-surface px-3 py-2 text-sm font-medium"
+      className="mb-4 flex items-center gap-2 rounded-lg bg-surface px-4 py-3 text-sm font-medium shadow-sm"
     >
       <TriangleAlert
         aria-hidden="true"
@@ -90,7 +90,7 @@ function OwnerOffline() {
     void client.refetchQueries({ queryKey: getGetOwnerSessionQueryKey() });
   };
   return (
-    <div className="mx-auto flex max-w-sm flex-col items-center gap-4 py-16 text-center">
+    <div className="mx-auto mt-8 flex max-w-sm flex-col items-center gap-4 rounded-lg bg-surface p-6 py-10 text-center shadow-sm">
       <WifiOff aria-hidden="true" className="size-10 text-muted" />
       {/* h2: judul besar di kerangka adalah satu-satunya h1. */}
       <h2 className="text-base font-semibold">
@@ -126,7 +126,7 @@ function OwnerShell() {
     <div className="min-h-dvh bg-bg lg:grid lg:grid-cols-[240px_1fr] lg:grid-rows-[auto_1fr]">
       {title && <PageHeader title={title} />}
       <OwnerNav />
-      <main className="px-4 pt-1 pb-24 lg:col-start-2 lg:row-start-2 lg:px-6 lg:pt-2 lg:pb-6">
+      <main className="px-4 pt-1 pb-28 lg:col-start-2 lg:row-start-2 lg:px-6 lg:pt-2 lg:pb-6">
         {loaded ? (
           <>
             {offline && <OfflineBanner />}

@@ -157,3 +157,37 @@ test("OwnerLayout memasang data-app=owner dan melepasnya saat unmount", async ()
   unmount();
   expect(document.documentElement.dataset.app).toBeUndefined();
 });
+
+test("nav: kapsul kaca, 5 tautan dengan target sentuh >= 48px, aktif ditandai", async () => {
+  renderApp("/owner/kasbon");
+  await screen.findByRole("heading", { level: 1, name: "Kasbon" });
+  const nav = screen.getByRole("navigation", { name: "Navigasi utama" });
+  expect(nav).toHaveClass("glass", "fixed", "rounded-full");
+  const links = within(nav).getAllByRole("link");
+  expect(links).toHaveLength(5);
+  for (const link of links) expect(link).toHaveClass("min-h-12");
+  const active = within(nav).getByRole("link", { name: "Kasbon" });
+  expect(active).toHaveAttribute("aria-current", "page");
+  expect(active).toHaveClass("data-[status=active]:bg-primary-soft");
+});
+
+test("fokus keyboard pada tautan tab terlihat (kelas focus-visible ada)", async () => {
+  const user = userEvent.setup();
+  renderApp("/owner");
+  await screen.findByRole("heading", { level: 1, name: "Beranda" });
+  const nav = screen.getByRole("navigation", { name: "Navigasi utama" });
+  const link = within(nav).getByRole("link", { name: "Kasbon" });
+  for (const l of within(nav).getAllByRole("link")) {
+    expect(l.className).toMatch(/focus-visible:outline/);
+  }
+  await user.tab();
+  const first = within(nav).getAllByRole("link")[0];
+  if (first) await waitFor(() => expect(first).toHaveFocus());
+  expect(link).toBeInTheDocument();
+});
+
+test("main memberi ruang bawah untuk kapsul tab bar", async () => {
+  renderApp("/owner");
+  await screen.findByRole("heading", { level: 1, name: "Beranda" });
+  expect(screen.getByRole("main")).toHaveClass("pb-28");
+});
