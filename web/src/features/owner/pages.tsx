@@ -5,21 +5,21 @@ import { pesanError } from "@/shared/lib/error-messages";
 import { Button } from "@/shared/ui/button";
 import { clearOwnerSession } from "./auth/owner-session";
 
-/** Halaman pemilik sementara; isi nyata dibangun di rencana berikutnya. */
-function PlaceholderPage({ title }: { title: string }) {
-  return <h1 className="text-xl font-bold">{title}</h1>;
+/** Isi halaman pemilik sementara; judulnya dari header kerangka, isi nyata menyusul. */
+function PlaceholderPage() {
+  return <p className="text-muted">Segera hadir</p>;
 }
 
 export function BarangPage() {
-  return <PlaceholderPage title="Barang" />;
+  return <PlaceholderPage />;
 }
 
 export function LaporanPage() {
-  return <PlaceholderPage title="Laporan" />;
+  return <PlaceholderPage />;
 }
 
 export function KasbonPage() {
-  return <PlaceholderPage title="Kasbon" />;
+  return <PlaceholderPage />;
 }
 
 export function LainnyaPage() {
@@ -29,7 +29,7 @@ export function LainnyaPage() {
   });
   return (
     <div className="grid gap-4">
-      <PlaceholderPage title="Lainnya" />
+      <PlaceholderPage />
       <Button
         variant="outline"
         className="justify-self-start"

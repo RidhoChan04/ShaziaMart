@@ -69,12 +69,15 @@
   border: 0.5px solid rgb(255 255 255 / 0.7);
   box-shadow: 0 1px 12px rgb(0 0 0 / 0.06);
 
+  /* Tepi putih tak terlihat di atas latar padat; pakai garis tepi biasa. */
   @supports not (backdrop-filter: blur(1px)) {
     background-color: var(--color-surface);
+    border-color: var(--color-border);
   }
 
   @media (prefers-reduced-transparency: reduce) {
     background-color: var(--color-surface);
+    border-color: var(--color-border);
     backdrop-filter: none;
   }
 }

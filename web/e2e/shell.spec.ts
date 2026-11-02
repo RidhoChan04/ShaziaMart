@@ -36,7 +36,7 @@ test.describe("owner", () => {
 
   test("owner HP: tab bawah; laptop: sidebar", async ({ page }, info) => {
     await loginOwner(page);
-    await expect(page.getByText("● toko online")).toBeVisible();
+    await expect(page.getByText("Toko online")).toBeVisible();
     const nav = page.getByRole("navigation", { name: "Navigasi utama" });
     await expect(nav.getByRole("link")).toHaveCount(5);
     const box = await nav.boundingBox();

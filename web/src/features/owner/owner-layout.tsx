@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { Link, Outlet } from "@tanstack/react-router";
+import { Link, Outlet, useLocation } from "@tanstack/react-router";
 import {
   ChartColumn,
   Ellipsis,
@@ -8,21 +8,18 @@ import {
   NotebookPen,
   Package,
   TriangleAlert,
-  Wifi,
   WifiOff,
 } from "lucide-react";
 import { useEffect } from "react";
 import { getGetOwnerSessionQueryKey } from "@/shared/api/gen/owner/owner";
-import { useBusinessDay } from "@/shared/hooks/use-business-day";
 import {
-  type ServerHealth,
   useRecheckServer,
   useServerHealth,
 } from "@/shared/hooks/use-server-health";
-import { cn } from "@/shared/lib/cn";
 import { Button } from "@/shared/ui/button";
 import { OwnerGate } from "./auth/owner-gate";
 import { useOwnerSession } from "./auth/owner-session";
+import { PageHeader } from "./page-header";
 
 type NavItem = {
   to:
@@ -69,26 +66,6 @@ function OwnerNav() {
   );
 }
 
-function StoreStatus({ online, checking }: ServerHealth) {
-  const Icon = online ? Wifi : WifiOff;
-  return (
-    <span
-      role="status"
-      className={cn(
-        "flex items-center gap-1.5 text-xs font-medium",
-        online ? "text-primary" : "text-danger",
-      )}
-    >
-      {!checking && (
-        <>
-          <Icon aria-hidden="true" className="size-3.5" />
-          {online ? "● toko online" : "● toko offline"}
-        </>
-      )}
-    </span>
-  );
-}
-
 function OfflineBanner() {
   return (
     <div
@@ -115,9 +92,10 @@ function OwnerOffline() {
   return (
     <div className="mx-auto flex max-w-sm flex-col items-center gap-4 py-16 text-center">
       <WifiOff aria-hidden="true" className="size-10 text-muted" />
-      <h1 className="text-base font-semibold">
+      {/* h2: judul besar di kerangka adalah satu-satunya h1. */}
+      <h2 className="text-base font-semibold">
         Tidak bisa terhubung ke toko — pastikan PC kasir menyala dan online
-      </h1>
+      </h2>
       <Button onClick={retry} disabled={rechecking}>
         Coba lagi
       </Button>
@@ -125,9 +103,20 @@ function OwnerOffline() {
   );
 }
 
+/** Label tab yang aktif, dicocokkan seperti `activeOptions` pada `Link` navigasi. */
+function useActiveTitle(): string | undefined {
+  // Seperti Link: garis miring di akhir diabaikan (start_url PWA `/owner/`).
+  const path = useLocation({
+    select: (l) => l.pathname.replace(/(.)\/$/, "$1"),
+  });
+  return navItems.find(({ to, exact }) =>
+    exact ? path === to : path === to || path.startsWith(`${to}/`),
+  )?.label;
+}
+
 function OwnerShell() {
   const health = useServerHealth();
-  const { label } = useBusinessDay();
+  const title = useActiveTitle();
   // Sesi yang sudah termuat = data pernah dimuat; halaman tetap dipasang saat offline.
   const session = useOwnerSession();
   const loaded = session.data != null;
@@ -135,15 +124,9 @@ function OwnerShell() {
 
   return (
     <div className="min-h-dvh bg-bg lg:grid lg:grid-cols-[240px_1fr] lg:grid-rows-[auto_1fr]">
-      <header className="flex items-start justify-between gap-3 border-b border-border bg-surface px-4 py-3 lg:col-start-2 lg:row-start-1">
-        <div>
-          <p className="text-xs text-muted">{label}</p>
-          <p className="text-base font-bold text-primary">ShaziaMart</p>
-        </div>
-        <StoreStatus {...health} />
-      </header>
+      {title && <PageHeader title={title} />}
       <OwnerNav />
-      <main className="p-4 pb-24 lg:col-start-2 lg:row-start-2 lg:p-6">
+      <main className="px-4 pt-1 pb-24 lg:col-start-2 lg:row-start-2 lg:px-6 lg:pt-2 lg:pb-6">
         {loaded ? (
           <>
             {offline && <OfflineBanner />}

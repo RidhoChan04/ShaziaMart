@@ -56,7 +56,7 @@ test("server mati setelah data dimuat: banner offline, halaman tetap", async ({
 }) => {
   await loginOwner(page);
   await expect(page.getByText("OMZET HARI INI")).toBeVisible();
-  await expect(page.getByText("● toko online")).toBeVisible();
+  await expect(page.getByText("Toko online")).toBeVisible();
 
   await page.evaluate(() =>
     localStorage.setItem("mock.skenario", "server-mati"),
@@ -66,7 +66,7 @@ test("server mati setelah data dimuat: banner offline, halaman tetap", async ({
   await expect(
     page.getByText("Tidak terhubung ke toko — data terakhir ditampilkan"),
   ).toBeVisible({ timeout: OFFLINE_DETECT_MS });
-  await expect(page.getByText("● toko offline")).toBeVisible();
+  await expect(page.getByText("Toko offline")).toBeVisible();
   await expect(page.getByText("OMZET HARI INI")).toBeVisible();
   await expect(
     page.getByRole("group", { name: /Omzet per jam hari ini dan .+ lalu/ }),

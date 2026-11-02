@@ -137,7 +137,6 @@ export function BerandaPage() {
 
   return (
     <div className="mx-auto max-w-6xl">
-      <h1 className="sr-only">Beranda</h1>
       {refreshing && (
         <p
           role="status"

@@ -73,23 +73,45 @@ test("owner: /owner adalah Beranda dan navigasi berpindah halaman", async () => 
   );
 });
 
-test("owner: header menampilkan tanggal hari bisnis, nama toko, dan status toko", async () => {
+test("owner: header menampilkan tanggal hari bisnis, judul halaman, dan status toko", async () => {
   renderApp("/owner");
   const header = within(await screen.findByRole("banner"));
   expect(header.getByText("Sabtu, 17 Okt")).toBeInTheDocument();
-  expect(header.getByText("ShaziaMart")).toBeInTheDocument();
-  const status = await header.findByText("● toko online");
-  expect(status).toHaveAttribute("role", "status");
-  expect(status).toHaveClass("text-primary");
+  expect(
+    header.getByRole("heading", { level: 1, name: "Beranda" }),
+  ).toBeInTheDocument();
+  await waitFor(() =>
+    expect(header.getByRole("status")).toHaveTextContent("Toko online"),
+  );
+});
+
+test("judul halaman = tab aktif", async () => {
+  renderApp("/owner/kasbon");
+  const header = within(await screen.findByRole("banner"));
+  expect(
+    await header.findByRole("heading", { level: 1, name: "Kasbon" }),
+  ).toBeInTheDocument();
+  await screen.findByText("Segera hadir");
+  // Judul besar di kerangka adalah satu-satunya h1 halaman.
+  expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+});
+
+test("header tidak lagi menampilkan ShaziaMart; halaman sementara menampilkan Segera hadir", async () => {
+  renderApp("/owner/barang");
+  expect(await screen.findByText("Segera hadir")).toBeInTheDocument();
+  expect(screen.queryByText("ShaziaMart")).not.toBeInTheDocument();
+});
+
+test("Beranda: h1 hanya dari kerangka (tanpa h1 sr-only di halaman)", async () => {
+  renderApp("/owner");
+  await screen.findByRole("heading", { name: "Omzet per jam" });
+  expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
 });
 
 test("offline setelah data dimuat → halaman tetap + banner; pulih → banner hilang", async () => {
   const { queryClient } = renderApp("/owner/barang");
-  const heading = await screen.findByRole("heading", {
-    level: 1,
-    name: "Barang",
-  });
-  await screen.findByText("● toko online");
+  const page = await screen.findByText("Segera hadir");
+  await screen.findByText("Toko online");
   const pollHealth = () =>
     act(() => queryClient.refetchQueries({ queryKey: getGetHealthQueryKey() }));
 
@@ -98,16 +120,15 @@ test("offline setelah data dimuat → halaman tetap + banner; pulih → banner h
   const banner = await screen.findByText(BANNER);
   expect(banner).toHaveAttribute("role", "status");
   // Halaman yang sama tetap terpasang (bukan dipasang ulang).
-  expect(heading).toBeInTheDocument();
+  expect(page).toBeInTheDocument();
   expect(screen.queryByText(OFFLINE_TEXT)).not.toBeInTheDocument();
-  const status = screen.getByText("● toko offline");
-  expect(status).toHaveClass("text-danger");
+  expect(screen.getByText("Toko offline")).toBeInTheDocument();
 
   setScenario("normal");
   await pollHealth();
   await waitFor(() => expect(screen.queryByText(BANNER)).toBeNull());
-  expect(heading).toBeInTheDocument();
-  expect(screen.getByText("● toko online")).toBeInTheDocument();
+  expect(page).toBeInTheDocument();
+  expect(screen.getByText("Toko online")).toBeInTheDocument();
 });
 
 test("offline sebelum data apa pun dimuat → layar penuh tidak bisa terhubung + Coba lagi", async () => {
@@ -115,9 +136,9 @@ test("offline sebelum data apa pun dimuat → layar penuh tidak bisa terhubung +
   setScenario("server-mati");
   renderApp("/owner/barang");
   expect(await screen.findByText(OFFLINE_TEXT)).toBeInTheDocument();
-  expect(
-    screen.queryByRole("heading", { level: 1, name: "Barang" }),
-  ).not.toBeInTheDocument();
+  // Halaman belum dipasang; judul besar kerangka tetap satu-satunya h1.
+  expect(screen.queryByText("Segera hadir")).not.toBeInTheDocument();
+  expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
   // navigasi tetap tersedia saat offline
   expect(
     screen.getByRole("navigation", { name: "Navigasi utama" }),
@@ -125,9 +146,7 @@ test("offline sebelum data apa pun dimuat → layar penuh tidak bisa terhubung +
 
   setScenario("normal");
   await user.click(screen.getByRole("button", { name: "Coba lagi" }));
-  expect(
-    await screen.findByRole("heading", { level: 1, name: "Barang" }),
-  ).toBeInTheDocument();
+  expect(await screen.findByText("Segera hadir")).toBeInTheDocument();
   expect(screen.queryByText(OFFLINE_TEXT)).not.toBeInTheDocument();
 });
 
