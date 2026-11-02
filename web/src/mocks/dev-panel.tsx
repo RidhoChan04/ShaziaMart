@@ -62,7 +62,7 @@ export function DevPanel() {
         "fixed left-3 z-50 flex flex-col items-start gap-1 text-xs text-text",
         // Di owner (HP) jangan menutupi tab bawah.
         onOwner
-          ? "bottom-[calc(4.5rem+env(safe-area-inset-bottom))] lg:bottom-3"
+          ? "bottom-[calc(5.5rem+env(safe-area-inset-bottom))] lg:bottom-3"
           : "bottom-3",
       )}
     >

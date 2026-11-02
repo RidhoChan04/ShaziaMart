@@ -7,20 +7,20 @@ import { attentionItems, comparisonText, hourWindow } from "./home-model";
 
 describe("comparisonText", () => {
   test.each([
-    [4872500, 4350000, "▲ 12% dari Jumat lalu", "up"],
-    [3915000, 4350000, "▼ 10% dari Jumat lalu", "down"],
-    [4350000, 4350000, "Sama dengan Jumat lalu", "flat"],
-    [0, 0, "Belum ada data Jumat lalu", "none"],
-    [500000, 0, "Belum ada data Jumat lalu", "none"],
-    [0, 4350000, "▼ 100% dari Jumat lalu", "down"],
-    [3, 2, "▲ 50% dari Jumat lalu", "up"], // tepat .5 naik
-    [201, 200, "▲ 1% dari Jumat lalu", "up"], // 0,5% -> 1%
-    [1001, 1000, "Sama dengan Jumat lalu", "flat"], // 0,1% -> 0%
-    [1000001, 1000000, "Sama dengan Jumat lalu", "flat"],
-    [999999, 1000000, "Sama dengan Jumat lalu", "flat"],
-    [9007199254740, 4503599627370, "▲ 100% dari Jumat lalu", "up"],
-  ] as const)("(%i, %i)", (revenue, last, text, trend) => {
-    expect(comparisonText(revenue, last, "Jumat")).toEqual({ text, trend });
+    [4872500, 4350000, "▲ 12% dari Jumat lalu"],
+    [3915000, 4350000, "▼ 10% dari Jumat lalu"],
+    [4350000, 4350000, "Sama dengan Jumat lalu"],
+    [0, 0, "Belum ada data Jumat lalu"],
+    [500000, 0, "Belum ada data Jumat lalu"],
+    [0, 4350000, "▼ 100% dari Jumat lalu"],
+    [3, 2, "▲ 50% dari Jumat lalu"], // tepat .5 naik
+    [201, 200, "▲ 1% dari Jumat lalu"], // 0,5% -> 1%
+    [1001, 1000, "Sama dengan Jumat lalu"], // 0,1% -> 0%
+    [1000001, 1000000, "Sama dengan Jumat lalu"],
+    [999999, 1000000, "Sama dengan Jumat lalu"],
+    [9007199254740, 4503599627370, "▲ 100% dari Jumat lalu"],
+  ] as const)("(%i, %i)", (revenue, last, text) => {
+    expect(comparisonText(revenue, last, "Jumat")).toBe(text);
   });
 });
 

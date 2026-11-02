@@ -195,3 +195,26 @@ test("main memberi ruang bawah untuk kapsul tab bar, termasuk jarak aman bawah",
     "lg:pb-6",
   );
 });
+
+test("isi halaman memakai kolom max-w-6xl yang sejajar dengan header", async () => {
+  renderApp("/owner/barang");
+  const placeholder = await screen.findByText("Segera hadir");
+  expect(placeholder.parentElement).toHaveClass("mx-auto", "max-w-6xl");
+});
+
+test("kapsul tab dan kerangka menghormati jarak aman kiri-kanan (viewport-fit=cover)", async () => {
+  const { container } = renderApp("/owner");
+  const nav = await screen.findByRole("navigation", {
+    name: "Navigasi utama",
+  });
+  expect(nav).toHaveClass(
+    "left-[calc(12px+env(safe-area-inset-left))]",
+    "right-[calc(12px+env(safe-area-inset-right))]",
+    "lg:left-auto",
+    "lg:right-auto",
+  );
+  expect(container.querySelector(".min-h-dvh")).toHaveClass(
+    "pl-[env(safe-area-inset-left)]",
+    "pr-[env(safe-area-inset-right)]",
+  );
+});

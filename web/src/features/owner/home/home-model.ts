@@ -5,27 +5,20 @@ import type {
 import { formatRupiah } from "@/shared/lib/money";
 import { roundHalfUp } from "@/shared/lib/quantity";
 
-type Trend = "up" | "down" | "flat" | "none";
-
 export function comparisonText(
   revenue: number,
   lastWeekRevenue: number,
   weekday: string,
-): { text: string; trend: Trend } {
-  if (lastWeekRevenue === 0)
-    return { text: `Belum ada data ${weekday} lalu`, trend: "none" };
+): string {
+  if (lastWeekRevenue === 0) return `Belum ada data ${weekday} lalu`;
   const percent = roundHalfUp(
     Math.abs(revenue - lastWeekRevenue) * 100,
     lastWeekRevenue,
   );
   // Selisih yang dibulatkan ke 0% dibaca "sama", bukan "▲ 0%".
-  if (percent === 0)
-    return { text: `Sama dengan ${weekday} lalu`, trend: "flat" };
+  if (percent === 0) return `Sama dengan ${weekday} lalu`;
   const up = revenue > lastWeekRevenue;
-  return {
-    text: `${up ? "▲" : "▼"} ${percent}% dari ${weekday} lalu`,
-    trend: up ? "up" : "down",
-  };
+  return `${up ? "▲" : "▼"} ${percent}% dari ${weekday} lalu`;
 }
 
 const DEFAULT_WINDOW = { from: 6, to: 21 };

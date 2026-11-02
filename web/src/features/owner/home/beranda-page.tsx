@@ -25,7 +25,7 @@ function RevenueCard({
   summary: OwnerTodaySummary;
   nowHour: number;
 }) {
-  const { text } = comparisonText(
+  const text = comparisonText(
     summary.revenue,
     summary.lastWeekRevenue,
     summary.weekdayLastWeek,
@@ -140,7 +140,7 @@ export function BerandaPage() {
   const refreshing = usePullToRefresh(query.refetch);
 
   return (
-    <div className="mx-auto max-w-6xl">
+    <div>
       {refreshing && (
         <p
           role="status"
