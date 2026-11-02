@@ -1,11 +1,11 @@
 import { useRef } from "react";
 import { useBusinessDay } from "@/shared/hooks/use-business-day";
-import { useScrolledPast } from "@/shared/hooks/use-scrolled-past";
 import {
   type ServerHealth,
   useServerHealth,
 } from "@/shared/hooks/use-server-health";
 import { cn } from "@/shared/lib/cn";
+import { useScrolledPast } from "./use-scrolled-past";
 
 function StoreStatus({ online, checking }: ServerHealth) {
   // Wadah role=status selalu ada agar perubahan diumumkan; kosong selama memeriksa.
