@@ -2,6 +2,7 @@ import { expect, test } from "vitest";
 import type { HourBucket } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import {
   buildChart,
+  HOUR_LABEL_HALF,
   PEAK_CHAR_WIDTH,
   peakSummary,
 } from "./hourly-chart-geometry";
@@ -48,28 +49,13 @@ test.each([
 ])("sumbu Y %s: batas atas %i, tanpa NaN/Infinity", (_n, hourly, top) => {
   const c = chart(hourly, 10);
   expect(c.ticks.map((t) => t.value)).toEqual([0, top / 2, top]);
-  expect(`${c.todayPath} ${c.lastWeekPath}`).not.toMatch(/NaN|Infinity/);
-  const numbers = [
-    ...c.ticks.map((t) => t.y),
-    ...c.hourTicks.map((t) => t.x),
-    c.endLabels.lastWeek.x,
-    c.endLabels.lastWeek.y,
-    c.endLabels.today?.y ?? 0,
-  ];
-  for (const n of numbers) expect(Number.isFinite(n)).toBe(true);
+  expectAllFinite(c);
 });
 
 test("label sumbu Y memakai format ringkas; sumbu X tiap 3 jam", () => {
   const c = chart(SAMPLE);
   expect(c.ticks.map((t) => t.label)).toEqual(["Rp0", "Rp250 rb", "Rp500 rb"]);
   expect(c.hourTicks.map((t) => t.label)).toEqual(["09.00", "12.00"]);
-});
-
-test("garis hari ini berhenti di jam sekarang; nol titik bila belum mulai", () => {
-  expect(chart(SAMPLE, 11).todayPath?.match(/[ML]/g)).toHaveLength(4);
-  expect(chart(SAMPLE, 11).lastWeekPath.match(/[ML]/g)).toHaveLength(6);
-  expect(chart(SAMPLE, 6).todayPath).toBeNull();
-  expect(chart(SAMPLE, 6).endLabels.today).toBeNull();
 });
 
 test("lebar mengubah posisi x tetapi bukan posisi y", () => {
@@ -86,32 +72,6 @@ test("hourAt memetakan x ke jam terdekat dan dijepit ke jendela", () => {
   expect(c.hourAt(c.x(10) + 2)).toBe(10);
   expect(c.hourAt(-50)).toBe(8);
   expect(c.hourAt(5000)).toBe(13);
-});
-
-test("label ujung garis dipisah minimal 12 dan tetap di dalam plot", () => {
-  const c = chart(
-    [bucket(11, 300_000, 300_000), bucket(12, 300_000, 300_000)],
-    12,
-  );
-  const today = c.endLabels.today;
-  expect(today).not.toBeNull();
-  expect(
-    Math.abs((today?.y ?? 0) - c.endLabels.lastWeek.y),
-  ).toBeGreaterThanOrEqual(12);
-  for (const y of [today?.y ?? 0, c.endLabels.lastWeek.y]) {
-    expect(y).toBeGreaterThanOrEqual(c.plot.top);
-    expect(y).toBeLessThanOrEqual(c.plot.bottom);
-  }
-});
-
-test("label ujung garis tidak digeser bila sudah berjauhan", () => {
-  const c = chart(
-    [bucket(8, 0, 1), bucket(11, 100_000, 100_000), bucket(13, 0, 400_000)],
-    11,
-  );
-  expect(c.hours.at(-1)).toBe(13);
-  expect(c.endLabels.today?.y).toBe(c.y(100_000));
-  expect(c.endLabels.lastWeek.y).toBe(c.y(400_000));
 });
 
 test("baris tabel: jam setelah sekarang tidak punya nilai hari ini", () => {
@@ -161,9 +121,24 @@ test("geometri batang: lebar 66% slot, hari ini 3px lebih sempit, tinggi sesuai 
   expect(b.today?.height).toBeCloseTo(c.plot.bottom - c.y(400_000), 5);
 });
 
-test("sumbu Y: label di kanan plot", () => {
+test("sumbu Y: label di kanan plot, plot mulai dari tepi kiri", () => {
   const c = chart(SAMPLE);
-  expect(c.plot.right).toBeLessThan(360);
+  expect(c.plot.left).toBe(0);
+  // Kolom label kanan muat "Rp250 rb" (11px) plus jarak.
+  expect(360 - c.plot.right).toBeGreaterThanOrEqual(50);
+  for (const t of c.ticks) expect(t.x).toBeGreaterThan(c.plot.right);
+});
+
+test("label jam paling kiri tidak terpotong tepi kiri pada jendela 16 jam", () => {
+  const hourly = [bucket(6, 0, 10_000), bucket(21, 0, 10_000)];
+  const c = chart(hourly, 10, 296);
+  expect(c.hours).toHaveLength(16);
+  const first = c.hourTicks[0];
+  if (!first) throw new Error("hourTick missing");
+  expect(first.hour).toBe(6);
+  expect(first.x - HOUR_LABEL_HALF).toBeGreaterThanOrEqual(c.plot.left);
+  // Label lain tetap di tengah batang.
+  for (const t of c.hourTicks.slice(1)) expect(t.x).toBe(c.x(t.hour));
 });
 
 test("puncak: omzet hari ini tertinggi s/d jam sekarang", () => {

@@ -126,7 +126,7 @@ function OwnerShell() {
     <div className="min-h-dvh bg-bg lg:grid lg:grid-cols-[240px_1fr] lg:grid-rows-[auto_1fr]">
       {title && <PageHeader title={title} />}
       <OwnerNav />
-      <main className="px-4 pt-1 pb-28 lg:col-start-2 lg:row-start-2 lg:px-6 lg:pt-2 lg:pb-6">
+      <main className="px-4 pt-1 pb-[calc(7rem+env(safe-area-inset-bottom))] lg:col-start-2 lg:row-start-2 lg:px-6 lg:pt-2 lg:pb-6">
         {loaded ? (
           <>
             {offline && <OfflineBanner />}

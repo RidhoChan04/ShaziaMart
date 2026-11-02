@@ -6,6 +6,7 @@ import {
   within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { HttpResponse, http } from "msw";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { mockDb } from "@/mocks/db";
 import {
@@ -14,6 +15,8 @@ import {
   post,
   unitOf,
 } from "@/mocks/handlers/test-helpers";
+import { server } from "@/mocks/node";
+import { ownerTodaySummary } from "@/mocks/owner-summary";
 import { setScenario } from "@/mocks/scenarios";
 import { getGetOwnerTodaySummaryQueryKey } from "@/shared/api/gen/owner/owner";
 import { newId } from "@/shared/lib/id";
@@ -69,10 +72,10 @@ test("omzet, perbandingan, grafik, tile, dan perlu perhatian tampil dari mock", 
   await ownerLogin();
   renderApp("/owner");
 
-  expect(await screen.findByText("OMZET HARI INI")).toBeInTheDocument();
-  expect(card("OMZET HARI INI").getByText("Rp36.000")).toBeInTheDocument();
+  expect(await screen.findByText("Omzet hari ini")).toBeInTheDocument();
+  expect(card("Omzet hari ini").getByText("Rp36.000")).toBeInTheDocument();
   expect(
-    card("OMZET HARI INI").getByText(/^[▲▼] \d+% dari Sabtu lalu$/),
+    card("Omzet hari ini").getByText(/^[▲▼] \d+% dari Sabtu lalu$/),
   ).toBeInTheDocument();
 
   expect(
@@ -81,10 +84,13 @@ test("omzet, perbandingan, grafik, tile, dan perlu perhatian tampil dari mock", 
   const chart = screen.getByRole("group", {
     name: "Omzet per jam hari ini dan Sabtu lalu",
   });
-  // garis minggu lalu berisi riwayat seed
+  // batang minggu lalu berisi riwayat seed
   expect(
-    chart.querySelector('path[stroke="var(--color-chart-2)"]'),
+    chart.querySelector('rect[fill="var(--color-chart-2)"]'),
   ).not.toBeNull();
+  expect(
+    screen.getByText(/^Paling ramai jam \d{2}\.00 · Rp/),
+  ).toBeInTheDocument();
 
   expect(card("Transaksi").getByText("1")).toBeInTheDocument();
   expect(card("Laba kotor").getByText(/^Rp[\d.]+$/)).toBeInTheDocument();
@@ -108,6 +114,23 @@ test("omzet, perbandingan, grafik, tile, dan perlu perhatian tampil dari mock", 
   expect(screen.queryByText("Semua aman hari ini")).not.toBeInTheDocument();
 });
 
+test("omzet >= Rp100 jt di pita: satu baris, tidak meluber", async () => {
+  server.use(
+    http.get("/api/owner/summary/today", () =>
+      HttpResponse.json({
+        ...ownerTodaySummary(mockDb.get(), Date.now()),
+        revenue: 123_456_789,
+      }),
+    ),
+  );
+  await ownerLogin();
+  renderApp("/owner");
+  const amount = await screen.findByText("Rp123.456.789");
+  // truncate = nowrap + overflow hidden + ellipsis; min-w-0 agar bisa menyusut di flex/grid.
+  expect(amount).toHaveClass("num", "truncate");
+  expect(amount.parentElement).toHaveClass("min-w-0");
+});
+
 test("tanpa penjualan dan tanpa perhatian: belum ada pembanding dan semua aman", async () => {
   mockDb.update((s) => {
     s.sales = [];
@@ -121,7 +144,7 @@ test("tanpa penjualan dan tanpa perhatian: belum ada pembanding dan semua aman",
   expect(
     await screen.findByText("Belum ada data Sabtu lalu"),
   ).toBeInTheDocument();
-  expect(card("OMZET HARI INI").getByText("Rp0")).toBeInTheDocument();
+  expect(card("Omzet hari ini").getByText("Rp0")).toBeInTheDocument();
   expect(screen.getByText("Semua aman hari ini")).toBeInTheDocument();
 });
 
@@ -130,7 +153,7 @@ test("kerangka saat memuat pertama, lalu data", async () => {
   renderApp("/owner");
   const busy = await screen.findByLabelText("Memuat beranda");
   expect(busy).toHaveAttribute("aria-busy", "true");
-  expect(await screen.findByText("OMZET HARI INI")).toBeInTheDocument();
+  expect(await screen.findByText("Omzet hari ini")).toBeInTheDocument();
   expect(screen.queryByLabelText("Memuat beranda")).not.toBeInTheDocument();
 });
 
@@ -148,27 +171,27 @@ test("gagal tanpa data → pesan galat dan Coba lagi memuat ulang", async () => 
 
   setScenario("normal");
   await user.click(screen.getByRole("button", { name: "Coba lagi" }));
-  expect(await screen.findByText("OMZET HARI INI")).toBeInTheDocument();
+  expect(await screen.findByText("Omzet hari ini")).toBeInTheDocument();
 });
 
 test("refetch gagal saat data sudah ada → data lama tetap, tanpa layar galat", async () => {
   await ownerLogin();
   const { queryClient } = renderApp("/owner");
-  await screen.findByText("OMZET HARI INI");
+  await screen.findByText("Omzet hari ini");
 
   setScenario("server-mati");
   await act(() => queryClient.refetchQueries({ queryKey: SUMMARY_KEY }));
-  expect(screen.getByText("OMZET HARI INI")).toBeInTheDocument();
+  expect(screen.getByText("Omzet hari ini")).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Coba lagi" })).toBeNull();
   expect(screen.queryByLabelText("Memuat beranda")).toBeNull();
 });
 
-test("server mati lalu jam berganti: garis hari ini berhenti di jam data terakhir", async () => {
+test("server mati lalu jam berganti: batang hari ini berhenti di jam data terakhir", async () => {
   // Sabtu 17 Okt 2026, 10.00 WIB
   vi.setSystemTime(Date.UTC(2026, 9, 17, 3, 0));
   await ownerLogin();
   renderApp("/owner");
-  await screen.findByText("OMZET HARI INI");
+  await screen.findByText("Omzet hari ini");
 
   // 13.00 WIB, server mati: tarik-segarkan gagal, data 10.00 tetap tampil.
   setScenario("server-mati");
@@ -208,7 +231,7 @@ test("kunci query memuat tanggal bisnis; ganti hari → kunci baru", async () =>
   await vi.waitFor(() => expect(has("2026-10-18")).toBe(true));
   // Angka hari kemarin tidak tampil sebagai angka hari baru.
   await vi.waitFor(() =>
-    expect(card("OMZET HARI INI").getByText("Rp0")).toBeInTheDocument(),
+    expect(card("Omzet hari ini").getByText("Rp0")).toBeInTheDocument(),
   );
   expect(screen.queryByText("Rp36.000")).not.toBeInTheDocument();
 });
@@ -216,7 +239,7 @@ test("kunci query memuat tanggal bisnis; ganti hari → kunci baru", async () =>
 test("tarik untuk refresh di layar sentuh memuat ulang ringkasan", async () => {
   await ownerLogin();
   const { queryClient } = renderApp("/owner");
-  await screen.findByText("OMZET HARI INI");
+  await screen.findByText("Omzet hari ini");
   setScenario("lambat");
   const fetches = vi.fn();
   queryClient.getQueryCache().subscribe((e) => {

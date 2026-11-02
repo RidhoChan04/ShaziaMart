@@ -3,24 +3,25 @@ import { formatRupiahShort } from "@/shared/lib/money";
 import { hourWindow } from "./home-model";
 
 export const CHART_HEIGHT = 160;
-const PLOT_LEFT = 58;
-/** Ruang di kanan plot untuk label ujung garis. */
-const PLOT_RIGHT_MARGIN = 70;
+const PLOT_LEFT = 0;
+/** Ruang di kanan plot untuk label sumbu nilai (mis. "Rp250 rb", 11px). */
+const PLOT_RIGHT_MARGIN = 56;
+/** Jarak label sumbu nilai dari tepi kanan plot. */
+const TICK_GAP = 6;
 /** Menyisakan ruang untuk label puncak di atas batang tertinggi. */
 const PLOT_TOP = 20;
 const PLOT_BOTTOM = 138;
-const LABEL_GAP = 12;
-const LABEL_OFFSET = 8;
 const MIN_TOP = 100_000;
 const BAR_RATIO = 0.66;
 const TODAY_INSET = 3;
 const PEAK_GAP = 4;
-/** Perkiraan lebar satu karakter label puncak (font 9.5px). */
-export const PEAK_CHAR_WIDTH = 5.5;
+/** Perkiraan lebar satu karakter label puncak (11px semibold, sedikit dilebihkan). */
+export const PEAK_CHAR_WIDTH = 6.5;
+/** Perkiraan setengah lebar label jam "06.00" (11px), agar label paling kiri tidak terpotong. */
+export const HOUR_LABEL_HALF = 16;
 
 export const hourLabel = (hour: number) =>
   `${String(hour).padStart(2, "0")}.00`;
-const round = (n: number) => Math.round(n * 10) / 10;
 
 /** Batas atas sumbu: 1, 2, atau 5 × 10^k (mulai Rp100 rb) terkecil yang >= `max`. */
 function niceTop(max: number): number {
@@ -29,17 +30,6 @@ function niceTop(max: number): number {
       if (base * factor >= max) return base * factor;
     }
   }
-}
-
-/** Geser dua label agar berjarak >= LABEL_GAP tanpa keluar dari plot. */
-function separate(a: number, b: number): [number, number] {
-  if (Math.abs(a - b) >= LABEL_GAP) return [a, b];
-  const upper = Math.min(
-    Math.max((a + b) / 2 - LABEL_GAP / 2, PLOT_TOP + LABEL_GAP / 2),
-    PLOT_BOTTOM - LABEL_GAP,
-  );
-  const lower = upper + LABEL_GAP;
-  return a <= b ? [upper, lower] : [lower, upper];
 }
 
 export type Bar = {
@@ -103,7 +93,6 @@ export function buildChart({
   const today = (h: number) => byHour.get(h)?.revenue ?? 0;
   const lastWeek = (h: number) => byHour.get(h)?.lastWeekRevenue ?? 0;
   const lastTodayHour = Math.min(nowHour, to);
-  const todayHours = hours.filter((h) => h <= lastTodayHour);
 
   const plot = {
     left: PLOT_LEFT,
@@ -118,20 +107,9 @@ export function buildChart({
   /** Titik tengah slot jam `h` (juga tengah batang). */
   const x = (h: number) => plot.left + (h - from + 0.5) * slot;
   const y = (v: number) => plot.bottom - (v / top) * (plot.bottom - plot.top);
-  const path = (hs: number[], value: (h: number) => number) =>
-    hs
-      .map(
-        (h, i) => `${i === 0 ? "M" : "L"}${round(x(h))} ${round(y(value(h)))}`,
-      )
-      .join(" ");
 
-  const lastWeekY = y(lastWeek(to));
-  const [todayLabelY, lastWeekLabelY] =
-    todayHours.length > 0
-      ? separate(y(today(lastTodayHour)), lastWeekY)
-      : [null, lastWeekY];
-
-  const hasSales = peakBucket(hourly, nowHour) !== null;
+  const peakRow = peakBucket(hourly, nowHour);
+  const hasSales = peakRow !== null;
   const barWidth = slot * BAR_RATIO;
   const bars: Bar[] = hours.map((h) => {
     const base = {
@@ -156,7 +134,6 @@ export function buildChart({
     };
   });
 
-  const peakRow = peakBucket(hourly, nowHour);
   const peakLabel = peakRow === null ? "" : formatRupiahShort(peakRow.revenue);
   const peakHalf = (peakLabel.length * PEAK_CHAR_WIDTH) / 2;
   const peak =
@@ -181,21 +158,17 @@ export function buildChart({
     peak,
     ticks: [0, top / 2, top].map((value) => ({
       value,
+      x: plot.right + TICK_GAP,
       y: y(value),
       label: formatRupiahShort(value),
     })),
     hourTicks: hours
       .filter((h) => h % 3 === 0)
-      .map((h) => ({ hour: h, x: x(h), label: hourLabel(h) })),
-    todayPath: todayHours.length > 0 ? path(todayHours, today) : null,
-    lastWeekPath: path(hours, lastWeek),
-    endLabels: {
-      today:
-        todayLabelY === null
-          ? null
-          : { x: x(lastTodayHour) + LABEL_OFFSET, y: todayLabelY },
-      lastWeek: { x: x(to) + LABEL_OFFSET, y: lastWeekLabelY },
-    },
+      .map((h) => ({
+        hour: h,
+        x: Math.max(x(h), plot.left + HOUR_LABEL_HALF),
+        label: hourLabel(h),
+      })),
     x,
     y,
     clamp,

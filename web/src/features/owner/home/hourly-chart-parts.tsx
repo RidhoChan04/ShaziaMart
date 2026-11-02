@@ -2,24 +2,37 @@ import { formatRupiah } from "@/shared/lib/money";
 import type { ChartRow } from "./hourly-chart-geometry";
 
 export const TODAY_NAME = "Hari ini";
-const TODAY_SWATCH = "h-0.5 bg-chart-1";
 /** Perkiraan setengah lebar tooltip, agar tidak keluar dari kartu. */
 const TOOLTIP_HALF_WIDTH = 110;
-const LAST_WEEK_SWATCH = "border-t-2 border-dashed border-chart-2";
 
-function Swatch({ className }: { className: string }) {
-  return <span aria-hidden className={`inline-block w-5 ${className}`} />;
+type Series = "today" | "last-week";
+const SWATCH_COLOR: Record<Series, string> = {
+  today: "bg-chart-1",
+  "last-week": "bg-chart-2",
+};
+
+function Swatch({ series }: { series: Series }) {
+  return (
+    <span
+      aria-hidden
+      data-swatch={series}
+      className={`inline-block size-2.5 shrink-0 rounded-[3px] ${SWATCH_COLOR[series]}`}
+    />
+  );
 }
 
 export function Legend({ lastWeekName }: { lastWeekName: string }) {
   return (
-    <div className="flex gap-4 pb-1 text-[11px] text-muted">
+    <div
+      data-testid="chart-legend"
+      className="mt-2 flex gap-4 text-xs text-muted"
+    >
       <span className="inline-flex items-center gap-1.5">
-        <Swatch className={TODAY_SWATCH} />
+        <Swatch series="today" />
         {TODAY_NAME}
       </span>
       <span className="inline-flex items-center gap-1.5">
-        <Swatch className={LAST_WEEK_SWATCH} />
+        <Swatch series="last-week" />
         {lastWeekName}
       </span>
     </div>
@@ -39,14 +52,14 @@ export function Tooltip({
   const lines = [
     ...(row.today === null
       ? []
-      : [{ name: TODAY_NAME, swatch: TODAY_SWATCH, value: row.today }]),
-    { name: lastWeekName, swatch: LAST_WEEK_SWATCH, value: row.lastWeek },
+      : [{ name: TODAY_NAME, series: "today" as const, value: row.today }]),
+    { name: lastWeekName, series: "last-week" as const, value: row.lastWeek },
   ];
   return (
     <div
       data-testid="chart-tooltip"
       aria-hidden
-      className="pointer-events-none absolute top-6 whitespace-nowrap rounded-md border border-border bg-surface px-2 py-1 text-xs text-text shadow-sm"
+      className="pointer-events-none absolute top-0 whitespace-nowrap rounded-md border border-border bg-surface px-2 py-1 text-xs text-text shadow-sm"
       style={{
         left: `clamp(${TOOLTIP_HALF_WIDTH}px, ${left}px, 100% - ${TOOLTIP_HALF_WIDTH}px)`,
         transform: "translateX(-50%)",
@@ -55,7 +68,7 @@ export function Tooltip({
       <div className="num font-semibold">{row.label}</div>
       {lines.map((l) => (
         <div key={l.name} className="num flex items-center gap-1.5">
-          <Swatch className={l.swatch} />
+          <Swatch series={l.series} />
           {`${l.name} ${formatRupiah(l.value)}`}
         </div>
       ))}

@@ -6,6 +6,8 @@
   --color-*: initial;
   --color-primary: #1f7a4d;
   --color-primary-foreground: #ffffff;
+  /* Ujung gelap gradien pita omzet pemilik. */
+  --color-primary-deep: #155c3b;
   --color-bg: #f6f7f5;
   --color-surface: #ffffff;
   --color-text: #1c2421;

@@ -11,34 +11,53 @@ import { pesanError } from "@/shared/lib/error-messages";
 import { formatRupiah } from "@/shared/lib/money";
 import { Button } from "@/shared/ui/button";
 import { AttentionList } from "./attention-list";
-import { CARD } from "./card-style";
 import { comparisonText } from "./home-model";
 import { HourlyChart } from "./hourly-chart";
 import { KpiTiles } from "./kpi-tiles";
 
 const REFRESH_MS = 60_000;
 
-const TREND_COLOR = {
-  up: "text-primary",
-  down: "text-danger",
-  flat: "text-muted",
-  none: "text-muted",
-} as const;
-
-function Hero({ summary }: { summary: OwnerTodaySummary }) {
-  const { text, trend } = comparisonText(
+/** Kartu C4: pita hijau berisi omzet, lalu bagian putih berisi grafik per jam. */
+function RevenueCard({
+  summary,
+  nowHour,
+}: {
+  summary: OwnerTodaySummary;
+  nowHour: number;
+}) {
+  const { text } = comparisonText(
     summary.revenue,
     summary.lastWeekRevenue,
     summary.weekdayLastWeek,
   );
   return (
-    <section className={CARD}>
-      <p className="text-[11px] text-muted">OMZET HARI INI</p>
-      <p className="num text-[26px] font-extrabold">
-        {formatRupiah(summary.revenue)}
-      </p>
-      <p className={cn("text-sm font-semibold", TREND_COLOR[trend])}>{text}</p>
-    </section>
+    <div className="min-w-0 overflow-hidden rounded-lg bg-surface">
+      <div className="min-w-0 bg-linear-155 from-primary to-primary-deep px-4 pt-4 pb-3.5 text-primary-foreground">
+        <p className="text-[13px] font-semibold">Omzet hari ini</p>
+        {/* Satu baris: angka panjang dipotong, bukan meluber dari kartu. */}
+        <p className="num mt-0.5 truncate text-[34px] leading-tight font-bold tracking-[-0.03em]">
+          {formatRupiah(summary.revenue)}
+        </p>
+        <p className="mt-2">
+          <span className="inline-flex rounded-full bg-primary-foreground/12 px-2.5 py-1 text-[13px] font-semibold">
+            {text}
+          </span>
+        </p>
+      </div>
+      <section aria-labelledby="hourly-title" className="px-4 pt-3.5 pb-4">
+        <h2
+          id="hourly-title"
+          className="mb-1 text-[13px] font-semibold text-muted"
+        >
+          Omzet per jam
+        </h2>
+        <HourlyChart
+          hourly={summary.hourly}
+          weekday={summary.weekdayLastWeek}
+          nowHour={nowHour}
+        />
+      </section>
+    </div>
   );
 }
 
@@ -50,21 +69,9 @@ function Summary({
   nowHour: number;
 }) {
   return (
-    <div className="grid gap-3 lg:grid-cols-2 lg:items-start lg:gap-4">
-      <div className="grid gap-3">
-        <Hero summary={summary} />
-        <section className={CARD} aria-labelledby="hourly-title">
-          <h2 id="hourly-title" className="mb-2 text-sm font-semibold">
-            Omzet per jam
-          </h2>
-          <HourlyChart
-            hourly={summary.hourly}
-            weekday={summary.weekdayLastWeek}
-            nowHour={nowHour}
-          />
-        </section>
-      </div>
-      <div className="grid gap-3">
+    <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 lg:items-start lg:gap-4">
+      <RevenueCard summary={summary} nowHour={nowHour} />
+      <div className="grid min-w-0 gap-3">
         <KpiTiles summary={summary} />
         <AttentionList attention={summary.attention} />
       </div>
@@ -90,18 +97,15 @@ function BerandaSkeleton() {
       role="status"
       aria-busy="true"
       aria-label="Memuat beranda"
-      className="grid gap-3 lg:grid-cols-2 lg:items-start lg:gap-4"
+      className="grid grid-cols-1 gap-3 lg:grid-cols-2 lg:items-start lg:gap-4"
     >
-      <div className="grid gap-3">
-        <Skeleton className="h-[104px]" />
-        <Skeleton className="h-[236px]" />
-      </div>
+      <Skeleton className="h-[395px]" />
       <div className="grid gap-3">
         <div className="grid grid-cols-2 gap-2 lg:gap-3">
-          <Skeleton className="h-[66px]" />
-          <Skeleton className="h-[66px]" />
-          <Skeleton className="h-[66px]" />
-          <Skeleton className="h-[66px]" />
+          <Skeleton className="h-[75px]" />
+          <Skeleton className="h-[75px]" />
+          <Skeleton className="h-[75px]" />
+          <Skeleton className="h-[75px]" />
         </div>
         <Skeleton className="h-24" />
       </div>

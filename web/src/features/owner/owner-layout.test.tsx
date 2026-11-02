@@ -186,8 +186,12 @@ test("fokus keyboard pada tautan tab terlihat (kelas focus-visible ada)", async 
   expect(link).toBeInTheDocument();
 });
 
-test("main memberi ruang bawah untuk kapsul tab bar", async () => {
+test("main memberi ruang bawah untuk kapsul tab bar, termasuk jarak aman bawah", async () => {
   renderApp("/owner");
   await screen.findByRole("heading", { level: 1, name: "Beranda" });
-  expect(screen.getByRole("main")).toHaveClass("pb-28");
+  // Kapsul digeser sebesar safe-area-inset-bottom; ruang bawah konten ikut bertambah.
+  expect(screen.getByRole("main")).toHaveClass(
+    "pb-[calc(7rem+env(safe-area-inset-bottom))]",
+    "lg:pb-6",
+  );
 });

@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, expect, test, vi } from "vitest";
 import type { HourBucket } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { HourlyChart } from "./hourly-chart";
+import { buildChart } from "./hourly-chart-geometry";
 
 const bucket = (
   hour: number,
@@ -51,50 +52,83 @@ function stubWidth(width: number) {
   );
 }
 
-const paths = (c: HTMLElement) =>
-  Array.from(c.querySelectorAll("svg path[stroke]"));
-const seriesPath = (c: HTMLElement, token: string) =>
-  c.querySelector(`svg path[stroke="var(--${token})"]`);
+const todayBars = (c: HTMLElement) =>
+  Array.from(c.querySelectorAll("svg rect[data-series='today']"));
+const lastWeekBars = (c: HTMLElement) =>
+  Array.from(c.querySelectorAll("svg rect[data-series='last-week']"));
 
-test("menggambar dua garis dengan token warna seri; minggu lalu putus-putus", () => {
+test("batang: rect hari ini berwarna token chart-1, jam berjalan chart-1-now", () => {
   const { container } = renderChart(SAMPLE);
-  const today = seriesPath(container, "color-chart-1");
-  const lastWeek = seriesPath(container, "color-chart-2");
-  expect(today).not.toHaveAttribute("stroke-dasharray");
-  expect(lastWeek).toHaveAttribute("stroke-dasharray", "4 3");
-  expect(paths(container)).toHaveLength(2);
-});
-
-test("garis hari ini berhenti di jam sekarang, minggu lalu sepanjang jendela", () => {
-  const { container } = renderChart(SAMPLE);
-  const today = seriesPath(container, "color-chart-1");
-  const lastWeek = seriesPath(container, "color-chart-2");
-  expect(today?.getAttribute("d")?.match(/[ML]/g)).toHaveLength(4); // 08-11
-  expect(lastWeek?.getAttribute("d")?.match(/[ML]/g)).toHaveLength(6); // 08-13
-});
-
-test("sebelum jam pertama jendela, garis hari ini tidak digambar", () => {
-  const { container } = renderChart(SAMPLE, 6);
-  expect(paths(container)).toHaveLength(1);
-  expect(paths(container)[0]).toHaveAttribute("stroke-dasharray", "4 3");
-});
-
-test("legenda dan label langsung memakai nama seri", () => {
-  renderChart(SAMPLE);
-  expect(screen.getAllByText("Hari ini").length).toBeGreaterThanOrEqual(2);
-  expect(screen.getAllByText("Jumat lalu").length).toBeGreaterThanOrEqual(2);
-});
-
-test("sumbu Y: nol, setengah, dan maksimum 'bagus'; sumbu X tiap 3 jam", () => {
-  const { container } = renderChart(SAMPLE);
-  const labels = Array.from(container.querySelectorAll("svg text")).map(
-    (t) => t.textContent,
+  expect(container.querySelector("svg path")).toBeNull();
+  const today = todayBars(container);
+  // 08-11: tiga jam selesai + jam berjalan.
+  expect(today.map((r) => r.getAttribute("fill"))).toEqual([
+    "var(--color-chart-1)",
+    "var(--color-chart-1)",
+    "var(--color-chart-1)",
+    "var(--color-chart-1-now)",
+  ]);
+  const lastWeek = lastWeekBars(container);
+  expect(lastWeek).toHaveLength(6);
+  for (const r of lastWeek)
+    expect(r).toHaveAttribute("fill", "var(--color-chart-2)");
+  for (const r of [...today, ...lastWeek]) expect(r).toHaveAttribute("rx", "3");
+  // Batang minggu lalu digambar lebih dulu (di belakang).
+  const all = Array.from(container.querySelectorAll("svg rect[data-series]"));
+  expect(all.indexOf(lastWeek[0] as Element)).toBeLessThan(
+    all.indexOf(today[0] as Element),
   );
+});
+
+test("sebelum jam pertama jendela, tanpa batang hari ini", () => {
+  const { container } = renderChart(SAMPLE, 6);
+  expect(todayBars(container)).toHaveLength(0);
+  expect(lastWeekBars(container)).toHaveLength(6);
+});
+
+test("ringkasan puncak tampil; tanpa penjualan → 'Belum ada penjualan hari ini'", () => {
+  const { container, unmount } = renderChart(SAMPLE);
+  expect(
+    screen.getByText("Paling ramai jam 10.00 · Rp400 rb"),
+  ).toBeInTheDocument();
+  const peak = container.querySelector("svg text[data-peak]");
+  expect(peak).toHaveTextContent("Rp400 rb");
+  expect(peak).toHaveClass("fill-text");
+  unmount();
+
+  const empty = renderChart([bucket(8, 0, 50_000), bucket(9, 0, 0)], 9);
+  expect(screen.getByText("Belum ada penjualan hari ini")).toBeInTheDocument();
+  expect(empty.container.querySelector("svg text[data-peak]")).toBeNull();
+  expect(todayBars(empty.container)).toHaveLength(0);
+  expect(empty.container.innerHTML).not.toMatch(/NaN|Infinity/);
+});
+
+test("legenda: kotak warna Hari ini dan {Hari} lalu", () => {
+  renderChart(SAMPLE);
+  const legend = screen.getByTestId("chart-legend");
+  expect(within(legend).getByText("Hari ini")).toBeInTheDocument();
+  expect(within(legend).getByText("Jumat lalu")).toBeInTheDocument();
+  const swatches = legend.querySelectorAll("[data-swatch]");
+  expect(
+    Array.from(swatches).map((s) => s.getAttribute("data-swatch")),
+  ).toEqual(["today", "last-week"]);
+});
+
+test("sumbu Y di kanan: nol, setengah, dan maksimum 'bagus'; sumbu X tiap 3 jam", () => {
+  const { container } = renderChart(SAMPLE);
+  const texts = Array.from(container.querySelectorAll("svg text"));
+  const labels = texts.map((t) => t.textContent);
   expect(labels).toEqual(
     expect.arrayContaining(["Rp0", "Rp250 rb", "Rp500 rb"]),
   );
   expect(labels).toEqual(expect.arrayContaining(["09.00", "12.00"]));
   expect(labels).not.toContain("10.00");
+  const plot = screen.getByTestId("chart-plot");
+  const plotRight =
+    Number(plot.getAttribute("x")) + Number(plot.getAttribute("width"));
+  const tick = texts.find((t) => t.textContent === "Rp500 rb");
+  expect(Number(tick?.getAttribute("x"))).toBeGreaterThan(plotRight);
+  expect(tick).toHaveAttribute("text-anchor", "start");
 });
 
 test.each([
@@ -106,17 +140,6 @@ test.each([
   const svg = container.querySelector("svg")?.outerHTML ?? "";
   expect(svg).not.toMatch(/NaN|Infinity|undefined/);
   expect(screen.getAllByText(top).length).toBeGreaterThan(0);
-});
-
-test("label ujung garis tidak bertumpuk saat nilai akhir hampir sama", () => {
-  const { container } = renderChart(
-    [bucket(11, 300_000, 300_000), bucket(12, 300_000, 300_000)],
-    12,
-  );
-  const [a, b] = Array.from(
-    container.querySelectorAll("svg text[data-end-label]"),
-  ).map((t) => Number(t.getAttribute("y")));
-  expect(Math.abs((a ?? 0) - (b ?? 0))).toBeGreaterThanOrEqual(12);
 });
 
 test("tabel sr-only memuat satu baris per jam di jendela", () => {
@@ -247,6 +270,51 @@ test("keyboard: panah memindah crosshair + tooltip, Esc menyembunyikan", async (
   expect(screen.queryByTestId("chart-tooltip")).not.toBeInTheDocument();
 });
 
+test("→ memindah jam aktif dan pembacaan aria-live; Esc menyembunyikan", async () => {
+  const user = userEvent.setup();
+  const { container } = renderChart(SAMPLE);
+  const active = () =>
+    Array.from(container.querySelectorAll("svg g[data-active='true']")).map(
+      (g) => g.getAttribute("data-hour"),
+    );
+  const live = screen.getByTestId("chart-live");
+  expect(active()).toEqual([]);
+
+  screen.getByRole("group", GROUP).focus();
+  await user.keyboard("{ArrowRight}");
+  expect(active()).toEqual(["11"]);
+  expect(live).toHaveTextContent(
+    "11.00, Hari ini Rp150.000, Jumat lalu Rp500.000",
+  );
+  await user.keyboard("{ArrowRight}");
+  expect(active()).toEqual(["12"]);
+  expect(live).toHaveTextContent("12.00, Jumat lalu Rp450.000");
+  // Batang lain diredupkan agar jam aktif menonjol.
+  const dimmed = container.querySelectorAll("svg g[data-hour][opacity]");
+  expect(dimmed).toHaveLength(5);
+
+  await user.keyboard("{Escape}");
+  expect(active()).toEqual([]);
+  expect(live).toBeEmptyDOMElement();
+  expect(container.querySelectorAll("svg g[data-hour][opacity]")).toHaveLength(
+    0,
+  );
+});
+
+test("tooltip memakai token teks dan swatch kotak", async () => {
+  const user = userEvent.setup();
+  renderChart(SAMPLE);
+  screen.getByRole("group", GROUP).focus();
+  await user.keyboard("{ArrowRight}");
+  const tooltip = screen.getByTestId("chart-tooltip");
+  expect(tooltip).toHaveClass("text-text", "bg-surface");
+  expect(
+    Array.from(tooltip.querySelectorAll("[data-swatch]")).map((s) =>
+      s.getAttribute("data-swatch"),
+    ),
+  ).toEqual(["today", "last-week"]);
+});
+
 test("panah tidak keluar dari jendela", async () => {
   const user = userEvent.setup();
   renderChart(SAMPLE);
@@ -262,9 +330,9 @@ test("pointer di area plot menampilkan jam terdekat", () => {
   const svg = container.querySelector("svg") as SVGSVGElement;
   svg.getBoundingClientRect = () =>
     ({ left: 0, top: 0, width: 360, height: 160 }) as DOMRect;
-  // Plot x: 58..290 untuk jam 08..13 -> jam 9 di x = 58 + 232/5.
+  const { x } = buildChart({ hourly: SAMPLE, nowHour: 11, width: 360 });
   fireEvent.pointerMove(screen.getByTestId("chart-plot"), {
-    clientX: 58 + 232 / 5 + 3,
+    clientX: x(9) + 3,
     clientY: 80,
   });
   expect(screen.getByTestId("chart-tooltip")).toHaveTextContent("09.00");
