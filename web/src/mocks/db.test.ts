@@ -22,7 +22,7 @@ test("JSON rusak di localStorage -> default tanpa melempar", () => {
   expect(mockDb.get().store.name).toBe("ShaziaMart");
 });
 
-test("JSON bentuk valid v3 di localStorage dimuat lazy", () => {
+test("JSON bentuk valid v4 di localStorage dimuat lazy", () => {
   const stored: MockState = {
     ...createSeedState(),
     store: { id: "abc", name: "Toko Lain" },
@@ -33,7 +33,7 @@ test("JSON bentuk valid v3 di localStorage dimuat lazy", () => {
 });
 
 test("JSON bentuk salah -> default", () => {
-  localStorage.setItem("mock.db", JSON.stringify({ version: 3, store: 1 }));
+  localStorage.setItem("mock.db", JSON.stringify({ version: 4, store: 1 }));
   __resetMockDbCacheForTests();
   expect(mockDb.get().store.name).toBe("ShaziaMart");
 });
@@ -51,43 +51,45 @@ test("mockDb.get mengembalikan salinan — mutasi tidak bocor", () => {
   expect(mockDb.get().store.name).toBe("ShaziaMart");
 });
 
-test("state v2 di localStorage → reseed v3", () => {
+test("state v3 di localStorage → reseed v4", () => {
   const {
-    unitCosts: _c,
-    minStock: _m,
-    creditLedger: _l,
-    ownerSession: _s,
-    ownerLoginFailures: _f,
-    ...v2
+    categories: _c,
+    priceHistory: _h,
+    costAlerts: _a,
+    ...rest
   } = createSeedState();
-  const lama = { id: "v2", name: "Lama" };
-  // Bentuk v2 asli, dan bentuk lengkap tetapi bertanda versi 2.
-  for (const stored of [v2, createSeedState()]) {
-    localStorage.setItem(
-      "mock.db",
-      JSON.stringify({ ...stored, version: 2, store: lama }),
-    );
+  const lama = { id: "v3", name: "Lama" };
+  // Bentuk v3 asli (dengan unitCosts), dan bentuk lengkap tetapi bertanda versi 3.
+  const v3 = { ...rest, version: 3, unitCosts: { x: 1000 } };
+  for (const stored of [v3, { ...createSeedState(), version: 3 }]) {
+    localStorage.setItem("mock.db", JSON.stringify({ ...stored, store: lama }));
     __resetMockDbCacheForTests();
     const s = mockDb.get();
-    expect(s.version).toBe(3);
+    expect(s.version).toBe(4);
     expect(s.store.name).toBe("ShaziaMart");
-    expect(Object.keys(s.unitCosts).length).toBeGreaterThan(0);
+    expect(s.categories).toHaveLength(20);
+    expect(s).not.toHaveProperty("unitCosts");
+    expect(s.products[0]).toMatchObject({ status: "aktif", scarce: false });
   }
 });
 
-test.each(["unitCosts", "minStock", "creditLedger", "ownerLoginFailures"])(
-  "v3 tanpa %s → reseed",
-  (key) => {
-    const stored: Record<string, unknown> = {
-      ...createSeedState(),
-      store: { id: "abc", name: "Toko Lain" },
-    };
-    delete stored[key];
-    localStorage.setItem("mock.db", JSON.stringify(stored));
-    __resetMockDbCacheForTests();
-    expect(mockDb.get().store.name).toBe("ShaziaMart");
-  },
-);
+test.each([
+  "categories",
+  "priceHistory",
+  "costAlerts",
+  "minStock",
+  "creditLedger",
+  "ownerLoginFailures",
+])("v4 tanpa %s → reseed", (key) => {
+  const stored: Record<string, unknown> = {
+    ...createSeedState(),
+    store: { id: "abc", name: "Toko Lain" },
+  };
+  delete stored[key];
+  localStorage.setItem("mock.db", JSON.stringify(stored));
+  __resetMockDbCacheForTests();
+  expect(mockDb.get().store.name).toBe("ShaziaMart");
+});
 
 // key null = localStorage.clear() di tab lain.
 test.each(["mock.db", null])(

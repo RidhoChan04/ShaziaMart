@@ -27,7 +27,7 @@ describe("HPP & buku kasbon", () => {
     mockDb.get().sales.find((s) => s.id === id)?.costTotal;
   const pinVoid = { ownerPin: "999999", reason: "salah input" };
 
-  test("respons createSale/listTodaySales tidak memuat costTotal", async () => {
+  test("respons createSale/listTodaySales/void tidak memuat costTotal & voidedAt", async () => {
     await loginWithShift();
     const body = {
       ...cashSale(),
@@ -52,30 +52,49 @@ describe("HPP & buku kasbon", () => {
       const keys = await keysOf(res);
       expect(keys).toContain("total");
       expect(keys).not.toContain("costTotal");
+      expect(keys).not.toContain("voidedAt");
     }
     expect(costOfStored(id)).toBeGreaterThan(0);
   });
 
   test("costTotal penjualan contoh = Σ HPP item; batal tidak mengubahnya", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(Date.UTC(2026, 9, 23, 2));
     await loginWithShift();
     const res = await post("/api/sales", {
       saleId: newId(),
       items: [
-        saleItem(GULA, { qtyBase: 1500 }, 18000), // 1500 g × 16.500/kg = 24.750
+        saleItem(GULA, { qtyBase: 1500 }, 18000), // 16.500 × 1500 ÷ 1000 = 24.750
         saleItem(GULA, { amount: 20000 }, 18000), // 1111 g → 18.331,5 → 18.332
         saleItem("Beras Pandan Wangi 5 kg", { qtyBase: 1 }, 78000), // 71.000
-        saleItem("Indomie Goreng", { qtyBase: 40 }, 112000, "dus"), // 104.000
-        saleItem("Indomie Goreng", { qtyBase: 3 }, 3100, "pcs"), // 3 × 2.650
+        saleItem("Indomie Goreng", { qtyBase: 40 }, 112000, "dus"), // 104.000 × 40 ÷ 40
+        saleItem("Indomie Goreng", { qtyBase: 3 }, 3100, "pcs"), // 104.000 × 3 ÷ 40 = 7.800
       ],
       payments: [{ method: "qris", amount: 246300 }],
       print: false,
     });
     expect(res.status).toBe(201);
     const sale = await json<Sale>(res);
-    expect(costOfStored(sale.id)).toBe(24750 + 18332 + 71000 + 104000 + 7950);
-    await voidSale(sale.id, pinVoid);
+    expect(costOfStored(sale.id)).toBe(225882);
+    expect(costOfStored(sale.id)).toBe(24750 + 18332 + 71000 + 104000 + 7800);
+    expect(mockDb.get().sales.find((s) => s.id === sale.id)?.voidedAt).toBe(
+      null,
+    );
+    vi.setSystemTime(Date.UTC(2026, 9, 23, 4));
+    const voided = await voidSale(sale.id, pinVoid);
+    expect(await keysOf(voided)).not.toContain("voidedAt");
     const stored = mockDb.get().sales.find((s) => s.id === sale.id);
-    expect(stored).toMatchObject({ status: "dibatalkan", costTotal: 226032 });
+    expect(stored).toMatchObject({
+      status: "dibatalkan",
+      costTotal: 225882,
+      voidedAt: Date.UTC(2026, 9, 23, 4),
+    });
+    // Batal kedua tidak menggeser waktu batal.
+    vi.setSystemTime(Date.UTC(2026, 9, 23, 5));
+    await voidSale(sale.id, pinVoid);
+    expect(mockDb.get().sales.find((s) => s.id === sale.id)?.voidedAt).toBe(
+      Date.UTC(2026, 9, 23, 4),
+    );
   });
 
   test("kasbon menambah ledger; batal menambah entri negatif; balance = Σ ledger", async () => {

@@ -36,6 +36,7 @@ function addSale(
     status: "selesai",
     printStatus: "tercetak",
     costTotal: Math.round(total * 0.9),
+    voidedAt: null,
     ...rest,
   });
 }

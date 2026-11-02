@@ -1,7 +1,12 @@
 import type {
+  CostAlert,
   Customer,
   KasirSettings,
+  PriceHistoryEntry,
   Product,
+  ProductCost,
+  ProductStatus,
+  ProductUnit,
   Sale,
   Shift,
   ShiftClosure,
@@ -18,7 +23,21 @@ export type MockClosedShift = ShiftClosure & {
 };
 export type MockShift = Shift & { cashSales: number; salesCount: number };
 /** HPP disalin saat penjualan; tidak pernah dikirim ke endpoint kasir. */
-export type MockSale = Sale & { costTotal: number };
+export type MockSale = Sale & { costTotal: number; voidedAt: number | null };
+
+/** `active: false` = satuan nonaktif: tidak dijual kasir, barcodenya tetap terpakai. */
+export type MockUnit = ProductUnit & { active: boolean };
+/** Barang lengkap; kasir hanya melihat proyeksi `toKasirProduct`. */
+export type MockProduct = Omit<Product, "units"> & {
+  units: MockUnit[];
+  category: string | null;
+  status: ProductStatus;
+  scarce: boolean;
+  stockCounted: boolean;
+  /** HPP: `amount` rupiah per `qtyBase` satuan dasar; null = belum diisi. */
+  cost: ProductCost | null;
+};
+export type MockCostAlert = CostAlert;
 
 /** Buku kasbon append-only: + kasbon, − pelunasan/batal. */
 export type CreditEntry = {
@@ -35,7 +54,7 @@ type LoginFailures = Record<
 >;
 
 export type MockState = {
-  version: 3;
+  version: 4;
   store: { id: string; name: string };
   users: MockUser[];
   session: { userId: string } | null;
@@ -44,13 +63,16 @@ export type MockState = {
   ownerLoginFailures: LoginFailures;
   shift: MockShift | null;
   closedShifts: MockClosedShift[];
-  products: Product[];
+  products: MockProduct[];
+  categories: string[];
+  /** Terlama dulu (append). */
+  priceHistory: (PriceHistoryEntry & { productId: string })[];
+  /** productId -> peringatan modal yang belum ditindaklanjuti pemilik. */
+  costAlerts: Record<string, MockCostAlert>;
   /** productId -> qtyBase */
   stock: Record<string, number>;
-  /** productId -> qtyBase */
+  /** productId -> qtyBase; key tidak ada = tanpa batas. */
   minStock: Record<string, number>;
-  /** unitId -> HPP per satuan jual (Rp) */
-  unitCosts: Record<string, number>;
   sales: MockSale[];
   customers: Customer[];
   /** `customer.balance` selalu = Σ entri pelanggan itu. */
@@ -67,7 +89,7 @@ const isObj = (x: unknown): x is Record<string, unknown> =>
 
 /** Pemeriksaan struktur murah (bukan validasi mendalam). */
 function isState(value: unknown): value is MockState {
-  if (!isObj(value) || value.version !== 3) return false;
+  if (!isObj(value) || value.version !== 4) return false;
   const { store } = value;
   return (
     isObj(store) &&
@@ -77,6 +99,8 @@ function isState(value: unknown): value is MockState {
       "users",
       "closedShifts",
       "products",
+      "categories",
+      "priceHistory",
       "sales",
       "customers",
       "creditLedger",
@@ -86,7 +110,7 @@ function isState(value: unknown): value is MockState {
       "ownerLoginFailures",
       "stock",
       "minStock",
-      "unitCosts",
+      "costAlerts",
       "settings",
       "saleSeq",
     ].every((k) => isObj(value[k])) &&

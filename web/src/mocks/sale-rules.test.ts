@@ -1,5 +1,6 @@
 import { expect, test } from "vitest";
-import { type PricedItem, priceChanges } from "./sale-rules";
+import { type PricedItem, priceChanges, saleCost } from "./sale-rules";
+import { createSeedState } from "./seed-data";
 
 const priced = (
   unitId: string,
@@ -65,4 +66,35 @@ test.each([
   ],
 ])("priceChanges: %s", (_name, items, expected) => {
   expect(priceChanges(items)).toEqual(expected);
+});
+
+test("saleCost: Σ round_half_up(HPP × qtyBase); satuan nonaktif tetap dihitung; HPP kosong / satuan tak dikenal = 0", () => {
+  const { products } = createSeedState();
+  const find = (code: string) => {
+    const p = products.find((x) => x.storeCode === code);
+    if (!p) throw new Error(code);
+    return p;
+  };
+  const indomie = find("1001");
+  const kopi = find("1004");
+  const line = (unitId: string, qtyBase: number, unitSize = 1) => ({
+    ...priced(unitId, 0, 0).item,
+    unitSize,
+    qtyBase,
+  });
+  const [pcs, dus] = indomie.units;
+  if (!pcs || !dus) throw new Error("Indomie tanpa satuan");
+  dus.active = false;
+  kopi.cost = null;
+  expect(
+    saleCost(products, [
+      line(pcs.id, 3), // 104.000 × 3 ÷ 40 = 7.800
+      line(pcs.id, 1), // 2.600
+      line(dus.id, 80, 40), // 208.000
+      line(kopi.units[0]?.id ?? "", 5), // HPP kosong
+      line("tidak-ada", 2),
+    ]),
+  ).toBe(7800 + 2600 + 208000);
+  indomie.cost = { amount: 1001, qtyBase: 2 };
+  expect(saleCost(products, [line(pcs.id, 1)])).toBe(501); // 500,5 → 501
 });

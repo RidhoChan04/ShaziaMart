@@ -1,6 +1,8 @@
 import { expect, test } from "vitest";
+import { isValidBarcode } from "@/shared/lib/product-rules";
 import { __resetMockDbCacheForTests, mockDb } from "./db";
 import { balanceOf, oldestUnpaidAt } from "./ledger";
+import { CATALOG_NAMES } from "./seed-catalog-names";
 import { createSeedState } from "./seed-data";
 
 const DAY = 86_400_000;
@@ -19,7 +21,7 @@ test("60 barang, storeCode & barcode unik", () => {
   expect(codes.filter((c) => c.startsWith("11"))[0]).toBe("1101");
 });
 
-test("barang buatan: barcode 13 digit berawalan 899, harga kelipatan 500", () => {
+test("barang buatan: barcode EAN-13 berawalan 899 dengan check digit benar, harga kelipatan 500", () => {
   const made = createSeedState().products.filter((p) =>
     p.storeCode.startsWith("11"),
   );
@@ -31,7 +33,10 @@ test("barang buatan: barcode 13 digit berawalan 899, harga kelipatan 500", () =>
     expect(pcs?.price).toBeLessThanOrEqual(95000);
     expect((pcs?.price ?? 1) % 500).toBe(0);
     for (const u of p.units) {
-      for (const b of u.barcodes) expect(b).toMatch(/^899\d{10}$/);
+      for (const b of u.barcodes) {
+        expect(b).toMatch(/^899\d{10}$/);
+        expect(isValidBarcode(b)).toBe(true);
+      }
     }
   }
   expect(made.filter((p) => p.units.length > 1).length).toBeGreaterThanOrEqual(
@@ -100,7 +105,7 @@ test("deterministik untuk now yang sama", () => {
 
 test("PIN seed dan state awal", () => {
   const s = createSeedState();
-  expect(s.version).toBe(3);
+  expect(s.version).toBe(4);
   expect(s.users.map((u) => [u.name, u.role, u.pin, u.password])).toEqual([
     ["Rina", "kasir", "123456", undefined],
     ["Budi", "kasir", "654321", undefined],
@@ -149,41 +154,139 @@ test("ID unik di seluruh state", () => {
   expect(new Set(ids).size).toBe(ids.length);
 });
 
-test("state versi lama di localStorage diganti default v3", () => {
+test("state versi lama di localStorage diganti default v4", () => {
   localStorage.setItem(
     "mock.db",
     JSON.stringify({ store: { id: "x", name: "y" } }),
   );
   __resetMockDbCacheForTests();
-  expect(mockDb.get().version).toBe(3);
+  expect(mockDb.get().version).toBe(4);
   expect(mockDb.get().products).toHaveLength(60);
 });
 
-test("HPP: setiap satuan punya HPP; fixture persis; lainnya 85–93% harga kelipatan Rp50", () => {
+const CATEGORIES = [
+  "Beras",
+  "Minyak Goreng",
+  "Gula & Tepung",
+  "Telur",
+  "Mi Instan",
+  "Bumbu Dapur",
+  "Kopi & Teh",
+  "Susu",
+  "Minuman",
+  "Makanan Ringan",
+  "Roti & Biskuit",
+  "Makanan Kaleng",
+  "Sabun & Deterjen",
+  "Perawatan Diri",
+  "Kebutuhan Bayi",
+  "Rokok",
+  "Gas & Air Galon",
+  "Obat Ringan",
+  "Alat Tulis",
+  "Lain-lain",
+];
+
+test("seed: 20 kategori template; setiap barang berkategori dari daftar; semua barcode valid & unik", () => {
   const s = createSeedState(NOW);
-  const cost = (code: string, unit: string) => {
-    const p = s.products.find((x) => x.storeCode === code);
-    const u = p?.units.find((x) => x.name === unit);
-    return s.unitCosts[u?.id ?? ""];
-  };
-  expect([
-    cost("2001", "kg"),
-    cost("1002", "pcs"),
-    cost("1001", "pcs"),
-    cost("1001", "dus"),
-  ]).toEqual([16500, 71000, 2650, 104000]);
-  const fixed = ["2001/kg", "1002/pcs", "1001/pcs", "1001/dus"];
-  const units = s.products.flatMap((p) => p.units.map((u) => ({ p, u })));
-  expect(Object.keys(s.unitCosts).sort()).toEqual(
-    units.map(({ u }) => u.id).sort(),
+  expect(s.categories).toEqual(CATEGORIES);
+  for (const p of s.products) expect(CATEGORIES).toContain(p.category);
+  const byCode = (code: string) =>
+    s.products.find((p) => p.storeCode === code)?.category;
+  expect(
+    [
+      "1001",
+      "1002",
+      "1003",
+      "1004",
+      "2001",
+      "2002",
+      "2003",
+      "2004",
+      "2005",
+    ].map(byCode),
+  ).toEqual([
+    "Mi Instan",
+    "Beras",
+    "Minyak Goreng",
+    "Kopi & Teh",
+    "Gula & Tepung",
+    "Beras",
+    "Telur",
+    "Minyak Goreng",
+    "Gula & Tepung",
+  ]);
+  // Barang buatan memakai kategori grupnya di CATALOG_NAMES.
+  for (const p of s.products.filter((x) => x.storeCode.startsWith("11"))) {
+    const entry = CATALOG_NAMES.find((c) => c.name === p.name);
+    expect(p.category).toBe(entry?.category);
+  }
+  const named = (name: string) =>
+    CATALOG_NAMES.find((c) => c.name === name)?.category;
+  expect(
+    [
+      "Beras Merah 1 kg",
+      "Margarin Blue Band 200 g",
+      "Madu Nusantara 150 ml",
+      "Pop Mie Ayam Cup",
+      "Teh Tubruk Gopek 50 g",
+      "Susu Bendera Cokelat 200 ml",
+      "Santan Kara 200 ml",
+      "Tisu Paseo 250 Sheet",
+      "Teh Pucuk Harum 350 ml",
+    ].map(named),
+  ).toEqual([
+    "Beras",
+    "Minyak Goreng",
+    "Gula & Tepung",
+    "Mi Instan",
+    "Kopi & Teh",
+    "Susu",
+    "Bumbu Dapur",
+    "Sabun & Deterjen",
+    "Minuman",
+  ]);
+  const barcodes = s.products.flatMap((p) =>
+    p.units.flatMap((u) => u.barcodes),
   );
-  for (const { p, u } of units) {
-    const c = s.unitCosts[u.id] ?? Number.NaN;
-    expect(Number.isSafeInteger(c)).toBe(true);
-    if (fixed.includes(`${p.storeCode}/${u.name}`)) continue;
-    expect(c % 50).toBe(0);
-    expect(c * 100).toBeGreaterThanOrEqual(u.price * 85 - 2500);
-    expect(c * 100).toBeLessThanOrEqual(u.price * 93 + 2500);
+  expect(barcodes.filter((b) => !isValidBarcode(b))).toEqual([]);
+  expect(new Set(barcodes).size).toBe(barcodes.length);
+});
+
+test("seed: semua barang aktif, tidak langka, stok terhitung; semua satuan aktif; tanpa riwayat harga & peringatan modal", () => {
+  const s = createSeedState(NOW);
+  for (const p of s.products) {
+    expect([p.status, p.scarce, p.stockCounted]).toEqual([
+      "aktif",
+      false,
+      true,
+    ]);
+    expect(p.units.every((u) => u.active)).toBe(true);
+  }
+  expect(s.priceHistory).toEqual([]);
+  expect(s.costAlerts).toEqual({});
+  expect(s).not.toHaveProperty("unitCosts");
+});
+
+test("HPP per barang: fixture persis; lainnya 85–93% harga satuan pertama kelipatan Rp50", () => {
+  const s = createSeedState(NOW);
+  const cost = (code: string) =>
+    s.products.find((x) => x.storeCode === code)?.cost;
+  expect(cost("2001")).toEqual({ amount: 16500, qtyBase: 1000 });
+  expect(cost("1002")).toEqual({ amount: 71000, qtyBase: 1 });
+  expect(cost("1001")).toEqual({ amount: 104000, qtyBase: 40 });
+  const fixed = ["2001", "1002", "1001"];
+  for (const p of s.products) {
+    if (fixed.includes(p.storeCode)) continue;
+    const [first] = p.units;
+    const c = p.cost;
+    expect(c?.qtyBase).toBe(first?.unitSize);
+    const amount = c?.amount ?? Number.NaN;
+    const price = first?.price ?? Number.NaN;
+    expect(Number.isSafeInteger(amount)).toBe(true);
+    expect(amount % 50).toBe(0);
+    expect(amount * 100).toBeGreaterThanOrEqual(price * 85 - 2500);
+    expect(amount * 100).toBeLessThanOrEqual(price * 93 + 2500);
   }
 });
 

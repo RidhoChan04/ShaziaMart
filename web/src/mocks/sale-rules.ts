@@ -9,8 +9,8 @@ import type {
   WholesaleTier,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { cartTotal, priceLine } from "@/shared/lib/pricing";
-import { roundHalfUp } from "@/shared/lib/quantity";
-import type { MockUser } from "./db";
+import { unitCost } from "@/shared/lib/product-rules";
+import type { MockProduct, MockUser } from "./db";
 
 /** Penolakan 422; handler mengubahnya menjadi problem+json. */
 export type Rejection = {
@@ -161,16 +161,17 @@ function safeSum(values: readonly number[]): number | null {
 export const saleTotal = (items: readonly PricedItem[]): number | null =>
   safeSum(items.map((p) => p.item.subtotal));
 
-/** HPP penjualan: Σ round_half_up(HPP satuan × qtyBase ÷ unitSize); HPP tak tercatat = 0. */
+/** HPP penjualan: Σ round_half_up(HPP.amount × qtyBase ÷ HPP.qtyBase) per item; HPP kosong = 0. */
 export const saleCost = (
-  unitCosts: Readonly<Record<string, number>>,
+  products: readonly MockProduct[],
   items: readonly SaleItem[],
 ): number =>
-  items.reduce(
-    (sum, i) =>
-      sum + roundHalfUp((unitCosts[i.unitId] ?? 0) * i.qtyBase, i.unitSize),
-    0,
-  );
+  items.reduce((sum, i) => {
+    const product = products.find((p) =>
+      p.units.some((u) => u.id === i.unitId),
+    );
+    return sum + (unitCost(product?.cost ?? null, i.qtyBase) ?? 0);
+  }, 0);
 
 function parsePayments(raw: unknown): PaymentInput[] | Rejection {
   if (!Array.isArray(raw) || raw.length === 0) {

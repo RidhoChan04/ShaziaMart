@@ -1,14 +1,13 @@
 import type {
-  Product,
   ProductBaseUnit,
-  ProductUnit,
+  ProductCost,
   WholesaleTier,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { roundHalfUp } from "@/shared/lib/quantity";
-import type { MockState, MockUser } from "./db";
+import type { MockProduct, MockState, MockUnit, MockUser } from "./db";
 import { generateHistory } from "./history";
 import { KIND, makeId, rng } from "./seed";
-import { CATALOG_NAMES } from "./seed-catalog-names";
+import { CATALOG_NAMES, TEMPLATE_CATEGORIES } from "./seed-catalog-names";
 import { seedCustomers } from "./seed-customers";
 
 type UnitSpec = {
@@ -22,6 +21,7 @@ type UnitSpec = {
 type Fixture = {
   name: string;
   storeCode: string;
+  category: string;
   baseUnit: ProductBaseUnit;
   isCurah: boolean;
   units: UnitSpec[];
@@ -30,12 +30,14 @@ type Fixture = {
 const curah = (
   name: string,
   storeCode: string,
+  category: string,
   baseUnit: ProductBaseUnit,
   unit: string,
   price: number,
 ): Fixture => ({
   name,
   storeCode,
+  category,
   baseUnit,
   isCurah: true,
   units: [{ name: unit, unitSize: 1000, price, barcodes: [] }],
@@ -44,11 +46,13 @@ const curah = (
 const pcs = (
   name: string,
   storeCode: string,
+  category: string,
   price: number,
   barcode: string,
 ): Fixture => ({
   name,
   storeCode,
+  category,
   baseUnit: "pcs",
   isCurah: false,
   units: [{ name: "pcs", unitSize: 1, price, barcodes: [barcode] }],
@@ -58,6 +62,7 @@ const FIXTURES: Fixture[] = [
   {
     name: "Indomie Goreng",
     storeCode: "1001",
+    category: "Mi Instan",
     baseUnit: "pcs",
     isCurah: false,
     units: [
@@ -71,24 +76,29 @@ const FIXTURES: Fixture[] = [
       { name: "dus", unitSize: 40, price: 112000, barcodes: ["189686010944"] },
     ],
   },
-  pcs("Beras Pandan Wangi 5 kg", "1002", 78000, "8991002101012"),
-  pcs("Minyak Goreng Bimoli 2 L", "1003", 36000, "8992696404441"),
-  pcs("Kopi Kapal Api 165 g", "1004", 14500, "8991002105126"),
-  curah("Gula Pasir", "2001", "gram", "kg", 18000),
-  curah("Beras", "2002", "gram", "kg", 14000),
-  curah("Telur Ayam", "2003", "gram", "kg", 29000),
-  curah("Minyak Goreng", "2004", "ml", "L", 17000),
-  curah("Tepung Terigu", "2005", "gram", "kg", 13000),
+  pcs("Beras Pandan Wangi 5 kg", "1002", "Beras", 78000, "8991002101012"),
+  pcs(
+    "Minyak Goreng Bimoli 2 L",
+    "1003",
+    "Minyak Goreng",
+    36000,
+    "8992696404441",
+  ),
+  pcs("Kopi Kapal Api 165 g", "1004", "Kopi & Teh", 14500, "8991002105126"),
+  curah("Gula Pasir", "2001", "Gula & Tepung", "gram", "kg", 18000),
+  curah("Beras", "2002", "Beras", "gram", "kg", 14000),
+  curah("Telur Ayam", "2003", "Telur", "gram", "kg", 29000),
+  curah("Minyak Goreng", "2004", "Minyak Goreng", "ml", "L", 17000),
+  curah("Tepung Terigu", "2005", "Gula & Tepung", "gram", "kg", 13000),
 ];
 
 const TOTAL_PRODUCTS = 60;
 
-/** HPP tetap ("storeCode/satuan" -> Rp) untuk fixture yang dipakai test angka persis. */
-const FIXED_COSTS: Record<string, number> = {
-  "1001/pcs": 2650,
-  "1001/dus": 104000,
-  "1002/pcs": 71000,
-  "2001/kg": 16500,
+/** HPP tetap (storeCode -> HPP) untuk fixture yang dipakai test angka persis; Indomie dari modal dus. */
+const FIXED_COSTS: Record<string, ProductCost> = {
+  "1001": { amount: 104000, qtyBase: 40 },
+  "1002": { amount: 71000, qtyBase: 1 },
+  "2001": { amount: 16500, qtyBase: 1000 },
 };
 
 /** Stok minimum = 10 satuan jual pertama (curah: 10 kg = 10000 g). */
@@ -119,9 +129,9 @@ function buildProduct(
   fx: Fixture,
   index: number,
   unitSeq: { n: number },
-): Product {
+): MockProduct {
   const id = makeId(KIND.product, index + 1);
-  const units: ProductUnit[] = fx.units.map((u) => {
+  const units: MockUnit[] = fx.units.map((u) => {
     unitSeq.n += 1;
     return {
       id: makeId(KIND.unit, unitSeq.n),
@@ -131,6 +141,7 @@ function buildProduct(
       price: u.price,
       wholesaleTiers: u.tiers ?? [],
       barcodes: u.barcodes,
+      active: true,
     };
   });
   return {
@@ -140,7 +151,21 @@ function buildProduct(
     isCurah: fx.isCurah,
     baseUnit: fx.baseUnit,
     units,
+    category: fx.category,
+    status: "aktif",
+    scarce: false,
+    stockCounted: true,
+    cost: null,
   };
+}
+
+/** Lengkapi 12 digit menjadi EAN-13 dengan check digit GS1 (bobot 1,3,1,3,…). */
+function ean13(body: string): string {
+  const sum = [...body].reduce(
+    (a, d, i) => a + Number(d) * (i % 2 === 0 ? 1 : 3),
+    0,
+  );
+  return `${body}${(10 - (sum % 10)) % 10}`;
 }
 
 function generatedFixtures(rand: () => number, count: number): Fixture[] {
@@ -149,7 +174,7 @@ function generatedFixtures(rand: () => number, count: number): Fixture[] {
   const barcode = () => {
     barcodeSeq += 1;
     const tail = barcodeSeq * 1000003 + Math.floor(rand() * 1000);
-    return `899${String(tail).padStart(10, "0")}`;
+    return ean13(`899${String(tail).padStart(9, "0")}`);
   };
   return shuffle(CATALOG_NAMES, rand)
     .slice(0, count)
@@ -173,6 +198,7 @@ function generatedFixtures(rand: () => number, count: number): Fixture[] {
       return {
         name: entry.name,
         storeCode: String(1101 + i),
+        category: entry.category,
         baseUnit: "pcs",
         isCurah: false,
         units,
@@ -199,14 +225,14 @@ export function createSeedState(now: number = Date.now()): MockState {
     stock[p.id] = p.isCurah ? qty * 1000 : qty;
   }
 
-  const unitCosts: Record<string, number> = {};
   const minStock: Record<string, number> = {};
   for (const p of products) {
-    minStock[p.id] = MIN_STOCK_UNITS * (p.units[0]?.unitSize ?? 1);
-    for (const u of p.units) {
-      unitCosts[u.id] =
-        FIXED_COSTS[`${p.storeCode}/${u.name}`] ?? costFromPrice(u.price, rand);
-    }
+    const first = p.units[0];
+    minStock[p.id] = MIN_STOCK_UNITS * (first?.unitSize ?? 1);
+    p.cost = FIXED_COSTS[p.storeCode] ?? {
+      amount: costFromPrice(first?.price ?? 0, rand),
+      qtyBase: first?.unitSize ?? 1,
+    };
   }
   // Barang buatan saja, agar fixture yang dipakai E2E tidak pernah menipis.
   const generated = products.slice(FIXTURES.length);
@@ -220,7 +246,7 @@ export function createSeedState(now: number = Date.now()): MockState {
     id: makeId(KIND.user, i + 1),
   }));
   const state: MockState = {
-    version: 3,
+    version: 4,
     store: { id: makeId(KIND.store, 1), name: "ShaziaMart" },
     users,
     session: null,
@@ -230,9 +256,11 @@ export function createSeedState(now: number = Date.now()): MockState {
     shift: null,
     closedShifts: [],
     products,
+    categories: [...TEMPLATE_CATEGORIES],
+    priceHistory: [],
+    costAlerts: {},
     stock,
     minStock,
-    unitCosts,
     sales: [],
     ...seedCustomers(now),
     settings: {

@@ -2,6 +2,7 @@ import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { delay, http } from "msw";
 import { beforeEach, expect, test, vi } from "vitest";
+import { mockDb } from "@/mocks/db";
 import { server } from "@/mocks/node";
 import type { CatalogMatch } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { beep } from "@/shared/lib/beep";
@@ -62,6 +63,23 @@ test("kode tidak dikenal → toast 'Barang tidak ditemukan'", async () => {
   await user.type(input, "999999999999{Enter}");
   expect(await screen.findByText("Barang tidak ditemukan")).toBeInTheDocument();
   expect(beep).toHaveBeenCalledWith("error");
+  expect(useCart.getState().lines).toHaveLength(0);
+  expect(input).toHaveValue("");
+});
+
+test("scan barang nonaktif → toast 'Barang ini tidak dijual lagi', bunyi error, keranjang kosong", async () => {
+  mockDb.update((s) => {
+    for (const p of s.products) {
+      if (p.name === "Minyak Goreng Bimoli 2 L") p.status = "nonaktif";
+    }
+  });
+  const { user, input } = setup();
+  await user.type(input, "8992696404441{Enter}");
+  expect(
+    await screen.findByText("Barang ini tidak dijual lagi"),
+  ).toBeInTheDocument();
+  expect(beep).toHaveBeenCalledWith("error");
+  expect(beep).not.toHaveBeenCalledWith("ok");
   expect(useCart.getState().lines).toHaveLength(0);
   expect(input).toHaveValue("");
 });

@@ -61,13 +61,14 @@ describe("riwayat 14 hari", () => {
     }
   });
 
-  test("penjualan konsisten: selesai, tercetak, total, HPP snapshot, pembayaran, kembalian", () => {
+  test("penjualan konsisten: selesai, tercetak, belum batal, total, HPP snapshot, pembayaran, kembalian", () => {
     for (const s of state.sales) {
       expect([s.status, s.printStatus]).toEqual(["selesai", "tercetak"]);
       expect(s.items.length).toBeGreaterThanOrEqual(1);
       expect(s.items.length).toBeLessThanOrEqual(6);
       expect(s.total).toBe(s.items.reduce((a, i) => a + i.subtotal, 0));
-      expect(s.costTotal).toBe(saleCost(state.unitCosts, s.items));
+      expect(s.costTotal).toBe(saleCost(state.products, s.items));
+      expect(s.voidedAt).toBeNull();
       expect(s.payments.reduce((a, p) => a + p.amount, 0)).toBe(s.total);
       const cash = s.payments.find((p) => p.method === "cash")?.amount ?? 0;
       if (cash > 0) {

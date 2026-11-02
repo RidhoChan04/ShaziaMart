@@ -8,6 +8,7 @@ import type {
 import { jakartaDateKey } from "@/shared/lib/business-day";
 import { type MockSale, type MockState, type MockUser, mockDb } from "../db";
 import { appendCredit } from "../ledger";
+import { productOfUnit } from "../products/views";
 import { formatSaleNumber } from "../sale-number";
 import {
   type CheckedPayments,
@@ -45,9 +46,9 @@ const notFound = () => problem(404, "NOT_FOUND", "Penjualan tidak ditemukan");
 const amountOf = (sale: Sale, method: "cash" | "credit"): number =>
   sale.payments.find((p) => p.method === method)?.amount ?? 0;
 
-/** HPP hanya untuk endpoint pemilik; respons kasir tidak boleh memuatnya. */
+/** HPP dan waktu batal hanya untuk endpoint pemilik; respons kasir tidak boleh memuatnya. */
 function toPublicSale(s: MockSale): Sale {
-  const { costTotal: _, ...sale } = s;
+  const { costTotal: _c, voidedAt: _v, ...sale } = s;
   return sale;
 }
 
@@ -68,9 +69,7 @@ function bumpFirstPrice(saleId: string, items: readonly PricedItem[]): boolean {
 
 function applyVoid(s: MockState, sale: Sale): void {
   for (const item of sale.items) {
-    const productId = s.products.find((p) =>
-      p.units.some((u) => u.id === item.unitId),
-    )?.id;
+    const productId = productOfUnit(s, item.unitId)?.id;
     if (productId)
       s.stock[productId] = (s.stock[productId] ?? 0) + item.qtyBase;
   }
@@ -89,7 +88,10 @@ function applyVoid(s: MockState, sale: Sale): void {
     s.shift.salesCount -= 1;
   }
   const stored = s.sales.find((x) => x.id === sale.id);
-  if (stored) stored.status = "dibatalkan";
+  if (stored) {
+    stored.status = "dibatalkan";
+    stored.voidedAt = Date.now();
+  }
 }
 
 /** Aturan 3–5: harga server per item, setelah skenario harga-berubah. */
@@ -136,13 +138,14 @@ function commitSale(
 ): MockSale {
   const createdAt = Date.now();
   const dateKey = jakartaDateKey(createdAt);
-  const { saleSeq, unitCosts } = mockDb.get();
+  const { saleSeq, products } = mockDb.get();
   const seq = (saleSeq[dateKey] ?? 0) + 1;
   const sale: MockSale = {
     ...draft,
     number: formatSaleNumber(createdAt, seq),
     createdAt,
-    costTotal: saleCost(unitCosts, draft.items),
+    costTotal: saleCost(products, draft.items),
+    voidedAt: null,
   };
   mockDb.update((s) => {
     s.saleSeq[dateKey] = seq;

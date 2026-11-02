@@ -157,7 +157,8 @@ function makeSale(
     customerId,
     status: "selesai",
     printStatus: "tercetak",
-    costTotal: saleCost(state.unitCosts, items),
+    costTotal: saleCost(state.products, items),
+    voidedAt: null,
   };
 }
 
