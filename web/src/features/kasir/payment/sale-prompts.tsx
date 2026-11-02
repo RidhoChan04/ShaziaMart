@@ -1,5 +1,5 @@
 import type { CartLine } from "../cart/cart-store";
-import { OwnerPinDialog } from "../shared/owner-pin-dialog";
+import { OwnerPinDialog } from "../common/owner-pin-dialog";
 import type { PaymentChoice } from "./payment-model";
 import { PriceChangedDialog } from "./price-changed-dialog";
 import { ReplayedSaleDialog } from "./replayed-sale-dialog";

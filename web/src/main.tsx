@@ -1,13 +1,13 @@
 import { registerSW } from "virtual:pwa-register";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { App } from "./app/app";
-import { isOwnerPath, shouldRegisterPwa } from "./app/pwa";
+import { App } from "@/app/app";
+import { isOwnerPath, shouldRegisterPwa } from "@/app/pwa";
 import "./app/styles.css";
 
 async function enableMocking(): Promise<void> {
   if (!(import.meta.env.DEV || import.meta.env.VITE_MOCK === "1")) return;
-  const { worker } = await import("./mocks/browser");
+  const { worker } = await import("@/mocks/browser");
   await worker.start({ onUnhandledRequest: "bypass" });
 }
 

@@ -1,9 +1,9 @@
 import type {
   CatalogMatch,
   PriceChange,
-} from "../../../shared/api/gen/shaziaMartAPI.schemas";
-import { newId } from "../../../shared/lib/id";
-import { unitPriceFor } from "../../../shared/lib/pricing";
+} from "@/shared/api/gen/shaziaMartAPI.schemas";
+import { newId } from "@/shared/lib/id";
+import { unitPriceFor } from "@/shared/lib/pricing";
 import type { CartData, CartLine } from "./cart-store";
 
 export function findUnit(match: CatalogMatch) {

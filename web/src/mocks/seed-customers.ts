@@ -1,5 +1,5 @@
+import type { Customer } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { DAY_MS } from "@/shared/lib/business-day";
-import type { Customer } from "../shared/api/gen/shaziaMartAPI.schemas";
 import type { CreditEntry } from "./db";
 import { appendCredit } from "./ledger";
 import { KIND, makeId } from "./seed";

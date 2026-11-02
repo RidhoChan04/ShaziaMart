@@ -1,6 +1,6 @@
-import { formatAngka } from "../../../shared/lib/money";
-import { cartTotal, priceLine } from "../../../shared/lib/pricing";
-import { formatGram } from "../../../shared/lib/quantity";
+import { formatAngka } from "@/shared/lib/money";
+import { cartTotal, priceLine } from "@/shared/lib/pricing";
+import { formatGram } from "@/shared/lib/quantity";
 import type { CartLine } from "./cart-store";
 
 export interface CartLineView {

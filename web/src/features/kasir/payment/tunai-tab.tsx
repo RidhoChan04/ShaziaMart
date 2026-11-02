@@ -5,7 +5,7 @@ import { quickCashOptions } from "@/shared/lib/denominations";
 import { formatAngka, formatRupiah, parseRupiah } from "@/shared/lib/money";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
-import { ScannedAlert } from "../shared/scanned-alert";
+import { ScannedAlert } from "../common/scanned-alert";
 
 /** Kolom uang dengan awalan "Rp"; teks tampil apa adanya, diparse oleh model. Rentetan scan ditolak. */
 export function MoneyField({

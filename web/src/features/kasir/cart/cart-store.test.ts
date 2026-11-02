@@ -2,7 +2,7 @@ import { beforeEach, expect, test } from "vitest";
 import type {
   CatalogMatch,
   Product,
-} from "../../../shared/api/gen/shaziaMartAPI.schemas";
+} from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { createCartStore, useCart } from "./cart-store";
 import { cartLineView, cartSummary } from "./cart-view";
 

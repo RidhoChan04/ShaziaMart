@@ -1,9 +1,9 @@
 import type {
   Attention,
   HourBucket,
-} from "../../../shared/api/gen/shaziaMartAPI.schemas";
-import { formatRupiah } from "../../../shared/lib/money";
-import { roundHalfUp } from "../../../shared/lib/quantity";
+} from "@/shared/api/gen/shaziaMartAPI.schemas";
+import { formatRupiah } from "@/shared/lib/money";
+import { roundHalfUp } from "@/shared/lib/quantity";
 
 type Trend = "up" | "down" | "flat" | "none";
 

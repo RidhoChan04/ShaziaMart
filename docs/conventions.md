@@ -15,7 +15,7 @@ Aturan ini berlaku untuk semua kode di repo. Tujuannya satu: kode yang mudah dib
 | Folder | Isi | Aturan |
 |---|---|---|
 | `app/` | router, provider, query client, gaya global | tanpa logika bisnis |
-| `features/kasir/`, `features/owner/` | layar per fitur, dikelompokkan per sub-fitur (`cart/`, `payment/`, …) | fitur tidak saling import; yang dipakai bersama pindah ke `shared/` |
+| `features/kasir/`, `features/owner/` | layar per fitur, dikelompokkan per sub-fitur (`cart/`, `payment/`, …); yang dipakai beberapa sub-fitur dalam satu fitur masuk `common/` | fitur tidak saling import; yang dipakai bersama pindah ke `shared/` |
 | `shared/lib/` | logika murni (uang, berat, harga, pesan error) | tanpa React, tanpa DOM, selalu dites |
 | `shared/hooks/` | hook React yang dipakai lebih dari satu fitur | |
 | `shared/components/` | komponen aplikasi yang dipakai lebih dari satu fitur | |
@@ -26,6 +26,7 @@ Aturan ini berlaku untuk semua kode di repo. Tujuannya satu: kode yang mudah dib
 ## Penamaan
 
 - File: `kebab-case.ts(x)`. Komponen: `PascalCase`. Hook: `useSesuatu`. Konstanta modul: `UPPER_SNAKE`.
+- Import: jalur relatif (`./`, `../`) hanya di dalam fitur atau folder yang sama; selebihnya lewat alias `@/` (mis. `@/shared/lib/money`).
 - Istilah domain memakai Bahasa Indonesia yang dipakai toko (`kasbon`, `curah`, `shift`, `struk`); kode lain memakai Bahasa Inggris (`cart`, `payment`, `total`). Satu konsep, satu nama di seluruh kode.
 - Teks yang dilihat pengguna selalu Bahasa Indonesia dan ditulis persis seperti di spec/rencana.
 

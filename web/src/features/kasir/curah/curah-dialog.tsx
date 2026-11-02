@@ -20,7 +20,7 @@ import {
 import { Input } from "@/shared/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs";
 import { useCart } from "../cart/cart-store";
-import { ScannedAlert } from "../shared/scanned-alert";
+import { ScannedAlert } from "../common/scanned-alert";
 
 type Mode = "berat" | "nominal";
 type Unit = Pick<ProductUnit, "price" | "unitSize" | "wholesaleTiers">;

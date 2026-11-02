@@ -4,9 +4,9 @@ import type {
   CatalogMatch,
   PriceChange,
   WholesaleTier,
-} from "../../../shared/api/gen/shaziaMartAPI.schemas";
-import { newId } from "../../../shared/lib/id";
-import { priceLine } from "../../../shared/lib/pricing";
+} from "@/shared/api/gen/shaziaMartAPI.schemas";
+import { newId } from "@/shared/lib/id";
+import { priceLine } from "@/shared/lib/pricing";
 import {
   findUnit,
   newLine,

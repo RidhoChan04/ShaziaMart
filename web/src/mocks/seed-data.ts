@@ -3,8 +3,8 @@ import type {
   ProductBaseUnit,
   ProductUnit,
   WholesaleTier,
-} from "../shared/api/gen/shaziaMartAPI.schemas";
-import { roundHalfUp } from "../shared/lib/quantity";
+} from "@/shared/api/gen/shaziaMartAPI.schemas";
+import { roundHalfUp } from "@/shared/lib/quantity";
 import type { MockState, MockUser } from "./db";
 import { generateHistory } from "./history";
 import { KIND, makeId, rng } from "./seed";

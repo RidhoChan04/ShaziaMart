@@ -18,8 +18,8 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/shared/ui/sheet";
+import { OwnerPinDialog } from "../common/owner-pin-dialog";
 import { focusScanBox } from "../scan/scan-box";
-import { OwnerPinDialog } from "../shared/owner-pin-dialog";
 
 const timeFormat = new Intl.DateTimeFormat("id-ID", {
   hour: "2-digit",

@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import type {
   Attention,
   HourBucket,
-} from "../../../shared/api/gen/shaziaMartAPI.schemas";
+} from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { attentionItems, comparisonText, hourWindow } from "./home-model";
 
 describe("comparisonText", () => {

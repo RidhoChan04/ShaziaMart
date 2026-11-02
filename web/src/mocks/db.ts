@@ -6,7 +6,7 @@ import type {
   Shift,
   ShiftClosure,
   User,
-} from "../shared/api/gen/shaziaMartAPI.schemas";
+} from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { createSeedState } from "./seed-data";
 
 /** `password` hanya untuk pemilik (login aplikasi pemilik); mock saja. */
