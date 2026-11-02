@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import type { HourBucket } from "@/shared/api/gen/shaziaMartAPI.schemas";
-import { buildChart } from "./hourly-chart-geometry";
+import { buildChart, peakSummary } from "./hourly-chart-geometry";
 
 const bucket = (
   hour: number,
@@ -59,7 +59,7 @@ test("lebar mengubah posisi x tetapi bukan posisi y", () => {
   expect(wide.plot.right).toBeGreaterThan(narrow.plot.right);
   expect(wide.x(13)).toBeGreaterThan(narrow.x(13));
   expect(wide.y(250_000)).toBe(narrow.y(250_000));
-  expect(wide.plot.right).toBe(wide.x(13));
+  expect(wide.x(13)).toBeLessThan(wide.plot.right);
 });
 
 test("hourAt memetakan x ke jam terdekat dan dijepit ke jendela", () => {
@@ -86,9 +86,13 @@ test("label ujung garis dipisah minimal 12 dan tetap di dalam plot", () => {
 });
 
 test("label ujung garis tidak digeser bila sudah berjauhan", () => {
-  const c = chart(SAMPLE, 11);
-  expect(c.endLabels.today?.y).toBe(c.y(150_000));
-  expect(c.endLabels.lastWeek.y).toBe(c.y(200_000));
+  const c = chart(
+    [bucket(8, 0, 1), bucket(11, 100_000, 100_000), bucket(13, 0, 400_000)],
+    11,
+  );
+  expect(c.hours.at(-1)).toBe(13);
+  expect(c.endLabels.today?.y).toBe(c.y(100_000));
+  expect(c.endLabels.lastWeek.y).toBe(c.y(400_000));
 });
 
 test("baris tabel: jam setelah sekarang tidak punya nilai hari ini", () => {
@@ -106,4 +110,92 @@ test("baris tabel: jam setelah sekarang tidak punya nilai hari ini", () => {
     today: null,
     lastWeek: 450_000,
   });
+});
+
+test("batang: satu per jam jendela; hari ini berhenti di jam sekarang; satu `now`", () => {
+  const c = chart(SAMPLE, 11);
+  expect(c.bars.map((b) => b.hour)).toEqual([8, 9, 10, 11, 12, 13]);
+  expect(c.bars.map((b) => b.today !== null)).toEqual([
+    true,
+    true,
+    true,
+    true,
+    false,
+    false,
+  ]);
+  expect(c.bars.filter((b) => b.today?.now)).toHaveLength(1);
+  expect(c.bars.find((b) => b.today?.now)?.hour).toBe(11);
+});
+
+test("geometri batang: lebar 66% slot, hari ini 3px lebih sempit, tinggi sesuai nilai", () => {
+  const c = chart(SAMPLE, 11);
+  const slot = (c.plot.right - c.plot.left) / 6;
+  const b = c.bars[2];
+  if (!b) throw new Error("bar missing");
+  expect(b.width).toBeCloseTo(slot * 0.66, 5);
+  expect(b.x).toBeCloseTo(c.x(10) - b.width / 2, 5);
+  expect(b.lastWeek.y).toBeCloseTo(c.y(350_000), 5);
+  expect(b.lastWeek.y + b.lastWeek.height).toBeCloseTo(c.plot.bottom, 5);
+  expect(b.today?.width).toBeCloseTo(b.width - 3, 5);
+  expect(b.today?.x).toBeCloseTo(b.x + 1.5, 5);
+  expect(b.today?.y).toBeCloseTo(c.y(400_000), 5);
+  expect(b.today?.height).toBeCloseTo(c.plot.bottom - c.y(400_000), 5);
+});
+
+test("sumbu Y: label di kanan plot", () => {
+  const c = chart(SAMPLE);
+  expect(c.plot.right).toBeLessThan(360);
+});
+
+test("puncak: omzet hari ini tertinggi s/d jam sekarang", () => {
+  const c = chart(SAMPLE, 11);
+  expect(c.peak?.hour).toBe(10);
+  expect(c.peak?.label).toBe("Rp400 rb");
+  expect(c.peak?.x).toBeCloseTo(c.x(10), 5);
+  expect(c.peak?.y).toBeLessThan(c.y(400_000));
+  expect(c.peak?.y).toBeGreaterThan(0);
+  expect(peakSummary(SAMPLE, 11)).toBe("Paling ramai jam 10.00 · Rp400 rb");
+});
+
+test("puncak: jam setelah sekarang diabaikan", () => {
+  const hourly = [bucket(9, 100_000, 0), bucket(12, 900_000, 0)];
+  expect(chart(hourly, 10).peak?.hour).toBe(9);
+});
+
+test("seri 500/500 memilih jam paling awal", () => {
+  const hourly = [bucket(9, 500_000, 0), bucket(10, 500_000, 0)];
+  expect(chart(hourly, 10).peak?.hour).toBe(9);
+  expect(peakSummary(hourly, 10)).toBe("Paling ramai jam 09.00 · Rp500 rb");
+});
+
+test("tanpa penjualan: tanpa batang hari ini, tanpa puncak, tanpa NaN", () => {
+  const hourly = [bucket(8, 0, 50_000), bucket(9, 0, 0)];
+  const c = chart(hourly, 9);
+  expect(c.peak).toBeNull();
+  expect(peakSummary(hourly, 9)).toBe("Belum ada penjualan hari ini");
+  expect(c.bars.every((b) => b.today === null)).toBe(true);
+  expect(JSON.stringify(c.bars)).not.toMatch(/NaN|null.*Infinity/);
+  expect(chart([], 9).peak).toBeNull();
+  expect(peakSummary([], 9)).toBe("Belum ada penjualan hari ini");
+});
+
+test("omzet besar: tick atas ringkas tanpa Infinity", () => {
+  const c = chart([bucket(10, 123_456_789, 98_000_000)], 10);
+  expect(c.ticks.at(-1)?.label).toBe("Rp200 jt");
+  expect(JSON.stringify(c.bars)).not.toMatch(/NaN|Infinity/);
+});
+
+test("label puncak di jam paling kanan tetap di dalam plot", () => {
+  const hourly = [bucket(8, 1_000, 0), bucket(13, 900_000, 0)];
+  const c = chart(hourly, 13);
+  expect(c.peak?.hour).toBe(13);
+  expect(c.peak?.x).toBeLessThanOrEqual(c.plot.right);
+  expect(c.peak?.x).toBeGreaterThanOrEqual(c.plot.left);
+});
+
+test("label puncak di jam paling kiri tetap di dalam plot", () => {
+  const hourly = [bucket(8, 900_000, 0), bucket(13, 1_000, 0)];
+  const c = chart(hourly, 13);
+  expect(c.peak?.hour).toBe(8);
+  expect(c.peak?.x).toBeGreaterThanOrEqual(c.plot.left);
 });
