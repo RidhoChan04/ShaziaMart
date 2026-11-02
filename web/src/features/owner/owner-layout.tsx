@@ -103,15 +103,13 @@ function OwnerOffline() {
   );
 }
 
-/** Label tab yang aktif, dicocokkan seperti `activeOptions` pada `Link` navigasi. */
+/** Judul besar kerangka: hanya di akar tab; sub-halaman (mis. /owner/barang/baru) punya header sendiri. */
 function useActiveTitle(): string | undefined {
   // Seperti Link: garis miring di akhir diabaikan (start_url PWA `/owner/`).
   const path = useLocation({
     select: (l) => l.pathname.replace(/(.)\/$/, "$1"),
   });
-  return navItems.find(({ to, exact }) =>
-    exact ? path === to : path === to || path.startsWith(`${to}/`),
-  )?.label;
+  return navItems.find(({ to }) => path === to)?.label;
 }
 
 function OwnerShell() {

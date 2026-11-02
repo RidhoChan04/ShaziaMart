@@ -97,9 +97,26 @@ test("judul halaman = tab aktif", async () => {
 });
 
 test("header tidak lagi menampilkan ShaziaMart; halaman sementara menampilkan Segera hadir", async () => {
-  renderApp("/owner/barang");
+  renderApp("/owner/kasbon");
   expect(await screen.findByText("Segera hadir")).toBeInTheDocument();
   expect(screen.queryByText("ShaziaMart")).not.toBeInTheDocument();
+});
+
+test("judul besar kerangka hanya untuk akar tab; sub-halaman tab Barang memakai header sendiri", async () => {
+  const { router } = renderApp("/owner/barang/baru");
+  const title = await screen.findByRole("heading", {
+    level: 1,
+    name: "Segera hadir",
+  });
+  // Bukan di <header> kerangka (tanpa tanggal/status toko).
+  expect(screen.queryByText("Sabtu, 17 Okt")).toBeNull();
+  expect(title.closest("main")).not.toBeNull();
+  expect(router.state.location.pathname).toBe("/owner/barang/baru");
+  expect(
+    within(
+      screen.getByRole("navigation", { name: "Navigasi utama" }),
+    ).getByRole("link", { name: "Barang" }),
+  ).toHaveAttribute("aria-current", "page");
 });
 
 test("Beranda: h1 hanya dari kerangka (tanpa h1 sr-only di halaman)", async () => {
@@ -109,7 +126,7 @@ test("Beranda: h1 hanya dari kerangka (tanpa h1 sr-only di halaman)", async () =
 });
 
 test("offline setelah data dimuat → halaman tetap + banner; pulih → banner hilang", async () => {
-  const { queryClient } = renderApp("/owner/barang");
+  const { queryClient } = renderApp("/owner/kasbon");
   const page = await screen.findByText("Segera hadir");
   await screen.findByText("Toko online");
   const pollHealth = () =>
@@ -134,7 +151,7 @@ test("offline setelah data dimuat → halaman tetap + banner; pulih → banner h
 test("offline sebelum data apa pun dimuat → layar penuh tidak bisa terhubung + Coba lagi", async () => {
   const user = userEvent.setup();
   setScenario("server-mati");
-  renderApp("/owner/barang");
+  renderApp("/owner/kasbon");
   expect(await screen.findByText(OFFLINE_TEXT)).toBeInTheDocument();
   // Halaman belum dipasang; judul besar kerangka tetap satu-satunya h1.
   expect(screen.queryByText("Segera hadir")).not.toBeInTheDocument();
@@ -197,7 +214,7 @@ test("main memberi ruang bawah untuk kapsul tab bar, termasuk jarak aman bawah",
 });
 
 test("isi halaman memakai kolom max-w-6xl yang sejajar dengan header", async () => {
-  renderApp("/owner/barang");
+  renderApp("/owner/kasbon");
   const placeholder = await screen.findByText("Segera hadir");
   expect(placeholder.parentElement).toHaveClass("mx-auto", "max-w-6xl");
 });

@@ -3,8 +3,9 @@
 export { BerandaPage } from "./home/beranda-page";
 export { OwnerLayout } from "./owner-layout";
 export {
-  BarangPage,
   KasbonPage,
   LainnyaPage,
   LaporanPage,
+  SegeraHadirPage,
 } from "./pages";
+export { BarangPage } from "./products/barang-page";

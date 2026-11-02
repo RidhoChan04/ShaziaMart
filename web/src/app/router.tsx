@@ -108,7 +108,51 @@ const ownerIndexRoute = createRoute({
 const ownerBarangRoute = createRoute({
   getParentRoute: () => ownerRoute,
   path: "barang",
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { q?: string; kategori?: string; nonaktif?: true } => ({
+    ...(typeof search.q === "string" && search.q ? { q: search.q } : {}),
+    ...(typeof search.kategori === "string" && search.kategori
+      ? { kategori: search.kategori }
+      : {}),
+    ...(search.nonaktif === true || search.nonaktif === "true"
+      ? { nonaktif: true as const }
+      : {}),
+  }),
   component: lazyRouteComponent(loadOwner, "BarangPage"),
+});
+
+const segeraHadir = lazyRouteComponent(loadOwner, "SegeraHadirPage");
+
+// Sub-halaman Barang: komponen nyata menggantikan "Segera hadir" di Task 8, 9, dan 12.
+const ownerBarangBaruRoute = createRoute({
+  getParentRoute: () => ownerRoute,
+  path: "barang/baru",
+  component: segeraHadir,
+});
+
+const ownerBarangImporRoute = createRoute({
+  getParentRoute: () => ownerRoute,
+  path: "barang/impor",
+  component: segeraHadir,
+});
+
+const ownerBarangDetailRoute = createRoute({
+  getParentRoute: () => ownerRoute,
+  path: "barang/$productId",
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { lembar?: "harga" | "habis" } =>
+    search.lembar === "harga" || search.lembar === "habis"
+      ? { lembar: search.lembar }
+      : {},
+  component: segeraHadir,
+});
+
+const ownerBarangUbahRoute = createRoute({
+  getParentRoute: () => ownerRoute,
+  path: "barang/$productId/ubah",
+  component: segeraHadir,
 });
 
 const ownerLaporanRoute = createRoute({
@@ -135,6 +179,10 @@ const routeTree = rootRoute.addChildren([
   ownerRoute.addChildren([
     ownerIndexRoute,
     ownerBarangRoute,
+    ownerBarangBaruRoute,
+    ownerBarangImporRoute,
+    ownerBarangDetailRoute,
+    ownerBarangUbahRoute,
     ownerLaporanRoute,
     ownerKasbonRoute,
     ownerLainnyaRoute,

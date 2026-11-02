@@ -21,6 +21,12 @@
   --color-chart-1-now: #2e9a62;
   --color-chart-2: #d1d1d6;
   --color-glass: rgb(255 255 255 / 0.72);
+  /* Tanda status (Menipis / Minus) dan latar pemindai kamera. */
+  --color-warning-soft: #fff0d9;
+  --color-warning-ink: #8a4b00;
+  --color-danger-soft: #fde8e6;
+  --color-danger-ink: #9b1c12;
+  --color-scan-bg: #000000;
 
   --font-sans: "Inter Variable", system-ui, sans-serif;
   --radius-md: 8px;
