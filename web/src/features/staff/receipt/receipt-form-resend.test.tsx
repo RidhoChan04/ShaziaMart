@@ -114,3 +114,44 @@ test("draf lama gagal dihapus → pesan 'buang manual', satu salinan baru antre,
   expect(all.filter((d) => d.id === DRAFT_ID)).toHaveLength(1);
   expect(posts).toBeLessThanOrEqual(1);
 });
+
+test("draf lama gagal dihapus lalu dibuka dan dikirim ulang lagi → tetap satu salinan antre dan satu nota di server", async () => {
+  await loginRina(true);
+  const inner = memoryDraftStore();
+  const store = {
+    ...inner,
+    remove: async (id: string) => {
+      if (id === DRAFT_ID) throw new Error("IDB mati");
+      return inner.remove(id);
+    },
+  };
+  await store.put(takenDraft(ID_TAKEN_MESSAGE));
+  server.use(http.post(RECEIPTS, () => HttpResponse.error()));
+  const user = userEvent.setup();
+  for (let i = 0; i < 2; i++) {
+    const { router, unmount } = renderForm(store);
+    await user.click(
+      await screen.findByRole("button", { name: "Kirim sebagai nota baru" }),
+    );
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe("/staff/masuk"),
+    );
+    unmount();
+    toast.dismiss();
+  }
+  const queued = (await store.list()).filter((d) => d.status === "queued");
+  expect(queued).toHaveLength(1);
+  expect(queued[0]?.id).toBe(`${DRAFT_ID}-r`);
+  // Jaringan pulih: kedua pengiriman memakai ID yang sama → satu nota.
+  server.resetHandlers();
+  await act(async () => {
+    window.dispatchEvent(new Event("online"));
+  });
+  const { unmount } = renderForm(store, "/staff/masuk");
+  await waitFor(() =>
+    expect(
+      mockDb.get().receipts.filter((r) => r.id === `${DRAFT_ID}-r`),
+    ).toHaveLength(1),
+  );
+  unmount();
+});
