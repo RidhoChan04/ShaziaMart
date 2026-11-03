@@ -111,13 +111,21 @@ const ownerBarangRoute = createRoute({
   path: "barang",
   validateSearch: (
     search: Record<string, unknown>,
-  ): { q?: string; kategori?: string; nonaktif?: true } => ({
+  ): {
+    q?: string;
+    kategori?: string;
+    nonaktif?: true;
+    menunggu?: true;
+  } => ({
     ...(typeof search.q === "string" && search.q ? { q: search.q } : {}),
     ...(typeof search.kategori === "string" && search.kategori
       ? { kategori: search.kategori }
       : {}),
     ...(search.nonaktif === true || search.nonaktif === "true"
       ? { nonaktif: true as const }
+      : {}),
+    ...(search.menunggu === true || search.menunggu === "true"
+      ? { menunggu: true as const }
       : {}),
   }),
   component: lazyRouteComponent(loadOwner, "BarangPage"),
@@ -170,6 +178,18 @@ const ownerLainnyaRoute = createRoute({
   getParentRoute: () => ownerRoute,
   path: "lainnya",
   component: lazyRouteComponent(loadOwner, "LainnyaPage"),
+});
+
+const ownerUtangRoute = createRoute({
+  getParentRoute: () => ownerRoute,
+  path: "lainnya/utang",
+  component: lazyRouteComponent(loadOwner, "DebtsPage"),
+});
+
+const ownerUtangDetailRoute = createRoute({
+  getParentRoute: () => ownerRoute,
+  path: "lainnya/utang/$receiptId",
+  component: lazyRouteComponent(loadOwner, "DebtDetailPage"),
 });
 
 // App HP orang toko (realm `/api/staff`); halaman Masuk menyusul (Task 10/11).
@@ -242,6 +262,8 @@ const routeTree = rootRoute.addChildren([
     ownerLaporanRoute,
     ownerKasbonRoute,
     ownerLainnyaRoute,
+    ownerUtangRoute,
+    ownerUtangDetailRoute,
   ]),
   staffRoute.addChildren([
     staffIndexRoute,

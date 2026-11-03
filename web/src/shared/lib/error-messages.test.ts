@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { ApiError } from "../api/fetcher";
-import { pesanError } from "./error-messages";
+import { pesanError, pesanPembayaran } from "./error-messages";
 
 test.each([
   ["NETWORK", "Server tidak tersambung — coba lagi"],
@@ -51,3 +51,20 @@ test("VALIDATION tanpa detail", () =>
   ));
 test("error non-ApiError → pesan umum", () =>
   expect(pesanError(new Error("x"))).toBe("Terjadi kesalahan di server"));
+
+test("pesanPembayaran: SHIFT_CLOSED memakai kalimat server (sumber uang harus dipilih ulang)", () => {
+  const detail =
+    "Tidak ada shift kasir yang buka — pilih Uang pemilik atau Transfer";
+  expect(
+    pesanPembayaran(
+      new ApiError({ status: 409, code: "SHIFT_CLOSED", detail }),
+    ),
+  ).toBe(detail);
+  expect(
+    pesanPembayaran(new ApiError({ status: 409, code: "SHIFT_CLOSED" })),
+  ).toBe("Shift belum dibuka");
+});
+test("pesanPembayaran: galat lain sama dengan pesanError", () =>
+  expect(
+    pesanPembayaran(new ApiError({ status: 409, code: "DEBT_ALREADY_PAID" })),
+  ).toBe("Utang ini sudah lunas"));

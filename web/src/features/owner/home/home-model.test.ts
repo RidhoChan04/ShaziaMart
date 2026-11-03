@@ -287,6 +287,89 @@ describe("attentionItems: modal berubah dan barang habis", () => {
     ]);
   });
 
+  test.each([
+    [
+      {
+        supplierDebts: {
+          overdueCount: 1,
+          overdueTotal: 1_275_000,
+          dueSoonCount: 0,
+          dueSoonTotal: 0,
+        },
+      },
+      {
+        key: "debt-overdue",
+        title: "Utang supplier lewat jatuh tempo",
+        detail: "1 nota · Rp1.275.000",
+        tone: "critical",
+        icon: "debt",
+        link: { to: "/owner/lainnya/utang" },
+      },
+    ],
+    [
+      {
+        supplierDebts: {
+          overdueCount: 0,
+          overdueTotal: 0,
+          dueSoonCount: 2,
+          dueSoonTotal: 2_812_000,
+        },
+      },
+      {
+        key: "debt-soon",
+        title: "Utang supplier segera jatuh tempo",
+        detail: "2 nota · Rp2.812.000",
+        tone: "warning",
+        icon: "debt",
+        link: { to: "/owner/lainnya/utang" },
+      },
+    ],
+    [
+      { awaitingPriceCount: 3 },
+      {
+        key: "awaiting-price",
+        title: "3 barang baru dari barang masuk",
+        detail: "Lengkapi harga jual",
+        tone: "warning",
+        icon: "price",
+        link: { to: "/owner/barang", search: { menunggu: true } },
+      },
+    ],
+  ] as const)("butir barang masuk %#", (patch, expected) => {
+    expect(attentionItems({ ...none, ...patch })).toEqual([expected]);
+  });
+
+  test("urutan lengkap: minus, utang lewat, modal, barang baru, menipis, utang segera, habis, kas, kasbon", () => {
+    const items = attentionItems({
+      lowStockCount: 2,
+      negativeStockCount: 1,
+      cashDifferences: [
+        { shiftId: "s1", kasirName: "Rina", closedAt: 1, difference: -5000 },
+      ],
+      overdueCredit: { count: 1, total: 100 },
+      costChanges: [change()],
+      stockOuts: [{ productId: "p-beras", productName: "Beras" }],
+      supplierDebts: {
+        overdueCount: 1,
+        overdueTotal: 10,
+        dueSoonCount: 1,
+        dueSoonTotal: 10,
+      },
+      awaitingPriceCount: 3,
+    });
+    expect(items.map((i) => i.key)).toEqual([
+      "negative-stock",
+      "debt-overdue",
+      "cost-p-indomie",
+      "awaiting-price",
+      "low-stock",
+      "debt-soon",
+      "stockout-p-beras",
+      "cash-s1",
+      "overdue-credit",
+    ]);
+  });
+
   test("urutan: minus, modal, menipis, habis, kas, kasbon", () => {
     const items = attentionItems({
       lowStockCount: 2,

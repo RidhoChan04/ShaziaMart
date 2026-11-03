@@ -46,7 +46,14 @@ export function hourWindow(
 }
 
 export type AttentionLink =
-  | { to: "/owner/barang" | "/owner/lainnya" | "/owner/kasbon" }
+  | {
+      to:
+        | "/owner/barang"
+        | "/owner/lainnya"
+        | "/owner/lainnya/utang"
+        | "/owner/kasbon";
+    }
+  | { to: "/owner/barang"; search: { menunggu: true } }
   | {
       to: "/owner/barang/$productId";
       params: { productId: string };
@@ -58,7 +65,7 @@ export type AttentionItem = {
   title: string;
   detail: string;
   tone: "warning" | "critical";
-  icon: "stock" | "cost" | "stockout" | "cash" | "credit";
+  icon: "stock" | "cost" | "stockout" | "cash" | "credit" | "debt" | "price";
   link: AttentionLink;
 };
 
@@ -87,7 +94,22 @@ function costItem(c: CostChangeItem): AttentionItem {
   };
 }
 
-/** Urutan: stok minus, perubahan modal, stok menipis, barang habis, selisih kas, kasbon > 30 hari. */
+function debtItem(
+  kind: "overdue" | "soon",
+  count: number,
+  total: number,
+): AttentionItem {
+  return {
+    key: `debt-${kind}`,
+    title: `Utang supplier ${kind === "overdue" ? "lewat" : "segera"} jatuh tempo`,
+    detail: `${count} nota · ${formatRupiah(total)}`,
+    tone: kind === "overdue" ? "critical" : "warning",
+    icon: "debt",
+    link: { to: "/owner/lainnya/utang" },
+  };
+}
+
+/** Urutan: stok minus, utang lewat, perubahan modal, barang baru menunggu harga, stok menipis, utang segera, barang habis, selisih kas, kasbon > 30 hari. */
 export function attentionItems(a: Attention): AttentionItem[] {
   const items: AttentionItem[] = [];
   if (a.negativeStockCount > 0) {
@@ -100,7 +122,21 @@ export function attentionItems(a: Attention): AttentionItem[] {
       link: { to: "/owner/barang" },
     });
   }
+  const debts = a.supplierDebts;
+  if (debts.overdueCount > 0) {
+    items.push(debtItem("overdue", debts.overdueCount, debts.overdueTotal));
+  }
   items.push(...a.costChanges.map(costItem));
+  if (a.awaitingPriceCount > 0) {
+    items.push({
+      key: "awaiting-price",
+      title: `${a.awaitingPriceCount} barang baru dari barang masuk`,
+      detail: "Lengkapi harga jual",
+      tone: "warning",
+      icon: "price",
+      link: { to: "/owner/barang", search: { menunggu: true } },
+    });
+  }
   if (a.lowStockCount > 0) {
     items.push({
       key: "low-stock",
@@ -110,6 +146,9 @@ export function attentionItems(a: Attention): AttentionItem[] {
       icon: "stock",
       link: { to: "/owner/barang" },
     });
+  }
+  if (debts.dueSoonCount > 0) {
+    items.push(debtItem("soon", debts.dueSoonCount, debts.dueSoonTotal));
   }
   for (const s of a.stockOuts) {
     items.push({

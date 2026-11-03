@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import {
   ChevronRight,
   CircleCheck,
+  HandCoins,
   type LucideIcon,
   NotebookPen,
   PackageX,
@@ -20,6 +21,8 @@ const ICONS: Record<AttentionItem["icon"], LucideIcon> = {
   stockout: PackageX,
   cash: Wallet,
   credit: NotebookPen,
+  debt: HandCoins,
+  price: Tag,
 };
 
 export function AttentionList({ attention }: { attention: Attention }) {

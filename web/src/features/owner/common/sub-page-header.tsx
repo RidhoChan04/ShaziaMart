@@ -7,13 +7,21 @@ import { useScrolledPast } from "../use-scrolled-past";
 export const pillClass =
   "inline-flex h-11 items-center gap-0.5 rounded-full bg-surface pr-4 pl-2.5 text-[15px] font-semibold text-primary shadow-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary";
 
+type BackFallback =
+  | "/owner/barang"
+  | "/owner/lainnya"
+  | "/owner/lainnya/utang"
+  | "/owner/lainnya/barang-masuk";
+
+type KnownFallback = Exclude<BackFallback, "/owner/lainnya/barang-masuk">;
+
 /** Kembali ke halaman sebelumnya bila ada riwayat (menjaga filter di URL), selain itu ke `fallback`. */
 function BackControl({
   label,
   fallback,
 }: {
   label: string;
-  fallback: "/owner/barang";
+  fallback: BackFallback;
 }) {
   const router = useRouter();
   const canGoBack = useCanGoBack();
@@ -35,7 +43,8 @@ function BackControl({
     );
   }
   return (
-    <Link to={fallback} className={pillClass}>
+    // Rute /owner/lainnya/barang-masuk baru ada di Task 13; sampai itu terdaftar, tipenya belum dikenal router.
+    <Link to={fallback as KnownFallback} className={pillClass}>
       {content}
     </Link>
   );
@@ -50,7 +59,7 @@ export function SubPageHeader({
 }: {
   title: string;
   eyebrow?: string;
-  back: { label: string; fallback: "/owner/barang" };
+  back: { label: string; fallback: BackFallback };
   action?: ReactNode;
 }) {
   const titleRef = useRef<HTMLHeadingElement>(null);

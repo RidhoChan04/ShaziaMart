@@ -32,3 +32,15 @@ export function pesanError(error: unknown): string {
   if (error.code === "VALIDATION") return error.detail ?? "Data tidak valid";
   return MESSAGES[error.code] ?? GENERIC;
 }
+
+/** Galat pembayaran: SHIFT_CLOSED menampilkan kalimat server (menyebut sumber uang lain); selebihnya `pesanError`. */
+export function pesanPembayaran(error: unknown): string {
+  if (
+    error instanceof ApiError &&
+    error.code === "SHIFT_CLOSED" &&
+    error.detail
+  ) {
+    return error.detail;
+  }
+  return pesanError(error);
+}
