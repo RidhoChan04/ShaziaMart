@@ -152,3 +152,54 @@ test("memuat nota → teks 'Memuat…' bukan halaman kosong", async () => {
   renderForm(memoryDraftStore(), PAGE);
   expect(await screen.findByText("Memuat…")).toBeVisible();
 });
+
+test("pemilik melunasi saat diubah: 422 RECEIPT_PAYMENT_LOCKED → nota dimuat ulang, pembayaran jadi ringkasan hanya-baca, ubahan lain tetap; simpan lagi berhasil", async () => {
+  const nanti = {
+    timing: "nanti",
+    method: null,
+    cashSource: null,
+    dueDate: "2026-11-16",
+  } as const;
+  await seedReceipt({ id: "draf-2", payment: nanti });
+  const puts = capturePuts();
+  renderForm(memoryDraftStore(), "/staff/masuk/draf-2");
+  const user = userEvent.setup();
+  await changeGula(user);
+  await user.click(
+    await screen.findByRole("button", { name: "Lanjut ke pembayaran" }),
+  );
+  await user.click(
+    await screen.findByRole("radio", { name: "Bayar sekarang" }),
+  );
+  // Pemilik menandai lunas dari aplikasinya saat staf masih mengubah.
+  mockDb.update((s) => {
+    const r = s.receipts.find((x) => x.id === "draf-2");
+    if (r) {
+      r.paid = {
+        at: NOW,
+        method: "tunai",
+        cashSource: "pemilik",
+        byName: "Pak Ahmad",
+      };
+    }
+  });
+  await user.click(screen.getByRole("button", { name: "Simpan perubahan" }));
+  await waitFor(() =>
+    expect(screen.queryAllByRole("radiogroup")).toHaveLength(0),
+  );
+  expect(
+    screen.getByText("Bayar nanti · jatuh tempo 16 Nov 2026"),
+  ).toBeVisible();
+  expect(
+    screen.getByText("Cara bayar tidak bisa diubah — sudah dibayar"),
+  ).toBeVisible();
+  // Ubahan lain (Gula 48) tetap: total berjalan tidak kembali ke awal.
+  expect(screen.getByText("Rp1.409.600")).toBeVisible();
+  await user.click(screen.getByRole("button", { name: "Simpan perubahan" }));
+  expect(await screen.findByText("Perubahan tersimpan")).toBeVisible();
+  expect(puts).toHaveLength(2);
+  expect(puts[1]).toMatchObject({ payment: nanti });
+  expect(
+    mockDb.get().receipts.find((r) => r.id === "draf-2")?.lines[2]?.qty,
+  ).toBe(48);
+});

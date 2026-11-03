@@ -9,6 +9,7 @@ import type {
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import {
   getGetStaffReceiptQueryKey,
+  getGetStaffReceiptQueryOptions,
   getListStaffReceiptsQueryKey,
   useGetStaffShift,
   useUpdateStaffReceipt,
@@ -18,7 +19,10 @@ import { useServerHealth } from "@/shared/hooks/use-server-health";
 import { jakartaIsoDate } from "@/shared/lib/business-day";
 import { pesanError } from "@/shared/lib/error-messages";
 import { paymentSummary } from "@/shared/lib/payment-labels";
-import { validateReceipt } from "@/shared/lib/receipt-rules";
+import {
+  RECEIPT_PAYMENT_LOCKED,
+  validateReceipt,
+} from "@/shared/lib/receipt-rules";
 import type { ReceiptForm } from "../drafts/draft-types";
 import { toPayment } from "../drafts/to-input";
 import { formFromReceipt, toReceiptEdit } from "./edit-model";
@@ -38,6 +42,9 @@ function serverErrors(error: unknown): ReceiptError[] | null {
 
 const isCancelled = (error: unknown): boolean =>
   error instanceof ApiError && error.code === "RECEIPT_CANCELLED";
+
+const isPaymentLocked = (e: ReceiptError): boolean =>
+  e.lineId === null && e.message === RECEIPT_PAYMENT_LOCKED;
 
 /** Form ubah nota milik sendiri: barang tetap, jumlah/harga/ED dan data nota bisa diubah; hanya online. */
 export function EditForm({ receipt }: { receipt: StaffReceipt }) {
@@ -90,11 +97,26 @@ export function EditForm({ receipt }: { receipt: StaffReceipt }) {
     if (found.length === 0) setStep("bayar");
   };
 
+  // Pemilik melunasi saat staf mengubah: muat ulang nota (pembayaran jadi ringkasan hanya-baca)
+  // dan kembalikan isian pembayaran ke yang tersimpan; ubahan lain tetap.
+  const relockPayment = async () => {
+    const fresh = await client
+      .fetchQuery({
+        ...getGetStaffReceiptQueryOptions(receipt.id),
+        staleTime: 0,
+      })
+      .catch(() => null);
+    if (!fresh || fresh.paymentEditable) return;
+    const payment = formFromReceipt(fresh, null).payment;
+    setForm((f) => ({ ...f, payment }));
+  };
+
   const failed = (error: unknown) => {
     const listed = serverErrors(error);
     if (listed) {
       setErrors(listed);
       if (listed.some(onNotaStep)) setStep("nota");
+      if (listed.some(isPaymentLocked)) void relockPayment();
       return;
     }
     setFailure(pesanError(error));
