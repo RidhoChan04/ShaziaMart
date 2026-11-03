@@ -1,8 +1,10 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { delay, HttpResponse, http } from "msw";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { mockDb } from "@/mocks/db";
 import { ownerLogin } from "@/mocks/handlers/test-helpers";
+import { server } from "@/mocks/node";
 import { renderApp } from "@/test/render-app";
 import { editReceipt, RECEIPT_NOW, seedReceipt } from "@/test/seed-receipts";
 
@@ -89,7 +91,9 @@ test("Batalkan nota → konfirmasi menyebut koreksi laci → batal: tanda 'Dibat
   expect(dialog).toHaveTextContent(
     "Stok, HPP, dan utang nota ini dibalik. Tidak bisa diurungkan.",
   );
-  expect(dialog).toHaveTextContent("Uang laci Rp1.442.000 dikembalikan");
+  expect(dialog).toHaveTextContent(
+    "Uang Rp1.442.000 yang tadi keluar dari laci dicatat masuk lagi ke shift kasir yang sedang berjalan.",
+  );
   await user.click(
     within(dialog).getByRole("button", { name: "Batalkan nota" }),
   );
@@ -115,6 +119,139 @@ test("konfirmasi 'Kembali' menutup dialog tanpa membatalkan; fokus kembali ke to
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument(),
   );
   expect(mockDb.get().receipts[0]?.status).toBe("aktif");
+  await waitFor(() => expect(trigger).toHaveFocus());
+});
+
+test("Escape menutup konfirmasi tanpa membatalkan; fokus kembali ke tombol 'Batalkan nota'", async () => {
+  const user = userEvent.setup();
+  renderApp(DETAIL);
+  await screen.findByRole("heading", { level: 1, name: TITLE });
+  const trigger = screen.getByRole("button", { name: "Batalkan nota" });
+  await user.click(trigger);
+  await screen.findByRole("alertdialog");
+  await user.keyboard("{Escape}");
+  await waitFor(() =>
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument(),
+  );
+  await waitFor(() => expect(trigger).toHaveFocus());
+  expect(mockDb.get().receipts[0]?.status).toBe("aktif");
+});
+
+const CANCELLED_PROBLEM = {
+  type: "about:blank",
+  title: "Conflict",
+  status: 409,
+  code: "RECEIPT_CANCELLED",
+  detail: "Nota ini sudah dibatalkan",
+};
+const PROBLEM_HEADERS = { "Content-Type": "application/problem+json" };
+
+test("409 RECEIPT_CANCELLED: pesan 'Nota ini sudah dibatalkan' tampil sebagai alert di konfirmasi", async () => {
+  const user = userEvent.setup();
+  server.use(
+    http.post("/api/owner/receipts/draf-1/cancel", () =>
+      HttpResponse.json(CANCELLED_PROBLEM, {
+        status: 409,
+        headers: PROBLEM_HEADERS,
+      }),
+    ),
+  );
+  renderApp(DETAIL);
+  await screen.findByRole("heading", { level: 1, name: TITLE });
+  await user.click(screen.getByRole("button", { name: "Batalkan nota" }));
+  const dialog = await screen.findByRole("alertdialog");
+  await user.click(
+    within(dialog).getByRole("button", { name: "Batalkan nota" }),
+  );
+  expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+    "Nota ini sudah dibatalkan",
+  );
+});
+
+test("409 RECEIPT_CANCELLED (tab lain sudah membatalkan): detail dan daftar dimuat ulang, 'Batalkan nota' tak ditawarkan lagi", async () => {
+  const user = userEvent.setup();
+  renderApp(DETAIL);
+  await screen.findByRole("heading", { level: 1, name: TITLE });
+  await user.click(screen.getByRole("button", { name: "Batalkan nota" }));
+  const dialog = await screen.findByRole("alertdialog");
+  mockDb.update((s) => {
+    const r = s.receipts[0];
+    if (r) r.status = "dibatalkan";
+  });
+  server.use(
+    http.post("/api/owner/receipts/draf-1/cancel", () =>
+      HttpResponse.json(CANCELLED_PROBLEM, {
+        status: 409,
+        headers: PROBLEM_HEADERS,
+      }),
+    ),
+  );
+  await user.click(
+    within(dialog).getByRole("button", { name: "Batalkan nota" }),
+  );
+  await waitFor(() =>
+    expect(
+      screen.queryByRole("button", { name: "Batalkan nota" }),
+    ).not.toBeInTheDocument(),
+  );
+  expect(screen.getAllByText("Dibatalkan").length).toBeGreaterThan(0);
+});
+
+test("saat menunggu server: kedua tombol nonaktif, klik kedua tidak mengirim permintaan lagi", async () => {
+  const user = userEvent.setup();
+  let calls = 0;
+  server.use(
+    http.post("/api/owner/receipts/draf-1/cancel", async () => {
+      calls += 1;
+      await delay(300);
+      return HttpResponse.json(CANCELLED_PROBLEM, {
+        status: 409,
+        headers: PROBLEM_HEADERS,
+      });
+    }),
+  );
+  renderApp(DETAIL);
+  await screen.findByRole("heading", { level: 1, name: TITLE });
+  await user.click(screen.getByRole("button", { name: "Batalkan nota" }));
+  const dialog = await screen.findByRole("alertdialog");
+  const confirm = within(dialog).getByRole("button", { name: "Batalkan nota" });
+  await user.click(confirm);
+  await waitFor(() => expect(confirm).toBeDisabled());
+  expect(
+    within(dialog).getByRole("button", { name: "Kembali" }),
+  ).toBeDisabled();
+  await user.click(confirm);
+  fireEvent.click(confirm);
+  await within(dialog).findByRole("alert");
+  expect(calls).toBe(1);
+});
+
+test("R23: nota Bayar nanti yang dilunasi tunai dari laci → konfirmasi menyebut uang laci yang kembali", async () => {
+  const user = userEvent.setup();
+  mockDb.update((s) => {
+    const r = s.receipts[0];
+    if (r) {
+      r.payment = {
+        timing: "nanti",
+        method: null,
+        cashSource: null,
+        dueDate: "2026-11-16",
+      };
+      r.paid = {
+        at: RECEIPT_NOW,
+        method: "tunai",
+        cashSource: "laci",
+        byName: "Pak Ahmad",
+      };
+    }
+  });
+  renderApp(DETAIL);
+  await screen.findByRole("heading", { level: 1, name: TITLE });
+  await user.click(screen.getByRole("button", { name: "Batalkan nota" }));
+  const dialog = await screen.findByRole("alertdialog");
+  expect(dialog).toHaveTextContent(
+    "Uang Rp1.442.000 yang tadi keluar dari laci",
+  );
 });
 
 test("nota dibayar uang pemilik: konfirmasi tanpa kalimat koreksi laci", async () => {
@@ -134,7 +271,8 @@ test("nota dibayar uang pemilik: konfirmasi tanpa kalimat koreksi laci", async (
   await screen.findByRole("heading", { level: 1, name: TITLE });
   await user.click(screen.getByRole("button", { name: "Batalkan nota" }));
   const dialog = await screen.findByRole("alertdialog");
-  expect(dialog).not.toHaveTextContent("Uang laci");
+  expect(dialog).not.toHaveTextContent("keluar dari laci");
+  expect(dialog).toHaveTextContent("Tidak ada uang laci yang berubah.");
 });
 
 test("foto: ketuk 'Foto nota' → dialog dengan img alt 'Foto nota' src /api/owner/receipt-photos/{id}", async () => {

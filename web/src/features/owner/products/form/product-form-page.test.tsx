@@ -632,6 +632,10 @@ test("Indomie setelah barang masuk: 'Harga modal' eceran & satuan besar nonaktif
   await user.type(price, "3200");
   await user.click(save());
   await screen.findByRole("heading", { level: 1, name: INDOMIE });
+  // Menyimpan tidak menggeser HPP dari barang masuk (K16).
+  expect(mockDb.get().products.find((p) => p.name === INDOMIE)?.cost).toEqual(
+    cost,
+  );
   expect(
     within(screen.getByRole("region", { name: "Harga" })).getByText("Rp3.200"),
   ).toBeInTheDocument();

@@ -78,8 +78,10 @@ describe("laciPaidOf & cancelNoteText", () => {
   });
   test("keterangan batal menyebut nominal laci hanya bila ada", () => {
     expect(cancelNoteText(0)).toBe(
-      "Stok, HPP, dan utang nota ini dibalik. Tidak bisa diurungkan.",
+      "Stok, HPP, dan utang nota ini dibalik. Tidak bisa diurungkan. Tidak ada uang laci yang berubah.",
     );
-    expect(cancelNoteText(1_442_000)).toContain("Rp1.442.000");
+    expect(cancelNoteText(1_442_000)).toBe(
+      "Stok, HPP, dan utang nota ini dibalik. Tidak bisa diurungkan. Uang Rp1.442.000 yang tadi keluar dari laci dicatat masuk lagi ke shift kasir yang sedang berjalan. Kalau tidak ada shift berjalan, uang ini tidak dicatat ulang — sesuaikan uang laci sendiri.",
+    );
   });
 });

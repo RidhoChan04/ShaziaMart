@@ -50,9 +50,9 @@ export function laciPaidOf(r: {
   return fromLaci ? r.total : 0;
 }
 
-/** Keterangan konfirmasi batal nota; menyebut koreksi laci (termasuk nota yang sudah dilunasi dari laci) bila ada. */
+/** Keterangan konfirmasi batal nota; menyebut uang laci yang kembali (termasuk nota yang sudah dilunasi dari laci) bila ada. */
 export function cancelNoteText(laci: number): string {
   const base = "Stok, HPP, dan utang nota ini dibalik. Tidak bisa diurungkan.";
-  if (laci <= 0) return base;
-  return `${base} Uang laci ${formatRupiah(laci)} dikembalikan sebagai koreksi di shift yang sedang buka; tanpa shift buka, koreksi tidak dicatat.`;
+  if (laci <= 0) return `${base} Tidak ada uang laci yang berubah.`;
+  return `${base} Uang ${formatRupiah(laci)} yang tadi keluar dari laci dicatat masuk lagi ke shift kasir yang sedang berjalan. Kalau tidak ada shift berjalan, uang ini tidak dicatat ulang — sesuaikan uang laci sendiri.`;
 }

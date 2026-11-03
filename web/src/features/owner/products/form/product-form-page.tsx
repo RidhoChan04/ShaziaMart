@@ -28,16 +28,12 @@ import {
 } from "@/shared/api/problem";
 import { ScanButton } from "@/shared/components/scan/scan-button";
 import { pesanError } from "@/shared/lib/error-messages";
-import { formatRupiah } from "@/shared/lib/money";
-import {
-  activeBigUnit,
-  unitCost,
-  validateDraft,
-} from "@/shared/lib/product-rules";
+import { activeBigUnit, validateDraft } from "@/shared/lib/product-rules";
 import { BIG_UNITS, SMALL_UNITS } from "@/shared/lib/units";
 import { Button } from "@/shared/ui/button";
 import { pillClass } from "../../common/sub-page-header";
 import { ProductNotFound } from "../detail/product-detail-page";
+import { CostRow, receiptCostTexts } from "./cost-row";
 import { FormSection, fieldId, SectionNote, TextField } from "./form-section";
 import {
   clearBigValues,
@@ -53,7 +49,6 @@ import { MoneyField } from "./money-field";
 
 const LOCKED_SOLD = "Tidak bisa diubah — barang sudah terjual";
 const LOCKED_STOCK = "Tidak bisa diubah — barang sudah punya stok";
-const FOLLOWS_RECEIPTS = "Mengikuti barang masuk";
 
 /** Urutan isian di layar; fokus pergi ke yang paling atas dari yang salah. */
 const FIELD_ORDER = Object.keys(emptyFormValues()) as ProductField[];
@@ -153,65 +148,6 @@ function unreachableFields(
   if (bigSizeLock) out.add("bigSize");
   if (costComputed) out.add("cost");
   return out;
-}
-
-/** Modal sekarang per satuan eceran dan per satuan besar untuk barang yang punya barang masuk; null bila modalnya diketik pemilik. */
-function receiptCostTexts(
-  product: OwnerProduct | null,
-  bigUnit: { unitSize: number } | null,
-): { eceran: string; big: string } | null {
-  if (product?.hasReceipts !== true) return null;
-  const text = (size: number | null): string => {
-    const n = size === null ? null : unitCost(product.cost, size);
-    return n === null ? "" : formatRupiah(n);
-  };
-  return {
-    eceran: text(product.units[0]?.unitSize ?? 1),
-    big: text(bigUnit?.unitSize ?? null),
-  };
-}
-
-type MoneyProps = Omit<Parameters<typeof MoneyField>[0], "label">;
-
-/**
- * Baris `Harga modal`: hanya-baca bila modal mengikuti barang masuk (`locked` = nilainya), teks bila
- * dihitung dari modal satuan besar, selain itu isian rupiah.
- */
-function CostRow({
-  field,
-  locked,
-  computedFrom = null,
-  money,
-}: {
-  field: "cost" | "bigCost";
-  locked: string | undefined;
-  computedFrom?: { bigName: string; cost: number } | null;
-  money: MoneyProps;
-}) {
-  if (locked !== undefined) {
-    return (
-      <TextField
-        field={field}
-        label="Harga modal"
-        value={locked}
-        onChange={() => undefined}
-        disabled
-        note={FOLLOWS_RECEIPTS}
-      />
-    );
-  }
-  if (computedFrom) {
-    return (
-      <div className="flex min-h-11 items-center justify-between gap-3 px-4 py-1.5 text-[17px]">
-        <span className="shrink-0 whitespace-nowrap">Harga modal</span>
-        <span className="text-right text-muted tabular-nums">
-          Dihitung dari modal {computedFrom.bigName}:{" "}
-          {formatRupiah(computedFrom.cost)}
-        </span>
-      </div>
-    );
-  }
-  return <MoneyField {...money} label="Harga modal" />;
 }
 
 function FormBody({
