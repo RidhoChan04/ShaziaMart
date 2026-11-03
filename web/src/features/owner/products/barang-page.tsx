@@ -27,7 +27,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/shared/ui/sheet";
-import { categoryChips, filterProducts } from "./product-model";
+import { categoryChips, filterProducts, menungguCount } from "./product-model";
 import { ProductRow, priceColumnWidth } from "./product-row";
 
 const iconButton =
@@ -125,7 +125,12 @@ function useElementWidth() {
 }
 
 export function BarangPage() {
-  const { q = "", kategori, nonaktif } = useSearch({ from: "/owner/barang" });
+  const {
+    q = "",
+    kategori,
+    nonaktif,
+    menunggu,
+  } = useSearch({ from: "/owner/barang" });
   const navigate = useNavigate({ from: "/owner/barang" });
   // Kolom cari memegang teksnya sendiri; URL hanya cermin (replace) agar kursor tidak melompat.
   const [text, setText] = useState(q);
@@ -146,6 +151,7 @@ export function BarangPage() {
   const rows = products.data;
 
   const isNonaktif = nonaktif === true;
+  const isMenunggu = menunggu === true;
   const visible = useMemo(
     () =>
       rows
@@ -153,12 +159,14 @@ export function BarangPage() {
             q: deferredText,
             kategori: kategori ?? null,
             nonaktif: isNonaktif,
+            menunggu: isMenunggu,
           })
         : [],
-    [rows, deferredText, kategori, isNonaktif],
+    [rows, deferredText, kategori, isNonaktif, isMenunggu],
   );
   const chips = useMemo(() => (rows ? categoryChips(rows) : []), [rows]);
   const activeCount = chips.reduce((sum, c) => sum + c.count, 0);
+  const waitingCount = rows ? menungguCount(rows) : 0;
   const inactiveCount = rows
     ? rows.filter((r) => r.status === "nonaktif").length
     : 0;
@@ -167,12 +175,14 @@ export function BarangPage() {
     q: string;
     kategori?: string | undefined;
     nonaktif?: true | undefined;
+    menunggu?: true | undefined;
   }) =>
     void navigate({
       search: {
         ...(next.q ? { q: next.q } : {}),
         ...(next.kategori ? { kategori: next.kategori } : {}),
         ...(next.nonaktif ? { nonaktif: true as const } : {}),
+        ...(next.menunggu ? { menunggu: true as const } : {}),
       },
       replace: true,
     });
@@ -193,7 +203,7 @@ export function BarangPage() {
             onChange={(e) => {
               setText(e.target.value);
               pushed.current.push(e.target.value);
-              setSearch({ q: e.target.value, kategori, nonaktif });
+              setSearch({ q: e.target.value, kategori, nonaktif, menunggu });
             }}
             ref={searchRef}
             className="h-11 w-full rounded-full bg-surface pr-12 pl-9 text-base shadow-sm outline-none placeholder:text-muted focus-visible:ring-2 focus-visible:ring-primary"
@@ -205,7 +215,7 @@ export function BarangPage() {
               onDetected={(code) => {
                 setText(code);
                 pushed.current.push(code);
-                setSearch({ q: code, kategori, nonaktif });
+                setSearch({ q: code, kategori, nonaktif, menunggu });
               }}
               onManual={() => setTimeout(() => searchRef.current?.focus(), 0)}
             />
@@ -224,16 +234,22 @@ export function BarangPage() {
       {rows && (
         <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 lg:mx-0 lg:px-0">
           <Chip
-            active={!kategori && !nonaktif}
+            active={!kategori && !nonaktif && !menunggu}
             onClick={() => setSearch({ q: text })}
           >{`Semua ${activeCount}`}</Chip>
           {chips.map((c) => (
             <Chip
               key={c.key}
-              active={kategori === c.key && !nonaktif}
+              active={kategori === c.key && !nonaktif && !menunggu}
               onClick={() => setSearch({ q: text, kategori: c.key })}
             >{`${c.label} ${c.count}`}</Chip>
           ))}
+          {(waitingCount > 0 || isMenunggu) && (
+            <Chip
+              active={isMenunggu}
+              onClick={() => setSearch({ q: text, menunggu: true })}
+            >{`Menunggu harga jual ${waitingCount}`}</Chip>
+          )}
           {(inactiveCount > 0 || isNonaktif) && (
             <Chip
               active={nonaktif === true}

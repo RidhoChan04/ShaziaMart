@@ -38,6 +38,14 @@ function indomie(from: ProductCost, to: ProductCost | null): OwnerProduct {
 }
 
 describe("costLines", () => {
+  test("barang menunggu harga jual: tanpa lembar harga, harganya diisi lewat form (R20)", () => {
+    const p = indomie(
+      { amount: 104000, qtyBase: 40 },
+      { amount: 108000, qtyBase: 40 },
+    );
+    expect(costLines({ ...p, status: "menunggu_harga" })).toEqual([]);
+  });
+
   test("Indomie {104000,40} -> {108000,40}: eceran, grosir 40+, dus", () => {
     const lines = costLines(
       indomie({ amount: 104000, qtyBase: 40 }, { amount: 108000, qtyBase: 40 }),

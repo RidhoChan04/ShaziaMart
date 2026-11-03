@@ -1,5 +1,6 @@
 import {
   CircleDashed,
+  CircleDollarSign,
   CircleMinus,
   EyeOff,
   Hourglass,
@@ -11,6 +12,7 @@ import { cn } from "@/shared/lib/cn";
 import type { Badge } from "./product-model";
 
 const ICONS: Record<Badge["key"], LucideIcon> = {
+  menunggu_harga: CircleDollarSign,
   minus: CircleMinus,
   menipis: TriangleAlert,
   langka: Hourglass,

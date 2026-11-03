@@ -17,6 +17,7 @@ import type { OwnerProduct } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { formatDateLong, jakartaTime } from "@/shared/lib/business-day";
 import { newId } from "@/shared/lib/id";
 import { renderApp } from "@/test/render-app";
+import { receiveTeh, seedReceipt, TEH_NAME } from "@/test/seed-receipts";
 
 const INDOMIE = "Indomie Goreng";
 const BERAS = "Beras Pandan Wangi 5 kg";
@@ -691,4 +692,46 @@ test("id tidak ada → 'Barang tidak ditemukan' + 'Kembali ke daftar barang'", a
   expect(
     screen.getByRole("link", { name: "Kembali ke daftar barang" }),
   ).toHaveAttribute("href", "/owner/barang");
+});
+
+test("detail barang menunggu harga jual: tanda di atas, harga '—' tanpa modal/untung, tanpa 'Pengaturan', 'Ubah' tetap ada", async () => {
+  await receiveTeh();
+  await openDetail(TEH_NAME);
+  expect(
+    within(screen.getByRole("list", { name: "Tanda status" })).getByText(
+      "Menunggu harga jual",
+    ),
+  ).toBeInTheDocument();
+  const harga = section("Harga");
+  expect(within(harga).getAllByText("—").length).toBeGreaterThanOrEqual(1);
+  expect(harga).not.toHaveTextContent("Rp0");
+  expect(harga).not.toHaveTextContent("Modal");
+  expect(harga).not.toHaveTextContent("untung");
+  expect(harga).toHaveTextContent("Isi harga jual lewat Ubah");
+  expect(screen.queryByRole("region", { name: "Pengaturan" })).toBeNull();
+  expect(screen.queryByText("Status barang")).toBeNull();
+  expect(screen.getByRole("link", { name: "Ubah" })).toBeInTheDocument();
+});
+
+test("riwayat stok: 'Barang masuk 80 pcs' / 'Hari ini {HH.MM} · Rina' / '+80'; setelah batal 'Barang masuk dibatalkan 80 pcs' / '−80'", async () => {
+  await seedReceipt();
+  await ownerLogin();
+  const at = mockDb.get().receipts[0]?.createdAt ?? 0;
+  const first = await openDetail(INDOMIE);
+  let stok = section("Stok");
+  let row = items(stok)[0] as HTMLElement;
+  expect(row).toHaveTextContent("Barang masuk 80 pcs");
+  expect(row).toHaveTextContent(`Hari ini ${jakartaTime(at)} · Rina`);
+  expect(row).not.toHaveTextContent("Kasir");
+  expect(within(row).getByText("+80")).toBeInTheDocument();
+  first.unmount();
+
+  expect((await post("/api/owner/receipts/draf-1/cancel", {})).status).toBe(
+    200,
+  );
+  await openDetail(INDOMIE);
+  stok = section("Stok");
+  row = items(stok)[0] as HTMLElement;
+  expect(row).toHaveTextContent("Barang masuk dibatalkan 80 pcs");
+  expect(within(row).getByText("−80")).toBeInTheDocument();
 });

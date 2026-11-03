@@ -13,8 +13,6 @@ type BackFallback =
   | "/owner/lainnya/utang"
   | "/owner/lainnya/barang-masuk";
 
-type KnownFallback = Exclude<BackFallback, "/owner/lainnya/barang-masuk">;
-
 /** Kembali ke halaman sebelumnya bila ada riwayat (menjaga filter di URL), selain itu ke `fallback`. */
 function BackControl({
   label,
@@ -43,8 +41,7 @@ function BackControl({
     );
   }
   return (
-    // Rute /owner/lainnya/barang-masuk baru ada di Task 13; sampai itu terdaftar, tipenya belum dikenal router.
-    <Link to={fallback as KnownFallback} className={pillClass}>
+    <Link to={fallback} className={pillClass}>
       {content}
     </Link>
   );

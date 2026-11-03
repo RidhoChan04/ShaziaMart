@@ -11,7 +11,10 @@ import { beforeEach, expect, test } from "vitest";
 import { mockDb } from "@/mocks/db";
 import { ownerLogin, post } from "@/mocks/handlers/test-helpers";
 import { server } from "@/mocks/node";
+import { formatRupiah } from "@/shared/lib/money";
+import { unitCost } from "@/shared/lib/product-rules";
 import { renderApp } from "@/test/render-app";
+import { receiveTeh, seedReceipt, TEH_NAME } from "@/test/seed-receipts";
 
 const INDOMIE = "Indomie Goreng";
 const TEH = "Teh Pucuk Harum 350 ml";
@@ -581,4 +584,60 @@ test("bagian, label, catatan, dan inputmode persis sesuai spec", async () => {
   ] as const) {
     expect(field(label, scope)).toHaveAttribute("inputmode", "numeric");
   }
+});
+
+test("barang menunggu harga jual: 'Harga jual' kosong dan wajib; isi 4.000 & dus 90.000 → Simpan → detail tanpa tanda, harga terisi", async () => {
+  await receiveTeh();
+  const { user } = await openEdit(TEH_NAME);
+  expect(field("Harga jual", region("Eceran"))).toHaveValue("");
+  expect(field("Harga jual", region(/^Satuan besar/))).toHaveValue("");
+
+  await user.click(save());
+  expect(
+    await screen.findByText(/Harga jual/, { selector: "#pf-price-error" }),
+  ).toBeInTheDocument();
+  expect(mockDb.get().products.find((p) => p.name === TEH_NAME)?.status).toBe(
+    "menunggu_harga",
+  );
+
+  await user.type(field("Harga jual", region("Eceran")), "4000");
+  await user.type(field("Harga jual", region(/^Satuan besar/)), "90000");
+  await user.click(save());
+  await screen.findByRole("heading", { level: 1, name: TEH_NAME });
+  const product = mockDb.get().products.find((p) => p.name === TEH_NAME);
+  expect(product?.status).toBe("aktif");
+  expect(screen.queryByText("Menunggu harga jual")).toBeNull();
+  expect(
+    within(screen.getByRole("region", { name: "Harga" })).getByText("Rp4.000"),
+  ).toBeInTheDocument();
+});
+
+test("Indomie setelah barang masuk: 'Harga modal' eceran & satuan besar nonaktif, bernilai modal sekarang, dengan 'Mengikuti barang masuk'; menyimpan harga jual tetap bisa", async () => {
+  await seedReceipt();
+  const { user } = await openEdit(INDOMIE);
+  const eceran = field("Harga modal", region("Eceran"));
+  const besar = field("Harga modal", region(/^Satuan besar/));
+  expect(eceran).toBeDisabled();
+  expect(besar).toBeDisabled();
+  // Modal sekarang = HPP dari barang masuk (bukan seed), per pcs dan per dus isi 40.
+  const cost = mockDb.get().products.find((p) => p.name === INDOMIE)?.cost;
+  if (!cost) throw new Error("HPP Indomie hilang");
+  expect(eceran).toHaveValue(formatRupiah(unitCost(cost, 1) ?? 0));
+  expect(besar).toHaveValue(formatRupiah(unitCost(cost, 40) ?? 0));
+  expect(eceran).toHaveAccessibleDescription("Mengikuti barang masuk");
+  expect(besar).toHaveAccessibleDescription("Mengikuti barang masuk");
+
+  const price = field("Harga jual", region("Eceran"));
+  await user.clear(price);
+  await user.type(price, "3200");
+  await user.click(save());
+  await screen.findByRole("heading", { level: 1, name: INDOMIE });
+  expect(
+    within(screen.getByRole("region", { name: "Harga" })).getByText("Rp3.200"),
+  ).toBeInTheDocument();
+});
+
+test("barang tanpa barang masuk: 'Harga modal' tetap bisa diisi", async () => {
+  await openEdit(INDOMIE);
+  expect(field("Harga modal", region(/^Satuan besar/))).toBeEnabled();
 });

@@ -16,6 +16,7 @@ function costNote(line: Pick<PriceLineView, "price" | "cost">): string {
 }
 
 export function PriceCard({ product }: { product: OwnerProduct }) {
+  const waiting = product.status === "menunggu_harga";
   return (
     <Section title="Harga">
       <RowList>
@@ -30,15 +31,26 @@ export function PriceCard({ product }: { product: OwnerProduct }) {
                 </span>
               </span>
               <span className="w-[38%] shrink-0 text-right font-bold tabular-nums">
-                <FitAmount text={formatRupiah(line.price)} max={17} min={13} />
+                <FitAmount
+                  text={waiting ? "—" : formatRupiah(line.price)}
+                  max={17}
+                  min={13}
+                />
               </span>
             </div>
-            <p className="mt-0.5 text-[13px] text-muted tabular-nums">
-              {costNote(line)}
-            </p>
+            {!waiting && (
+              <p className="mt-0.5 text-[13px] text-muted tabular-nums">
+                {costNote(line)}
+              </p>
+            )}
           </li>
         ))}
       </RowList>
+      {waiting && (
+        <p className="border-t border-border px-4 py-3 text-[13px] text-muted">
+          Isi harga jual lewat Ubah agar barang ini bisa dijual di kasir.
+        </p>
+      )}
     </Section>
   );
 }

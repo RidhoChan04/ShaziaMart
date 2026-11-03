@@ -7,7 +7,6 @@ import {
   type LucideIcon,
   PackagePlus,
 } from "lucide-react";
-import type { ReactNode } from "react";
 import {
   useListOwnerSupplierDebts,
   useOwnerLogout,
@@ -35,14 +34,6 @@ function RowIcon({ icon: Icon }: { icon: LucideIcon }) {
   );
 }
 
-function Value({ children }: { children: ReactNode }) {
-  return (
-    <span className="shrink-0 text-[15px] whitespace-nowrap text-muted tabular-nums">
-      {children}
-    </span>
-  );
-}
-
 /** Menu Lainnya: kartu daftar ala Settings (Barang masuk, Utang supplier), lalu Keluar. */
 export function LainnyaPage() {
   const client = useQueryClient();
@@ -58,11 +49,18 @@ export function LainnyaPage() {
     <div className="grid gap-4 lg:max-w-2xl">
       <div className="overflow-hidden rounded-lg bg-surface">
         <RowList>
-          {/* Rute Barang masuk menyusul (Task 13); sampai ada, baris ini tidak bisa diketuk. */}
-          <li className={`${rowClass} text-muted`}>
-            <RowIcon icon={PackagePlus} />
-            <span className="min-w-0 flex-1">Barang masuk</span>
-            <Value>Segera hadir</Value>
+          <li>
+            <Link
+              to="/owner/lainnya/barang-masuk"
+              className={`${rowClass} hover:bg-bg`}
+            >
+              <RowIcon icon={PackagePlus} />
+              <span className="min-w-0 flex-1">Barang masuk</span>
+              <ChevronRight
+                aria-hidden="true"
+                className="size-4 shrink-0 text-muted"
+              />
+            </Link>
           </li>
           <li>
             <Link

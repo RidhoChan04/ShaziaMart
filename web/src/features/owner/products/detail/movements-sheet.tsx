@@ -1,4 +1,10 @@
-import { RotateCcw, ShoppingCart } from "lucide-react";
+import {
+  type LucideIcon,
+  PackagePlus,
+  PackageX,
+  RotateCcw,
+  ShoppingCart,
+} from "lucide-react";
 import { useListOwnerProductMovements } from "@/shared/api/gen/owner/owner";
 import type { StockMovement } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { relativeDayTime } from "@/shared/lib/business-day";
@@ -18,7 +24,22 @@ import { RowList } from "./section";
 
 type Unit = { name: string; size: number };
 
-/** Satu mutasi stok: `Terjual 2 pcs`, `{waktu} · Kasir {nama}`, jumlah bertanda. */
+type Kind = StockMovement["kind"];
+
+/** Teks, ikon, dan keterangan pencatat per jenis mutasi; barang masuk dicatat orang toko, bukan kasir. */
+const KINDS: Record<Kind, { label: string; icon: LucideIcon; by: string }> = {
+  jual: { label: "Terjual", icon: ShoppingCart, by: "Kasir " },
+  batal: { label: "Penjualan dibatalkan", icon: RotateCcw, by: "Kasir " },
+  masuk: { label: "Barang masuk", icon: PackagePlus, by: "" },
+  koreksi_masuk: {
+    label: "Koreksi barang masuk",
+    icon: PackagePlus,
+    by: "",
+  },
+  batal_masuk: { label: "Barang masuk dibatalkan", icon: PackageX, by: "" },
+};
+
+/** Satu mutasi stok: `Terjual 2 pcs` / `Barang masuk 80 pcs`, `{waktu} · {pencatat}`, jumlah bertanda. */
 export function MovementRow({
   movement,
   unit,
@@ -29,33 +50,33 @@ export function MovementRow({
   now: number;
 }) {
   const abs = Math.abs(movement.qtyBase);
-  const sold = movement.kind === "jual";
-  const Icon = sold ? ShoppingCart : RotateCcw;
-  const sign = movement.qtyBase < 0 ? "−" : "+";
+  const { label, icon: Icon, by } = KINDS[movement.kind];
+  const out = movement.qtyBase < 0;
+  const sign = out ? "−" : "+";
   return (
     <li className="flex items-center gap-3 px-4 py-2.5">
       <span
         aria-hidden="true"
         className={cn(
           "inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-primary-foreground",
-          sold ? "bg-muted" : "bg-primary",
+          out ? "bg-muted" : "bg-primary",
         )}
       >
         <Icon className="size-4" />
       </span>
       <div className="min-w-0 flex-1">
         <p className="text-[15px] font-medium">
-          {sold ? "Terjual" : "Penjualan dibatalkan"}{" "}
-          {formatQty(abs, unit.size, unit.name)}
+          {label} {formatQty(abs, unit.size, unit.name)}
         </p>
         <p className="text-[13px] text-muted">
-          {relativeDayTime(movement.at, now)} · Kasir {movement.kasirName}
+          {relativeDayTime(movement.at, now)} · {by}
+          {movement.kasirName}
         </p>
       </div>
       <span
         className={cn(
           "text-[15px] font-semibold tabular-nums",
-          !sold && "text-primary",
+          !out && "text-primary",
         )}
       >
         {sign}
@@ -114,7 +135,8 @@ export function MovementsSheet({
       >
         <SheetTitle className="text-[20px] font-bold">Riwayat stok</SheetTitle>
         <SheetDescription className="sr-only">
-          Penjualan dan pembatalan yang mengubah stok barang ini
+          Penjualan, barang masuk, dan pembatalannya yang mengubah stok barang
+          ini
         </SheetDescription>
         <MovementsList productId={productId} unit={unit} />
         <SheetClose asChild>

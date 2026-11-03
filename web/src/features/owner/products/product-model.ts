@@ -5,6 +5,8 @@ export type ProductFilter = {
   q: string;
   kategori: string | null;
   nonaktif: boolean;
+  /** true = hanya barang `menunggu_harga` (belum punya harga jual). */
+  menunggu: boolean;
 };
 
 const NO_CATEGORY_LABEL = "Tanpa kategori";
@@ -22,6 +24,7 @@ export function filterProducts(
   const q = f.q.trim().toLowerCase();
   return rows.filter((r) => {
     if ((r.status === "nonaktif") !== f.nonaktif) return false;
+    if (f.menunggu && r.status !== "menunggu_harga") return false;
     if (f.kategori !== null && categoryKey(r) !== f.kategori) return false;
     if (q === "") return true;
     return (
@@ -51,8 +54,14 @@ export function categoryChips(
     .sort((a, b) => a.label.localeCompare(b.label, "id"));
 }
 
+/** Jumlah barang yang menunggu harga jual (untuk chip filter). */
+export function menungguCount(rows: OwnerProductRow[]): number {
+  return rows.filter((r) => r.status === "menunggu_harga").length;
+}
+
 export type Badge = {
   key:
+    | "menunggu_harga"
     | "minus"
     | "menipis"
     | "langka"
@@ -68,6 +77,12 @@ export function productBadges(
   p: Pick<OwnerProductRow, "status" | "scarce" | "stockCounted" | "stockAlert">,
 ): Badge[] {
   const out: Badge[] = [];
+  if (p.status === "menunggu_harga")
+    out.push({
+      key: "menunggu_harga",
+      label: "Menunggu harga jual",
+      tone: "warning",
+    });
   if (p.stockAlert === "minus")
     out.push({ key: "minus", label: "Minus", tone: "danger" });
   if (p.stockAlert === "menipis")

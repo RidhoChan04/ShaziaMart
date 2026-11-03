@@ -1,6 +1,11 @@
 import { describe, expect, test } from "vitest";
 import type { ReceiptPayment } from "../api/gen/shaziaMartAPI.schemas";
-import { paidSummary, paymentSummary } from "./payment-labels";
+import {
+  cancelNoteText,
+  laciPaidOf,
+  paidSummary,
+  paymentSummary,
+} from "./payment-labels";
 
 const laci: ReceiptPayment = {
   timing: "sekarang",
@@ -44,4 +49,37 @@ test("paidSummary: tunai laci / tunai pemilik / transfer", () => {
   expect(paidSummary({ method: "transfer", cashSource: null })).toBe(
     "Transfer",
   );
+});
+
+describe("laciPaidOf & cancelNoteText", () => {
+  const nanti: ReceiptPayment = {
+    timing: "nanti",
+    method: null,
+    cashSource: null,
+    dueDate: "2026-11-16",
+  };
+  test("laci langsung, lunas dari laci, lunas dari pemilik, belum lunas", () => {
+    expect(laciPaidOf({ payment: laci, paid: null, total: 1_442_000 })).toBe(
+      1_442_000,
+    );
+    const paid = (cashSource: "laci" | "pemilik") => ({
+      at: 1,
+      method: "tunai" as const,
+      cashSource,
+      byName: "Pak Ahmad",
+    });
+    expect(laciPaidOf({ payment: nanti, paid: paid("laci"), total: 500 })).toBe(
+      500,
+    );
+    expect(
+      laciPaidOf({ payment: nanti, paid: paid("pemilik"), total: 500 }),
+    ).toBe(0);
+    expect(laciPaidOf({ payment: nanti, paid: null, total: 500 })).toBe(0);
+  });
+  test("keterangan batal menyebut nominal laci hanya bila ada", () => {
+    expect(cancelNoteText(0)).toBe(
+      "Stok, HPP, dan utang nota ini dibalik. Tidak bisa diurungkan.",
+    );
+    expect(cancelNoteText(1_442_000)).toContain("Rp1.442.000");
+  });
 });

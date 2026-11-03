@@ -54,7 +54,11 @@ export const ProductRow = memo(function ProductRow({
               )}
             >
               <FitAmount
-                text={`${formatRupiah(row.price)}/${row.unitName}`}
+                text={
+                  row.status === "menunggu_harga"
+                    ? "—"
+                    : `${formatRupiah(row.price)}/${row.unitName}`
+                }
                 max={15}
                 min={12}
                 width={priceWidth}

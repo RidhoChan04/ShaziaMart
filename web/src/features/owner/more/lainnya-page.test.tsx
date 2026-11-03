@@ -13,13 +13,16 @@ beforeEach(async () => {
 
 afterEach(() => vi.useRealTimers());
 
-test("Lainnya: 'Barang masuk' (segera hadir), 'Utang supplier' dengan total belum dibayar, tombol 'Keluar'", async () => {
+test("Lainnya: 'Barang masuk' menaut ke daftar nota, 'Utang supplier' dengan total belum dibayar, tombol 'Keluar'", async () => {
   renderApp("/owner/lainnya");
   const link = await screen.findByRole("link", { name: /Utang supplier/ });
   expect(link).toHaveAttribute("href", "/owner/lainnya/utang");
   expect(await within(link).findByText("Rp4.087.000")).toBeInTheDocument();
-  const barangMasuk = screen.getByText("Barang masuk").closest("li");
-  expect(barangMasuk).toHaveTextContent("Segera hadir");
+  expect(screen.getByRole("link", { name: "Barang masuk" })).toHaveAttribute(
+    "href",
+    "/owner/lainnya/barang-masuk",
+  );
+  expect(screen.queryByText("Segera hadir")).toBeNull();
   expect(screen.getByRole("button", { name: "Keluar" })).toBeEnabled();
 });
 

@@ -49,6 +49,14 @@ const quantityText = (n: number): string => String(n).replace(".", ",");
  * dicatat per isi satuan besar ditaruh di `bigCost`, selain itu modal eceran di `cost`.
  */
 export function formValuesFromProduct(p: OwnerProduct): FormValues {
+  const values = valuesOfProduct(p);
+  // Barang dari barang masuk: harga jual belum ada (disimpan 0); isian dikosongkan agar wajib diisi.
+  return p.status === "menunggu_harga"
+    ? { ...values, price: "", bigPrice: "" }
+    : values;
+}
+
+function valuesOfProduct(p: OwnerProduct): FormValues {
   const eceran = p.units[0];
   const big = activeBigUnit(p);
   if (!eceran) return emptyFormValues();

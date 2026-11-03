@@ -216,6 +216,21 @@ describe("formValuesFromProduct", () => {
     });
   });
 
+  test("barang menunggu_harga: Harga jual dan Harga jual satuan besar kosong (wajib diisi), modal tetap", () => {
+    const p = product({});
+    const waiting = {
+      ...p,
+      status: "menunggu_harga" as const,
+      units: p.units.map((u) => ({ ...u, price: 0 })),
+    };
+    const v = formValuesFromProduct(waiting);
+    expect(v.price).toBe("");
+    expect(v.bigPrice).toBe("");
+    expect(v.bigCost).toBe("Rp104.000");
+    const { draft } = draftFromForm(v);
+    expect(validateDraft(draft).map((x) => x.field)).toContain("price");
+  });
+
   test("modal eceran saja; satuan besar nonaktif dilewati; batas pecahan kg", () => {
     const p = product({});
     const [eceran, big] = p.units;

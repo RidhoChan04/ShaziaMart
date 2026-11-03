@@ -3,6 +3,7 @@ import type {
   ReceiptPayment,
 } from "../api/gen/shaziaMartAPI.schemas";
 import { formatIsoDate } from "./business-day";
+import { formatRupiah } from "./money";
 
 /** Label cara bayar & sumber uang barang masuk — satu sumber untuk app orang toko, pemilik, dan server palsu. */
 export const PAYMENT_METHOD_LABEL = {
@@ -32,4 +33,26 @@ export function paymentSummary(p: ReceiptPayment): string {
   }
   const method = p.method ?? "tunai";
   return `Bayar sekarang · ${paidSummary({ method, cashSource: p.cashSource })}`;
+}
+
+/** Uang laci yang dipakai nota: total bila dibayar (sekarang atau lunas) tunai dari laci, selain itu 0. */
+export function laciPaidOf(r: {
+  payment: ReceiptPayment;
+  paid: DebtPayment | null;
+  total: number;
+}): number {
+  const { payment: p, paid } = r;
+  const fromLaci =
+    (p.timing === "sekarang" &&
+      p.method === "tunai" &&
+      p.cashSource === "laci") ||
+    (paid !== null && paid.method === "tunai" && paid.cashSource === "laci");
+  return fromLaci ? r.total : 0;
+}
+
+/** Keterangan konfirmasi batal nota; menyebut koreksi laci (termasuk nota yang sudah dilunasi dari laci) bila ada. */
+export function cancelNoteText(laci: number): string {
+  const base = "Stok, HPP, dan utang nota ini dibalik. Tidak bisa diurungkan.";
+  if (laci <= 0) return base;
+  return `${base} Uang laci ${formatRupiah(laci)} dikembalikan sebagai koreksi di shift yang sedang buka; tanpa shift buka, koreksi tidak dicatat.`;
 }

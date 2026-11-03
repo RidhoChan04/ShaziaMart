@@ -3,6 +3,7 @@ import type { OwnerProductRow } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import {
   categoryChips,
   filterProducts,
+  menungguCount,
   NO_CATEGORY_KEY,
   productBadges,
   stockText,
@@ -51,7 +52,7 @@ const ROWS = [
   }),
   row({ id: "5", name: "Kopi Hitam", category: "Kopi", status: "nonaktif" }),
 ];
-const F = { q: "", kategori: null, nonaktif: false };
+const F = { q: "", kategori: null, nonaktif: false, menunggu: false };
 const names = (rs: OwnerProductRow[]) => rs.map((r) => r.name);
 
 test("filterProducts: '0896' → Indomie; '1003' → Bimoli; 'BIMOLI' → Bimoli; nonaktif disembunyikan kecuali filter nonaktif", () => {
@@ -187,4 +188,36 @@ test("stockText: 'Stok 86,5 kg'; minus; null bila belum dihitung", () => {
     "Stok −2,5 kg",
   );
   expect(stockText(row({ stockCounted: false }))).toBeNull();
+});
+
+const WAITING = row({
+  id: "6",
+  name: "Teh Pucuk Harum 350 ml",
+  status: "menunggu_harga",
+  price: 0,
+});
+
+test("filterProducts menunggu: hanya barang menunggu harga jual; menungguCount menghitungnya", () => {
+  const rows = [...ROWS, WAITING];
+  expect(names(filterProducts(rows, { ...F, menunggu: true }))).toEqual([
+    "Teh Pucuk Harum 350 ml",
+  ]);
+  expect(names(filterProducts(rows, F))).toContain("Teh Pucuk Harum 350 ml");
+  expect(menungguCount(rows)).toBe(1);
+  expect(menungguCount(ROWS)).toBe(0);
+});
+
+test("productBadges: menunggu_harga = 'Menunggu harga jual' (warning), urutan pertama", () => {
+  const badges = productBadges({
+    status: "menunggu_harga",
+    scarce: true,
+    stockCounted: true,
+    stockAlert: "menipis",
+  });
+  expect(badges[0]).toEqual({
+    key: "menunggu_harga",
+    label: "Menunggu harga jual",
+    tone: "warning",
+  });
+  expect(badges.length).toBeGreaterThan(1);
 });

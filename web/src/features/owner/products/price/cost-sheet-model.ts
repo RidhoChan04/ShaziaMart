@@ -16,7 +16,9 @@ export type CostLine = PriceLineView & {
 /** Satu blok per baris harga (eceran, grosir, satuan besar aktif); kosong tanpa peringatan atau tanpa modal sekarang. */
 export function costLines(p: OwnerProduct): CostLine[] {
   const alert = p.costAlert;
-  if (alert === null || p.cost === null) return [];
+  // Barang menunggu harga jual tidak punya harga yang bisa disarankan; harganya hanya diisi lewat form (R20).
+  if (alert === null || p.cost === null || p.status === "menunggu_harga")
+    return [];
   const lines: CostLine[] = [];
   for (const line of priceLines(p)) {
     const oldCost = unitCost(alert.fromCost, line.unitSize);

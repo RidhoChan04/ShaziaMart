@@ -111,7 +111,9 @@ export function ProductDetailPage() {
         <div className="grid gap-5">
           <BarcodeCard product={product} />
           <PriceHistoryCard product={product} />
-          <StatusCard product={product} />
+          {product.status !== "menunggu_harga" && (
+            <StatusCard product={product} />
+          )}
         </div>
       </div>
       <CostSheet product={product} requested={lembar === "harga"} />

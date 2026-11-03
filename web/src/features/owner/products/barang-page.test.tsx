@@ -5,6 +5,7 @@ import { mockDb } from "@/mocks/db";
 import { ownerLogin } from "@/mocks/handlers/test-helpers";
 import { renderApp } from "@/test/render-app";
 import { stubWidth } from "@/test/resize-observer";
+import { receiveTeh, TEH_NAME } from "@/test/seed-receipts";
 
 beforeEach(async () => {
   await ownerLogin();
@@ -299,4 +300,47 @@ test("kolom cari ikut berubah saat ?q= di URL berubah tanpa remount", async () =
   await waitFor(() => expect(search).toHaveValue("bimoli"));
   await router.navigate({ to: "/owner/barang" });
   await waitFor(() => expect(search).toHaveValue(""));
+});
+
+test("chip 'Menunggu harga jual 1' → hanya Teh Pucuk dengan tanda 'Menunggu harga jual' dan harga '—'", async () => {
+  const user = userEvent.setup();
+  await receiveTeh();
+  await openBarang();
+  const chip = screen.getByRole("button", { name: "Menunggu harga jual 1" });
+  expect(chip).toHaveAttribute("aria-pressed", "false");
+  const row = listRow(TEH_NAME);
+  expect(row.getByText("Menunggu harga jual")).toBeInTheDocument();
+  expect(row.getByText("—")).toBeInTheDocument();
+  expect(row.queryByText(/Rp0/)).toBeNull();
+
+  await user.click(chip);
+  expect(chip).toHaveAttribute("aria-pressed", "true");
+  await waitFor(() =>
+    expect(
+      main().getAllByRole("link", { name: /Stok|belum dihitung/ }),
+    ).toHaveLength(1),
+  );
+  expect(main().getByText(TEH_NAME)).toBeInTheDocument();
+  expect(main().queryByText("Indomie Goreng")).toBeNull();
+  expect(screen.getByRole("button", { name: /^Semua \d+$/ })).toHaveAttribute(
+    "aria-pressed",
+    "false",
+  );
+});
+
+test("?menunggu=true di URL menyaring dan menekan chip; tanpa barang menunggu chip tidak tampil", async () => {
+  await receiveTeh();
+  await openBarang("/owner/barang?menunggu=true");
+  expect(
+    screen.getByRole("button", { name: "Menunggu harga jual 1" }),
+  ).toHaveAttribute("aria-pressed", "true");
+  expect(main().queryByText("Indomie Goreng")).toBeNull();
+  expect(main().getByText(TEH_NAME)).toBeInTheDocument();
+});
+
+test("tanpa barang menunggu harga jual: chip 'Menunggu harga jual' tidak tampil", async () => {
+  await openBarang();
+  expect(
+    screen.queryByRole("button", { name: /^Menunggu harga jual/ }),
+  ).toBeNull();
 });

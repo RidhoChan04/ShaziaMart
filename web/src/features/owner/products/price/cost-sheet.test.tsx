@@ -312,6 +312,37 @@ test("sumber impor -> 'lewat Impor Excel'", async () => {
   ).toBeInTheDocument();
 });
 
+test("sumber barang_masuk -> '+Rp100 · lewat Barang masuk, 15.20'; ubah_nota -> '… · lewat ubah nota, 15.20'", async () => {
+  seedCostAlert({ amount: 108000, qtyBase: 40 }, "barang_masuk");
+  const first = await openFromBeranda();
+  expect(
+    within(block(first.sheet, "Eceran · per pcs")).getByText(
+      "+Rp100 · lewat Barang masuk, 15.20",
+    ),
+  ).toBeInTheDocument();
+  first.unmount();
+
+  seedCostAlert({ amount: 108000, qtyBase: 40 }, "ubah_nota");
+  const second = await openFromBeranda();
+  expect(
+    within(block(second.sheet, "Eceran · per pcs")).getByText(
+      "+Rp100 · lewat ubah nota, 15.20",
+    ),
+  ).toBeInTheDocument();
+});
+
+test("barang menunggu harga jual dengan peringatan modal: ?lembar=harga tidak membuka lembar harga (R20)", async () => {
+  seedCostAlert();
+  const id = indomie().id;
+  mockDb.update((s) => {
+    const p = s.products.find((x) => x.id === id);
+    if (p) p.status = "menunggu_harga";
+  });
+  renderApp(`/owner/barang/${id}?lembar=harga`);
+  await screen.findByRole("heading", { level: 1, name: INDOMIE });
+  expect(screen.queryByRole("dialog", { name: /^Harga modal/ })).toBeNull();
+});
+
 test("modal turun -> judul 'Harga modal turun', saran tetap ke atas Rp500", async () => {
   seedCostAlert({ amount: 100000, qtyBase: 40 });
   const { sheet } = await openFromBeranda("Harga modal Indomie Goreng turun");
