@@ -7,6 +7,15 @@ import {
   typePin,
 } from "./kasir-helpers.ts";
 
+import {
+  fillReceipt,
+  loginStaff,
+  NEW_PRODUCT,
+  NEW_PRODUCT_BARCODE,
+  newStaffPage,
+  payAndSave,
+} from "./staff-helpers.ts";
+
 const RINA = { kasir: "Rina", pin: "123456", opening: "200.000" };
 const BERAS = "8991002101012";
 const BIMOLI = "8992696404441";
@@ -206,4 +215,70 @@ test("panel pengembang (tertutup maupun terbuka) tidak menutupi Bayar", async ({
   expect(overlaps(b, t)).toBe(false);
   await bayar.click();
   await expect(page.getByRole("dialog")).toBeVisible();
+});
+
+test("tutup shift menampilkan Bayar supplier dari barang masuk yang dibayar dari laci", async ({
+  page,
+  context,
+}) => {
+  await openShift(page, { ...RINA, opening: "1.500.000" });
+  await scan(page, BERAS);
+  await scan(page, BIMOLI);
+  await scan(page, BIMOLI);
+  const total = page.getByRole("complementary", { name: "Total" });
+  await expect(total).toContainText("Rp150.000");
+  await total.getByRole("button", { name: "Bayar" }).click();
+  const pay = page.getByRole("dialog");
+  await pay.getByLabel("UANG DITERIMA").fill("150.000");
+  await pay.getByRole("button", { name: "Selesai" }).click();
+  await expect(pay).toBeHidden();
+
+  // Di HP: Rina mencatat nota Rp1.442.000 dan membayarnya tunai dari laci.
+  const staff = await newStaffPage(context);
+  await loginStaff(staff, "Rina", "123456", "/staff/masuk/baru", false);
+  await fillReceipt(staff, {
+    supplier: "Sumber Pangan Jaya",
+    payment: "laci",
+    lines: [
+      { search: "Indomie", pick: "Indomie Goreng", qty: 10, cost: "100000" },
+      {
+        search: "Bimoli",
+        pick: "Minyak Goreng Bimoli 2 L",
+        qty: 12,
+        cost: "34000",
+      },
+      {
+        search: NEW_PRODUCT,
+        qty: 2,
+        cost: "17000",
+        isNew: { sellUnit: "pcs", barcode: NEW_PRODUCT_BARCODE },
+      },
+    ],
+  });
+  await staff.getByRole("button", { name: "Lanjut ke pembayaran" }).click();
+  await expect(
+    staff.getByText(/Dicatat sebagai uang keluar di shift Rina/),
+  ).toContainText("Bayar supplier −Rp1.442.000");
+  await payAndSave(staff, "laci", { advance: false });
+  await expect(staff.getByText("Barang masuk tersimpan")).toBeVisible();
+  await staff.close();
+
+  await page.getByRole("button", { name: "Tutup shift" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Uang fisik di laci").fill("203.000");
+  await dialog.getByRole("button", { name: "Tutup shift" }).click();
+  await expect(dialog).toContainText("Bayar supplier");
+  await expect(dialog).toContainText("-Rp1.442.000");
+  await expect(dialog.getByText("Uang seharusnya").locator("..")).toContainText(
+    "Rp208.000",
+  );
+  await expect(dialog.getByText("Selisih").locator("..")).toContainText(
+    "-Rp5.000",
+  );
+  await expect(dialog).toHaveCSS("opacity", "1");
+  // Kursor masih di atas tombol lama; hover memudarkan "Selesai" dan memalsukan hasil kontras.
+  await page.mouse.move(0, 0);
+  await expectNoA11yViolations(page);
+  await dialog.getByRole("button", { name: "Selesai" }).click();
+  await expect(page.getByRole("heading", { name: "Buka shift" })).toBeVisible();
 });
