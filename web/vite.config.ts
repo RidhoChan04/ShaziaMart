@@ -43,6 +43,9 @@ export default defineConfig(({ command, mode }) => {
       // Test integrasi layar kasir (render penuh + MSW) bisa > 5 dtk saat semua worker
       // mulai bersamaan di mesin sibuk; 15 dtk tetap menangkap test yang benar-benar macet.
       testTimeout: 15_000,
+      // Default (core - 1 = 11 worker) membuat test integrasi timeout di laptop dev;
+      // 4 worker lulus stabil.
+      maxWorkers: 4,
     },
   };
 });
