@@ -124,11 +124,11 @@ const ownerBarangRoute = createRoute({
 
 const segeraHadir = lazyRouteComponent(loadOwner, "SegeraHadirPage");
 
-// Sub-halaman Barang: komponen nyata menggantikan "Segera hadir" di Task 9 dan 12.
+// Sub-halaman Barang: komponen nyata menggantikan "Segera hadir" (impor: Task 12).
 const ownerBarangBaruRoute = createRoute({
   getParentRoute: () => ownerRoute,
   path: "barang/baru",
-  component: segeraHadir,
+  component: lazyRouteComponent(loadOwner, "ProductFormPage"),
 });
 
 const ownerBarangImporRoute = createRoute({
@@ -152,7 +152,7 @@ const ownerBarangDetailRoute = createRoute({
 const ownerBarangUbahRoute = createRoute({
   getParentRoute: () => ownerRoute,
   path: "barang/$productId/ubah",
-  component: segeraHadir,
+  component: lazyRouteComponent(loadOwner, "ProductFormPage"),
 });
 
 const ownerLaporanRoute = createRoute({

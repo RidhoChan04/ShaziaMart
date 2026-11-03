@@ -86,16 +86,24 @@ test("rute sub-halaman Barang: baru, impor, detail (lembar valid saja), ubah", a
   if (typeof validate !== "function") throw new Error("tanpa validateSearch");
   expect(validate({ lembar: "ngawur" })).toEqual({});
 
-  for (const to of ["/owner/barang/baru", "/owner/barang/impor"] as const) {
-    await router.navigate({ to });
-    expect(router.state.location.pathname).toBe(to);
-    expect(
-      await screen.findByRole("heading", { level: 1, name: "Segera hadir" }),
-    ).toBeInTheDocument();
-  }
+  await router.navigate({ to: "/owner/barang/baru" });
+  expect(router.state.location.pathname).toBe("/owner/barang/baru");
+  expect(
+    await screen.findByRole("heading", { level: 1, name: "Barang baru" }),
+  ).toBeInTheDocument();
+
+  await router.navigate({ to: "/owner/barang/impor" });
+  expect(router.state.location.pathname).toBe("/owner/barang/impor");
+  expect(
+    await screen.findByRole("heading", { level: 1, name: "Segera hadir" }),
+  ).toBeInTheDocument();
+
   await router.navigate({
     to: "/owner/barang/$productId/ubah",
     params: { productId: "abc" },
   });
   expect(router.state.location.pathname).toBe("/owner/barang/abc/ubah");
+  expect(
+    await screen.findByRole("heading", { name: "Barang tidak ditemukan" }),
+  ).toBeInTheDocument();
 });

@@ -16,7 +16,7 @@ import { StockOutDialog } from "./stock-out-dialog";
 const ubahPill =
   "inline-flex h-11 items-center rounded-full bg-surface px-4 text-[15px] font-semibold text-primary shadow-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary";
 
-function NotFound() {
+export function ProductNotFound() {
   return (
     <div className="grid justify-items-start gap-4 pt-6">
       <h1 className="text-[28px] leading-tight font-bold tracking-[-0.025em]">
@@ -40,7 +40,7 @@ export function ProductDetailPage() {
 
   if (!product) {
     if (query.error instanceof ApiError && query.error.status === 404) {
-      return <NotFound />;
+      return <ProductNotFound />;
     }
     if (query.isError) {
       return (

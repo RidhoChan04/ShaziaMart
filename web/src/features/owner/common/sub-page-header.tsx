@@ -4,7 +4,7 @@ import { type ReactNode, useRef } from "react";
 import { cn } from "@/shared/lib/cn";
 import { useScrolledPast } from "../use-scrolled-past";
 
-const pill =
+export const pillClass =
   "inline-flex h-11 items-center gap-0.5 rounded-full bg-surface pr-4 pl-2.5 text-[15px] font-semibold text-primary shadow-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary";
 
 /** Kembali ke halaman sebelumnya bila ada riwayat (menjaga filter di URL), selain itu ke `fallback`. */
@@ -27,7 +27,7 @@ function BackControl({
     return (
       <button
         type="button"
-        className={pill}
+        className={pillClass}
         onClick={() => router.history.back()}
       >
         {content}
@@ -35,7 +35,7 @@ function BackControl({
     );
   }
   return (
-    <Link to={fallback} className={pill}>
+    <Link to={fallback} className={pillClass}>
       {content}
     </Link>
   );

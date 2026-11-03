@@ -243,8 +243,8 @@ test("chip Nonaktif hanya ada bila ada barang nonaktif, dan menampilkan hanya ya
   expect(listRow("Gula Pasir").getByText("Nonaktif")).toBeInTheDocument();
 });
 
-test("sub-halaman /owner/barang/baru tidak menampilkan judul besar 'Barang' dari kerangka", async () => {
-  renderApp("/owner/barang/baru");
+test("sub-halaman /owner/barang/impor tidak menampilkan judul besar 'Barang' dari kerangka", async () => {
+  renderApp("/owner/barang/impor");
   await screen.findByRole("heading", { level: 1, name: "Segera hadir" });
   expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
   expect(
@@ -259,7 +259,7 @@ test("sub-halaman /owner/barang/baru tidak menampilkan judul besar 'Barang' dari
 });
 
 test("sub-halaman dibuka langsung (tanpa riwayat): kembali = tautan ke /owner/barang", async () => {
-  renderApp("/owner/barang/baru");
+  renderApp("/owner/barang/impor");
   await screen.findByRole("heading", { level: 1, name: "Segera hadir" });
   const back = main().getByRole("link", { name: "Barang" });
   expect(back).toHaveAttribute("href", "/owner/barang");

@@ -103,7 +103,7 @@ test("header tidak lagi menampilkan ShaziaMart; halaman sementara menampilkan Se
 });
 
 test("judul besar kerangka hanya untuk akar tab; sub-halaman tab Barang memakai header sendiri", async () => {
-  const { router } = renderApp("/owner/barang/baru");
+  const { router } = renderApp("/owner/barang/impor");
   const title = await screen.findByRole("heading", {
     level: 1,
     name: "Segera hadir",
@@ -111,7 +111,7 @@ test("judul besar kerangka hanya untuk akar tab; sub-halaman tab Barang memakai 
   // Bukan di <header> kerangka (tanpa tanggal/status toko).
   expect(screen.queryByText("Sabtu, 17 Okt")).toBeNull();
   expect(title.closest("main")).not.toBeNull();
-  expect(router.state.location.pathname).toBe("/owner/barang/baru");
+  expect(router.state.location.pathname).toBe("/owner/barang/impor");
   expect(
     within(
       screen.getByRole("navigation", { name: "Navigasi utama" }),

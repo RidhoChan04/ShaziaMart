@@ -1,9 +1,12 @@
 // zod/mini: bisa di-tree-shake, menjaga chunk kasir dalam anggaran ukuran.
 import { z } from "zod/mini";
 import { ApiError } from "./fetcher";
-import type {
-  CreditLimitProblem,
-  PriceChangedProblem,
+import {
+  type CreditLimitProblem,
+  type PriceChangedProblem,
+  ProductField,
+  type ProductValidationProblem,
+  ProductValidationProblemCode,
 } from "./gen/shaziaMartAPI.schemas";
 
 /** Baca body problem+json dari ApiError sesuai skema; null bila bukan ApiError atau body tak cocok. */
@@ -45,3 +48,20 @@ export const creditLimitProblemSchema = z.object({
   creditLimit: z.number(),
   attempted: z.number(),
 }) satisfies z.core.$ZodType<CreditLimitProblem>;
+
+const PRODUCT_FIELDS = Object.values(ProductField) as [
+  ProductField,
+  ...ProductField[],
+];
+
+/** 422 `VALIDATION` dari form barang: pesan per field (nama field dari kontrak). */
+export const productValidationProblemSchema = z.object({
+  type: z.string(),
+  title: z.string(),
+  status: z.number(),
+  code: z.literal(ProductValidationProblemCode.VALIDATION),
+  detail: z.exactOptional(z.string()),
+  errors: z.array(
+    z.object({ field: z.enum(PRODUCT_FIELDS), message: z.string() }),
+  ),
+}) satisfies z.core.$ZodType<ProductValidationProblem>;
