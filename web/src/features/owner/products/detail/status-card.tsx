@@ -126,7 +126,11 @@ function DeleteButton({ product }: { product: OwnerProduct }) {
           Hapus barang
         </button>
       </DialogTrigger>
-      <DialogContent role="alertdialog" showCloseButton={false}>
+      <DialogContent
+        role="alertdialog"
+        showCloseButton={false}
+        onInteractOutside={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle>{`Hapus ${product.name}?`}</DialogTitle>
           <DialogDescription>
@@ -140,7 +144,9 @@ function DeleteButton({ product }: { product: OwnerProduct }) {
         )}
         <DialogFooter>
           <DialogClose asChild>
-            <Button variant="outline">Batal</Button>
+            <Button variant="outline" disabled={remove.isPending}>
+              Batal
+            </Button>
           </DialogClose>
           <Button
             variant="danger"

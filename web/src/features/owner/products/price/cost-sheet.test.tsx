@@ -440,7 +440,7 @@ test("galat 422 ditautkan ke isiannya lewat aria-describedby", async () => {
   expect(input).toBeInvalid();
 });
 
-test("Esc menutup lembar dan menghapus parameter; fokus tidak tertinggal di lembar", async () => {
+test("Esc menutup lembar dan menghapus parameter; fokus pindah ke judul halaman (h1)", async () => {
   seedCostAlert();
   const { router } = await openFromBeranda();
   await userEvent.keyboard("{Escape}");
@@ -450,8 +450,11 @@ test("Esc menutup lembar dan menghapus parameter; fokus tidak tertinggal di lemb
     ).not.toBeInTheDocument(),
   );
   expect(router.state.location.search).toEqual({});
-  expect(document.activeElement).not.toBeNull();
-  expect(document.activeElement?.closest('[role="dialog"]')).toBeNull();
+  await waitFor(() =>
+    expect(
+      screen.getByRole("heading", { level: 1, name: INDOMIE }),
+    ).toHaveFocus(),
+  );
 });
 
 test("saat menyimpan, permintaan tutup diabaikan", async () => {

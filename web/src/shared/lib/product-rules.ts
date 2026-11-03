@@ -97,13 +97,13 @@ export function markup(
   return { profit, percent: profit < 0 ? -pct : pct };
 }
 
-/** Harga sekarang x modal baru / modal lama, dibulatkan ke atas ke Rp500. */
+/** Harga sekarang x modal baru / modal lama, dibulatkan ke atas ke Rp500; tanpa modal yang berarti -> null. */
 export function suggestedPrice(
   price: number,
   oldCost: number,
   newCost: number,
 ): number | null {
-  if (oldCost === 0) return null;
+  if (oldCost === 0 || newCost <= 0) return null;
   const n = newCost * price;
   const d = oldCost * 500;
   if (!Number.isSafeInteger(n) || !Number.isSafeInteger(d)) {
@@ -210,6 +210,7 @@ function checkBig({ d, bigSize, bigM }: Ctx, add: Add): void {
 function checkMinStock({ d, size }: Ctx, add: Add): void {
   if (d.minStock === null) return;
   const base = d.minStock * size;
+  // 1,005 kg x 1000 = 1004.9999999999999: galat biner desimal, bukan pecahan gram.
   const whole =
     Number.isFinite(base) && Math.abs(base - Math.round(base)) < 1e-9;
   if (d.minStock < 0 || !whole) {

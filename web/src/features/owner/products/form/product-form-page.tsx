@@ -69,7 +69,8 @@ const BIG_UNITS = [
   "karung",
   "krat",
 ];
-const LOCKED = "Tidak bisa diubah — barang sudah terjual";
+const LOCKED_SOLD = "Tidak bisa diubah — barang sudah terjual";
+const LOCKED_STOCK = "Tidak bisa diubah — barang sudah punya stok";
 
 /** Urutan isian di layar; fokus pergi ke yang paling atas dari yang salah. */
 const FIELD_ORDER = Object.keys(emptyFormValues()) as ProductField[];
@@ -135,18 +136,37 @@ function withoutErrors(e: Errors, fields: readonly ProductField[]): Errors {
   );
 }
 
-/** Kunci dari barang tersimpan: satuan dasar (terjual atau stok ≠ 0) dan isi satuan besar yang terjual. */
+/**
+ * Kunci dari barang tersimpan: satuan dasar (terjual, atau stok ≠ 0 yang akan berubah arti)
+ * dan isi satuan besar yang terjual. Nilai = keterangan di bawah isian; null = tidak terkunci.
+ */
 function lockState(product: OwnerProduct | null) {
   const bigUnit = product ? activeBigUnit(product) : null;
+  const sold =
+    product !== null && (product.hasSales || product.units[0]?.sold === true);
+  const sellUnitLock = sold
+    ? LOCKED_SOLD
+    : product !== null && product.stock !== 0
+      ? LOCKED_STOCK
+      : null;
   return {
     bigUnit,
-    sellUnitLocked:
-      product !== null &&
-      (product.hasSales ||
-        product.stock !== 0 ||
-        product.units[0]?.sold === true),
-    bigSizeLocked: bigUnit?.sold === true,
+    sellUnitLock,
+    bigSizeLock: bigUnit?.sold === true ? LOCKED_SOLD : null,
   };
+}
+
+/** Isian yang tidak bisa difokus: terkunci, atau modal eceran yang dihitung dari satuan besar (tidak tampil). */
+function unreachableFields(
+  sellUnitLock: string | null,
+  bigSizeLock: string | null,
+  costComputed: boolean,
+): ReadonlySet<ProductField> {
+  const out = new Set<ProductField>();
+  if (sellUnitLock) out.add("sellUnit");
+  if (bigSizeLock) out.add("bigSize");
+  if (costComputed) out.add("cost");
+  return out;
 }
 
 function FormBody({
@@ -188,17 +208,29 @@ function FormBody({
     error: errors[field],
   });
 
-  const showErrors = (next: Errors) => {
-    setErrors(next);
-    const first = FIELD_ORDER.find((f) => next[f] !== undefined);
-    if (first) setFocusReq((r) => ({ field: first, n: (r?.n ?? 0) + 1 }));
-  };
-
-  const { sellUnitLocked, bigSizeLocked, bigUnit } = lockState(product);
+  const { sellUnitLock, bigSizeLock, bigUnit } = lockState(product);
 
   const { draft } = draftFromForm(values);
   const hints = hintsFromDraft(draft);
   const unit = values.sellUnit.trim();
+
+  const unreachable = unreachableFields(
+    sellUnitLock,
+    bigSizeLock,
+    hints.computedCostFrom !== null,
+  );
+
+  const showErrors = (next: Errors) => {
+    setErrors(next);
+    const hidden = FIELD_ORDER.filter(
+      (f) => next[f] !== undefined && unreachable.has(f),
+    ).map((f) => next[f]);
+    if (hidden.length > 0) setFailure(hidden.join(" · "));
+    const first = FIELD_ORDER.find(
+      (f) => next[f] !== undefined && !unreachable.has(f),
+    );
+    if (first) setFocusReq((r) => ({ field: first, n: (r?.n ?? 0) + 1 }));
+  };
 
   const finish = (saved: OwnerProduct) => {
     client.setQueryData(getGetOwnerProductQueryKey(saved.id), saved);
@@ -301,8 +333,8 @@ function FormBody({
           {...text("sellUnit")}
           label="Dijual per"
           list="pf-satuan-kecil"
-          disabled={sellUnitLocked}
-          note={sellUnitLocked ? LOCKED : undefined}
+          disabled={sellUnitLock !== null}
+          note={sellUnitLock ?? undefined}
         />
         <Datalist id="pf-kategori" options={categories.data ?? []} />
         <Datalist id="pf-satuan-kecil" options={SMALL_UNITS} />
@@ -374,8 +406,8 @@ function FormBody({
           label="Isi"
           inputMode="numeric"
           suffix={unit}
-          disabled={bigSizeLocked}
-          note={bigSizeLocked ? LOCKED : undefined}
+          disabled={bigSizeLock !== null}
+          note={bigSizeLock ?? undefined}
         />
         <TextField
           {...text("bigBarcode")}

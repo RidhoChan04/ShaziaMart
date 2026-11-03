@@ -584,6 +584,107 @@ test("?lembar=habis diabaikan bila bukan tidak_diambil, atau stok masih ada; ?le
   ).toBeInTheDocument();
 });
 
+/** Tekan di luar dialog (di overlay), seperti jari yang meleset. */
+async function pressOutside() {
+  const overlay = document.querySelector('[data-slot="dialog-overlay"]');
+  if (!overlay) throw new Error("tanpa overlay");
+  // Overlay modal Radix menonaktifkan pointer-events di body; jari tetap bisa menekannya.
+  await userEvent.setup({ pointerEventsCheck: 0 }).click(overlay);
+  await new Promise((r) => setTimeout(r, 50));
+}
+
+test("dialog Hapus: tekan di luar tidak menutupnya; Batal nonaktif selama menghapus", async () => {
+  const user = userEvent.setup();
+  const created = await json<OwnerProduct>(
+    await post("/api/owner/products", TEH),
+  );
+  let release: () => void = () => {};
+  const gate = new Promise<void>((r) => {
+    release = r;
+  });
+  server.use(
+    http.delete("/api/owner/products/:id", async () => {
+      await gate;
+      return HttpResponse.error();
+    }),
+  );
+  renderApp(`/owner/barang/${created.id}`);
+  await screen.findByRole("heading", { level: 1, name: TEH.name });
+  await user.click(screen.getByRole("button", { name: "Hapus barang" }));
+  const dialog = await screen.findByRole("alertdialog");
+  await pressOutside();
+  expect(screen.getByRole("alertdialog")).toBe(dialog);
+
+  await user.click(within(dialog).getByRole("button", { name: "Hapus" }));
+  await waitFor(() =>
+    expect(
+      within(dialog).getByRole("button", { name: "Batal" }),
+    ).toBeDisabled(),
+  );
+  release();
+  await waitFor(() =>
+    expect(within(dialog).getByRole("button", { name: "Batal" })).toBeEnabled(),
+  );
+});
+
+test("?lembar=habis: tekan di luar tidak menutup dialog", async () => {
+  makeTidakDiambil(BERAS, 0);
+  const { router } = renderApp(`/owner/barang/${idOf(BERAS)}?lembar=habis`);
+  await screen.findByRole("alertdialog");
+  await pressOutside();
+  expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+  expect(router.state.location.href).toContain("lembar=habis");
+});
+
+test("?lembar=habis diabaikan bila stok belum pernah dihitung (sama dengan Beranda)", async () => {
+  makeTidakDiambil(BERAS, 0);
+  mockDb.update((s) => {
+    const p = s.products.find((x) => x.name === BERAS);
+    if (p) p.stockCounted = false;
+  });
+  await openDetail(BERAS, "?lembar=habis");
+  expect(screen.queryByRole("alertdialog")).toBeNull();
+});
+
+test("stok belum dihitung → 'Stok sekarang' '—'", async () => {
+  mockDb.update((s) => {
+    const p = s.products.find((x) => x.name === INDOMIE);
+    if (p) p.stockCounted = false;
+  });
+  await openDetail(INDOMIE);
+  expect(
+    within(section("Stok")).getByText("Stok sekarang").parentElement,
+  ).toHaveTextContent(/^Stok sekarang—$/);
+});
+
+test("harga jual di bawah modal → 'Modal Rp2.600 · rugi Rp100 (4% dari modal)'", async () => {
+  mockDb.update((s) => {
+    const p = s.products.find((x) => x.name === INDOMIE);
+    const pcs = p?.units[0];
+    if (pcs) pcs.price = 2500;
+  });
+  await openDetail(INDOMIE);
+  const eceran = rowWith(section("Harga"), "Eceran");
+  expect(
+    within(eceran).getByText("Modal Rp2.600 · rugi Rp100 (4% dari modal)"),
+  ).toBeInTheDocument();
+});
+
+test("stok minus → tanda Minus (ikon + teks) di kartu Stok, bukan di kepala", async () => {
+  mockDb.update((s) => {
+    const p = s.products.find((x) => x.name === INDOMIE);
+    if (p) s.stock[p.id] = -3;
+  });
+  await openDetail(INDOMIE);
+  const stok = section("Stok");
+  const badge = within(stok).getByText("Minus");
+  expect(badge.querySelector("svg")).not.toBeNull();
+  expect(
+    within(stok).getByText("Stok sekarang").parentElement,
+  ).toHaveTextContent("−3 pcs");
+  expect(screen.queryByRole("list", { name: "Tanda status" })).toBeNull();
+});
+
 test("id tidak ada → 'Barang tidak ditemukan' + 'Kembali ke daftar barang'", async () => {
   renderApp("/owner/barang/tidak-ada");
   expect(await screen.findByText("Barang tidak ditemukan")).toBeInTheDocument();

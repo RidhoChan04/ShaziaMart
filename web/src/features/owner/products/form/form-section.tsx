@@ -102,7 +102,7 @@ export function TextField({
   return (
     <div className="px-4 py-1.5">
       <div className="flex min-h-11 items-center gap-3">
-        <label htmlFor={id} className="shrink-0 text-[17px]">
+        <label htmlFor={id} className="min-w-0 shrink text-[17px]">
           {label}
         </label>
         <input
@@ -119,7 +119,7 @@ export function TextField({
           onChange={(e) => onChange(e.target.value)}
           onBlur={onBlur}
           className={cn(
-            "h-11 min-w-0 flex-1 rounded-md bg-transparent px-1 text-right text-[17px] tabular-nums outline-none placeholder:text-muted/70 focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-primary disabled:cursor-not-allowed disabled:text-muted",
+            "h-11 min-w-20 flex-1 rounded-md bg-transparent px-1 text-right text-[17px] tabular-nums outline-none placeholder:text-muted/70 focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-primary disabled:cursor-not-allowed disabled:text-muted",
             error && "text-danger",
           )}
         />

@@ -350,6 +350,11 @@ export function CostSheet({
       <SheetContent
         side="bottom"
         showCloseButton={false}
+        onCloseAutoFocus={(e) => {
+          // Dibuka dari URL, tanpa tombol pemicu: fokus ke judul halaman, bukan ke body.
+          e.preventDefault();
+          document.querySelector<HTMLElement>("main h1")?.focus();
+        }}
         className="max-h-[92dvh] gap-4 overflow-y-auto rounded-t-lg p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] lg:mx-auto lg:max-w-[480px]"
       >
         <CostSheetBody

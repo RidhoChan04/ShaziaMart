@@ -16,7 +16,7 @@ import {
 } from "@/shared/ui/dialog";
 import { useInvalidateProduct } from "./use-invalidate-product";
 
-/** Dialog `{nama} habis` dari Beranda (`?lembar=habis`); hanya terbuka bila barang memang tidak diambil lagi dan habis. */
+/** Dialog `{nama} habis` dari Beranda (`?lembar=habis`); hanya terbuka bila barang memang tidak diambil lagi dan habis. Harus dijawab: tekan di luar tidak menutupnya. */
 export function StockOutDialog({
   product,
   requested,
@@ -35,8 +35,12 @@ export function StockOutDialog({
       },
     },
   });
+  // Aturan sama dengan butir `stockOuts` di Beranda: stok yang belum pernah dihitung bukan "habis".
   const open =
-    requested && product.status === "tidak_diambil" && product.stock <= 0;
+    requested &&
+    product.status === "tidak_diambil" &&
+    product.stockCounted &&
+    product.stock <= 0;
   const pick = (status: ProductStatus) =>
     choose.mutate({
       productId: product.id,
@@ -50,7 +54,11 @@ export function StockOutDialog({
         if (!next) clearParam();
       }}
     >
-      <DialogContent role="alertdialog" showCloseButton={false}>
+      <DialogContent
+        role="alertdialog"
+        showCloseButton={false}
+        onInteractOutside={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle>{`${product.name} habis`}</DialogTitle>
           <DialogDescription>

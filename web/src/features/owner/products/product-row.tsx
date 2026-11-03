@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { ChevronRight } from "lucide-react";
+import { memo } from "react";
 import type { OwnerProductRow } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { cn } from "@/shared/lib/cn";
 import { formatRupiah } from "@/shared/lib/money";
@@ -15,8 +16,11 @@ export function priceColumnWidth(listWidth: number): number {
   return Math.max(0, Math.floor((listWidth - ROW_CHROME_PX) * PRICE_SHARE));
 }
 
-/** Satu baris daftar; baris di luar layar tidak dilukis (`content-visibility`). */
-export function ProductRow({
+/**
+ * Satu baris daftar; baris di luar layar tidak dilukis (`content-visibility`). `memo`: mengetik
+ * di kolom cari atau mengubah satu barang tidak merender ulang ratusan baris yang sama.
+ */
+export const ProductRow = memo(function ProductRow({
   row,
   priceWidth,
 }: {
@@ -65,4 +69,4 @@ export function ProductRow({
       </Link>
     </li>
   );
-}
+});

@@ -9,7 +9,7 @@ import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { beforeEach, expect, test } from "vitest";
 import { mockDb } from "@/mocks/db";
-import { ownerLogin } from "@/mocks/handlers/test-helpers";
+import { ownerLogin, post } from "@/mocks/handlers/test-helpers";
 import { server } from "@/mocks/node";
 import { renderApp } from "@/test/render-app";
 
@@ -325,6 +325,66 @@ test("ubah Indomie (terjual): Dijual per & Isi dus disabled dengan keterangan; h
     await screen.findByRole("heading", { level: 1, name: INDOMIE }),
   ).toBeInTheDocument();
   await waitFor(() => expect(region("Harga")).toHaveTextContent("Rp3.200"));
+});
+
+test("barang belum terjual tapi punya stok: Dijual per terkunci dengan 'Tidak bisa diubah — barang sudah punya stok'", async () => {
+  const res = await post("/api/owner/products", {
+    name: TEH,
+    category: "Minuman",
+    sellUnit: "botol",
+    barcode: null,
+    cost: 3000,
+    price: 4000,
+    tier: null,
+    bigUnit: null,
+    minStock: null,
+  });
+  expect(res.status).toBe(201);
+  mockDb.update((s) => {
+    const p = s.products.find((x) => x.name === TEH);
+    if (!p) throw new Error("tanpa Teh");
+    s.stock[p.id] = 6;
+    p.stockCounted = true;
+  });
+  await openEdit(TEH);
+  const dijual = field("Dijual per");
+  expect(dijual).toBeDisabled();
+  expect(dijual).toHaveAccessibleDescription(
+    "Tidak bisa diubah — barang sudah punya stok",
+  );
+});
+
+test("422 untuk isian terkunci (tidak bisa difokus) → pesannya juga tampil di peringatan; fokus ke isian salah yang bisa diubah", async () => {
+  server.use(
+    http.put("/api/owner/products/:id", () =>
+      HttpResponse.json(
+        {
+          type: "about:blank",
+          title: "Unprocessable",
+          status: 422,
+          code: "VALIDATION",
+          errors: [
+            {
+              field: "sellUnit",
+              message: "'Dijual per' tidak bisa diubah — barang sudah terjual",
+            },
+            { field: "price", message: "Harga jual di bawah modal (Rp2.600)" },
+          ],
+        },
+        { status: 422, headers: PROBLEM },
+      ),
+    ),
+  );
+  const { user } = await openEdit(INDOMIE);
+  await user.click(save());
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "'Dijual per' tidak bisa diubah — barang sudah terjual",
+  );
+  const harga = field("Harga jual", region("Eceran"));
+  await waitFor(() => expect(harga).toHaveFocus());
+  expect(harga).toHaveAccessibleDescription(
+    "Harga jual di bawah modal (Rp2.600)",
+  );
 });
 
 test("Hapus satuan besar mengosongkan bagian; modal terhitung jadi modal eceran", async () => {

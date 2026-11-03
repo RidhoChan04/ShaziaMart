@@ -66,6 +66,8 @@ export function SubPageHeader({
       )}
       <h1
         ref={titleRef}
+        // Tujuan fokus setelah lembar yang dibuka dari URL (tanpa tombol pemicu) ditutup.
+        tabIndex={-1}
         className={cn(
           "text-[28px] leading-tight font-bold tracking-[-0.025em]",
           eyebrow ? "mt-0.5" : "mt-3",

@@ -48,7 +48,7 @@ export function AttentionList({ attention }: { attention: Attention }) {
               >
                 <Link
                   {...link}
-                  className="flex min-h-14 items-center gap-3 px-4 py-2 hover:bg-primary-soft"
+                  className="flex min-h-14 items-center gap-3 px-4 py-2 hover:bg-bg"
                 >
                   <span
                     aria-hidden="true"

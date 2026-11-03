@@ -178,8 +178,10 @@ test.each([
   expect(suggestedPrice(price, oldCost, newCost)).toBe(want),
 );
 
-test("suggestedPrice modal lama 0 -> null; di luar batas aman -> RangeError", () => {
+test("suggestedPrice modal lama 0 atau modal baru <= 0 -> null; di luar batas aman -> RangeError", () => {
   expect(suggestedPrice(1000, 0, 500)).toBeNull();
+  expect(suggestedPrice(1000, 500, 0)).toBeNull();
+  expect(suggestedPrice(1000, 500, -100)).toBeNull();
   expect(() => suggestedPrice(2 ** 40, 1, 2 ** 20)).toThrow(RangeError);
 });
 
