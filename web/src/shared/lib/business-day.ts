@@ -112,3 +112,71 @@ export function relativeDayTime(ms: number, now: number): string {
   const { d, m } = dateParts(ms);
   return `${d} ${m} ${time}`;
 }
+
+// Tanggal kalender ISO "YYYY-MM-DD" (nota, jatuh tempo, kedaluwarsa), menurut kalender Asia/Jakarta.
+
+/** Tanggal kalender Asia/Jakarta untuk waktu UTC ms: `2026-11-02`. */
+export const jakartaIsoDate = (ms: number): string => JAKARTA_DATE.format(ms);
+
+const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+const isLeapYear = (y: number): boolean =>
+  (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+
+function daysInMonth(y: number, m: number): number {
+  if (m === 2) return isLeapYear(y) ? 29 : 28;
+  return [4, 6, 9, 11].includes(m) ? 30 : 31;
+}
+
+function isoParts(s: string): { y: number; m: number; d: number } | null {
+  const match = ISO_DATE.exec(s);
+  if (match === null) return null;
+  const y = Number(match[1]);
+  const m = Number(match[2]);
+  const d = Number(match[3]);
+  if (m < 1 || m > 12 || d < 1 || d > daysInMonth(y, m)) return null;
+  return { y, m, d };
+}
+
+function parseIso(iso: string): { y: number; m: number; d: number } {
+  const parts = isoParts(iso);
+  if (parts === null) throw new RangeError(`Tanggal tidak sah: ${iso}`);
+  return parts;
+}
+
+/** Hari ke-n sejak 1970-01-01 (tengah malam UTC); aman untuk tahun < 100. */
+function dayNumber(iso: string): number {
+  const { y, m, d } = parseIso(iso);
+  const date = new Date(0);
+  date.setUTCFullYear(y, m - 1, d);
+  return Math.round(date.getTime() / DAY_MS);
+}
+
+/** Tanggal kalender sah `YYYY-MM-DD` (tanpa jam, bulan & hari ada). */
+export const isIsoDate = (s: string): boolean => isoParts(s) !== null;
+
+/** `iso` ditambah `days` hari kalender (boleh negatif). */
+export function addIsoDays(iso: string, days: number): string {
+  if (!Number.isSafeInteger(days)) {
+    throw new RangeError(`Jumlah hari harus bilangan bulat: ${days}`);
+  }
+  const date = new Date((dayNumber(iso) + days) * DAY_MS);
+  const y = String(date.getUTCFullYear()).padStart(4, "0");
+  return `${y}-${pad2(date.getUTCMonth() + 1)}-${pad2(date.getUTCDate())}`;
+}
+
+/** Selisih hari kalender `to − from`. */
+export const isoDaysBetween = (from: string, to: string): number =>
+  dayNumber(to) - dayNumber(from);
+
+/** `20 Apr 2027` */
+export function formatIsoDate(iso: string): string {
+  const { y, m, d } = parseIso(iso);
+  return `${d} ${MONTHS[m - 1]} ${y}`;
+}
+
+/** `30 Okt` */
+export function formatIsoDayMonth(iso: string): string {
+  const { m, d } = parseIso(iso);
+  return `${d} ${MONTHS[m - 1]}`;
+}
