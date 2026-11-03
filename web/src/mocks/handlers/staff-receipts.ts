@@ -1,104 +1,21 @@
 import { HttpResponse, http } from "msw";
 import type {
-  NewProductInput,
   ReceiptError,
-  ReceiptInput,
-  ReceiptLineInput,
-  ReceiptPayment,
   StaffReceiptRow,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { type MockReceipt, mockDb } from "../db";
 import { mockPhotos } from "../photos";
 import { checkReceipt } from "../receipts/check";
 import { applyReceipt } from "../receipts/receive";
+import { applyEdit, checkEdit } from "../receipts/revise";
 import { toStaffReceipt, toStaffReceiptRow } from "../receipts/views";
 import { withScenario } from "../scenarios";
+import { readReceiptEdit, readReceiptInput } from "./receipt-body";
 import { problem, readJson, requireOwnerSession } from "./respond";
 import { requireStaffSession, staffRealm } from "./staff-realm";
 
 const BASE = "/api/staff/receipts";
-const ID_MAX = 64;
-const LINES_MAX = 100;
 const PHOTO_MAX_BYTES = 1024 * 1024;
-
-type Obj = Record<string, unknown>;
-const isObj = (x: unknown): x is Obj =>
-  typeof x === "object" && x !== null && !Array.isArray(x);
-const isStr = (x: unknown): x is string => typeof x === "string";
-const isNum = (x: unknown): x is number =>
-  typeof x === "number" && Number.isFinite(x);
-const isStrOrNull = (x: unknown): x is string | null => x === null || isStr(x);
-const isId = (x: unknown): x is string =>
-  isStr(x) && x.length > 0 && x.length <= ID_MAX;
-const isOneOf = <T extends string>(
-  x: unknown,
-  values: readonly (T | null)[],
-): x is T | null => values.includes(x as T | null);
-
-function readNewProduct(x: unknown): NewProductInput | null | undefined {
-  if (x === null) return null;
-  if (!isObj(x)) return undefined;
-  const { name, sellUnit, notaUnit, notaUnitSize, barcode } = x;
-  return isStr(name) &&
-    isStr(sellUnit) &&
-    isStr(notaUnit) &&
-    isNum(notaUnitSize) &&
-    isStrOrNull(barcode)
-    ? { name, sellUnit, notaUnit, notaUnitSize, barcode }
-    : undefined;
-}
-
-function readLine(x: unknown): ReceiptLineInput | null {
-  if (!isObj(x)) return null;
-  const { lineId, productId, unitId, qty, unitCost, expiryDate } = x;
-  const newProduct = readNewProduct(x.newProduct);
-  const ok =
-    isId(lineId) &&
-    isStrOrNull(productId) &&
-    isStrOrNull(unitId) &&
-    newProduct !== undefined &&
-    isNum(qty) &&
-    isNum(unitCost) &&
-    isStrOrNull(expiryDate);
-  return ok
-    ? { lineId, productId, unitId, newProduct, qty, unitCost, expiryDate }
-    : null;
-}
-
-function readPayment(x: unknown): ReceiptPayment | null {
-  if (!isObj(x)) return null;
-  const { timing, method, cashSource, dueDate } = x;
-  const ok =
-    (timing === "sekarang" || timing === "nanti") &&
-    isOneOf(method, ["tunai", "transfer", null]) &&
-    isOneOf(cashSource, ["laci", "pemilik", null]) &&
-    isStrOrNull(dueDate);
-  return ok ? { timing, method, cashSource, dueDate } : null;
-}
-
-/**
- * Bentuk & tipe body (nilai diperiksa `checkReceipt` dengan galat per isian); null bila rusak.
- * lineId wajib unik karena galat dan ubah nota merujuk baris lewat lineId.
- */
-function readReceiptInput(body: Obj | null): ReceiptInput | null {
-  if (body === null) return null;
-  const { id, supplierName, notaDate, photoId } = body;
-  const raw = Array.isArray(body.lines) ? body.lines : null;
-  const lines = raw?.map(readLine) ?? [];
-  const payment = readPayment(body.payment);
-  const ok =
-    isId(id) &&
-    isStr(supplierName) &&
-    isStr(notaDate) &&
-    isStrOrNull(photoId) &&
-    raw !== null &&
-    raw.length <= LINES_MAX &&
-    payment !== null;
-  const valid = lines.filter((l): l is ReceiptLineInput => l !== null);
-  if (!ok || valid.length !== lines.length) return null;
-  if (new Set(valid.map((l) => l.lineId)).size !== valid.length) return null;
-  return { id, supplierName, notaDate, photoId, lines: valid, payment };
-}
 
 const receiptProblem = (errors: ReceiptError[]): Response =>
   problem(422, "VALIDATION", "Nota tidak valid", { errors });
@@ -170,6 +87,39 @@ export const staffReceiptHandlers = [
         (x) => x.id === String(params.receiptId) && x.createdById === user.id,
       );
       return r ? HttpResponse.json(toStaffReceipt(state, r)) : notFound();
+    }),
+  ),
+  http.put(
+    `${BASE}/:receiptId`,
+    staffRealm(async ({ params, request }) => {
+      const body = await readJson(request);
+      // State dibaca sesudah body agar pemeriksaan & penerapan memakai data yang sama.
+      const state = mockDb.get();
+      const user = requireStaffSession(state);
+      if (user instanceof Response) return user;
+      const id = String(params.receiptId);
+      // K5: hanya pembuatnya; nota orang lain tidak dibedakan dari yang tidak ada.
+      const r = state.receipts.find(
+        (x) => x.id === id && x.createdById === user.id,
+      );
+      if (!r) return notFound();
+      if (r.status === "dibatalkan") {
+        return problem(409, "RECEIPT_CANCELLED", "Nota ini sudah dibatalkan");
+      }
+      const edit = readReceiptEdit(body);
+      if (edit === null) return receiptProblem([]);
+      const now = Date.now();
+      const errors = checkEdit(state, r, edit, now);
+      if (errors.length > 0) return receiptProblem(errors);
+      mockDb.update((s) => {
+        const target = s.receipts.find((x) => x.id === id);
+        if (!target) throw new Error("Nota hilang");
+        applyEdit(s, target, edit, user, now);
+      });
+      const saved = mockDb.get();
+      const updated = saved.receipts.find((x) => x.id === id);
+      if (!updated) throw new Error("Nota hilang");
+      return HttpResponse.json(toStaffReceipt(saved, updated));
     }),
   ),
   http.put(

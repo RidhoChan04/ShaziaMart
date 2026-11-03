@@ -1,4 +1,6 @@
 import type {
+  OwnerReceipt,
+  OwnerReceiptRow,
   StaffReceipt,
   StaffReceiptRow,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
@@ -45,5 +47,40 @@ export function toStaffReceiptRow(
     lineCount: r.lines.length,
     status: r.status,
     createdAt: r.createdAt,
+  };
+}
+
+/** Nota untuk pemilik: field nota staf + pelunasan, pembatalan, dan riwayat (terlama dulu). */
+export function toOwnerReceipt(
+  state: Readonly<MockState>,
+  r: MockReceipt,
+): OwnerReceipt {
+  return {
+    ...toStaffReceipt(state, r),
+    paid: r.paid,
+    cancelledAt: r.cancelledAt,
+    audit: state.receiptAudit
+      .filter((a) => a.receiptId === r.id)
+      .sort((a, b) => a.at - b.at)
+      .map(({ receiptId: _, ...entry }) => entry),
+  };
+}
+
+export function toOwnerReceiptRow(
+  state: Readonly<MockState>,
+  r: MockReceipt,
+): OwnerReceiptRow {
+  return {
+    id: r.id,
+    supplierName: supplierNameOf(state, r),
+    notaDate: r.notaDate,
+    total: receiptTotalOf(r),
+    lineCount: r.lines.length,
+    status: r.status,
+    payment: r.payment,
+    paid: r.paid,
+    createdAt: r.createdAt,
+    createdByName: r.createdByName,
+    editedByName: r.editedByName,
   };
 }

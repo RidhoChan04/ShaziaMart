@@ -189,6 +189,13 @@ function unitCostError(l: CheckLine): ReceiptError | null {
 export const RECEIPT_TOO_LARGE =
   "Angka terlalu besar — periksa jumlah dan harga beli";
 
+/** Ubah nota: baris tidak bisa ditambah/dihapus (K5); lineId harus tepat sama dengan nota tersimpan. */
+export const RECEIPT_LINES_MISMATCH = "Baris nota tidak cocok — muat ulang";
+
+/** Ubah nota: pembayaran hanya bisa diubah selama Bayar nanti belum lunas (K5). */
+export const RECEIPT_PAYMENT_LOCKED =
+  "Cara bayar tidak bisa diubah — sudah dibayar";
+
 /** Total berjalan atas baris yang jumlah & harganya sah; galat sekali di baris yang melewati batas. */
 function totalError(
   l: CheckLine,
