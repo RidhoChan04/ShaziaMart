@@ -142,6 +142,7 @@ describe("ownerTodaySummary", () => {
       difference,
       openingCash: 0,
       cashSales: 0,
+      supplierPayments: 0,
       expectedCash: 0,
       countedCash: 0,
       salesCount: 0,

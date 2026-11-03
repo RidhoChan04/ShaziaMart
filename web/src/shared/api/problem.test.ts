@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import { z } from "zod";
 import { ApiError } from "./fetcher";
-import { readProblem } from "./problem";
+import { readProblem, receiptProblemSchema } from "./problem";
 
 const priceChangedProblemSchema = z.object({
   code: z.literal("PRICE_CHANGED"),
@@ -39,4 +39,27 @@ test("readProblem null untuk error lain atau body tak cocok", () => {
       priceChangedProblemSchema,
     ),
   ).toBeNull();
+});
+
+test("receiptProblemSchema membaca errors per baris", () => {
+  const body = {
+    type: "about:blank",
+    title: "Nota tidak valid",
+    status: 422,
+    code: "VALIDATION",
+    errors: [
+      { lineId: null, field: "supplierName", message: "Supplier belum diisi" },
+      {
+        lineId: "l2",
+        field: "product",
+        message: "Barang ini tidak dijual lagi",
+      },
+    ],
+  };
+  const err = new ApiError({ status: 422, code: "VALIDATION", body });
+  expect(readProblem(err, receiptProblemSchema)?.errors[1]).toEqual({
+    lineId: "l2",
+    field: "product",
+    message: "Barang ini tidak dijual lagi",
+  });
 });

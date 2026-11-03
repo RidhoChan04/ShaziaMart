@@ -9,6 +9,7 @@ import {
 import type {
   OwnerProduct,
   PriceLineInput,
+  PriceSource,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { jakartaTime } from "@/shared/lib/business-day";
 import { pesanError } from "@/shared/lib/error-messages";
@@ -30,6 +31,13 @@ type PriceField = "price" | "tierPrice" | "bigPrice";
 type FieldMessages = Partial<Record<PriceField, string>>;
 
 const NOT_A_NUMBER = "Ketik angka saja, mis. 3500";
+
+const SOURCE_TEXT: Record<PriceSource, string> = {
+  pemilik: "oleh Pemilik",
+  impor: "lewat Impor Excel",
+  barang_masuk: "lewat Barang masuk",
+  ubah_nota: "lewat ubah nota",
+};
 
 /** Field galat 422 yang menunjuk baris ini: eceran `price`, grosir `tierPrice`, satuan besar `bigPrice`. */
 function fieldOf(line: CostLine, eceranUnitId: string | undefined): PriceField {
@@ -106,7 +114,7 @@ function Block({
   error,
 }: {
   line: CostLine;
-  source: "pemilik" | "impor";
+  source: PriceSource;
   changedAt: number;
   text: string;
   onText: (value: string) => void;
@@ -114,7 +122,7 @@ function Block({
 }) {
   const uid = useId();
   const invalid = text.trim() !== "" && parseRupiah(text) === null;
-  const by = source === "pemilik" ? "oleh Pemilik" : "lewat Impor Excel";
+  const by = SOURCE_TEXT[source];
   const note = noteFor(text, line.newCost);
   const direction = profitDirection(line);
   const row = "flex items-baseline justify-between gap-3 px-4 py-2.5";

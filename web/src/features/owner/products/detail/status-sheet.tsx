@@ -22,9 +22,14 @@ const STATUS_LABEL: Record<ProductStatus, string> = {
   aktif: "Aktif",
   tidak_diambil: "Tidak diambil lagi",
   nonaktif: "Nonaktif",
+  menunggu_harga: "Menunggu harga jual",
 };
 
-const OPTIONS: { value: ProductStatus; hint: string | null }[] = [
+// menunggu_harga bukan pilihan: status itu hanya berakhir saat harga jual disimpan.
+const OPTIONS: {
+  value: Exclude<ProductStatus, "menunggu_harga">;
+  hint: string | null;
+}[] = [
   { value: "aktif", hint: null },
   {
     value: "tidak_diambil",

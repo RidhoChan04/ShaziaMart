@@ -68,6 +68,13 @@ function attention(state: Readonly<MockState>, now: number): Attention {
       )
       .map((p) => ({ productId: p.id, productName: p.name }))
       .sort((a, b) => a.productName.localeCompare(b.productName, "id")),
+    supplierDebts: {
+      overdueCount: 0,
+      overdueTotal: 0,
+      dueSoonCount: 0,
+      dueSoonTotal: 0,
+    },
+    awaitingPriceCount: 0,
   };
 }
 

@@ -15,6 +15,17 @@ info:
     HPP dan laba hanya muncul di endpoint /api/owner; endpoint kasir tidak pernah memuatnya.
     Data barang: kategori, status, stok, dan modal hanya di /api/owner.
     Hari bisnis memakai zona Asia/Jakarta.
+
+    Endpoint orang toko (HP) berada di bawah /api/staff dengan realm cookie ketiga:
+    staff_session (akun ber-role kasir, nama + PIN). Sesi kasir dan pemilik tidak berlaku di sana
+    dan sebaliknya; masuk/keluar di satu realm tidak menyentuh dua lainnya. Realm ini hanya untuk
+    Wi-Fi toko (LAN): setiap request /api/staff (termasuk login) yang membawa header
+    Cf-Connecting-Ip atau Cf-Ray ditolak 403 STAFF_LAN_ONLY sebelum apa pun, dan backend menolak
+    semua yang bukan LAN (gagal-tertutup). HPP, modal, harga jual, stok, dan laba tidak pernah
+    ada di respons /api/staff; satu-satunya angka uang adalah unitCost (harga beli yang diketik)
+    beserta subtotal/total pada nota milik staf itu sendiri.
+    Tanggal kalender (notaDate, dueDate, expiryDate) berupa string YYYY-MM-DD menurut kalender
+    Asia/Jakarta.
 tags:
   - name: system
   - name: auth
@@ -26,6 +37,7 @@ tags:
   - name: reports
   - name: settings
   - name: owner
+  - name: staff
 paths:
   /api/health:
     get:
@@ -193,7 +205,8 @@ paths:
       operationId: lookupCatalog
       summary: Cari satu barang dari barcode atau kode toko
       description: |
-        PRODUCT_INACTIVE (410) bila kode cocok dengan barang nonaktif atau satuan nonaktif.
+        PRODUCT_INACTIVE (410) bila kode cocok dengan barang nonaktif atau satuan nonaktif;
+        PRODUCT_NO_PRICE (410) bila barangnya menunggu_harga (belum punya harga jual).
         Penjualan yang sudah ada di keranjang tetap diterima createSale.
       parameters:
         - name: code
@@ -212,7 +225,11 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
         "410":
-          $ref: "#/components/responses/ProductInactive"
+          description: PRODUCT_INACTIVE atau PRODUCT_NO_PRICE
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
         "422":
           description: Parameter code kosong atau tidak ada (VALIDATION)
           content:
@@ -227,7 +244,7 @@ paths:
       description: |
         Mencari menurut nama saja (barcode / kode toko lewat lookupCatalog); q kurang dari
         2 karakter atau hanya angka menghasilkan daftar kosong. Mengembalikan paling banyak 8 hasil,
-        tanpa barang nonaktif dan satuan nonaktif.
+        tanpa barang nonaktif atau menunggu_harga, dan tanpa satuan nonaktif.
       parameters:
         - name: q
           in: query
@@ -250,7 +267,7 @@ paths:
       tags: [catalog]
       operationId: listQuickCurah
       summary: Barang curah pilihan cepat
-      description: Sesuai quickCurahProductIds, tanpa barang nonaktif dan satuan nonaktif.
+      description: Sesuai quickCurahProductIds, tanpa barang nonaktif atau menunggu_harga, dan tanpa satuan nonaktif.
       responses:
         "200":
           description: Kecocokan sesuai quickCurahProductIds
@@ -570,6 +587,8 @@ paths:
       description: |
         Field null menghapus nilainya. Barang yang sudah terjual: 'Dijual per' dan isi satuan
         yang sudah terjual dikunci (422); satuan besar terjual yang diganti dinonaktifkan.
+        Barang hasReceipts: cost dan bigUnit.cost diabaikan (HPP mengikuti barang masuk), bukan 422.
+        Barang menunggu_harga yang disimpan dengan harga jual menjadi aktif.
         Batas min/max di skema adalah panduan klien; server selalu memvalidasi isi mentah dan mengembalikan ProductValidationFailed dengan pesan per field.
       security:
         - ownerCookieAuth: []
@@ -617,6 +636,9 @@ paths:
       tags: [owner]
       operationId: setOwnerProductStatus
       summary: Ubah status barang dan tanda Sedang langka
+      description: |
+        Barang menunggu_harga, atau body dengan status menunggu_harga, ditolak 422 VALIDATION
+        (detail "Isi harga jual dulu"): status itu hanya diakhiri dengan menyimpan harga jual.
       security:
         - ownerCookieAuth: []
       parameters:
@@ -638,6 +660,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
   /api/owner/products/{productId}/prices:
     put:
       tags: [owner]
@@ -760,6 +784,7 @@ paths:
       description: |
         Memvalidasi ulang lalu menyimpan baris baru dan diperbarui sekaligus (atomik); baris tidak
         berubah dan baris bermasalah dilewati. Sel kosong tidak menghapus data lama.
+        Modal untuk barang hasReceipts diabaikan (HPP mengikuti barang masuk) dan dicatat di notes.
       security:
         - ownerCookieAuth: []
       requestBody:
@@ -779,10 +804,471 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "422":
           $ref: "#/components/responses/ValidationFailed"
+  /api/owner/receipts:
+    get:
+      tags: [owner]
+      operationId: listOwnerReceipts
+      summary: Daftar barang masuk (semua staf)
+      security:
+        - ownerCookieAuth: []
+      responses:
+        "200":
+          description: Nota barang masuk, terbaru dulu (createdAt)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OwnerReceiptRow"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/owner/receipts/{receiptId}:
+    get:
+      tags: [owner]
+      operationId: getOwnerReceipt
+      summary: Detail nota barang masuk dengan riwayat perubahan
+      security:
+        - ownerCookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ReceiptId"
+      responses:
+        "200":
+          description: Nota
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnerReceipt"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /api/owner/receipts/{receiptId}/cancel:
+    post:
+      tags: [owner]
+      operationId: cancelOwnerReceipt
+      summary: Batalkan nota barang masuk
+      description: |
+        Membuat entri balik: stok (batal_masuk), HPP (PriceSource ubah_nota), utang yang belum lunas
+        dihapus, dan uang keluar laci dikoreksi di shift yang sedang buka (tanpa shift buka: tidak
+        dicatat, audit memuat catatannya). Idempoten: nota yang sudah dibatalkan dikembalikan apa adanya.
+      security:
+        - ownerCookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ReceiptId"
+      responses:
+        "200":
+          description: Nota dibatalkan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnerReceipt"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /api/owner/receipt-photos/{photoId}:
+    get:
+      tags: [owner]
+      operationId: getOwnerReceiptPhoto
+      summary: Foto nota (JPEG)
+      security:
+        - ownerCookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PhotoId"
+      responses:
+        "200":
+          description: Foto nota
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /api/owner/supplier-debts:
+    get:
+      tags: [owner]
+      operationId: listOwnerSupplierDebts
+      summary: Utang ke supplier (nota Bayar nanti)
+      security:
+        - ownerCookieAuth: []
+      responses:
+        "200":
+          description: Utang supplier dan shift laci yang sedang buka
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SupplierDebtList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/owner/supplier-debts/{receiptId}/pay:
+    post:
+      tags: [owner]
+      operationId: payOwnerSupplierDebt
+      summary: Tandai utang supplier lunas
+      description: |
+        Lunas penuh (tanpa pelunasan sebagian). tunai + laci dicatat sebagai uang keluar di shift
+        yang sedang buka. 409 membawa DEBT_ALREADY_PAID, RECEIPT_CANCELLED, atau SHIFT_CLOSED
+        (laci dipilih tanpa shift buka). 422 VALIDATION bila cashSource tidak cocok dengan method.
+      security:
+        - ownerCookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ReceiptId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PayDebtInput"
+      responses:
+        "200":
+          description: Utang lunas
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SupplierDebt"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: DEBT_ALREADY_PAID, RECEIPT_CANCELLED, atau SHIFT_CLOSED
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+  /api/staff/users:
+    get:
+      tags: [staff]
+      operationId: listStaffUsers
+      summary: Daftar akun yang bisa masuk di HP orang toko
+      description: Hanya pengguna ber-role kasir.
+      responses:
+        "200":
+          description: Pengguna kasir
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+        "403":
+          $ref: "#/components/responses/LanOnly"
+  /api/staff/login:
+    post:
+      tags: [staff]
+      operationId: staffLogin
+      summary: Masuk orang toko dengan PIN kasir
+      description: |
+        PIN_INVALID (401) bila PIN salah atau akun bukan kasir; LOCKED_OUT (423) bila terlalu banyak
+        percobaan. Hitungan PIN salah dibagi dengan login kasir (akun yang sama). Sukses mengeset
+        cookie staff_session tanpa menyentuh kasir_session atau owner_session.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PinLoginRequest"
+      responses:
+        "200":
+          description: Sesi orang toko dibuat (cookie staff_session diset)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "401":
+          $ref: "#/components/responses/PinInvalid"
+        "403":
+          $ref: "#/components/responses/LanOnly"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+        "423":
+          $ref: "#/components/responses/LockedOut"
+  /api/staff/session:
+    get:
+      tags: [staff]
+      operationId: getStaffSession
+      summary: Sesi orang toko aktif
+      security:
+        - staffCookieAuth: []
+      responses:
+        "200":
+          description: Sesi aktif
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/LanOnly"
+  /api/staff/logout:
+    post:
+      tags: [staff]
+      operationId: staffLogout
+      summary: Keluar orang toko
+      description: Selalu 204 (idempoten), juga tanpa sesi; hanya menghapus staff_session.
+      security:
+        - staffCookieAuth: []
+      responses:
+        "204":
+          description: Sesi orang toko dihapus
+        "403":
+          $ref: "#/components/responses/LanOnly"
+  /api/staff/shift:
+    get:
+      tags: [staff]
+      operationId: getStaffShift
+      summary: Shift kasir yang sedang buka (untuk pilihan Dari laci kasir)
+      security:
+        - staffCookieAuth: []
+      responses:
+        "200":
+          description: Shift saat ini; shift bernilai null bila tidak ada yang buka
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CurrentShift"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/LanOnly"
+  /api/staff/products:
+    get:
+      tags: [staff]
+      operationId: searchStaffProducts
+      summary: Cari barang untuk barang masuk
+      description: |
+        Nama (mengandung, tanpa beda huruf besar/kecil), barcode, atau kode toko (persis); tanpa
+        barang nonaktif dan satuan nonaktif (barang menunggu_harga ikut). Paling banyak 20 hasil.
+        Tanpa harga jual, modal, atau stok.
+      security:
+        - staffCookieAuth: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Nama, barcode, atau kode toko
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Kecocokan, maksimal 20 hasil
+          content:
+            application/json:
+              schema:
+                type: array
+                maxItems: 20
+                items:
+                  $ref: "#/components/schemas/StaffProduct"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/LanOnly"
+  /api/staff/suppliers:
+    get:
+      tags: [staff]
+      operationId: listStaffSuppliers
+      summary: Supplier yang pernah dipakai
+      security:
+        - staffCookieAuth: []
+      responses:
+        "200":
+          description: Supplier, terakhir dipakai dulu
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Supplier"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/LanOnly"
+  /api/staff/receipts:
+    post:
+      tags: [staff]
+      operationId: createStaffReceipt
+      summary: Simpan nota barang masuk
+      description: |
+        Idempoten menurut id (ID draf dari HP): id yang sudah tersimpan mengembalikan nota lama
+        dengan 200 tanpa validasi ulang dan tanpa mencatat ulang stok, HPP, uang keluar, atau utang.
+        Atomik: 422 ReceiptProblem dengan galat per baris/field, tanpa perubahan sebagian.
+        Batas min/max di skema adalah panduan klien; server selalu memvalidasi isi mentah.
+      security:
+        - staffCookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReceiptInput"
+      responses:
+        "200":
+          description: id sudah pernah disimpan; nota lama dikembalikan (replay)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaffReceipt"
+        "201":
+          description: Nota dibuat
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaffReceipt"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/LanOnly"
+        "422":
+          $ref: "#/components/responses/ReceiptValidationFailed"
+    get:
+      tags: [staff]
+      operationId: listStaffReceipts
+      summary: Nota barang masuk milik sendiri
+      security:
+        - staffCookieAuth: []
+      responses:
+        "200":
+          description: Nota yang dibuat pengguna ini, terbaru dulu (createdAt)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StaffReceiptRow"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/LanOnly"
+  /api/staff/receipts/{receiptId}:
+    get:
+      tags: [staff]
+      operationId: getStaffReceipt
+      summary: Detail nota milik sendiri
+      description: Nota milik orang lain juga 404.
+      security:
+        - staffCookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ReceiptId"
+      responses:
+        "200":
+          description: Nota
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaffReceipt"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/LanOnly"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [staff]
+      operationId: updateStaffReceipt
+      summary: Ubah nota milik sendiri
+      description: |
+        Hanya staf pembuatnya (nota orang lain 404). Baris tidak bisa ditambah atau dihapus; barang
+        dan satuannya tetap. payment hanya bisa diubah selama paymentEditable. Atomik: 422
+        ReceiptProblem tanpa perubahan sebagian; 409 RECEIPT_CANCELLED bila nota sudah dibatalkan.
+      security:
+        - staffCookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ReceiptId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReceiptEdit"
+      responses:
+        "200":
+          description: Nota diubah
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaffReceipt"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/LanOnly"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/ReceiptCancelled"
+        "422":
+          $ref: "#/components/responses/ReceiptValidationFailed"
+  /api/staff/receipt-photos/{photoId}:
+    put:
+      tags: [staff]
+      operationId: putStaffReceiptPhoto
+      summary: Unggah foto nota
+      description: |
+        Idempoten menurut photoId (ID dari HP): unggah ulang dengan id yang sama tetap 204.
+        JPEG, paling besar 1 MB; selain itu 422 VALIDATION.
+      security:
+        - staffCookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PhotoId"
+      requestBody:
+        required: true
+        content:
+          image/jpeg:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "204":
+          description: Foto tersimpan
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/LanOnly"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+    get:
+      tags: [staff]
+      operationId: getStaffReceiptPhoto
+      summary: Foto nota (JPEG)
+      security:
+        - staffCookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PhotoId"
+      responses:
+        "200":
+          description: Foto nota
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/LanOnly"
+        "404":
+          $ref: "#/components/responses/NotFound"
 components:
   parameters:
     ProductId:
       name: productId
+      in: path
+      required: true
+      schema:
+        type: string
+    ReceiptId:
+      name: receiptId
+      in: path
+      required: true
+      schema:
+        type: string
+    PhotoId:
+      name: photoId
       in: path
       required: true
       schema:
@@ -796,7 +1282,37 @@ components:
       type: apiKey
       in: cookie
       name: owner_session
+    staffCookieAuth:
+      type: apiKey
+      in: cookie
+      name: staff_session
   responses:
+    LanOnly:
+      description: |
+        Bukan dari Wi-Fi toko (STAFF_LAN_ONLY): header Cf-Connecting-Ip/Cf-Ray → 403 STAFF_LAN_ONLY;
+        backend menolak semua yang bukan LAN (gagal-tertutup)
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    ProductNoPrice:
+      description: Barang menunggu harga jual (PRODUCT_NO_PRICE)
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    ReceiptCancelled:
+      description: Nota sudah dibatalkan (RECEIPT_CANCELLED)
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    ReceiptValidationFailed:
+      description: Nota tidak valid (VALIDATION) dengan galat per baris/field
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ReceiptProblem"
     LoginInvalid:
       description: Nama atau password salah (LOGIN_INVALID)
       content:
@@ -907,6 +1423,10 @@ components:
         - LOGIN_INVALID
         - PRODUCT_INACTIVE
         - PRODUCT_HAS_SALES
+        - STAFF_LAN_ONLY
+        - PRODUCT_NO_PRICE
+        - RECEIPT_CANCELLED
+        - DEBT_ALREADY_PAID
     Problem:
       type: object
       required: [type, title, status, code]
@@ -1050,7 +1570,7 @@ components:
           description: Jumlah saldo kasbon seluruh pelanggan tersebut (rupiah).
     Attention:
       type: object
-      required: [lowStockCount, negativeStockCount, cashDifferences, overdueCredit, costChanges, stockOuts]
+      required: [lowStockCount, negativeStockCount, cashDifferences, overdueCredit, costChanges, stockOuts, supplierDebts, awaitingPriceCount]
       properties:
         lowStockCount:
           type: integer
@@ -1080,6 +1600,27 @@ components:
           description: Barang tidak_diambil yang stoknya sudah dihitung dan habis (stok <= 0); urut nama.
           items:
             $ref: "#/components/schemas/StockOutItem"
+        supplierDebts:
+          $ref: "#/components/schemas/SupplierDebtAttention"
+        awaitingPriceCount:
+          type: integer
+          description: Jumlah barang menunggu_harga (barang baru dari barang masuk yang belum punya harga jual).
+    SupplierDebtAttention:
+      type: object
+      description: |
+        Utang supplier belum lunas dari nota yang tidak dibatalkan, menurut tanggal hari ini
+        (Asia/Jakarta). overdue = lewat jatuh tempo (setelah hari H); dueSoon = 0–3 hari sebelum
+        jatuh tempo, termasuk hari H. Total dalam rupiah.
+      required: [overdueCount, overdueTotal, dueSoonCount, dueSoonTotal]
+      properties:
+        overdueCount:
+          type: integer
+        overdueTotal:
+          type: integer
+        dueSoonCount:
+          type: integer
+        dueSoonTotal:
+          type: integer
     CostChangeItem:
       type: object
       description: |
@@ -1207,7 +1748,7 @@ components:
           minimum: 0
     ShiftClosure:
       type: object
-      required: [shiftId, openingCash, cashSales, expectedCash, countedCash, difference, salesCount]
+      required: [shiftId, openingCash, cashSales, supplierPayments, expectedCash, countedCash, difference, salesCount]
       properties:
         shiftId:
           type: string
@@ -1215,6 +1756,9 @@ components:
           type: integer
         cashSales:
           type: integer
+        supplierPayments:
+          type: integer
+          description: Σ uang keluar ke supplier di shift ini, bertanda; expectedCash = openingCash + cashSales − supplierPayments
         expectedCash:
           type: integer
         countedCash:
@@ -1303,8 +1847,11 @@ components:
       type: string
       description: |
         aktif; tidak_diambil = tetap dijual sampai habis, tanpa peringatan menipis;
-        nonaktif = tidak muncul di kasir (pencarian, scan, curah cepat), riwayat tetap.
-      enum: [aktif, tidak_diambil, nonaktif]
+        nonaktif = tidak muncul di kasir (pencarian, scan, curah cepat), riwayat tetap;
+        menunggu_harga = barang baru dari barang masuk, semua satuannya price 0 sampai pemilik
+        menyimpan form barang dengan harga jual (lalu aktif); tidak muncul di pencarian dan curah
+        cepat kasir, scan/kode → 410 PRODUCT_NO_PRICE.
+      enum: [aktif, tidak_diambil, nonaktif, menunggu_harga]
     StockAlert:
       type: string
       description: |
@@ -1315,8 +1862,10 @@ components:
       enum: [none, menipis, minus]
     PriceSource:
       type: string
-      description: pemilik = diubah di aplikasi pemilik; impor = lewat Impor Excel.
-      enum: [pemilik, impor]
+      description: |
+        pemilik = diubah di aplikasi pemilik; impor = lewat Impor Excel; barang_masuk = HPP dari
+        nota barang masuk; ubah_nota = HPP dari nota yang diubah atau dibatalkan.
+      enum: [pemilik, impor, barang_masuk, ubah_nota]
     ProductCost:
       type: object
       description: |
@@ -1368,7 +1917,7 @@ components:
           description: Tanda Sedang langka.
         stockCounted:
           type: boolean
-          description: false = Stok belum dihitung (belum pernah opname atau barang masuk).
+          description: false = Stok belum dihitung (belum pernah opname); barang masuk tidak mengubahnya, kecuali barang baru dari nota yang langsung terhitung.
         isCurah:
           type: boolean
         baseUnit:
@@ -1393,7 +1942,7 @@ components:
           $ref: "#/components/schemas/StockAlert"
     OwnerProduct:
       type: object
-      required: [id, name, storeCode, category, status, scarce, stockCounted, isCurah, baseUnit, units, cost, stock, minStock, stockAlert, hasSales, costAlert, recentMovements, priceHistory]
+      required: [id, name, storeCode, category, status, scarce, stockCounted, isCurah, baseUnit, units, cost, stock, minStock, stockAlert, hasSales, hasReceipts, costAlert, recentMovements, priceHistory]
       properties:
         id:
           type: string
@@ -1411,7 +1960,7 @@ components:
           description: Tanda Sedang langka.
         stockCounted:
           type: boolean
-          description: false = Stok belum dihitung (belum pernah opname atau barang masuk).
+          description: false = Stok belum dihitung (belum pernah opname); barang masuk tidak mengubahnya, kecuali barang baru dari nota yang langsung terhitung.
         isCurah:
           type: boolean
         baseUnit:
@@ -1440,6 +1989,9 @@ components:
         hasSales:
           type: boolean
           description: Barang pernah terjual (tidak bisa dihapus).
+        hasReceipts:
+          type: boolean
+          description: Barang punya barang masuk aktif → modal mengikuti barang masuk; isian modal diabaikan.
         costAlert:
           nullable: true
           description: Peringatan modal berubah yang belum ditindaklanjuti.
@@ -1479,12 +2031,16 @@ components:
           format: int64
         kind:
           type: string
-          enum: [jual, batal]
+          description: |
+            jual / batal = penjualan dan pembatalannya; masuk = barang masuk; koreksi_masuk = nota
+            barang masuk diubah; batal_masuk = nota barang masuk dibatalkan.
+          enum: [jual, batal, masuk, koreksi_masuk, batal_masuk]
         qtyBase:
           type: integer
-          description: Bertanda; jual negatif, batal positif.
+          description: Bertanda; jual negatif, batal positif, masuk positif, koreksi_masuk bertanda, batal_masuk negatif.
         kasirName:
           type: string
+          description: nama orang yang mencatat
     PriceHistoryEntry:
       type: object
       required: [id, at, unitId, unitName, isEceran, unitSize, tierMinQty, oldPrice, newPrice, source]
@@ -1936,3 +2492,487 @@ components:
         phone:
           type: string
           pattern: '^\d{8,15}$'
+    StaffUnit:
+      type: object
+      description: Satuan barang untuk orang toko; tanpa harga jual, modal, dan stok.
+      required: [id, name, unitSize, barcodes]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        unitSize:
+          type: integer
+          minimum: 1
+          description: Jumlah satuan dasar per satuan ini.
+        barcodes:
+          type: array
+          items:
+            type: string
+    StaffProduct:
+      type: object
+      description: Barang untuk orang toko; tanpa harga jual, modal, dan stok. units[0] = satuan eceran; hanya satuan aktif.
+      required: [id, name, category, isCurah, baseUnit, status, units]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        category:
+          type: string
+          nullable: true
+        isCurah:
+          type: boolean
+        baseUnit:
+          type: string
+          enum: [pcs, gram, ml]
+        status:
+          $ref: "#/components/schemas/ProductStatus"
+        units:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/StaffUnit"
+    Supplier:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+    ReceiptPayment:
+      type: object
+      description: |
+        sekarang: method wajib; cashSource wajib bila tunai (laci = uang keluar di shift yang sedang
+        buka), null bila transfer; dueDate null. nanti: method dan cashSource null (dipilih saat
+        pemilik menandai lunas); dueDate wajib, tidak sebelum notaDate.
+      required: [timing, method, cashSource, dueDate]
+      properties:
+        timing:
+          type: string
+          enum: [sekarang, nanti]
+        method:
+          type: string
+          nullable: true
+          enum: [tunai, transfer]
+        cashSource:
+          type: string
+          nullable: true
+          enum: [laci, pemilik]
+        dueDate:
+          type: string
+          format: date
+          nullable: true
+    NewProductInput:
+      type: object
+      description: |
+        Barang baru dari nota (status menunggu_harga). Satuan eceran = sellUnit; bila notaUnit
+        berbeda, satuan besar notaUnit berisi notaUnitSize. barcode melekat ke satuan nota.
+      required: [name, sellUnit, notaUnit, notaUnitSize, barcode]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        sellUnit:
+          type: string
+          minLength: 1
+          maxLength: 20
+          description: Dijual per; kg, ons, liter, dan l = barang curah.
+        notaUnit:
+          type: string
+          minLength: 1
+          maxLength: 20
+        notaUnitSize:
+          type: integer
+          minimum: 1
+          description: Isi satu satuan nota, dalam satuan Dijual per (1 bila sama dengan sellUnit).
+        barcode:
+          type: string
+          nullable: true
+          description: "EAN-13, UPC-A, EAN-8, atau GTIN-14 (ITF-14 di dus); check digit GS1 mod-10; unik di semua satuan semua barang termasuk nonaktif."
+    ReceiptLineInput:
+      type: object
+      description: Tepat salah satu dari (productId + unitId) atau newProduct (ditegakkan server).
+      required: [lineId, productId, unitId, newProduct, qty, unitCost, expiryDate]
+      properties:
+        lineId:
+          type: string
+          minLength: 1
+          maxLength: 64
+        productId:
+          type: string
+          nullable: true
+        unitId:
+          type: string
+          nullable: true
+          description: Satuan sesuai nota (satuan aktif barang itu).
+        newProduct:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/NewProductInput"
+        qty:
+          type: integer
+          minimum: 1
+          description: Jumlah dalam satuan nota.
+        unitCost:
+          type: integer
+          minimum: 0
+          description: Harga beli per satuan nota (rupiah); 0 = barang bonus.
+        expiryDate:
+          type: string
+          format: date
+          nullable: true
+    ReceiptInput:
+      type: object
+      required: [id, supplierName, notaDate, photoId, lines, payment]
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: ID draf dari HP (idempotensi); id yang sama mengembalikan nota lama dengan 200.
+        supplierName:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Supplier lama (nama sama, tanpa beda huruf) atau baru.
+        notaDate:
+          type: string
+          format: date
+          description: Tidak boleh setelah hari ini.
+        photoId:
+          type: string
+          nullable: true
+          description: Foto nota yang sudah diunggah lewat putStaffReceiptPhoto.
+        lines:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            $ref: "#/components/schemas/ReceiptLineInput"
+        payment:
+          $ref: "#/components/schemas/ReceiptPayment"
+    ReceiptLineEdit:
+      type: object
+      required: [lineId, qty, unitCost, expiryDate]
+      properties:
+        lineId:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: Baris nota yang sudah ada.
+        qty:
+          type: integer
+          minimum: 1
+        unitCost:
+          type: integer
+          minimum: 0
+        expiryDate:
+          type: string
+          format: date
+          nullable: true
+    ReceiptEdit:
+      type: object
+      description: Semua baris nota (tepat sama dengan lineId yang ada); baris tidak bisa ditambah atau dihapus.
+      required: [supplierName, notaDate, lines, payment]
+      properties:
+        supplierName:
+          type: string
+          minLength: 1
+          maxLength: 100
+        notaDate:
+          type: string
+          format: date
+        lines:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            $ref: "#/components/schemas/ReceiptLineEdit"
+        payment:
+          $ref: "#/components/schemas/ReceiptPayment"
+    ReceiptStatus:
+      type: string
+      enum: [aktif, dibatalkan]
+    ReceiptLine:
+      type: object
+      description: productName, unitName, dan unitSize disalin saat nota disimpan. subtotal = qty × unitCost.
+      required: [lineId, productId, productName, unitId, unitName, unitSize, qty, unitCost, subtotal, expiryDate, newProduct]
+      properties:
+        lineId:
+          type: string
+        productId:
+          type: string
+        productName:
+          type: string
+        unitId:
+          type: string
+        unitName:
+          type: string
+        unitSize:
+          type: integer
+          minimum: 1
+        qty:
+          type: integer
+        unitCost:
+          type: integer
+        subtotal:
+          type: integer
+        expiryDate:
+          type: string
+          format: date
+          nullable: true
+        newProduct:
+          type: boolean
+          description: Barang dibuat dari baris ini.
+    StaffReceipt:
+      type: object
+      required: [id, supplierName, notaDate, photoId, lines, payment, paymentEditable, total, status, createdAt, createdByName, editedAt, editedByName]
+      properties:
+        id:
+          type: string
+        supplierName:
+          type: string
+        notaDate:
+          type: string
+          format: date
+        photoId:
+          type: string
+          nullable: true
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReceiptLine"
+        payment:
+          $ref: "#/components/schemas/ReceiptPayment"
+        paymentEditable:
+          type: boolean
+          description: Bayar nanti yang belum dilunasi.
+        total:
+          type: integer
+          description: Σ subtotal (rupiah).
+        status:
+          $ref: "#/components/schemas/ReceiptStatus"
+        createdAt:
+          type: integer
+          format: int64
+        createdByName:
+          type: string
+        editedAt:
+          type: integer
+          format: int64
+          nullable: true
+        editedByName:
+          type: string
+          nullable: true
+    StaffReceiptRow:
+      type: object
+      required: [id, supplierName, notaDate, total, lineCount, status, createdAt]
+      properties:
+        id:
+          type: string
+        supplierName:
+          type: string
+        notaDate:
+          type: string
+          format: date
+        total:
+          type: integer
+        lineCount:
+          type: integer
+        status:
+          $ref: "#/components/schemas/ReceiptStatus"
+        createdAt:
+          type: integer
+          format: int64
+    DebtPayment:
+      type: object
+      description: Pelunasan utang supplier.
+      required: [at, method, cashSource, byName]
+      properties:
+        at:
+          type: integer
+          format: int64
+        method:
+          type: string
+          enum: [tunai, transfer]
+        cashSource:
+          type: string
+          nullable: true
+          enum: [laci, pemilik]
+        byName:
+          type: string
+    ReceiptAuditAction:
+      type: string
+      enum: [buat, ubah, batal, lunas]
+    ReceiptAuditEntry:
+      type: object
+      required: [id, at, actorName, action, changes]
+      properties:
+        id:
+          type: string
+        at:
+          type: integer
+          format: int64
+        actorName:
+          type: string
+        action:
+          $ref: "#/components/schemas/ReceiptAuditAction"
+        changes:
+          type: array
+          description: Baris perubahan yang sudah berupa teks, mis. "Supplier A → B".
+          items:
+            type: string
+    OwnerReceiptRow:
+      type: object
+      required: [id, supplierName, notaDate, total, lineCount, status, payment, paid, createdAt, createdByName, editedByName]
+      properties:
+        id:
+          type: string
+        supplierName:
+          type: string
+        notaDate:
+          type: string
+          format: date
+        total:
+          type: integer
+        lineCount:
+          type: integer
+        status:
+          $ref: "#/components/schemas/ReceiptStatus"
+        payment:
+          $ref: "#/components/schemas/ReceiptPayment"
+        paid:
+          nullable: true
+          description: Pelunasan utang; null bila belum lunas atau bukan Bayar nanti.
+          allOf:
+            - $ref: "#/components/schemas/DebtPayment"
+        createdAt:
+          type: integer
+          format: int64
+        createdByName:
+          type: string
+        editedByName:
+          type: string
+          nullable: true
+    OwnerReceipt:
+      description: Nota versi pemilik (field StaffReceipt ditambah pelunasan, pembatalan, dan riwayat).
+      allOf:
+        - $ref: "#/components/schemas/StaffReceipt"
+        - type: object
+          required: [paid, cancelledAt, audit]
+          properties:
+            paid:
+              nullable: true
+              description: Pelunasan utang; null bila belum lunas atau bukan Bayar nanti.
+              allOf:
+                - $ref: "#/components/schemas/DebtPayment"
+            cancelledAt:
+              type: integer
+              format: int64
+              nullable: true
+            audit:
+              type: array
+              description: Riwayat perubahan, terlama dulu.
+              items:
+                $ref: "#/components/schemas/ReceiptAuditEntry"
+    SupplierDebt:
+      type: object
+      description: Satu nota Bayar nanti yang tidak dibatalkan; amount = total nota.
+      required: [receiptId, supplierName, notaDate, amount, dueDate, paid, photoId, createdAt, createdByName]
+      properties:
+        receiptId:
+          type: string
+        supplierName:
+          type: string
+        notaDate:
+          type: string
+          format: date
+        amount:
+          type: integer
+        dueDate:
+          type: string
+          format: date
+        paid:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/DebtPayment"
+        photoId:
+          type: string
+          nullable: true
+        createdAt:
+          type: integer
+          format: int64
+        createdByName:
+          type: string
+    DrawerShift:
+      type: object
+      description: Shift kasir yang sedang buka (tujuan uang keluar Dari laci kasir).
+      required: [kasirName, openedAt]
+      properties:
+        kasirName:
+          type: string
+        openedAt:
+          type: integer
+          format: int64
+    SupplierDebtList:
+      type: object
+      required: [debts, drawerShift]
+      properties:
+        debts:
+          type: array
+          description: Belum lunas urut jatuh tempo, lalu lunas terbaru dulu.
+          items:
+            $ref: "#/components/schemas/SupplierDebt"
+        drawerShift:
+          nullable: true
+          description: null bila tidak ada shift buka (Dari laci kasir tidak tersedia).
+          allOf:
+            - $ref: "#/components/schemas/DrawerShift"
+    PayDebtInput:
+      type: object
+      description: cashSource wajib bila tunai, null bila transfer.
+      required: [method, cashSource]
+      properties:
+        method:
+          type: string
+          enum: [tunai, transfer]
+        cashSource:
+          type: string
+          nullable: true
+          enum: [laci, pemilik]
+    ReceiptField:
+      type: string
+      description: |
+        Isian nota yang salah. Tingkat nota (lineId null): supplierName, notaDate, lines, photoId,
+        payment, dueDate, cashSource. Tingkat baris: product, unit, qty, unitCost, expiryDate, dan
+        isian barang baru newName, newSellUnit, newNotaUnit, newNotaUnitSize, newBarcode.
+      enum: [supplierName, notaDate, lines, photoId, payment, dueDate, cashSource, product, unit, qty, unitCost, expiryDate, newName, newSellUnit, newNotaUnit, newNotaUnitSize, newBarcode]
+    ReceiptError:
+      type: object
+      required: [lineId, field, message]
+      properties:
+        lineId:
+          type: string
+          nullable: true
+          description: null = galat tingkat nota.
+        field:
+          $ref: "#/components/schemas/ReceiptField"
+        message:
+          type: string
+    ReceiptProblem:
+      description: Problem VALIDATION dengan galat per baris/field nota barang masuk.
+      allOf:
+        - $ref: "#/components/schemas/Problem"
+        - type: object
+          required: [code, errors]
+          properties:
+            code:
+              type: string
+              enum: [VALIDATION]
+            errors:
+              type: array
+              items:
+                $ref: "#/components/schemas/ReceiptError"

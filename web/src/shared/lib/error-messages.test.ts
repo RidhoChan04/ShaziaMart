@@ -25,6 +25,15 @@ test.each([
   expect(pesanError(new ApiError({ status: 0, code }))).toBe(msg),
 );
 
+test.each([
+  ["STAFF_LAN_ONLY", "Hanya bisa dipakai di Wi-Fi toko"],
+  ["PRODUCT_NO_PRICE", "Barang belum punya harga jual"],
+  ["RECEIPT_CANCELLED", "Nota ini sudah dibatalkan"],
+  ["DEBT_ALREADY_PAID", "Utang ini sudah lunas"],
+] as const)("pesanError %s", (code, text) =>
+  expect(pesanError(new ApiError({ status: 403, code }))).toBe(text),
+);
+
 test("VALIDATION memakai detail bila ada", () =>
   expect(
     pesanError(

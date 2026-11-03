@@ -79,6 +79,7 @@ export const shiftHandlers = [
         shiftId: shift.id,
         openingCash: shift.openingCash,
         cashSales: shift.cashSales,
+        supplierPayments: 0,
         expectedCash,
         countedCash,
         difference: countedCash - expectedCash,

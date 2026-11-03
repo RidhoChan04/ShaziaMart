@@ -5,4 +5,5 @@ export * from './owner/owner';
 export * from './sales/sales';
 export * from './settings/settings';
 export * from './shift/shift';
+export * from './staff/staff';
 export * from './system/system';

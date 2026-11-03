@@ -15,6 +15,17 @@
  * Data barang: kategori, status, stok, dan modal hanya di /api/owner.
  * Hari bisnis memakai zona Asia/Jakarta.
  *
+ * Endpoint orang toko (HP) berada di bawah /api/staff dengan realm cookie ketiga:
+ * staff_session (akun ber-role kasir, nama + PIN). Sesi kasir dan pemilik tidak berlaku di sana
+ * dan sebaliknya; masuk/keluar di satu realm tidak menyentuh dua lainnya. Realm ini hanya untuk
+ * Wi-Fi toko (LAN): setiap request /api/staff (termasuk login) yang membawa header
+ * Cf-Connecting-Ip atau Cf-Ray ditolak 403 STAFF_LAN_ONLY sebelum apa pun, dan backend menolak
+ * semua yang bukan LAN (gagal-tertutup). HPP, modal, harga jual, stok, dan laba tidak pernah
+ * ada di respons /api/staff; satu-satunya angka uang adalah unitCost (harga beli yang diketik)
+ * beserta subtotal/total pada nota milik staf itu sendiri.
+ * Tanggal kalender (notaDate, dueDate, expiryDate) berupa string YYYY-MM-DD menurut kalender
+ * Asia/Jakarta.
+ *
  * OpenAPI spec version: 0.1.0
  */
 import * as zod from 'zod';
@@ -68,6 +79,7 @@ export const CloseShiftResponse = zod.object({
   "shiftId": zod.string(),
   "openingCash": zod.int(),
   "cashSales": zod.int(),
+  "supplierPayments": zod.int().describe('Σ uang keluar ke supplier di shift ini, bertanda; expectedCash = openingCash + cashSales − supplierPayments'),
   "expectedCash": zod.int(),
   "countedCash": zod.int(),
   "difference": zod.int(),

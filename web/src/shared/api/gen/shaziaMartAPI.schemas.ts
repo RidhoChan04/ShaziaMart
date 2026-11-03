@@ -15,6 +15,17 @@
  * Data barang: kategori, status, stok, dan modal hanya di /api/owner.
  * Hari bisnis memakai zona Asia/Jakarta.
  *
+ * Endpoint orang toko (HP) berada di bawah /api/staff dengan realm cookie ketiga:
+ * staff_session (akun ber-role kasir, nama + PIN). Sesi kasir dan pemilik tidak berlaku di sana
+ * dan sebaliknya; masuk/keluar di satu realm tidak menyentuh dua lainnya. Realm ini hanya untuk
+ * Wi-Fi toko (LAN): setiap request /api/staff (termasuk login) yang membawa header
+ * Cf-Connecting-Ip atau Cf-Ray ditolak 403 STAFF_LAN_ONLY sebelum apa pun, dan backend menolak
+ * semua yang bukan LAN (gagal-tertutup). HPP, modal, harga jual, stok, dan laba tidak pernah
+ * ada di respons /api/staff; satu-satunya angka uang adalah unitCost (harga beli yang diketik)
+ * beserta subtotal/total pada nota milik staf itu sendiri.
+ * Tanggal kalender (notaDate, dueDate, expiryDate) berupa string YYYY-MM-DD menurut kalender
+ * Asia/Jakarta.
+ *
  * OpenAPI spec version: 0.1.0
  */
 export type HealthStatus = typeof HealthStatus[keyof typeof HealthStatus];
@@ -59,6 +70,10 @@ export const ErrorCode = {
   LOGIN_INVALID: 'LOGIN_INVALID',
   PRODUCT_INACTIVE: 'PRODUCT_INACTIVE',
   PRODUCT_HAS_SALES: 'PRODUCT_HAS_SALES',
+  STAFF_LAN_ONLY: 'STAFF_LAN_ONLY',
+  PRODUCT_NO_PRICE: 'PRODUCT_NO_PRICE',
+  RECEIPT_CANCELLED: 'RECEIPT_CANCELLED',
+  DEBT_ALREADY_PAID: 'DEBT_ALREADY_PAID',
 } as const;
 
 export interface Problem {
@@ -194,7 +209,8 @@ export interface OverdueCredit {
 }
 
 /**
- * pemilik = diubah di aplikasi pemilik; impor = lewat Impor Excel.
+ * pemilik = diubah di aplikasi pemilik; impor = lewat Impor Excel; barang_masuk = HPP dari
+ * nota barang masuk; ubah_nota = HPP dari nota yang diubah atau dibatalkan.
  */
 export type PriceSource = typeof PriceSource[keyof typeof PriceSource];
 
@@ -202,6 +218,8 @@ export type PriceSource = typeof PriceSource[keyof typeof PriceSource];
 export const PriceSource = {
   pemilik: 'pemilik',
   impor: 'impor',
+  barang_masuk: 'barang_masuk',
+  ubah_nota: 'ubah_nota',
 } as const;
 
 /**
@@ -226,6 +244,18 @@ export interface StockOutItem {
   productName: string;
 }
 
+/**
+ * Utang supplier belum lunas dari nota yang tidak dibatalkan, menurut tanggal hari ini
+ * (Asia/Jakarta). overdue = lewat jatuh tempo (setelah hari H); dueSoon = 0–3 hari sebelum
+ * jatuh tempo, termasuk hari H. Total dalam rupiah.
+ */
+export interface SupplierDebtAttention {
+  overdueCount: number;
+  overdueTotal: number;
+  dueSoonCount: number;
+  dueSoonTotal: number;
+}
+
 export interface Attention {
   /**
      * Jumlah barang dengan stockAlert menipis (0 <= stok < minStock). Aturan penanda diam:
@@ -245,6 +275,9 @@ export interface Attention {
   costChanges: CostChangeItem[];
   /** Barang tidak_diambil yang stoknya sudah dihitung dan habis (stok <= 0); urut nama. */
   stockOuts: StockOutItem[];
+  supplierDebts: SupplierDebtAttention;
+  /** Jumlah barang menunggu_harga (barang baru dari barang masuk yang belum punya harga jual). */
+  awaitingPriceCount: number;
 }
 
 /**
@@ -311,6 +344,8 @@ export interface ShiftClosure {
   shiftId: string;
   openingCash: number;
   cashSales: number;
+  /** Σ uang keluar ke supplier di shift ini, bertanda; expectedCash = openingCash + cashSales − supplierPayments */
+  supplierPayments: number;
   expectedCash: number;
   countedCash: number;
   difference: number;
@@ -361,7 +396,10 @@ export interface Product {
 
 /**
  * aktif; tidak_diambil = tetap dijual sampai habis, tanpa peringatan menipis;
- * nonaktif = tidak muncul di kasir (pencarian, scan, curah cepat), riwayat tetap.
+ * nonaktif = tidak muncul di kasir (pencarian, scan, curah cepat), riwayat tetap;
+ * menunggu_harga = barang baru dari barang masuk, semua satuannya price 0 sampai pemilik
+ * menyimpan form barang dengan harga jual (lalu aktif); tidak muncul di pencarian dan curah
+ * cepat kasir, scan/kode → 410 PRODUCT_NO_PRICE.
  */
 export type ProductStatus = typeof ProductStatus[keyof typeof ProductStatus];
 
@@ -370,6 +408,7 @@ export const ProductStatus = {
   aktif: 'aktif',
   tidak_diambil: 'tidak_diambil',
   nonaktif: 'nonaktif',
+  menunggu_harga: 'menunggu_harga',
 } as const;
 
 /**
@@ -434,7 +473,7 @@ export interface OwnerProductRow {
   status: ProductStatus;
   /** Tanda Sedang langka. */
   scarce: boolean;
-  /** false = Stok belum dihitung (belum pernah opname atau barang masuk). */
+  /** false = Stok belum dihitung (belum pernah opname); barang masuk tidak mengubahnya, kecuali barang baru dari nota yang langsung terhitung. */
   stockCounted: boolean;
   isCurah: boolean;
   baseUnit: OwnerProductRowBaseUnit;
@@ -467,20 +506,32 @@ export interface CostAlert {
   source: PriceSource;
 }
 
+/**
+ * jual / batal = penjualan dan pembatalannya; masuk = barang masuk; koreksi_masuk = nota
+ * barang masuk diubah; batal_masuk = nota barang masuk dibatalkan.
+ */
 export type StockMovementKind = typeof StockMovementKind[keyof typeof StockMovementKind];
 
 
 export const StockMovementKind = {
   jual: 'jual',
   batal: 'batal',
+  masuk: 'masuk',
+  koreksi_masuk: 'koreksi_masuk',
+  batal_masuk: 'batal_masuk',
 } as const;
 
 export interface StockMovement {
   id: string;
   at: number;
+  /**
+     * jual / batal = penjualan dan pembatalannya; masuk = barang masuk; koreksi_masuk = nota
+     * barang masuk diubah; batal_masuk = nota barang masuk dibatalkan.
+     */
   kind: StockMovementKind;
-  /** Bertanda; jual negatif, batal positif. */
+  /** Bertanda; jual negatif, batal positif, masuk positif, koreksi_masuk bertanda, batal_masuk negatif. */
   qtyBase: number;
+  /** nama orang yang mencatat */
   kasirName: string;
 }
 
@@ -518,7 +569,7 @@ export interface OwnerProduct {
   status: ProductStatus;
   /** Tanda Sedang langka. */
   scarce: boolean;
-  /** false = Stok belum dihitung (belum pernah opname atau barang masuk). */
+  /** false = Stok belum dihitung (belum pernah opname); barang masuk tidak mengubahnya, kecuali barang baru dari nota yang langsung terhitung. */
   stockCounted: boolean;
   isCurah: boolean;
   baseUnit: OwnerProductBaseUnit;
@@ -539,6 +590,8 @@ export interface OwnerProduct {
   stockAlert: StockAlert;
   /** Barang pernah terjual (tidak bisa dihapus). */
   hasSales: boolean;
+  /** Barang punya barang masuk aktif → modal mengikuti barang masuk; isian modal diabaikan. */
+  hasReceipts: boolean;
   /** Peringatan modal berubah yang belum ditindaklanjuti. */
   costAlert: CostAlert | null;
   /**
@@ -921,6 +974,488 @@ export interface NewCustomer {
 }
 
 /**
+ * Satuan barang untuk orang toko; tanpa harga jual, modal, dan stok.
+ */
+export interface StaffUnit {
+  id: string;
+  name: string;
+  /**
+     * Jumlah satuan dasar per satuan ini.
+     * @minimum 1
+     */
+  unitSize: number;
+  barcodes: string[];
+}
+
+export type StaffProductBaseUnit = typeof StaffProductBaseUnit[keyof typeof StaffProductBaseUnit];
+
+
+export const StaffProductBaseUnit = {
+  pcs: 'pcs',
+  gram: 'gram',
+  ml: 'ml',
+} as const;
+
+/**
+ * Barang untuk orang toko; tanpa harga jual, modal, dan stok. units[0] = satuan eceran; hanya satuan aktif.
+ */
+export interface StaffProduct {
+  id: string;
+  name: string;
+  /** @nullable */
+  category: string | null;
+  isCurah: boolean;
+  baseUnit: StaffProductBaseUnit;
+  status: ProductStatus;
+  /** @minItems 1 */
+  units: StaffUnit[];
+}
+
+export interface Supplier {
+  id: string;
+  name: string;
+}
+
+export type ReceiptPaymentTiming = typeof ReceiptPaymentTiming[keyof typeof ReceiptPaymentTiming];
+
+
+export const ReceiptPaymentTiming = {
+  sekarang: 'sekarang',
+  nanti: 'nanti',
+} as const;
+
+/**
+ * @nullable
+ */
+export type ReceiptPaymentMethod = typeof ReceiptPaymentMethod[keyof typeof ReceiptPaymentMethod] | null;
+
+
+export const ReceiptPaymentMethod = {
+  tunai: 'tunai',
+  transfer: 'transfer',
+} as const;
+
+/**
+ * @nullable
+ */
+export type ReceiptPaymentCashSource = typeof ReceiptPaymentCashSource[keyof typeof ReceiptPaymentCashSource] | null;
+
+
+export const ReceiptPaymentCashSource = {
+  laci: 'laci',
+  pemilik: 'pemilik',
+} as const;
+
+/**
+ * sekarang: method wajib; cashSource wajib bila tunai (laci = uang keluar di shift yang sedang
+ * buka), null bila transfer; dueDate null. nanti: method dan cashSource null (dipilih saat
+ * pemilik menandai lunas); dueDate wajib, tidak sebelum notaDate.
+ */
+export interface ReceiptPayment {
+  timing: ReceiptPaymentTiming;
+  /** @nullable */
+  method: ReceiptPaymentMethod;
+  /** @nullable */
+  cashSource: ReceiptPaymentCashSource;
+  /** @nullable */
+  dueDate: string | null;
+}
+
+/**
+ * Barang baru dari nota (status menunggu_harga). Satuan eceran = sellUnit; bila notaUnit
+ * berbeda, satuan besar notaUnit berisi notaUnitSize. barcode melekat ke satuan nota.
+ */
+export interface NewProductInput {
+  /**
+     * @minLength 1
+     * @maxLength 100
+     */
+  name: string;
+  /**
+     * Dijual per; kg, ons, liter, dan l = barang curah.
+     * @minLength 1
+     * @maxLength 20
+     */
+  sellUnit: string;
+  /**
+     * @minLength 1
+     * @maxLength 20
+     */
+  notaUnit: string;
+  /**
+     * Isi satu satuan nota, dalam satuan Dijual per (1 bila sama dengan sellUnit).
+     * @minimum 1
+     */
+  notaUnitSize: number;
+  /**
+     * EAN-13, UPC-A, EAN-8, atau GTIN-14 (ITF-14 di dus); check digit GS1 mod-10; unik di semua satuan semua barang termasuk nonaktif.
+     * @nullable
+     */
+  barcode: string | null;
+}
+
+/**
+ * Tepat salah satu dari (productId + unitId) atau newProduct (ditegakkan server).
+ */
+export interface ReceiptLineInput {
+  /**
+     * @minLength 1
+     * @maxLength 64
+     */
+  lineId: string;
+  /** @nullable */
+  productId: string | null;
+  /**
+     * Satuan sesuai nota (satuan aktif barang itu).
+     * @nullable
+     */
+  unitId: string | null;
+  newProduct: NewProductInput | null;
+  /**
+     * Jumlah dalam satuan nota.
+     * @minimum 1
+     */
+  qty: number;
+  /**
+     * Harga beli per satuan nota (rupiah); 0 = barang bonus.
+     * @minimum 0
+     */
+  unitCost: number;
+  /** @nullable */
+  expiryDate: string | null;
+}
+
+export interface ReceiptInput {
+  /**
+     * ID draf dari HP (idempotensi); id yang sama mengembalikan nota lama dengan 200.
+     * @minLength 1
+     * @maxLength 64
+     */
+  id: string;
+  /**
+     * Supplier lama (nama sama, tanpa beda huruf) atau baru.
+     * @minLength 1
+     * @maxLength 100
+     */
+  supplierName: string;
+  /** Tidak boleh setelah hari ini. */
+  notaDate: string;
+  /**
+     * Foto nota yang sudah diunggah lewat putStaffReceiptPhoto.
+     * @nullable
+     */
+  photoId: string | null;
+  /**
+     * @minItems 1
+     * @maxItems 100
+     */
+  lines: ReceiptLineInput[];
+  payment: ReceiptPayment;
+}
+
+export interface ReceiptLineEdit {
+  /**
+     * Baris nota yang sudah ada.
+     * @minLength 1
+     * @maxLength 64
+     */
+  lineId: string;
+  /** @minimum 1 */
+  qty: number;
+  /** @minimum 0 */
+  unitCost: number;
+  /** @nullable */
+  expiryDate: string | null;
+}
+
+/**
+ * Semua baris nota (tepat sama dengan lineId yang ada); baris tidak bisa ditambah atau dihapus.
+ */
+export interface ReceiptEdit {
+  /**
+     * @minLength 1
+     * @maxLength 100
+     */
+  supplierName: string;
+  notaDate: string;
+  /**
+     * @minItems 1
+     * @maxItems 100
+     */
+  lines: ReceiptLineEdit[];
+  payment: ReceiptPayment;
+}
+
+export type ReceiptStatus = typeof ReceiptStatus[keyof typeof ReceiptStatus];
+
+
+export const ReceiptStatus = {
+  aktif: 'aktif',
+  dibatalkan: 'dibatalkan',
+} as const;
+
+/**
+ * productName, unitName, dan unitSize disalin saat nota disimpan. subtotal = qty × unitCost.
+ */
+export interface ReceiptLine {
+  lineId: string;
+  productId: string;
+  productName: string;
+  unitId: string;
+  unitName: string;
+  /** @minimum 1 */
+  unitSize: number;
+  qty: number;
+  unitCost: number;
+  subtotal: number;
+  /** @nullable */
+  expiryDate: string | null;
+  /** Barang dibuat dari baris ini. */
+  newProduct: boolean;
+}
+
+export interface StaffReceipt {
+  id: string;
+  supplierName: string;
+  notaDate: string;
+  /** @nullable */
+  photoId: string | null;
+  lines: ReceiptLine[];
+  payment: ReceiptPayment;
+  /** Bayar nanti yang belum dilunasi. */
+  paymentEditable: boolean;
+  /** Σ subtotal (rupiah). */
+  total: number;
+  status: ReceiptStatus;
+  createdAt: number;
+  createdByName: string;
+  /** @nullable */
+  editedAt: number | null;
+  /** @nullable */
+  editedByName: string | null;
+}
+
+export interface StaffReceiptRow {
+  id: string;
+  supplierName: string;
+  notaDate: string;
+  total: number;
+  lineCount: number;
+  status: ReceiptStatus;
+  createdAt: number;
+}
+
+export type DebtPaymentMethod = typeof DebtPaymentMethod[keyof typeof DebtPaymentMethod];
+
+
+export const DebtPaymentMethod = {
+  tunai: 'tunai',
+  transfer: 'transfer',
+} as const;
+
+/**
+ * @nullable
+ */
+export type DebtPaymentCashSource = typeof DebtPaymentCashSource[keyof typeof DebtPaymentCashSource] | null;
+
+
+export const DebtPaymentCashSource = {
+  laci: 'laci',
+  pemilik: 'pemilik',
+} as const;
+
+/**
+ * Pelunasan utang supplier.
+ */
+export interface DebtPayment {
+  at: number;
+  method: DebtPaymentMethod;
+  /** @nullable */
+  cashSource: DebtPaymentCashSource;
+  byName: string;
+}
+
+export type ReceiptAuditAction = typeof ReceiptAuditAction[keyof typeof ReceiptAuditAction];
+
+
+export const ReceiptAuditAction = {
+  buat: 'buat',
+  ubah: 'ubah',
+  batal: 'batal',
+  lunas: 'lunas',
+} as const;
+
+export interface ReceiptAuditEntry {
+  id: string;
+  at: number;
+  actorName: string;
+  action: ReceiptAuditAction;
+  /** Baris perubahan yang sudah berupa teks, mis. "Supplier A → B". */
+  changes: string[];
+}
+
+export interface OwnerReceiptRow {
+  id: string;
+  supplierName: string;
+  notaDate: string;
+  total: number;
+  lineCount: number;
+  status: ReceiptStatus;
+  payment: ReceiptPayment;
+  /** Pelunasan utang; null bila belum lunas atau bukan Bayar nanti. */
+  paid: DebtPayment | null;
+  createdAt: number;
+  createdByName: string;
+  /** @nullable */
+  editedByName: string | null;
+}
+
+/**
+ * Nota versi pemilik (field StaffReceipt ditambah pelunasan, pembatalan, dan riwayat).
+ */
+export type OwnerReceipt = StaffReceipt & ({
+  /** Pelunasan utang; null bila belum lunas atau bukan Bayar nanti. */
+  paid: DebtPayment | null;
+  /** @nullable */
+  cancelledAt: number | null;
+  /** Riwayat perubahan, terlama dulu. */
+  audit: ReceiptAuditEntry[];
+});
+
+/**
+ * Satu nota Bayar nanti yang tidak dibatalkan; amount = total nota.
+ */
+export interface SupplierDebt {
+  receiptId: string;
+  supplierName: string;
+  notaDate: string;
+  amount: number;
+  dueDate: string;
+  paid: DebtPayment | null;
+  /** @nullable */
+  photoId: string | null;
+  createdAt: number;
+  createdByName: string;
+}
+
+/**
+ * Shift kasir yang sedang buka (tujuan uang keluar Dari laci kasir).
+ */
+export interface DrawerShift {
+  kasirName: string;
+  openedAt: number;
+}
+
+export interface SupplierDebtList {
+  /** Belum lunas urut jatuh tempo, lalu lunas terbaru dulu. */
+  debts: SupplierDebt[];
+  /** null bila tidak ada shift buka (Dari laci kasir tidak tersedia). */
+  drawerShift: DrawerShift | null;
+}
+
+export type PayDebtInputMethod = typeof PayDebtInputMethod[keyof typeof PayDebtInputMethod];
+
+
+export const PayDebtInputMethod = {
+  tunai: 'tunai',
+  transfer: 'transfer',
+} as const;
+
+/**
+ * @nullable
+ */
+export type PayDebtInputCashSource = typeof PayDebtInputCashSource[keyof typeof PayDebtInputCashSource] | null;
+
+
+export const PayDebtInputCashSource = {
+  laci: 'laci',
+  pemilik: 'pemilik',
+} as const;
+
+/**
+ * cashSource wajib bila tunai, null bila transfer.
+ */
+export interface PayDebtInput {
+  method: PayDebtInputMethod;
+  /** @nullable */
+  cashSource: PayDebtInputCashSource;
+}
+
+/**
+ * Isian nota yang salah. Tingkat nota (lineId null): supplierName, notaDate, lines, photoId,
+ * payment, dueDate, cashSource. Tingkat baris: product, unit, qty, unitCost, expiryDate, dan
+ * isian barang baru newName, newSellUnit, newNotaUnit, newNotaUnitSize, newBarcode.
+ */
+export type ReceiptField = typeof ReceiptField[keyof typeof ReceiptField];
+
+
+export const ReceiptField = {
+  supplierName: 'supplierName',
+  notaDate: 'notaDate',
+  lines: 'lines',
+  photoId: 'photoId',
+  payment: 'payment',
+  dueDate: 'dueDate',
+  cashSource: 'cashSource',
+  product: 'product',
+  unit: 'unit',
+  qty: 'qty',
+  unitCost: 'unitCost',
+  expiryDate: 'expiryDate',
+  newName: 'newName',
+  newSellUnit: 'newSellUnit',
+  newNotaUnit: 'newNotaUnit',
+  newNotaUnitSize: 'newNotaUnitSize',
+  newBarcode: 'newBarcode',
+} as const;
+
+export interface ReceiptError {
+  /**
+     * null = galat tingkat nota.
+     * @nullable
+     */
+  lineId: string | null;
+  field: ReceiptField;
+  message: string;
+}
+
+export type ReceiptProblemCode = typeof ReceiptProblemCode[keyof typeof ReceiptProblemCode];
+
+
+export const ReceiptProblemCode = {
+  VALIDATION: 'VALIDATION',
+} as const;
+
+/**
+ * Problem VALIDATION dengan galat per baris/field nota barang masuk.
+ */
+export type ReceiptProblem = Problem & {
+  code: ReceiptProblemCode;
+  errors: ReceiptError[];
+};
+
+/**
+ * Bukan dari Wi-Fi toko (STAFF_LAN_ONLY): header Cf-Connecting-Ip/Cf-Ray → 403 STAFF_LAN_ONLY;
+ * backend menolak semua yang bukan LAN (gagal-tertutup)
+ */
+export type LanOnlyResponse = Problem;
+
+/**
+ * Barang menunggu harga jual (PRODUCT_NO_PRICE)
+ */
+export type ProductNoPriceResponse = Problem;
+
+/**
+ * Nota sudah dibatalkan (RECEIPT_CANCELLED)
+ */
+export type ReceiptCancelledResponse = Problem;
+
+/**
+ * Nota tidak valid (VALIDATION) dengan galat per baris/field
+ */
+export type ReceiptValidationFailedResponse = ReceiptProblem;
+
+/**
  * Nama atau password salah (LOGIN_INVALID)
  */
 export type LoginInvalidResponse = Problem;
@@ -1004,5 +1539,12 @@ export type SearchCustomersParams = {
  * Nama atau telepon
  */
 q?: string;
+};
+
+export type SearchStaffProductsParams = {
+/**
+ * Nama, barcode, atau kode toko
+ */
+q: string;
 };
 

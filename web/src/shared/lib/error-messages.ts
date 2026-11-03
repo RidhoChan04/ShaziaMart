@@ -18,6 +18,10 @@ const MESSAGES: Record<string, string> = {
   PRODUCT_INACTIVE: "Barang ini tidak dijual lagi",
   PRODUCT_HAS_SALES:
     "Barang yang sudah pernah terjual tidak bisa dihapus — gunakan Nonaktif.",
+  STAFF_LAN_ONLY: "Hanya bisa dipakai di Wi-Fi toko",
+  PRODUCT_NO_PRICE: "Barang belum punya harga jual",
+  RECEIPT_CANCELLED: "Nota ini sudah dibatalkan",
+  DEBT_ALREADY_PAID: "Utang ini sudah lunas",
   INTERNAL: GENERIC,
 };
 

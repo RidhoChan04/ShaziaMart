@@ -180,6 +180,7 @@ function closeShifts(ctx: Ctx, day: BusinessDay, sales: readonly MockSale[]) {
       shiftId: makeId(KIND.shift, ctx.shiftN),
       openingCash: OPENING_CASH,
       cashSales,
+      supplierPayments: 0,
       expectedCash,
       countedCash: expectedCash + difference,
       difference,

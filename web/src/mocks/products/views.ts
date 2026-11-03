@@ -146,6 +146,7 @@ export function toOwnerProduct(
     minStock: state.minStock[p.id] ?? null,
     stockAlert: stockAlertOf(state, p),
     hasSales: p.units.some((u) => sold.has(u.id)),
+    hasReceipts: false,
     costAlert: meaningfulCostAlert(state, p),
     recentMovements: movementsOf(state, p.id).slice(0, RECENT_MOVEMENTS),
     priceHistory: state.priceHistory

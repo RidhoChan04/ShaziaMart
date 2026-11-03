@@ -15,6 +15,17 @@
  * Data barang: kategori, status, stok, dan modal hanya di /api/owner.
  * Hari bisnis memakai zona Asia/Jakarta.
  *
+ * Endpoint orang toko (HP) berada di bawah /api/staff dengan realm cookie ketiga:
+ * staff_session (akun ber-role kasir, nama + PIN). Sesi kasir dan pemilik tidak berlaku di sana
+ * dan sebaliknya; masuk/keluar di satu realm tidak menyentuh dua lainnya. Realm ini hanya untuk
+ * Wi-Fi toko (LAN): setiap request /api/staff (termasuk login) yang membawa header
+ * Cf-Connecting-Ip atau Cf-Ray ditolak 403 STAFF_LAN_ONLY sebelum apa pun, dan backend menolak
+ * semua yang bukan LAN (gagal-tertutup). HPP, modal, harga jual, stok, dan laba tidak pernah
+ * ada di respons /api/staff; satu-satunya angka uang adalah unitCost (harga beli yang diketik)
+ * beserta subtotal/total pada nota milik staf itu sendiri.
+ * Tanggal kalender (notaDate, dueDate, expiryDate) berupa string YYYY-MM-DD menurut kalender
+ * Asia/Jakarta.
+ *
  * OpenAPI spec version: 0.1.0
  */
 import {
@@ -46,14 +57,20 @@ import type {
   OwnerLogin,
   OwnerProduct,
   OwnerProductRow,
+  OwnerReceipt,
+  OwnerReceiptRow,
   OwnerSession,
   OwnerTodaySummary,
+  PayDebtInput,
   PriceUpdate,
+  Problem,
   ProductHasSalesResponse,
   ProductInput,
   ProductStatusInput,
   ProductValidationFailedResponse,
   StockMovement,
+  SupplierDebt,
+  SupplierDebtList,
   UnauthorizedResponse,
   ValidationFailedResponse
 } from '../shaziaMartAPI.schemas';
@@ -747,6 +764,8 @@ export const getUpdateOwnerProductUrl = (productId: string,) => {
 /**
  * Field null menghapus nilainya. Barang yang sudah terjual: 'Dijual per' dan isi satuan
  * yang sudah terjual dikunci (422); satuan besar terjual yang diganti dinonaktifkan.
+ * Barang hasReceipts: cost dan bigUnit.cost diabaikan (HPP mengikuti barang masuk), bukan 422.
+ * Barang menunggu_harga yang disimpan dengan harga jual menjadi aktif.
  * Batas min/max di skema adalah panduan klien; server selalu memvalidasi isi mentah dan mengembalikan ProductValidationFailed dengan pesan per field.
  * @summary Ubah barang
  */
@@ -910,6 +929,8 @@ export const useDeleteOwnerProduct = <TError = ErrorType<UnauthorizedResponse | 
 }
 
 /**
+ * Barang menunggu_harga, atau body dengan status menunggu_harga, ditolak 422 VALIDATION
+ * (detail "Isi harga jual dulu"): status itu hanya diakhiri dengan menyimpan harga jual.
  * @summary Ubah status barang dan tanda Sedang langka
  */
 export const setOwnerProductStatus = async (productId: string,
@@ -944,7 +965,7 @@ return customFetch<OwnerProduct>(getSetOwnerProductStatusUrl(productId),
 
 export const getSetOwnerProductStatusMutationKey = () => ['setOwnerProductStatus'] as const;
 
-export const getSetOwnerProductStatusMutationOptions = <TError = ErrorType<UnauthorizedResponse | NotFoundResponse>,
+export const getSetOwnerProductStatusMutationOptions = <TError = ErrorType<UnauthorizedResponse | NotFoundResponse | ValidationFailedResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setOwnerProductStatus>>, TError,SetOwnerProductStatusMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof setOwnerProductStatus>>, TError,SetOwnerProductStatusMutationVariables, TContext> => {
 
@@ -973,13 +994,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type SetOwnerProductStatusMutationResult = NonNullable<Awaited<ReturnType<typeof setOwnerProductStatus>>>
     export type SetOwnerProductStatusMutationBody = ProductStatusInput
-    export type SetOwnerProductStatusMutationError = ErrorType<UnauthorizedResponse | NotFoundResponse>
+    export type SetOwnerProductStatusMutationError = ErrorType<UnauthorizedResponse | NotFoundResponse | ValidationFailedResponse>
     export type SetOwnerProductStatusMutationVariables = {productId: string;data: ProductStatusInput}
 
     /**
  * @summary Ubah status barang dan tanda Sedang langka
  */
-export const useSetOwnerProductStatus = <TError = ErrorType<UnauthorizedResponse | NotFoundResponse>,
+export const useSetOwnerProductStatus = <TError = ErrorType<UnauthorizedResponse | NotFoundResponse | ValidationFailedResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setOwnerProductStatus>>, TError,SetOwnerProductStatusMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof setOwnerProductStatus>>,
@@ -1453,6 +1474,7 @@ export const useCheckOwnerProductImport = <TError = ErrorType<UnauthorizedRespon
 /**
  * Memvalidasi ulang lalu menyimpan baris baru dan diperbarui sekaligus (atomik); baris tidak
  * berubah dan baris bermasalah dilewati. Sel kosong tidak menghapus data lama.
+ * Modal untuk barang hasReceipts diabaikan (HPP mengikuti barang masuk) dan dicatat di notes.
  * @summary Impor baris Excel
  */
 export const commitOwnerProductImport = async (importRequest: ImportRequest, options?: Parameters<typeof customFetch>[1]): Promise<ImportResult> => {
@@ -1530,4 +1552,571 @@ export const useCommitOwnerProductImport = <TError = ErrorType<UnauthorizedRespo
         TContext
       > => {
       return useMutation(getCommitOwnerProductImportMutationOptions(options), queryClient);
+    }
+    export const getListOwnerReceiptsUrl = () => {
+
+
+
+
+  return `/api/owner/receipts`
+}
+
+/**
+ * @summary Daftar barang masuk (semua staf)
+ */
+export const listOwnerReceipts = async ( options?: Parameters<typeof customFetch>[1]): Promise<OwnerReceiptRow[]> => {
+
+  return customFetch<OwnerReceiptRow[]>(getListOwnerReceiptsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListOwnerReceiptsQueryKey = () => {
+    return [
+    `/api/owner/receipts`
+    ] as const;
+    }
+
+
+export const getListOwnerReceiptsQueryOptions = <TData = Awaited<ReturnType<typeof listOwnerReceipts>>, TError = ErrorType<UnauthorizedResponse>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOwnerReceipts>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListOwnerReceiptsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listOwnerReceipts>>> = ({ signal }) => listOwnerReceipts({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listOwnerReceipts>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListOwnerReceiptsQueryResult = NonNullable<Awaited<ReturnType<typeof listOwnerReceipts>>>
+export type ListOwnerReceiptsQueryError = ErrorType<UnauthorizedResponse>
+
+
+export function useListOwnerReceipts<TData = Awaited<ReturnType<typeof listOwnerReceipts>>, TError = ErrorType<UnauthorizedResponse>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOwnerReceipts>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listOwnerReceipts>>,
+          TError,
+          Awaited<ReturnType<typeof listOwnerReceipts>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListOwnerReceipts<TData = Awaited<ReturnType<typeof listOwnerReceipts>>, TError = ErrorType<UnauthorizedResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOwnerReceipts>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listOwnerReceipts>>,
+          TError,
+          Awaited<ReturnType<typeof listOwnerReceipts>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListOwnerReceipts<TData = Awaited<ReturnType<typeof listOwnerReceipts>>, TError = ErrorType<UnauthorizedResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOwnerReceipts>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Daftar barang masuk (semua staf)
+ */
+
+export function useListOwnerReceipts<TData = Awaited<ReturnType<typeof listOwnerReceipts>>, TError = ErrorType<UnauthorizedResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOwnerReceipts>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListOwnerReceiptsQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+export const getGetOwnerReceiptUrl = (receiptId: string,) => {
+
+
+
+
+  return `/api/owner/receipts/${receiptId}`
+}
+
+/**
+ * @summary Detail nota barang masuk dengan riwayat perubahan
+ */
+export const getOwnerReceipt = async (receiptId: string, options?: Parameters<typeof customFetch>[1]): Promise<OwnerReceipt> => {
+
+  return customFetch<OwnerReceipt>(getGetOwnerReceiptUrl(receiptId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetOwnerReceiptQueryKey = (receiptId: string,) => {
+    return [
+    `/api/owner/receipts/${receiptId}`
+    ] as const;
+    }
+
+
+export const getGetOwnerReceiptQueryOptions = <TData = Awaited<ReturnType<typeof getOwnerReceipt>>, TError = ErrorType<UnauthorizedResponse | NotFoundResponse>>(receiptId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerReceipt>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetOwnerReceiptQueryKey(receiptId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOwnerReceipt>>> = ({ signal }) => getOwnerReceipt(receiptId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: receiptId !== null && receiptId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getOwnerReceipt>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetOwnerReceiptQueryResult = NonNullable<Awaited<ReturnType<typeof getOwnerReceipt>>>
+export type GetOwnerReceiptQueryError = ErrorType<UnauthorizedResponse | NotFoundResponse>
+
+
+export function useGetOwnerReceipt<TData = Awaited<ReturnType<typeof getOwnerReceipt>>, TError = ErrorType<UnauthorizedResponse | NotFoundResponse>>(
+ receiptId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerReceipt>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getOwnerReceipt>>,
+          TError,
+          Awaited<ReturnType<typeof getOwnerReceipt>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetOwnerReceipt<TData = Awaited<ReturnType<typeof getOwnerReceipt>>, TError = ErrorType<UnauthorizedResponse | NotFoundResponse>>(
+ receiptId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerReceipt>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getOwnerReceipt>>,
+          TError,
+          Awaited<ReturnType<typeof getOwnerReceipt>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetOwnerReceipt<TData = Awaited<ReturnType<typeof getOwnerReceipt>>, TError = ErrorType<UnauthorizedResponse | NotFoundResponse>>(
+ receiptId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerReceipt>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Detail nota barang masuk dengan riwayat perubahan
+ */
+
+export function useGetOwnerReceipt<TData = Awaited<ReturnType<typeof getOwnerReceipt>>, TError = ErrorType<UnauthorizedResponse | NotFoundResponse>>(
+ receiptId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerReceipt>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetOwnerReceiptQueryOptions(receiptId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+export const getCancelOwnerReceiptUrl = (receiptId: string,) => {
+
+
+
+
+  return `/api/owner/receipts/${receiptId}/cancel`
+}
+
+/**
+ * Membuat entri balik: stok (batal_masuk), HPP (PriceSource ubah_nota), utang yang belum lunas
+ * dihapus, dan uang keluar laci dikoreksi di shift yang sedang buka (tanpa shift buka: tidak
+ * dicatat, audit memuat catatannya). Idempoten: nota yang sudah dibatalkan dikembalikan apa adanya.
+ * @summary Batalkan nota barang masuk
+ */
+export const cancelOwnerReceipt = async (receiptId: string, options?: Parameters<typeof customFetch>[1]): Promise<OwnerReceipt> => {
+
+  return customFetch<OwnerReceipt>(getCancelOwnerReceiptUrl(receiptId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getCancelOwnerReceiptMutationKey = () => ['cancelOwnerReceipt'] as const;
+
+export const getCancelOwnerReceiptMutationOptions = <TError = ErrorType<UnauthorizedResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelOwnerReceipt>>, TError,CancelOwnerReceiptMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof cancelOwnerReceipt>>, TError,CancelOwnerReceiptMutationVariables, TContext> => {
+
+const mutationKey = getCancelOwnerReceiptMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cancelOwnerReceipt>>, CancelOwnerReceiptMutationVariables> = (props) => {
+          const {receiptId} = props ?? {};
+
+          return  cancelOwnerReceipt(receiptId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CancelOwnerReceiptMutationResult = NonNullable<Awaited<ReturnType<typeof cancelOwnerReceipt>>>
+
+    export type CancelOwnerReceiptMutationError = ErrorType<UnauthorizedResponse | NotFoundResponse>
+    export type CancelOwnerReceiptMutationVariables = {receiptId: string}
+
+    /**
+ * @summary Batalkan nota barang masuk
+ */
+export const useCancelOwnerReceipt = <TError = ErrorType<UnauthorizedResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelOwnerReceipt>>, TError,CancelOwnerReceiptMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof cancelOwnerReceipt>>,
+        TError,
+        CancelOwnerReceiptMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCancelOwnerReceiptMutationOptions(options), queryClient);
+    }
+    export const getGetOwnerReceiptPhotoUrl = (photoId: string,) => {
+
+
+
+
+  return `/api/owner/receipt-photos/${photoId}`
+}
+
+/**
+ * @summary Foto nota (JPEG)
+ */
+export const getOwnerReceiptPhoto = async (photoId: string, options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {
+
+  return customFetch<Blob>(getGetOwnerReceiptPhotoUrl(photoId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetOwnerReceiptPhotoQueryKey = (photoId: string,) => {
+    return [
+    `/api/owner/receipt-photos/${photoId}`
+    ] as const;
+    }
+
+
+export const getGetOwnerReceiptPhotoQueryOptions = <TData = Awaited<ReturnType<typeof getOwnerReceiptPhoto>>, TError = ErrorType<UnauthorizedResponse | NotFoundResponse>>(photoId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerReceiptPhoto>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetOwnerReceiptPhotoQueryKey(photoId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOwnerReceiptPhoto>>> = ({ signal }) => getOwnerReceiptPhoto(photoId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: photoId !== null && photoId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getOwnerReceiptPhoto>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetOwnerReceiptPhotoQueryResult = NonNullable<Awaited<ReturnType<typeof getOwnerReceiptPhoto>>>
+export type GetOwnerReceiptPhotoQueryError = ErrorType<UnauthorizedResponse | NotFoundResponse>
+
+
+export function useGetOwnerReceiptPhoto<TData = Awaited<ReturnType<typeof getOwnerReceiptPhoto>>, TError = ErrorType<UnauthorizedResponse | NotFoundResponse>>(
+ photoId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerReceiptPhoto>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getOwnerReceiptPhoto>>,
+          TError,
+          Awaited<ReturnType<typeof getOwnerReceiptPhoto>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetOwnerReceiptPhoto<TData = Awaited<ReturnType<typeof getOwnerReceiptPhoto>>, TError = ErrorType<UnauthorizedResponse | NotFoundResponse>>(
+ photoId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerReceiptPhoto>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getOwnerReceiptPhoto>>,
+          TError,
+          Awaited<ReturnType<typeof getOwnerReceiptPhoto>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetOwnerReceiptPhoto<TData = Awaited<ReturnType<typeof getOwnerReceiptPhoto>>, TError = ErrorType<UnauthorizedResponse | NotFoundResponse>>(
+ photoId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerReceiptPhoto>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Foto nota (JPEG)
+ */
+
+export function useGetOwnerReceiptPhoto<TData = Awaited<ReturnType<typeof getOwnerReceiptPhoto>>, TError = ErrorType<UnauthorizedResponse | NotFoundResponse>>(
+ photoId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerReceiptPhoto>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetOwnerReceiptPhotoQueryOptions(photoId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+export const getListOwnerSupplierDebtsUrl = () => {
+
+
+
+
+  return `/api/owner/supplier-debts`
+}
+
+/**
+ * @summary Utang ke supplier (nota Bayar nanti)
+ */
+export const listOwnerSupplierDebts = async ( options?: Parameters<typeof customFetch>[1]): Promise<SupplierDebtList> => {
+
+  return customFetch<SupplierDebtList>(getListOwnerSupplierDebtsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListOwnerSupplierDebtsQueryKey = () => {
+    return [
+    `/api/owner/supplier-debts`
+    ] as const;
+    }
+
+
+export const getListOwnerSupplierDebtsQueryOptions = <TData = Awaited<ReturnType<typeof listOwnerSupplierDebts>>, TError = ErrorType<UnauthorizedResponse>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOwnerSupplierDebts>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListOwnerSupplierDebtsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listOwnerSupplierDebts>>> = ({ signal }) => listOwnerSupplierDebts({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listOwnerSupplierDebts>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListOwnerSupplierDebtsQueryResult = NonNullable<Awaited<ReturnType<typeof listOwnerSupplierDebts>>>
+export type ListOwnerSupplierDebtsQueryError = ErrorType<UnauthorizedResponse>
+
+
+export function useListOwnerSupplierDebts<TData = Awaited<ReturnType<typeof listOwnerSupplierDebts>>, TError = ErrorType<UnauthorizedResponse>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOwnerSupplierDebts>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listOwnerSupplierDebts>>,
+          TError,
+          Awaited<ReturnType<typeof listOwnerSupplierDebts>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListOwnerSupplierDebts<TData = Awaited<ReturnType<typeof listOwnerSupplierDebts>>, TError = ErrorType<UnauthorizedResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOwnerSupplierDebts>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listOwnerSupplierDebts>>,
+          TError,
+          Awaited<ReturnType<typeof listOwnerSupplierDebts>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListOwnerSupplierDebts<TData = Awaited<ReturnType<typeof listOwnerSupplierDebts>>, TError = ErrorType<UnauthorizedResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOwnerSupplierDebts>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Utang ke supplier (nota Bayar nanti)
+ */
+
+export function useListOwnerSupplierDebts<TData = Awaited<ReturnType<typeof listOwnerSupplierDebts>>, TError = ErrorType<UnauthorizedResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOwnerSupplierDebts>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListOwnerSupplierDebtsQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+export const getPayOwnerSupplierDebtUrl = (receiptId: string,) => {
+
+
+
+
+  return `/api/owner/supplier-debts/${receiptId}/pay`
+}
+
+/**
+ * Lunas penuh (tanpa pelunasan sebagian). tunai + laci dicatat sebagai uang keluar di shift
+ * yang sedang buka. 409 membawa DEBT_ALREADY_PAID, RECEIPT_CANCELLED, atau SHIFT_CLOSED
+ * (laci dipilih tanpa shift buka). 422 VALIDATION bila cashSource tidak cocok dengan method.
+ * @summary Tandai utang supplier lunas
+ */
+export const payOwnerSupplierDebt = async (receiptId: string,
+    payDebtInput: PayDebtInput, options?: Parameters<typeof customFetch>[1]): Promise<SupplierDebt> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<SupplierDebt>(getPayOwnerSupplierDebtUrl(receiptId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(payDebtInput)
+  }
+);}
+
+
+
+
+
+export const getPayOwnerSupplierDebtMutationKey = () => ['payOwnerSupplierDebt'] as const;
+
+export const getPayOwnerSupplierDebtMutationOptions = <TError = ErrorType<UnauthorizedResponse | NotFoundResponse | Problem | ValidationFailedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof payOwnerSupplierDebt>>, TError,PayOwnerSupplierDebtMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof payOwnerSupplierDebt>>, TError,PayOwnerSupplierDebtMutationVariables, TContext> => {
+
+const mutationKey = getPayOwnerSupplierDebtMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof payOwnerSupplierDebt>>, PayOwnerSupplierDebtMutationVariables> = (props) => {
+          const {receiptId,data} = props ?? {};
+
+          return  payOwnerSupplierDebt(receiptId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PayOwnerSupplierDebtMutationResult = NonNullable<Awaited<ReturnType<typeof payOwnerSupplierDebt>>>
+    export type PayOwnerSupplierDebtMutationBody = PayDebtInput
+    export type PayOwnerSupplierDebtMutationError = ErrorType<UnauthorizedResponse | NotFoundResponse | Problem | ValidationFailedResponse>
+    export type PayOwnerSupplierDebtMutationVariables = {receiptId: string;data: PayDebtInput}
+
+    /**
+ * @summary Tandai utang supplier lunas
+ */
+export const usePayOwnerSupplierDebt = <TError = ErrorType<UnauthorizedResponse | NotFoundResponse | Problem | ValidationFailedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof payOwnerSupplierDebt>>, TError,PayOwnerSupplierDebtMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof payOwnerSupplierDebt>>,
+        TError,
+        PayOwnerSupplierDebtMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPayOwnerSupplierDebtMutationOptions(options), queryClient);
     }

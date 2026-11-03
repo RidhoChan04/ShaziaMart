@@ -7,6 +7,9 @@ import {
   ProductField,
   type ProductValidationProblem,
   ProductValidationProblemCode,
+  ReceiptField,
+  type ReceiptProblem,
+  ReceiptProblemCode,
 } from "./gen/shaziaMartAPI.schemas";
 
 /** Baca body problem+json dari ApiError sesuai skema; null bila bukan ApiError atau body tak cocok. */
@@ -65,3 +68,24 @@ export const productValidationProblemSchema = z.object({
     z.object({ field: z.enum(PRODUCT_FIELDS), message: z.string() }),
   ),
 }) satisfies z.core.$ZodType<ProductValidationProblem>;
+
+const RECEIPT_FIELDS = Object.values(ReceiptField) as [
+  ReceiptField,
+  ...ReceiptField[],
+];
+
+/** 422 `VALIDATION` dari nota barang masuk: galat per baris (`lineId`) atau tingkat nota (`null`). */
+export const receiptProblemSchema = z.object({
+  type: z.string(),
+  title: z.string(),
+  status: z.number(),
+  code: z.literal(ReceiptProblemCode.VALIDATION),
+  detail: z.exactOptional(z.string()),
+  errors: z.array(
+    z.object({
+      lineId: z.nullable(z.string()),
+      field: z.enum(RECEIPT_FIELDS),
+      message: z.string(),
+    }),
+  ),
+}) satisfies z.core.$ZodType<ReceiptProblem>;

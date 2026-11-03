@@ -94,6 +94,13 @@ describe("attentionItems", () => {
     overdueCredit: { count: 0, total: 0 },
     costChanges: [],
     stockOuts: [],
+    supplierDebts: {
+      overdueCount: 0,
+      overdueTotal: 0,
+      dueSoonCount: 0,
+      dueSoonTotal: 0,
+    },
+    awaitingPriceCount: 0,
   };
 
   test("semua nol -> kosong", () => expect(attentionItems(none)).toEqual([]));
@@ -109,6 +116,8 @@ describe("attentionItems", () => {
       overdueCredit: { count: 2, total: 1250000 },
       costChanges: [],
       stockOuts: [],
+      supplierDebts: none.supplierDebts,
+      awaitingPriceCount: 0,
     };
     expect(attentionItems(a)).toEqual([
       {
@@ -186,6 +195,13 @@ describe("attentionItems: modal berubah dan barang habis", () => {
     overdueCredit: { count: 0, total: 0 },
     costChanges: [],
     stockOuts: [],
+    supplierDebts: {
+      overdueCount: 0,
+      overdueTotal: 0,
+      dueSoonCount: 0,
+      dueSoonTotal: 0,
+    },
+    awaitingPriceCount: 0,
   };
   const change = (
     over: Partial<Attention["costChanges"][number]> = {},
@@ -281,6 +297,8 @@ describe("attentionItems: modal berubah dan barang habis", () => {
       overdueCredit: { count: 1, total: 100 },
       costChanges: [change()],
       stockOuts: [{ productId: "p-beras", productName: "Beras" }],
+      supplierDebts: none.supplierDebts,
+      awaitingPriceCount: 0,
     });
     expect(items.map((i) => i.key)).toEqual([
       "negative-stock",

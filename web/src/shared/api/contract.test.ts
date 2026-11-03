@@ -12,9 +12,16 @@ import type {
   PriceChangedProblem,
   Product,
   ProductInput,
+  ShiftClosure,
+  StockMovement,
   StockOutItem,
+  SupplierDebtAttention,
 } from "./gen/shaziaMartAPI.schemas";
-import { ErrorCode } from "./gen/shaziaMartAPI.schemas";
+import {
+  ErrorCode,
+  PriceSource,
+  ProductStatus,
+} from "./gen/shaziaMartAPI.schemas";
 import { LookupCatalogResponse } from "./gen/zod/catalog/catalog";
 import {
   CheckOwnerProductImportBody,
@@ -80,12 +87,50 @@ test("creditLimitProblemSchema cocok dengan tipe hasil generate", () => {
   expect(ok.success).toBe(true);
 });
 
-test("ErrorCode 16 nilai termasuk PRODUCT_INACTIVE dan PRODUCT_HAS_SALES", () => {
-  expect(Object.values(ErrorCode)).toHaveLength(16);
+test("ErrorCode 20 nilai termasuk 4 kode baru", () => {
+  expect(Object.values(ErrorCode)).toHaveLength(20);
   expect(Object.values(ErrorCode)).toEqual(
-    expect.arrayContaining(["PRODUCT_INACTIVE", "PRODUCT_HAS_SALES"]),
+    expect.arrayContaining([
+      "PRODUCT_INACTIVE",
+      "PRODUCT_HAS_SALES",
+      "STAFF_LAN_ONLY",
+      "PRODUCT_NO_PRICE",
+      "RECEIPT_CANCELLED",
+      "DEBT_ALREADY_PAID",
+    ]),
   );
   expect(ErrorCode.LOGIN_INVALID).toBe("LOGIN_INVALID");
+});
+
+test("enum diperluas", () => {
+  expect(Object.values(ProductStatus)).toEqual([
+    "aktif",
+    "tidak_diambil",
+    "nonaktif",
+    "menunggu_harga",
+  ]);
+  expect(Object.values(PriceSource)).toEqual([
+    "pemilik",
+    "impor",
+    "barang_masuk",
+    "ubah_nota",
+  ]);
+  expectTypeOf<StockMovement["kind"]>().toEqualTypeOf<
+    "jual" | "batal" | "masuk" | "koreksi_masuk" | "batal_masuk"
+  >();
+});
+
+test("ShiftClosure.supplierPayments, Attention.supplierDebts/awaitingPriceCount, OwnerProduct.hasReceipts", () => {
+  expectTypeOf<ShiftClosure["supplierPayments"]>().toEqualTypeOf<number>();
+  expectTypeOf<
+    Attention["supplierDebts"]
+  >().toEqualTypeOf<SupplierDebtAttention>();
+  expectTypeOf<Attention["awaitingPriceCount"]>().toEqualTypeOf<number>();
+  expectTypeOf<OwnerProduct["hasReceipts"]>().toEqualTypeOf<boolean>();
+  expectTypeOf<keyof SupplierDebtAttention>().toEqualTypeOf<
+    "overdueCount" | "overdueTotal" | "dueSoonCount" | "dueSoonTotal"
+  >();
+  expectTypeOf<Required<ShiftClosure>>().toEqualTypeOf<ShiftClosure>();
 });
 
 test("Product kasir tanpa field pemilik; OwnerProductUnit punya cost", () => {
@@ -205,6 +250,7 @@ test("bentuk OwnerProduct, OwnerProductRow, ProductInput, ImportRowResult: key l
     | "minStock"
     | "stockAlert"
     | "hasSales"
+    | "hasReceipts"
     | "costAlert"
     | "recentMovements"
     | "priceHistory"
@@ -308,9 +354,23 @@ test("fixture OwnerTodaySummary valid terhadap skema respons dan tipe", () => {
         },
       ],
       stockOuts: [{ productId: "p2", productName: "Teh Kotak" }],
+      supplierDebts: {
+        overdueCount: 1,
+        overdueTotal: 1442000,
+        dueSoonCount: 2,
+        dueSoonTotal: 350000,
+      },
+      awaitingPriceCount: 3,
     },
   } satisfies OwnerTodaySummary;
   expect(GetOwnerTodaySummaryResponse.safeParse(summary).success).toBe(true);
+  const { awaitingPriceCount: _, ...noAwaiting } = summary.attention;
+  expect(
+    GetOwnerTodaySummaryResponse.safeParse({
+      ...summary,
+      attention: noAwaiting,
+    }).success,
+  ).toBe(false);
   const short = { ...summary, hourly: summary.hourly.slice(0, 23) };
   expect(GetOwnerTodaySummaryResponse.safeParse(short).success).toBe(false);
 });
