@@ -245,7 +245,7 @@ test("chip Nonaktif hanya ada bila ada barang nonaktif, dan menampilkan hanya ya
 
 test("sub-halaman /owner/barang/impor tidak menampilkan judul besar 'Barang' dari kerangka", async () => {
   renderApp("/owner/barang/impor");
-  await screen.findByRole("heading", { level: 1, name: "Segera hadir" });
+  await screen.findByRole("heading", { level: 1, name: "Impor dari Excel" });
   expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
   expect(
     screen.queryByRole("heading", { level: 1, name: "Barang" }),
@@ -260,7 +260,7 @@ test("sub-halaman /owner/barang/impor tidak menampilkan judul besar 'Barang' dar
 
 test("sub-halaman dibuka langsung (tanpa riwayat): kembali = tautan ke /owner/barang", async () => {
   renderApp("/owner/barang/impor");
-  await screen.findByRole("heading", { level: 1, name: "Segera hadir" });
+  await screen.findByRole("heading", { level: 1, name: "Impor dari Excel" });
   const back = main().getByRole("link", { name: "Barang" });
   expect(back).toHaveAttribute("href", "/owner/barang");
 });

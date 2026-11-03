@@ -106,7 +106,7 @@ test("judul besar kerangka hanya untuk akar tab; sub-halaman tab Barang memakai 
   const { router } = renderApp("/owner/barang/impor");
   const title = await screen.findByRole("heading", {
     level: 1,
-    name: "Segera hadir",
+    name: "Impor dari Excel",
   });
   // Bukan di <header> kerangka (tanpa tanggal/status toko).
   expect(screen.queryByText("Sabtu, 17 Okt")).toBeNull();
