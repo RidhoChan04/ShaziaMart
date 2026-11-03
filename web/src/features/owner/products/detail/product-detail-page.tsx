@@ -4,6 +4,7 @@ import { useGetOwnerProduct } from "@/shared/api/gen/owner/owner";
 import { pesanError } from "@/shared/lib/error-messages";
 import { Button } from "@/shared/ui/button";
 import { SubPageHeader } from "../../common/sub-page-header";
+import { CostSheet } from "../price/cost-sheet";
 import { productBadges } from "../product-model";
 import { StatusBadge } from "../status-badge";
 import { BarcodeCard } from "./barcode-card";
@@ -113,7 +114,7 @@ export function ProductDetailPage() {
           <StatusCard product={product} />
         </div>
       </div>
-      {/* ?lembar=harga: Task 11 memasang lembar Ubah harga di sini (priceLines + costAlert); sampai itu parameter diabaikan. */}
+      <CostSheet product={product} requested={lembar === "harga"} />
       <StockOutDialog product={product} requested={lembar === "habis"} />
     </div>
   );

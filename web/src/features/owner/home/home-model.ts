@@ -1,5 +1,6 @@
 import type {
   Attention,
+  CostChangeItem,
   HourBucket,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { formatRupiah } from "@/shared/lib/money";
@@ -44,14 +45,49 @@ export function hourWindow(
   return { from: from + shift, to: to + shift };
 }
 
+export type AttentionLink =
+  | { to: "/owner/barang" | "/owner/lainnya" | "/owner/kasbon" }
+  | {
+      to: "/owner/barang/$productId";
+      params: { productId: string };
+      search: { lembar: "harga" | "habis" };
+    };
+
 export type AttentionItem = {
   key: string;
   title: string;
   detail: string;
   tone: "warning" | "critical";
-  to: "/owner/barang" | "/owner/lainnya" | "/owner/kasbon";
+  icon: "stock" | "cost" | "stockout" | "cash" | "credit";
+  link: AttentionLink;
 };
 
+/** Butir `Harga modal {nama} naik|turun {Rp}`; selisih eceran di bawah Rp1 tidak pernah ditulis "Rp0". */
+function costItem(c: CostChangeItem): AttentionItem {
+  const delta = c.newCost - c.oldCost;
+  const verb =
+    delta === 0
+      ? "berubah"
+      : `${delta > 0 ? "naik" : "turun"} ${formatRupiah(Math.abs(delta))}`;
+  const profit = c.price - c.newCost;
+  return {
+    key: `cost-${c.productId}`,
+    title: `Harga modal ${c.productName} ${verb}`,
+    detail:
+      profit < 0
+        ? `Rugi ${formatRupiah(-profit)}`
+        : `Untung jadi ${formatRupiah(profit)}`,
+    tone: "warning",
+    icon: "cost",
+    link: {
+      to: "/owner/barang/$productId",
+      params: { productId: c.productId },
+      search: { lembar: "harga" },
+    },
+  };
+}
+
+/** Urutan: stok minus, perubahan modal, stok menipis, barang habis, selisih kas, kasbon > 30 hari. */
 export function attentionItems(a: Attention): AttentionItem[] {
   const items: AttentionItem[] = [];
   if (a.negativeStockCount > 0) {
@@ -60,16 +96,33 @@ export function attentionItems(a: Attention): AttentionItem[] {
       title: "Stok minus",
       detail: `${a.negativeStockCount} barang`,
       tone: "critical",
-      to: "/owner/barang",
+      icon: "stock",
+      link: { to: "/owner/barang" },
     });
   }
+  items.push(...a.costChanges.map(costItem));
   if (a.lowStockCount > 0) {
     items.push({
       key: "low-stock",
       title: "Stok menipis",
       detail: `${a.lowStockCount} barang`,
       tone: "warning",
-      to: "/owner/barang",
+      icon: "stock",
+      link: { to: "/owner/barang" },
+    });
+  }
+  for (const s of a.stockOuts) {
+    items.push({
+      key: `stockout-${s.productId}`,
+      title: `${s.productName} habis`,
+      detail: "Tidak diambil lagi",
+      tone: "warning",
+      icon: "stockout",
+      link: {
+        to: "/owner/barang/$productId",
+        params: { productId: s.productId },
+        search: { lembar: "habis" },
+      },
     });
   }
   for (const c of a.cashDifferences) {
@@ -83,7 +136,8 @@ export function attentionItems(a: Attention): AttentionItem[] {
       title: `Selisih kas ${signed}`,
       detail: `Shift ${c.kasirName}`,
       tone: c.difference < 0 ? "critical" : "warning",
-      to: "/owner/lainnya",
+      icon: "cash",
+      link: { to: "/owner/lainnya" },
     });
   }
   if (a.overdueCredit.count > 0) {
@@ -92,7 +146,8 @@ export function attentionItems(a: Attention): AttentionItem[] {
       title: "Kasbon > 30 hari",
       detail: `${a.overdueCredit.count} pelanggan · ${formatRupiah(a.overdueCredit.total)}`,
       tone: "warning",
-      to: "/owner/kasbon",
+      icon: "credit",
+      link: { to: "/owner/kasbon" },
     });
   }
   return items;

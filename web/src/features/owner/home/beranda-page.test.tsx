@@ -312,3 +312,40 @@ test("keterangan perhatian dengan nama kasir panjang dipotong (truncate), bukan 
   const detail = await screen.findByText(`Shift ${longName}`);
   expect(detail).toHaveClass("truncate");
 });
+
+test("perlu perhatian: butir modal berubah dan barang habis membuka lembar di detail barang", async () => {
+  const find = (name: string) => {
+    const p = mockDb.get().products.find((x) => x.name === name);
+    if (!p) throw new Error(`seed tanpa ${name}`);
+    return p.id;
+  };
+  const indomie = find("Indomie Goreng");
+  const beras = find("Beras Pandan Wangi 5 kg");
+  mockDb.update((s) => {
+    const p = s.products.find((x) => x.id === indomie);
+    const b = s.products.find((x) => x.id === beras);
+    if (!p || !b) throw new Error("seed");
+    p.cost = { amount: 108000, qtyBase: 40 };
+    s.costAlerts[indomie] = {
+      fromCost: { amount: 104000, qtyBase: 40 },
+      changedAt: Date.UTC(2026, 9, 17, 1, 0),
+      source: "pemilik",
+    };
+    b.status = "tidak_diambil";
+    b.stockCounted = true;
+    s.stock[beras] = 0;
+  });
+  await ownerLogin();
+  renderApp("/owner");
+
+  expect(
+    await screen.findByRole("link", {
+      name: /^Harga modal Indomie Goreng naik Rp100\sUntung jadi Rp400$/,
+    }),
+  ).toHaveAttribute("href", `/owner/barang/${indomie}?lembar=harga`);
+  expect(
+    screen.getByRole("link", {
+      name: /^Beras Pandan Wangi 5 kg habis\sTidak diambil lagi$/,
+    }),
+  ).toHaveAttribute("href", `/owner/barang/${beras}?lembar=habis`);
+});
