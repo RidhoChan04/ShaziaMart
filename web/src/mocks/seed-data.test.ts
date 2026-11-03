@@ -105,7 +105,7 @@ test("deterministik untuk now yang sama", () => {
 
 test("PIN seed dan state awal", () => {
   const s = createSeedState();
-  expect(s.version).toBe(4);
+  expect(s.version).toBe(5);
   expect(s.users.map((u) => [u.name, u.role, u.pin, u.password])).toEqual([
     ["Rina", "kasir", "123456", undefined],
     ["Budi", "kasir", "654321", undefined],
@@ -117,7 +117,16 @@ test("PIN seed dan state awal", () => {
     s.pinFailures,
     s.ownerSession,
     s.ownerLoginFailures,
-  ]).toEqual([null, null, {}, null, {}]);
+    s.staffSession,
+    s.staffPinFailures,
+  ]).toEqual([null, null, {}, null, {}, null, {}]);
+  // Tidak ada nota seed.
+  expect([s.suppliers, s.receipts, s.receiptAudit, s.stockEntries]).toEqual([
+    [],
+    [],
+    [],
+    [],
+  ]);
 });
 
 test("pelanggan seed", () => {
@@ -154,13 +163,13 @@ test("ID unik di seluruh state", () => {
   expect(new Set(ids).size).toBe(ids.length);
 });
 
-test("state versi lama di localStorage diganti default v4", () => {
+test("state versi lama di localStorage diganti default v5", () => {
   localStorage.setItem(
     "mock.db",
     JSON.stringify({ store: { id: "x", name: "y" } }),
   );
   __resetMockDbCacheForTests();
-  expect(mockDb.get().version).toBe(4);
+  expect(mockDb.get().version).toBe(5);
   expect(mockDb.get().products).toHaveLength(60);
 });
 

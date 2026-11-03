@@ -52,6 +52,7 @@ export const shiftHandlers = [
         openingCash,
         cashSales: 0,
         salesCount: 0,
+        cashOuts: [],
       };
       mockDb.update((s) => {
         s.shift = shift;

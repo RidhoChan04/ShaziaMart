@@ -3,12 +3,35 @@ import { newId } from "@/shared/lib/id";
 import { type MockSale, type MockState, mockDb } from "../db";
 import { KIND, makeId } from "../seed";
 
-export function post(path: string, body: unknown): Promise<Response> {
+export function post(
+  path: string,
+  body: unknown,
+  headers: Record<string, string> = {},
+): Promise<Response> {
   return fetch(path, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...headers },
     body: JSON.stringify(body),
   });
+}
+
+export function put(
+  path: string,
+  body: unknown,
+  headers: Record<string, string> = {},
+): Promise<Response> {
+  return fetch(path, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...headers },
+    body: JSON.stringify(body),
+  });
+}
+
+export function get(
+  path: string,
+  headers: Record<string, string> = {},
+): Promise<Response> {
+  return fetch(path, { headers });
 }
 
 export function userId(name: string): string {
@@ -19,6 +42,36 @@ export function userId(name: string): string {
 
 export const login = (pin: string, name = "Rina"): Promise<Response> =>
   post("/api/auth/pin-login", { userId: userId(name), pin });
+
+/** Login orang toko (realm `/api/staff`, terpisah dari sesi kasir & pemilik). */
+export const staffLogin = (name = "Rina", pin = "123456"): Promise<Response> =>
+  post("/api/staff/login", { userId: userId(name), pin });
+
+/** Key yang tidak boleh ada di respons `/api/staff` di kedalaman mana pun. */
+export const FORBIDDEN_STAFF_KEYS: readonly string[] = [
+  "cost",
+  "costAlert",
+  "fromCost",
+  "oldCost",
+  "newCost",
+  "price",
+  "stock",
+  "grossProfit",
+  "openingCash",
+];
+
+/** Semua key objek di nilai JSON, rekursif (termasuk di dalam array). */
+export function deepKeys(value: unknown, out = new Set<string>()): Set<string> {
+  if (Array.isArray(value)) {
+    for (const v of value) deepKeys(v, out);
+  } else if (value !== null && typeof value === "object") {
+    for (const [key, v] of Object.entries(value)) {
+      out.add(key);
+      deepKeys(v, out);
+    }
+  }
+  return out;
+}
 
 /** Login pemilik (realm `/api/owner`, terpisah dari sesi kasir). */
 export const ownerLogin = (

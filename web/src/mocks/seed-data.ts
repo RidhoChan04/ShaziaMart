@@ -246,13 +246,15 @@ export function createSeedState(now: number = Date.now()): MockState {
     id: makeId(KIND.user, i + 1),
   }));
   const state: MockState = {
-    version: 4,
+    version: 5,
     store: { id: makeId(KIND.store, 1), name: "ShaziaMart" },
     users,
     session: null,
     pinFailures: {},
     ownerSession: null,
     ownerLoginFailures: {},
+    staffSession: null,
+    staffPinFailures: {},
     shift: null,
     closedShifts: [],
     products,
@@ -272,6 +274,10 @@ export function createSeedState(now: number = Date.now()): MockState {
       allowNegativeStock: true,
     },
     saleSeq: {},
+    suppliers: [],
+    receipts: [],
+    receiptAudit: [],
+    stockEntries: [],
   };
   generateHistory(state, now);
   return state;

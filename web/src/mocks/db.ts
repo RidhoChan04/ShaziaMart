@@ -1,15 +1,21 @@
 import type {
   CostAlert,
   Customer,
+  DebtPayment,
   KasirSettings,
   PriceHistoryEntry,
   Product,
   ProductCost,
   ProductStatus,
   ProductUnit,
+  ReceiptAuditEntry,
+  ReceiptLine,
+  ReceiptPayment,
+  ReceiptStatus,
   Sale,
   Shift,
   ShiftClosure,
+  Supplier,
   User,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { createSeedState } from "./seed-data";
@@ -21,7 +27,19 @@ export type MockClosedShift = ShiftClosure & {
   kasirName: string;
   closedAt: number;
 };
-export type MockShift = Shift & { cashSales: number; salesCount: number };
+/** Uang keluar laci di shift ini (barang masuk, koreksi nota, pelunasan utang); keluar = positif. */
+export type MockCashOut = {
+  id: string;
+  at: number;
+  amount: number;
+  receiptId: string;
+  kind: "bayar" | "koreksi" | "lunas";
+};
+export type MockShift = Shift & {
+  cashSales: number;
+  salesCount: number;
+  cashOuts: MockCashOut[];
+};
 /** HPP disalin saat penjualan; tidak pernah dikirim ke endpoint kasir. */
 export type MockSale = Sale & { costTotal: number; voidedAt: number | null };
 
@@ -48,19 +66,56 @@ export type CreditEntry = {
   saleId: string | null;
 };
 
+export type MockSupplier = Supplier & { lastUsedAt: number };
+
+/**
+ * Nota barang masuk. `id` = ID draf dari HP; replay hanya untuk pembuatnya
+ * (R7: `id` milik `createdById` lain → 409 ID_TAKEN, nota tidak pernah dikembalikan).
+ */
+export type MockReceipt = {
+  id: string;
+  supplierId: string;
+  notaDate: string;
+  photoId: string | null;
+  lines: ReceiptLine[];
+  payment: ReceiptPayment;
+  paid: DebtPayment | null;
+  status: ReceiptStatus;
+  createdById: string;
+  createdByName: string;
+  createdAt: number;
+  editedByName: string | null;
+  editedAt: number | null;
+  cancelledAt: number | null;
+};
+export type MockAuditEntry = ReceiptAuditEntry & { receiptId: string };
+/** Mutasi stok dari barang masuk; `qtyBase` bertanda (batal/koreksi turun = negatif). */
+export type MockStockEntry = {
+  id: string;
+  productId: string;
+  receiptId: string;
+  at: number;
+  kind: "masuk" | "koreksi_masuk" | "batal_masuk";
+  qtyBase: number;
+  actorName: string;
+};
+
 type LoginFailures = Record<
   string,
   { count: number; lockedUntil: number | null }
 >;
 
 export type MockState = {
-  version: 4;
+  version: 5;
   store: { id: string; name: string };
   users: MockUser[];
   session: { userId: string } | null;
   pinFailures: LoginFailures;
   ownerSession: { userId: string } | null;
   ownerLoginFailures: LoginFailures;
+  /** Realm HP orang toko: sesi dan kunci PIN sendiri, terpisah dari kasir (R9). */
+  staffSession: { userId: string } | null;
+  staffPinFailures: LoginFailures;
   shift: MockShift | null;
   closedShifts: MockClosedShift[];
   products: MockProduct[];
@@ -80,6 +135,11 @@ export type MockState = {
   settings: KasirSettings;
   /** "YYYYMMDD" -> urutan terakhir */
   saleSeq: Record<string, number>;
+  suppliers: MockSupplier[];
+  /** Hanya status, pelunasan, dan isi ubah yang berubah; tiga koleksi di bawahnya append-only. */
+  receipts: MockReceipt[];
+  receiptAudit: MockAuditEntry[];
+  stockEntries: MockStockEntry[];
 };
 
 const STORAGE_KEY = "mock.db";
@@ -89,7 +149,7 @@ const isObj = (x: unknown): x is Record<string, unknown> =>
 
 /** Pemeriksaan struktur murah (bukan validasi mendalam). */
 function isState(value: unknown): value is MockState {
-  if (!isObj(value) || value.version !== 4) return false;
+  if (!isObj(value) || value.version !== 5) return false;
   const { store } = value;
   return (
     isObj(store) &&
@@ -104,17 +164,22 @@ function isState(value: unknown): value is MockState {
       "sales",
       "customers",
       "creditLedger",
+      "suppliers",
+      "receipts",
+      "receiptAudit",
+      "stockEntries",
     ].every((k) => Array.isArray(value[k])) &&
     [
       "pinFailures",
       "ownerLoginFailures",
+      "staffPinFailures",
       "stock",
       "minStock",
       "costAlerts",
       "settings",
       "saleSeq",
     ].every((k) => isObj(value[k])) &&
-    ["session", "ownerSession", "shift"].every(
+    ["session", "ownerSession", "staffSession", "shift"].every(
       (k) => value[k] === null || isObj(value[k]),
     )
   );

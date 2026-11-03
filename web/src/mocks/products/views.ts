@@ -2,6 +2,7 @@ import type {
   OwnerProduct,
   OwnerProductRow,
   Product,
+  StaffProduct,
   StockAlert,
   StockMovement,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
@@ -30,6 +31,51 @@ export function toKasirProduct(p: MockProduct): Product {
       .filter((u) => u.active)
       .map(({ active: _, ...unit }) => unit),
   };
+}
+
+/** Proyeksi untuk orang toko: tanpa harga jual, HPP, dan stok; satuan nonaktif dibuang. */
+export function toStaffProduct(p: MockProduct): StaffProduct {
+  return {
+    id: p.id,
+    name: p.name,
+    category: p.category,
+    isCurah: p.isCurah,
+    baseUnit: p.baseUnit,
+    status: p.status,
+    units: p.units
+      .filter((u) => u.active)
+      .map(({ id, name, unitSize, barcodes }) => ({
+        id,
+        name,
+        unitSize,
+        barcodes,
+      })),
+  };
+}
+
+const STAFF_MAX_RESULTS = 20;
+const STAFF_MIN_NAME_QUERY = 2;
+
+/**
+ * K17: nama mengandung `q` (tanpa beda huruf, min. 2 karakter), atau `q` persis
+ * barcode satuan aktif / kode toko; tanpa barang nonaktif; urut nama, maks. 20.
+ */
+export function searchStaffProducts(
+  state: Readonly<MockState>,
+  query: string,
+): StaffProduct[] {
+  const q = query.trim();
+  const lower = q.toLowerCase();
+  const byName = q.length >= STAFF_MIN_NAME_QUERY;
+  const matches = (p: MockProduct): boolean =>
+    (byName && p.name.toLowerCase().includes(lower)) ||
+    p.storeCode === q ||
+    p.units.some((u) => u.active && u.barcodes.includes(q));
+  return state.products
+    .filter((p) => p.status !== "nonaktif" && q !== "" && matches(p))
+    .sort((a, b) => a.name.localeCompare(b.name, "id"))
+    .slice(0, STAFF_MAX_RESULTS)
+    .map(toStaffProduct);
 }
 
 /** Barang pemilik satuan ini, termasuk satuan nonaktif. */
