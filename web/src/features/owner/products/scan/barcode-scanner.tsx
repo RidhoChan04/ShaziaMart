@@ -32,9 +32,10 @@ const pill =
 /** Deteksi tiap 150 ms; hasil yang bukan barcode valid diabaikan, yang pertama valid dilaporkan sekali. */
 function watchBarcodes(
   video: HTMLVideoElement | null,
+  formats: readonly string[],
   onHit: (code: string) => void,
 ): () => void {
-  const detector = new BarcodeDetector({ formats: SCAN_FORMATS });
+  const detector = new BarcodeDetector({ formats });
   let busy = false;
   let live = true;
   const timer = setInterval(() => {
@@ -70,6 +71,12 @@ async function openCamera(): Promise<MediaStream | null> {
   }
 }
 
+/** SCAN_FORMATS yang sanggup dibaca browser ini; format yang tak dikenal membuat konstruktor gagal. */
+async function usableFormats(): Promise<string[]> {
+  const supported = await BarcodeDetector.getSupportedFormats();
+  return SCAN_FORMATS.filter((f) => supported.includes(f));
+}
+
 function showStream(video: HTMLVideoElement | null, stream: MediaStream) {
   if (!video) return;
   video.srcObject = stream;
@@ -78,6 +85,59 @@ function showStream(video: HTMLVideoElement | null, stream: MediaStream) {
 
 function stopTracks(stream: MediaStream | null) {
   for (const t of stream?.getTracks() ?? []) t.stop();
+}
+
+type Session = {
+  onTrack: (track: TorchTrack | null) => void;
+  onFail: () => void;
+  onHit: (code: string) => void;
+};
+
+/**
+ * Buka kamera belakang, tampilkan di video, lalu pantau barcode. Kamera ditolak, detector
+ * gagal dibuat, atau track berakhir (dicabut/diambil aplikasi lain) → `onFail`. Kembalian
+ * menghentikan semuanya; aman dipanggil lebih dari sekali.
+ */
+function startScanner(
+  video: () => HTMLVideoElement | null,
+  session: Session,
+): () => void {
+  let alive = true;
+  let stream: MediaStream | null = null;
+  let stopWatch: (() => void) | undefined;
+  const stop = () => {
+    alive = false;
+    stopWatch?.();
+    for (const t of stream?.getVideoTracks() ?? []) t.onended = null;
+    stopTracks(stream);
+    stream = null;
+  };
+  const fail = () => {
+    if (!alive) return;
+    stop();
+    session.onFail();
+  };
+  const run = async () => {
+    const opened = await openCamera();
+    if (!alive) {
+      stopTracks(opened);
+      return;
+    }
+    if (!opened) return fail();
+    stream = opened;
+    const track = opened.getVideoTracks()[0] as TorchTrack | undefined;
+    if (track) track.onended = fail;
+    session.onTrack(track ?? null);
+    showStream(video(), opened);
+    const formats = await usableFormats();
+    if (!alive) return;
+    stopWatch = watchBarcodes(video(), formats, (code) => {
+      stop();
+      session.onHit(code);
+    });
+  };
+  run().catch(fail);
+  return stop;
 }
 
 export function BarcodeScanner({
@@ -91,45 +151,37 @@ export function BarcodeScanner({
   const trackRef = useRef<TorchTrack | null>(null);
   const callbacks = useRef({ onDetected, onClose });
   callbacks.current = { onDetected, onClose };
+  // Barcode terbaca atau Ketik manual: pemanggil yang memindahkan fokus; Batal/Esc kembali ke pemicu.
+  const handledRef = useRef(false);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
   const [failed, setFailed] = useState(false);
   const [hasTorch, setHasTorch] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
 
   useEffect(() => {
     if (!open) return;
-    let alive = true;
-    let stopWatch: (() => void) | undefined;
-    let stream: MediaStream | null = null;
+    handledRef.current = false;
     setFailed(false);
     setHasTorch(false);
     setTorchOn(false);
-
-    const start = async () => {
-      stream = await openCamera();
-      if (!stream || !alive) {
-        if (!stream && alive) setFailed(true);
-        if (!alive) stopTracks(stream);
-        stream = null;
-        return;
-      }
-      const track = stream.getVideoTracks()[0] as TorchTrack | undefined;
-      trackRef.current = track ?? null;
-      setHasTorch(track?.getCapabilities?.()?.torch === true);
-      const video = videoRef.current;
-      showStream(video, stream);
-      stopWatch = watchBarcodes(video, (code) => {
-        alive = false;
+    const stop = startScanner(() => videoRef.current, {
+      onTrack: (track) => {
+        trackRef.current = track;
+        setHasTorch(track?.getCapabilities?.()?.torch === true);
+      },
+      onFail: () => {
+        trackRef.current = null;
+        setFailed(true);
+      },
+      onHit: (code) => {
+        handledRef.current = true;
         navigator.vibrate?.(50);
         callbacks.current.onDetected(code);
         callbacks.current.onClose();
-      });
-    };
-    void start();
-
+      },
+    });
     return () => {
-      alive = false;
-      stopWatch?.();
-      stopTracks(stream);
+      stop();
       trackRef.current = null;
     };
   }, [open]);
@@ -149,7 +201,17 @@ export function BarcodeScanner({
       <Dialog.Portal>
         <Dialog.Content
           aria-describedby={undefined}
-          onCloseAutoFocus={(e) => e.preventDefault()}
+          onOpenAutoFocus={() => {
+            // Tanpa Dialog.Trigger, Radix tidak tahu ke mana fokus kembali.
+            returnFocusRef.current =
+              document.activeElement instanceof HTMLElement
+                ? document.activeElement
+                : null;
+          }}
+          onCloseAutoFocus={(e) => {
+            e.preventDefault();
+            if (!handledRef.current) returnFocusRef.current?.focus();
+          }}
           className="fixed inset-0 z-50 flex flex-col bg-scan-bg text-white outline-none"
         >
           <div className="z-10 flex items-start justify-between gap-3 px-4 pt-[max(1rem,env(safe-area-inset-top))]">
@@ -201,7 +263,14 @@ export function BarcodeScanner({
                 )}
               </button>
             )}
-            <button type="button" onClick={onManual} className={pill}>
+            <button
+              type="button"
+              onClick={() => {
+                handledRef.current = true;
+                onManual();
+              }}
+              className={pill}
+            >
               Ketik manual
             </button>
           </div>

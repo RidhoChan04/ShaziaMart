@@ -110,3 +110,28 @@ test("daftar: hasil scan mengisi kolom cari (q) dan menyaring", async () => {
     await screen.findByRole("link", { name: /^Indomie Goreng/ }),
   ).toBeVisible();
 });
+
+test.each([
+  [
+    "Batal",
+    (user: ReturnType<typeof userEvent.setup>) =>
+      user.click(screen.getByRole("button", { name: "Batal" })),
+  ],
+  [
+    "Esc",
+    (user: ReturnType<typeof userEvent.setup>) => user.keyboard("{Escape}"),
+  ],
+])(
+  "form: %s menutup kamera dan mengembalikan fokus ke tombol 'Scan dengan kamera'",
+  async (_, close) => {
+    const user = userEvent.setup();
+    installCamera();
+    await openForm();
+    const trigger = await within(section("Eceran")).findByRole("button", SCAN);
+    await user.click(trigger);
+    expect(await screen.findByText("Barcode eceran")).toBeVisible();
+    await close(user);
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(trigger).toHaveFocus());
+  },
+);

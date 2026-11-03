@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, test, vi } from "vitest";
 import { installCamera } from "@/test/camera";
@@ -9,7 +9,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function setup(options: { torch?: boolean } = {}) {
+function setup(options: { torch?: boolean; supported?: string[] } = {}) {
   const cam = installCamera(options);
   const props = {
     onDetected: vi.fn(),
@@ -164,4 +164,48 @@ test("izin kamera baru selesai setelah ditutup → stream langsung dihentikan", 
   unmount();
   grant(cam.stream);
   await waitFor(() => expect(cam.track.stop).toHaveBeenCalled());
+});
+
+const DENIED = "Kamera tidak bisa dibuka — ketik barcode secara manual";
+
+test("format detector = SCAN_FORMATS yang didukung browser saja", async () => {
+  const { cam } = setup({ supported: ["qr_code", "upc_a", "ean_13"] });
+  await waitFor(() => expect(cam.state.detectCalls).toBeGreaterThan(0));
+  expect(cam.state.formats).toEqual(["ean_13", "upc_a"]);
+});
+
+test("detector gagal dibuat → pesan kamera gagal dan track dihentikan", async () => {
+  const cam = installCamera();
+  vi.stubGlobal(
+    "BarcodeDetector",
+    class {
+      static getSupportedFormats() {
+        return Promise.resolve(["ean_13"]);
+      }
+      constructor() {
+        throw new TypeError("format tidak didukung");
+      }
+    },
+  );
+  render(
+    <BarcodeScanner
+      open
+      purpose="eceran"
+      onDetected={vi.fn()}
+      onManual={vi.fn()}
+      onClose={vi.fn()}
+    />,
+  );
+  expect(await screen.findByText(DENIED)).toBeVisible();
+  expect(cam.track.stop).toHaveBeenCalled();
+});
+
+test("track kamera berakhir (dicabut/diambil aplikasi lain) → pesan kamera gagal, deteksi berhenti", async () => {
+  const { cam } = setup();
+  await waitFor(() => expect(cam.state.detectCalls).toBeGreaterThan(0));
+  act(() => cam.track.onended?.());
+  expect(await screen.findByText(DENIED)).toBeVisible();
+  const after = cam.state.detectCalls;
+  await idle(400);
+  expect(cam.state.detectCalls).toBe(after);
 });
