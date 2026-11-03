@@ -134,14 +134,10 @@ test("router: /staff memuat chunk terpisah (lazyRouteComponent loadStaff); /staf
   }
 });
 
-test("rute /staff/masuk/baru: validateSearch menyimpan draf & langkah=bayar saja", async () => {
+test("rute /staff/masuk/baru: formulir nota sungguhan; validateSearch menyimpan draf & langkah=bayar saja", async () => {
   await staffLogin("Rina");
   const { router } = renderApp("/staff/masuk/baru?draf=d1&langkah=bayar");
-  await screen.findByText("Segera hadir");
-  expect(router.state.matches.at(-1)?.search).toEqual({
-    draf: "d1",
-    langkah: "bayar",
-  });
+  await screen.findByRole("heading", { level: 1, name: "Barang masuk" });
   const validate =
     router.routesByPath["/staff/masuk/baru"].options.validateSearch;
   if (typeof validate !== "function") throw new Error("tanpa validateSearch");

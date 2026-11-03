@@ -100,8 +100,10 @@ test("Beranda: kartu Barang masuk → /staff/masuk/baru; tombol Akun → Lainnya
   await waitFor(() =>
     expect(router.state.location.pathname).toBe("/staff/masuk/baru"),
   );
-  // Sub-halaman: judul besar kerangka tidak tampil; tab Masuk tetap aktif.
-  expect(screen.queryByRole("heading", { name: "Barang masuk" })).toBeNull();
+  // Sub-halaman: hanya judul formulir (bukan judul besar kerangka); tab Masuk tetap aktif.
+  expect(
+    await screen.findAllByRole("heading", { level: 1, name: "Barang masuk" }),
+  ).toHaveLength(1);
   expect(within(nav()).getByRole("link", { name: "Masuk" })).toHaveAttribute(
     "aria-current",
     "page",

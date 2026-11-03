@@ -202,7 +202,7 @@ const staffMasukBaruRoute = createRoute({
       : {}),
     ...(search.langkah === "bayar" ? { langkah: "bayar" as const } : {}),
   }),
-  component: lazyRouteComponent(loadStaff, "StaffPlaceholderPage"),
+  component: lazyRouteComponent(loadStaff, "ReceiptFormPage"),
 });
 
 const staffMasukDetailRoute = createRoute({
