@@ -4,13 +4,24 @@ import type {
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import type { MockCostAlert, MockProduct, MockState } from "../db";
 
-/** Rasio HPP sama (amount/qtyBase), bukan bentuk penulisannya. */
+/**
+ * Rasio HPP sama (amount/qtyBase), bukan bentuk penulisannya. Perkalian silang bisa melewati
+ * 2^53 (amount & qtyBase masing-masing bilangan bulat aman) → dibandingkan dengan BigInt.
+ */
 export function sameCost(
   a: ProductCost | null,
   b: ProductCost | null,
 ): boolean {
   if (a === null || b === null) return a === b;
-  return a.amount * b.qtyBase === b.amount * a.qtyBase;
+  const left = a.amount * b.qtyBase;
+  const right = b.amount * a.qtyBase;
+  if (Number.isSafeInteger(left) && Number.isSafeInteger(right)) {
+    return left === right;
+  }
+  return (
+    BigInt(a.amount) * BigInt(b.qtyBase) ===
+    BigInt(b.amount) * BigInt(a.qtyBase)
+  );
 }
 
 /**
