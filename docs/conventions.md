@@ -47,7 +47,7 @@ Aturan ini berlaku untuk semua kode di repo. Tujuannya satu: kode yang mudah dib
 ## Performa
 
 - `/kasir` dan `/owner` dimuat terpisah (lazy route); jangan mengimpor kode owner dari kasir atau sebaliknya.
-- Anggaran ukuran gzip dicek `npm run size:check` (utama 130 KB, kasir 50 KB, owner 50 KB, chunk lain 25 KB, total 220 KB). Melampaui anggaran berarti perlu alasan dan menaikkan anggaran secara sadar di commit tersendiri.
+- Anggaran ukuran gzip dicek `npm run size:check` (utama 130 KB, kasir 50 KB, owner 50 KB, staff 50 KB, chunk lain 25 KB, total 270 KB — tiga app terpisah, satu pengguna hanya memuat utama + satu app; K15). Melampaui anggaran berarti perlu alasan dan menaikkan anggaran secara sadar di commit tersendiri.
 - Daftar panjang (keranjang, riwayat, barang) memakai kunci stabil dan tidak merender ulang semua baris saat satu baris berubah.
 
 ## Test
