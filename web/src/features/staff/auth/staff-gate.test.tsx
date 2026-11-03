@@ -102,6 +102,9 @@ test("PIN salah → 'PIN salah'; login 403 STAFF_LAN_ONLY (server.use) → 'Hany
       "Hanya bisa dipakai di Wi-Fi toko",
     ),
   );
+  expect(screen.getAllByText("Hanya bisa dipakai di Wi-Fi toko")).toHaveLength(
+    1,
+  );
   expect(mockDb.get().staffSession).toBeNull();
 });
 
@@ -141,6 +144,9 @@ test("daftar nama gagal dimuat lewat terowongan (403) → pesan Wi-Fi toko + Cob
   expect(await screen.findByRole("alert")).toHaveTextContent(
     "Hanya bisa dipakai di Wi-Fi toko",
   );
+  expect(screen.getAllByText("Hanya bisa dipakai di Wi-Fi toko")).toHaveLength(
+    1,
+  );
   expect(screen.queryByLabelText("PIN")).toBeNull();
   server.resetHandlers();
   await user.click(screen.getByRole("button", { name: "Coba lagi" }));
@@ -156,6 +162,10 @@ test("sesi tidak bisa diperiksa (403 STAFF_LAN_ONLY) → layar penolakan, bukan 
   renderApp("/staff");
   expect(await screen.findByRole("alert")).toHaveTextContent(
     "Hanya bisa dipakai di Wi-Fi toko",
+  );
+  // Satu kali saja: catatan kaki Wi-Fi tidak mengulang pesan galat yang sama.
+  expect(screen.getAllByText("Hanya bisa dipakai di Wi-Fi toko")).toHaveLength(
+    1,
   );
   expect(screen.queryByRole("navigation")).toBeNull();
   expect(screen.getByRole("button", { name: "Coba lagi" })).toBeVisible();

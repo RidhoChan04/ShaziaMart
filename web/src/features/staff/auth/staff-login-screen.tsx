@@ -1,6 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { Package, Wifi } from "lucide-react";
 import { type ReactNode, useState } from "react";
+import { ApiError } from "@/shared/api/fetcher";
 import type { User } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { useListStaffUsers, useStaffLogin } from "@/shared/api/gen/staff/staff";
 import { PinPad } from "@/shared/components/pin-pad";
@@ -8,8 +9,21 @@ import { pesanError } from "@/shared/lib/error-messages";
 import { Button } from "@/shared/ui/button";
 import { setStaffSession } from "./staff-session";
 
-/** Kerangka layar masuk: ikon app, merek, isi, lalu catatan "hanya Wi-Fi toko". */
-function AuthFrame({ children }: { children: ReactNode }) {
+/** Galat 403 STAFF_LAN_ONLY: pesannya sama dengan catatan kaki Wi-Fi toko. */
+const isLanOnly = (error: unknown): boolean =>
+  error instanceof ApiError && error.code === "STAFF_LAN_ONLY";
+
+/**
+ * Kerangka layar masuk: ikon app, merek, isi, lalu catatan "hanya Wi-Fi toko" — kecuali
+ * galat yang tampil sudah berisi kalimat yang sama (403 STAFF_LAN_ONLY), agar tidak dobel.
+ */
+function AuthFrame({
+  children,
+  error = null,
+}: {
+  children: ReactNode;
+  error?: unknown;
+}) {
   return (
     <main className="flex min-h-dvh flex-col items-center gap-5 bg-bg px-4 pt-[calc(2.5rem+env(safe-area-inset-top))] pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
       <div className="grid justify-items-center gap-2.5 text-center">
@@ -27,10 +41,12 @@ function AuthFrame({ children }: { children: ReactNode }) {
         </div>
       </div>
       {children}
-      <p className="flex items-center gap-1.5 text-[13px] font-semibold text-muted">
-        <Wifi aria-hidden="true" className="size-4" />
-        Hanya bisa dipakai di Wi-Fi toko
-      </p>
+      {!isLanOnly(error) && (
+        <p className="flex items-center gap-1.5 text-[13px] font-semibold text-muted">
+          <Wifi aria-hidden="true" className="size-4" />
+          Hanya bisa dipakai di Wi-Fi toko
+        </p>
+      )}
     </main>
   );
 }
@@ -68,7 +84,7 @@ export function StaffUnavailableScreen({
   retrying: boolean;
 }) {
   return (
-    <AuthFrame>
+    <AuthFrame error={error}>
       <Failure
         message={pesanError(error)}
         onRetry={onRetry}
@@ -121,7 +137,7 @@ export function StaffLoginScreen() {
 
   if (users.isError) {
     return (
-      <AuthFrame>
+      <AuthFrame error={users.error}>
         <Failure
           message={pesanError(users.error)}
           onRetry={() => void users.refetch()}
@@ -134,7 +150,7 @@ export function StaffLoginScreen() {
   const picked = list.find((u) => u.id === pickedId) ?? list[0];
 
   return (
-    <AuthFrame>
+    <AuthFrame error={login.error}>
       {users.isPending && <p className="text-muted">Memuat…</p>}
       {picked && (
         <>
