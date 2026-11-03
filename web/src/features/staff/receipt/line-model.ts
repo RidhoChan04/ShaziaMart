@@ -124,7 +124,8 @@ export function newProductEquivalence(
   }
 }
 
-function toCheckLine(line: DraftLine): CheckLine {
+/** Baris draf (isian teks) → baris aturan nota; harga bukan angka → -1 agar ditolak aturan. */
+export function toCheckLine(line: DraftLine): CheckLine {
   return {
     lineId: line.lineId,
     productId: line.product?.id ?? null,

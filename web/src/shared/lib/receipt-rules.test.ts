@@ -2,12 +2,10 @@ import { describe, expect, test } from "vitest";
 import type {
   NewProductInput,
   ReceiptPayment,
-  StaffProduct,
 } from "../api/gen/shaziaMartAPI.schemas";
 import {
   type CheckLine,
   type CheckReceipt,
-  type DraftLine,
   DUE_SOON_DAYS,
   debtStage,
   newProductUnits,
@@ -707,34 +705,4 @@ describe("tanggal kosong vs format salah", () => {
     expect(validateReceipt(receipt({ notaDate: "2/11/2026" }), ctx)).toEqual([
       { lineId: null, field: "notaDate", message: "Format tanggal tidak sah" },
     ]));
-});
-
-// Boleh dihapus setelah Task 8 meng-import DraftLine (hanya menjaga knip & bentuk salinan offline).
-describe("DraftLine", () => {
-  test("barang dari pencarian staf (StaffProduct) bisa disalin apa adanya ke baris draf", () => {
-    const indomie: StaffProduct = {
-      id: "p-indomie",
-      name: "Indomie Goreng",
-      category: "Mi instan",
-      isCurah: false,
-      baseUnit: "pcs",
-      status: "aktif",
-      units: [
-        { id: "u-pcs", name: "pcs", unitSize: 1, barcodes: ["089686010947"] },
-        { id: "u-dus", name: "dus", unitSize: 40, barcodes: [] },
-      ],
-    };
-    const draft: DraftLine = {
-      lineId: "l1",
-      product: indomie,
-      unitId: "u-dus",
-      newProduct: null,
-      qty: 2,
-      unitCostText: "112.000",
-      expiryDate: "2027-04-20",
-    };
-    expect(
-      draft.product?.units.find((u) => u.id === draft.unitId)?.unitSize,
-    ).toBe(40);
-  });
 });
