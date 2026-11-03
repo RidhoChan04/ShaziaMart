@@ -73,3 +73,16 @@ test("DevPanel: Reset data mengembalikan data mock ke awal", async () => {
   await user.click(await screen.findByRole("button", { name: "Reset data" }));
   expect(mockDb.get().store.name).toBe("ShaziaMart");
 });
+
+test.each([
+  ["/owner", true],
+  ["/staff", true],
+  ["/kasir", false],
+])("DevPanel di %s: naik di atas tab bawah HP = %s", async (path, raised) => {
+  renderApp(path);
+  const toggle = await screen.findByRole("button", {
+    name: "Panel pengembang",
+  });
+  const lift = "bottom-[calc(5.5rem+env(safe-area-inset-bottom))]";
+  expect(toggle.parentElement?.classList.contains(lift)).toBe(raised);
+});

@@ -8,7 +8,6 @@ import {
   fillReceipt,
   goOffline,
   goOnline,
-  hideDevPanel,
   INDOMIE_BARCODE,
   installNetworkSwitches,
   loginStaff,
@@ -24,7 +23,6 @@ test.beforeEach(({ page: _page }, info) => {
 test("login staf, kerangka, dan layar tanpa gulir horizontal serta pelanggaran aksesibilitas", async ({
   page,
 }) => {
-  await hideDevPanel(page);
   await page.goto("/staff");
   await expect(
     page.getByRole("heading", { name: "ShaziaMart · Stok" }),
@@ -323,7 +321,6 @@ test("staf hanya memakai /api/staff: tanpa request owner/katalog/shift dan tanpa
 test("di luar Wi-Fi toko (header terowongan Cloudflare): login menolak dengan pesan Wi-Fi toko", async ({
   page,
 }) => {
-  await hideDevPanel(page);
   await installNetworkSwitches(page, true);
   await page.goto("/staff");
   await expect(page.getByRole("alert")).toContainText(

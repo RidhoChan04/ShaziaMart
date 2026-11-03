@@ -8,21 +8,6 @@ export const INDOMIE_BARCODE = "089686010947";
 export const NEW_PRODUCT = "Teh Pucuk Harum 350 ml";
 export const NEW_PRODUCT_BARCODE = "8996001600269";
 
-/**
- * Sembunyikan "Panel pengembang" (alat mock; di /staff ia menutupi tab Beranda & Masuk di 360 px,
- * lihat laporan Task 14). Dipasang sebelum navigasi, tahan muat ulang.
- */
-export async function hideDevPanel(page: Page) {
-  await page.addInitScript(() => {
-    document.addEventListener("DOMContentLoaded", () => {
-      const style = document.createElement("style");
-      style.textContent =
-        "div.fixed.left-3.z-50.flex-col { display: none !important; }";
-      document.head.append(style);
-    });
-  });
-}
-
 /** Buka /staff lalu masuk sebagai `name` dengan PIN; menunggu tab bar orang toko. */
 export async function loginStaff(
   page: Page,
@@ -33,7 +18,6 @@ export async function loginStaff(
 ) {
   // Halaman kedua di konteks yang sama (reset=false) tidak boleh mengosongkan state mock bersama.
   if (reset) await resetMock(page);
-  await hideDevPanel(page);
   await installNetworkSwitches(page);
   await page.goto(path);
   await page.getByRole("button", { name, exact: true }).click();
