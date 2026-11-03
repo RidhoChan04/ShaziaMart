@@ -60,8 +60,9 @@
   }
 }
 
-/* Token gaya Apple khusus aplikasi pemilik; layar kasir tidak terpengaruh. */
-:root[data-app="owner"] {
+/* Token gaya Apple untuk app pemilik dan app HP orang toko; layar kasir tidak terpengaruh. */
+:root[data-app="owner"],
+:root[data-app="staff"] {
   --color-bg: #f2f2f7;
   --color-muted: #6e6e73;
   --color-border: #e5e5ea;

@@ -8,6 +8,7 @@ const budgets = [
   { label: "utama", prefix: "index-", max: 130 * KB },
   { label: "kasir", prefix: "kasir-", max: 50 * KB },
   { label: "owner", prefix: "owner-", max: 50 * KB },
+  { label: "staff", prefix: "staff-", max: 50 * KB },
 ];
 const OTHER_MAX = 25 * KB;
 const TOTAL_MAX = 220 * KB;

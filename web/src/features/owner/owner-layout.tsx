@@ -1,10 +1,9 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { Link, Outlet, useLocation } from "@tanstack/react-router";
+import { Outlet, useLocation } from "@tanstack/react-router";
 import {
   ChartColumn,
   Ellipsis,
   House,
-  type LucideIcon,
   NotebookPen,
   Package,
   TriangleAlert,
@@ -12,6 +11,7 @@ import {
 } from "lucide-react";
 import { useLayoutEffect } from "react";
 import { getGetOwnerSessionQueryKey } from "@/shared/api/gen/owner/owner";
+import { TabNav, type TabNavItem } from "@/shared/components/tab-nav";
 import {
   useRecheckServer,
   useServerHealth,
@@ -21,16 +21,13 @@ import { OwnerGate } from "./auth/owner-gate";
 import { useOwnerSession } from "./auth/owner-session";
 import { PageHeader } from "./page-header";
 
-type NavItem = {
+type NavItem = TabNavItem & {
   to:
     | "/owner"
     | "/owner/barang"
     | "/owner/laporan"
     | "/owner/kasbon"
     | "/owner/lainnya";
-  label: string;
-  icon: LucideIcon;
-  exact: boolean;
 };
 
 const navItems: readonly NavItem[] = [
@@ -40,31 +37,6 @@ const navItems: readonly NavItem[] = [
   { to: "/owner/kasbon", label: "Kasbon", icon: NotebookPen, exact: false },
   { to: "/owner/lainnya", label: "Lainnya", icon: Ellipsis, exact: false },
 ];
-
-function OwnerNav() {
-  // Satu <nav> responsif: tab bawah < 1024px, sidebar >= 1024px.
-  return (
-    <nav
-      aria-label="Navigasi utama"
-      className="glass fixed left-[calc(12px+env(safe-area-inset-left))] right-[calc(12px+env(safe-area-inset-right))] bottom-[calc(12px+env(safe-area-inset-bottom))] z-30 rounded-full p-1 lg:sticky lg:right-auto lg:left-auto lg:top-3 lg:bottom-auto lg:col-start-1 lg:row-span-2 lg:row-start-1 lg:m-3 lg:h-[calc(100dvh-24px)] lg:rounded-lg lg:p-2"
-    >
-      <ul className="flex gap-1 lg:flex-col">
-        {navItems.map(({ to, label, icon: Icon, exact }) => (
-          <li key={to} className="flex-1 lg:flex-none">
-            <Link
-              to={to}
-              activeOptions={{ exact }}
-              className="flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-full text-xs text-text focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary data-[status=active]:bg-primary-soft data-[status=active]:font-semibold data-[status=active]:text-primary lg:min-h-11 lg:flex-row lg:justify-start lg:gap-3 lg:rounded-md lg:px-3 lg:text-[15px] lg:hover:bg-primary-soft"
-            >
-              <Icon aria-hidden="true" className="size-5" />
-              {label}
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </nav>
-  );
-}
 
 function OfflineBanner() {
   return (
@@ -123,7 +95,7 @@ function OwnerShell() {
   return (
     <div className="min-h-dvh bg-bg pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)] lg:grid lg:grid-cols-[240px_1fr] lg:grid-rows-[auto_1fr]">
       {title && <PageHeader title={title} />}
-      <OwnerNav />
+      <TabNav label="Navigasi utama" items={navItems} />
       <main className="px-4 pt-1 pb-[calc(7rem+env(safe-area-inset-bottom))] lg:col-start-2 lg:row-start-2 lg:px-6 lg:pt-2 lg:pb-6">
         {loaded ? (
           <>

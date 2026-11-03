@@ -1,10 +1,10 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { usePinLogin } from "@/shared/api/gen/auth/auth";
 import type { Shift } from "@/shared/api/gen/shaziaMartAPI.schemas";
+import { PinPad } from "@/shared/components/pin-pad";
 import { pesanError } from "@/shared/lib/error-messages";
 import { GateCard } from "./gate-card";
 import { setSession, syncGate } from "./gate-state";
-import { PinPad } from "./pin-pad";
 
 /** Shift terbuka tanpa sesi: hanya kasir shift yang bisa membuka dengan PIN. */
 export function LockScreen({ shift }: { shift: Shift }) {

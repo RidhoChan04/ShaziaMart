@@ -77,9 +77,10 @@ const indexRoute = createRoute({
   },
 });
 
-// Satu modul masuk per bagian, sehingga kasir dan owner masing-masing satu chunk.
+// Satu modul masuk per bagian, sehingga kasir, owner, dan staf masing-masing satu chunk.
 const loadKasir = () => import("@/features/kasir");
 const loadOwner = () => import("@/features/owner");
+const loadStaff = () => import("@/features/staff");
 
 const kasirRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -171,6 +172,63 @@ const ownerLainnyaRoute = createRoute({
   component: lazyRouteComponent(loadOwner, "LainnyaPage"),
 });
 
+// App HP orang toko (realm `/api/staff`); halaman Masuk menyusul (Task 10/11).
+const staffRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "staff",
+  component: lazyRouteComponent(loadStaff, "StaffLayout"),
+});
+
+const staffIndexRoute = createRoute({
+  getParentRoute: () => staffRoute,
+  path: "/",
+  component: lazyRouteComponent(loadStaff, "StaffBerandaPage"),
+});
+
+const staffMasukRoute = createRoute({
+  getParentRoute: () => staffRoute,
+  path: "masuk",
+  component: lazyRouteComponent(loadStaff, "StaffPlaceholderPage"),
+});
+
+const staffMasukBaruRoute = createRoute({
+  getParentRoute: () => staffRoute,
+  path: "masuk/baru",
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { draf?: string; langkah?: "bayar" } => ({
+    ...(typeof search.draf === "string" && search.draf
+      ? { draf: search.draf }
+      : {}),
+    ...(search.langkah === "bayar" ? { langkah: "bayar" as const } : {}),
+  }),
+  component: lazyRouteComponent(loadStaff, "StaffPlaceholderPage"),
+});
+
+const staffMasukDetailRoute = createRoute({
+  getParentRoute: () => staffRoute,
+  path: "masuk/$receiptId",
+  component: lazyRouteComponent(loadStaff, "StaffPlaceholderPage"),
+});
+
+const staffOpnameRoute = createRoute({
+  getParentRoute: () => staffRoute,
+  path: "opname",
+  component: lazyRouteComponent(loadStaff, "StaffPlaceholderPage"),
+});
+
+const staffKedaluwarsaRoute = createRoute({
+  getParentRoute: () => staffRoute,
+  path: "kedaluwarsa",
+  component: lazyRouteComponent(loadStaff, "StaffPlaceholderPage"),
+});
+
+const staffLainnyaRoute = createRoute({
+  getParentRoute: () => staffRoute,
+  path: "lainnya",
+  component: lazyRouteComponent(loadStaff, "StaffLainnyaPage"),
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   kasirRoute.addChildren([kasirIndexRoute]),
@@ -184,6 +242,15 @@ const routeTree = rootRoute.addChildren([
     ownerLaporanRoute,
     ownerKasbonRoute,
     ownerLainnyaRoute,
+  ]),
+  staffRoute.addChildren([
+    staffIndexRoute,
+    staffMasukRoute,
+    staffMasukBaruRoute,
+    staffMasukDetailRoute,
+    staffOpnameRoute,
+    staffKedaluwarsaRoute,
+    staffLainnyaRoute,
   ]),
 ]);
 

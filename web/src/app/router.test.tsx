@@ -1,6 +1,6 @@
 import { screen, within } from "@testing-library/react";
 import { expect, test } from "vitest";
-import { ownerLogin } from "@/mocks/handlers/test-helpers";
+import { ownerLogin, staffLogin } from "@/mocks/handlers/test-helpers";
 import { setScenario } from "@/mocks/scenarios";
 import { renderApp } from "@/test/render-app";
 
@@ -106,4 +106,45 @@ test("rute sub-halaman Barang: baru, impor, detail (lembar valid saja), ubah", a
   expect(
     await screen.findByRole("heading", { name: "Barang tidak ditemukan" }),
   ).toBeInTheDocument();
+});
+
+test("router: /staff memuat chunk terpisah (lazyRouteComponent loadStaff); /staff/tidak-ada → Halaman tidak ditemukan", async () => {
+  await staffLogin("Rina");
+  const { router } = renderApp("/staff/tidak-ada");
+  expect(
+    await screen.findByText("Halaman tidak ditemukan"),
+  ).toBeInTheDocument();
+
+  const staffPaths = [
+    "/staff",
+    "/staff/",
+    "/staff/masuk",
+    "/staff/masuk/baru",
+    "/staff/masuk/$receiptId",
+    "/staff/opname",
+    "/staff/kedaluwarsa",
+    "/staff/lainnya",
+  ] as const;
+  for (const path of staffPaths) {
+    const component = router.routesById[path].options.component as
+      | { preload?: unknown }
+      | undefined;
+    // lazyRouteComponent → komponen dengan `preload`, bukan impor statis.
+    expect(typeof component?.preload, path).toBe("function");
+  }
+});
+
+test("rute /staff/masuk/baru: validateSearch menyimpan draf & langkah=bayar saja", async () => {
+  await staffLogin("Rina");
+  const { router } = renderApp("/staff/masuk/baru?draf=d1&langkah=bayar");
+  await screen.findByText("Segera hadir");
+  expect(router.state.matches.at(-1)?.search).toEqual({
+    draf: "d1",
+    langkah: "bayar",
+  });
+  const validate =
+    router.routesByPath["/staff/masuk/baru"].options.validateSearch;
+  if (typeof validate !== "function") throw new Error("tanpa validateSearch");
+  expect(validate({ draf: "", langkah: "ngawur" })).toEqual({});
+  expect(validate({ draf: 5 })).toEqual({});
 });

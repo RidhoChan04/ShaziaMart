@@ -3,13 +3,13 @@ import { useState } from "react";
 import { useListKasirUsers, usePinLogin } from "@/shared/api/gen/auth/auth";
 import type { User } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { useOpenShift } from "@/shared/api/gen/shift/shift";
+import { PinPad } from "@/shared/components/pin-pad";
 import { pesanError } from "@/shared/lib/error-messages";
 import { parseRupiah } from "@/shared/lib/money";
 import { Button } from "@/shared/ui/button";
 import { MoneyField } from "../payment/tunai-tab";
 import { GateCard } from "./gate-card";
 import { setSession, setShift, syncGate } from "./gate-state";
-import { PinPad } from "./pin-pad";
 
 type Step = { kind: "kasir" } | { kind: "pin" | "modal"; kasir: User };
 
