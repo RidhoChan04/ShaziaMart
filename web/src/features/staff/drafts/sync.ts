@@ -11,6 +11,7 @@ import {
 } from "@/shared/api/gen/staff/staff";
 import { readProblem, receiptProblemSchema } from "@/shared/api/problem";
 import { pesanError } from "@/shared/lib/error-messages";
+import { CORRUPT_DRAFT } from "./draft-shape";
 import type { DraftStore } from "./draft-store";
 import type { ReceiptDraft } from "./draft-types";
 import { toReceiptInput } from "./to-input";
@@ -24,6 +25,13 @@ export type SyncReport = {
   sent: string[];
   rejected: string[];
   stopped: "offline" | "unauthorized" | "lan" | null;
+};
+
+export type SyncOptions = {
+  /** Dibatalkan saat pengguna keluar/berganti. */
+  signal?: AbortSignal | undefined;
+  /** Pengguna sesi saat ini (cookie); dicek sebelum tiap request. */
+  currentUserId?: (() => string | null) | undefined;
 };
 
 type Stop = NonNullable<SyncReport["stopped"]>;
@@ -49,24 +57,20 @@ function stopFor(error: ApiError): Stop | null {
   return null;
 }
 
-/** Galat per baris/field dari 422; selain itu (body rusak `errors: []`, 409, …) satu pesan umum. */
-function rejectionErrors(error: ApiError, field: ReceiptField): ReceiptError[] {
+/**
+ * Galat per baris/field dari 422; selain itu (body rusak `errors: []`, 409, …) satu pesan umum.
+ * Bukan ApiError = request tidak bisa dibuat dari draf ini (isian rusak).
+ */
+function rejectionErrors(error: unknown, field: ReceiptField): ReceiptError[] {
+  if (!(error instanceof ApiError)) {
+    return [{ lineId: null, field, message: CORRUPT_DRAFT }];
+  }
   const problem = readProblem(error, receiptProblemSchema);
   if (problem && problem.errors.length > 0) return problem.errors;
   return [{ lineId: null, field, message: pesanError(error) }];
 }
 
-/** Ubah draf versi terbaru di penyimpan (bisa sudah diubah layar lain); hilang → tidak apa-apa. */
-async function update(
-  store: DraftStore,
-  id: string,
-  change: (d: ReceiptDraft) => ReceiptDraft,
-): Promise<void> {
-  const latest = await store.get(id);
-  if (latest) await store.put(change(latest));
-}
-
-/** Ditolak server: data & foto tetap di HP, status `rejected` dengan pesannya (tidak pernah dibuang). */
+/** Ditolak: data & foto tetap di HP, status `rejected` dengan pesannya (tidak pernah dibuang). */
 async function reject(
   store: DraftStore,
   id: string,
@@ -74,7 +78,7 @@ async function reject(
 ): Promise<void> {
   // Server tidak menemukan foto: unggah ulang setelah draf disimpan lagi.
   const photoLost = errors.some((e) => e.field === "photoId");
-  await update(store, id, (d) => ({
+  await store.update(id, (d) => ({
     ...d,
     status: "rejected",
     errors,
@@ -84,17 +88,28 @@ async function reject(
 
 type Outcome = "sent" | "rejected" | Stop;
 
+/** Galat request → berhenti (sementara) atau draf ditolak; galat penyimpan HP tetap dilempar. */
 async function failed(
   store: DraftStore,
   id: string,
   error: unknown,
   field: ReceiptField,
 ): Promise<Outcome> {
-  if (!(error instanceof ApiError)) throw error;
-  const stop = stopFor(error);
+  const stop = error instanceof ApiError ? stopFor(error) : null;
   if (stop) return stop;
   await reject(store, id, rejectionErrors(error, field));
   return "rejected";
+}
+
+/**
+ * Boleh mengirim draf ini sekarang? Tidak bila sync dibatalkan atau sesi (cookie) bukan
+ * pemilik draf — mis. Budi sudah masuk sebelum React menghentikan sync Rina.
+ */
+function mayRequest(draft: ReceiptDraft, opts: SyncOptions): boolean {
+  if (opts.signal?.aborted) return false;
+  return (
+    opts.currentUserId === undefined || opts.currentUserId() === draft.userId
+  );
 }
 
 /** Foto dulu (sekali), lalu nota dengan id draf; respons hilang → kirim ulang aman (200 replay). */
@@ -102,22 +117,23 @@ async function sendOne(
   store: DraftStore,
   draft: ReceiptDraft,
   api: SyncApi,
-  signal: AbortSignal | undefined,
+  opts: SyncOptions,
 ): Promise<Outcome> {
   const { photo } = draft;
   if (photo && !photo.uploaded) {
+    if (!mayRequest(draft, opts)) return "unauthorized";
     try {
       await api.putPhoto(photo.id, photo.blob);
     } catch (error) {
       return failed(store, draft.id, error, "photoId");
     }
-    await update(store, draft.id, (d) => ({
+    await store.update(draft.id, (d) => ({
       ...d,
       photo:
         d.photo?.id === photo.id ? { ...d.photo, uploaded: true } : d.photo,
     }));
   }
-  if (signal?.aborted) return "unauthorized";
+  if (!mayRequest(draft, opts)) return "unauthorized";
   try {
     await api.createReceipt(toReceiptInput(draft));
   } catch (error) {
@@ -131,19 +147,19 @@ async function sendQueued(
   store: DraftStore,
   userId: string,
   api: SyncApi,
-  signal: AbortSignal | undefined,
+  opts: SyncOptions,
 ): Promise<SyncReport> {
   const report: SyncReport = { sent: [], rejected: [], stopped: null };
   const tried = new Set<string>();
   // Baca ulang tiap putaran: draf yang diantre selama sync ikut terkirim.
   for (;;) {
-    if (signal?.aborted) return { ...report, stopped: "unauthorized" };
+    if (opts.signal?.aborted) return { ...report, stopped: "unauthorized" };
     const next = (await store.list()).find(
       (d) => d.userId === userId && d.status === "queued" && !tried.has(d.id),
     );
     if (!next) return report;
     tried.add(next.id);
-    const outcome = await sendOne(store, next, api, signal);
+    const outcome = await sendOne(store, next, api, opts);
     if (outcome === "sent") report.sent.push(next.id);
     else if (outcome === "rejected") report.rejected.push(next.id);
     else return { ...report, stopped: outcome };
@@ -161,21 +177,22 @@ const inFlight = new WeakMap<DraftStore, Flight>();
 /**
  * Kirim draf antre milik `userId` (urut createdAt). Single-flight per penyimpan: panggilan
  * bersamaan untuk pengguna yang sama berbagi satu promise; pengguna lain (atau sync yang
- * sudah dibatalkan) menunggu giliran. `signal` dibatalkan (pengguna keluar/berganti) →
- * berhenti sebelum request berikutnya, dilaporkan sebagai `unauthorized`.
+ * sudah dibatalkan) menunggu giliran. Dibatalkan atau sesi bukan pemilik draf → berhenti
+ * sebelum request berikutnya tanpa mengubah draf, dilaporkan sebagai `unauthorized`.
+ * Draf rusak ditandai `rejected`; hanya galat penyimpan HP yang membuat promise ditolak.
  */
 export function syncDrafts(
   store: DraftStore,
   userId: string,
   api: SyncApi,
-  opts: { signal?: AbortSignal | undefined } = {},
+  opts: SyncOptions = {},
 ): Promise<SyncReport> {
   const current = inFlight.get(store);
   if (current?.userId === userId && !current.signal?.aborted) {
     return current.run;
   }
   const run = (current?.run.catch(() => undefined) ?? Promise.resolve()).then(
-    () => sendQueued(store, userId, api, opts.signal),
+    () => sendQueued(store, userId, api, opts),
   );
   const entry: Flight = { userId, signal: opts.signal, run };
   inFlight.set(store, entry);

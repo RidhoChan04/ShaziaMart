@@ -1,4 +1,8 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  type QueryClient,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import {
   createContext,
   useCallback,
@@ -8,7 +12,11 @@ import {
   useRef,
   useState,
 } from "react";
-import { getListStaffReceiptsQueryKey } from "@/shared/api/gen/staff/staff";
+import type { Session } from "@/shared/api/gen/shaziaMartAPI.schemas";
+import {
+  getGetStaffSessionQueryKey,
+  getListStaffReceiptsQueryKey,
+} from "@/shared/api/gen/staff/staff";
 import { useServerHealth } from "@/shared/hooks/use-server-health";
 import { type DraftStore, indexedDbDraftStore } from "./draft-store";
 import type { ReceiptDraft } from "./draft-types";
@@ -33,61 +41,113 @@ export function useDraftStore(): DraftStore {
 // Bukan URL /api/staff/: tidak ikut dibuang saat keluar; draf tetap terpisah per pengguna.
 const draftsKey = (userId: string) => ["staff-drafts", userId] as const;
 
-/** Draf milik `userId` di HP, urut createdAt. */
+/**
+ * Baca ulang daftar draf. Bacaan yang sedang berjalan dibatalkan dulu: tanpa itu TanStack
+ * memakai bacaan lama (sebelum simpan) bila daftar belum pernah selesai dimuat.
+ */
+function reloadDrafts(client: QueryClient, userId: string): void {
+  const queryKey = draftsKey(userId);
+  void client
+    .cancelQueries({ queryKey })
+    .then(() => client.invalidateQueries({ queryKey }));
+}
+
+/**
+ * Draf milik `userId` di HP, urut createdAt. `storageError` = penyimpanan HP gagal dibaca
+ * atau simpan terakhir gagal (tampilkan peringatan). `save` menolak bila gagal menyimpan.
+ */
 export function useDrafts(userId: string): {
   drafts: ReceiptDraft[];
   refresh: () => void;
+  storageError: boolean;
+  save: (d: ReceiptDraft) => Promise<void>;
 } {
   const store = useDraftStore();
   const client = useQueryClient();
+  const [saveFailed, setSaveFailed] = useState(false);
   const query = useQuery({
     queryKey: draftsKey(userId),
     queryFn: async () =>
       (await store.list()).filter((d) => d.userId === userId),
     enabled: userId !== "",
   });
+  const refresh = () => reloadDrafts(client, userId);
   return {
     drafts: query.data ?? [],
-    refresh: () => {
-      void client.invalidateQueries({ queryKey: draftsKey(userId) });
+    refresh,
+    storageError: query.isError || saveFailed,
+    save: async (d) => {
+      try {
+        await store.put(d);
+        setSaveFailed(false);
+      } catch (error) {
+        setSaveFailed(true);
+        throw error;
+      } finally {
+        refresh();
+      }
     },
   };
 }
 
+/** Pengguna sesi orang toko di cache (diperbarui saat masuk/keluar). */
+const sessionUserId = (client: QueryClient) => () =>
+  client.getQueryData<Session | null>(getGetStaffSessionQueryKey())?.user.id ??
+  null;
+
 /**
  * Kirim draf antre: saat login (mount), event `online`, server kembali tersambung, dan tiap
  * 30 dtk selama masih ada draf antre. Pengguna berganti → sync pengguna lama dihentikan.
+ * `storageError` = penyimpanan HP gagal (sync tidak bisa jalan); tampilkan peringatan.
  */
 export function useDraftSync(userId: string | null): {
   syncNow: () => Promise<SyncReport>;
   syncing: boolean;
+  storageError: boolean;
 } {
   const store = useDraftStore();
   const client = useQueryClient();
   const { online, checking } = useServerHealth();
-  const { drafts } = useDrafts(userId ?? "");
+  const { drafts, storageError: listFailed } = useDrafts(userId ?? "");
   const [syncing, setSyncing] = useState(false);
-  const abortRef = useRef<AbortController | null>(null);
+  const [syncFailed, setSyncFailed] = useState(false);
+  // Pengendali milik satu pengguna; syncNow lama (pengguna lain) tidak memakainya.
+  const owner = useRef<{ userId: string; controller: AbortController } | null>(
+    null,
+  );
 
   const syncNow = useCallback(async (): Promise<SyncReport> => {
-    if (userId === null) return NOTHING_SENT;
-    const signal = abortRef.current?.signal;
+    const own = owner.current;
+    if (
+      userId === null ||
+      own?.userId !== userId ||
+      own.controller.signal.aborted
+    ) {
+      return NOTHING_SENT;
+    }
     setSyncing(true);
     try {
-      const report = await syncDrafts(store, userId, realSyncApi, { signal });
+      const report = await syncDrafts(store, userId, realSyncApi, {
+        signal: own.controller.signal,
+        currentUserId: sessionUserId(client),
+      });
+      setSyncFailed(false);
       if (report.sent.length > 0) {
         void client.invalidateQueries({
           queryKey: getListStaffReceiptsQueryKey(),
         });
       }
-      void client.invalidateQueries({ queryKey: draftsKey(userId) });
       return report;
+    } catch (error) {
+      setSyncFailed(true);
+      throw error;
     } finally {
+      reloadDrafts(client, userId);
       setSyncing(false);
     }
   }, [client, store, userId]);
 
-  // Pemicu otomatis: gagal tidak apa-apa, draf tetap di HP dan dicoba di pemicu berikutnya.
+  // Pemicu otomatis: galat sudah tampil lewat storageError; dicoba lagi di pemicu berikutnya.
   const trigger = useEffectEvent(() => {
     syncNow().catch(() => undefined);
   });
@@ -95,7 +155,7 @@ export function useDraftSync(userId: string | null): {
   useEffect(() => {
     if (userId === null) return;
     const controller = new AbortController();
-    abortRef.current = controller;
+    owner.current = { userId, controller };
     trigger();
     // Keluar/berganti pengguna: sync pengguna ini berhenti sebelum request berikutnya.
     return () => controller.abort();
@@ -121,5 +181,5 @@ export function useDraftSync(userId: string | null): {
     return () => clearInterval(timer);
   }, [hasQueued]);
 
-  return { syncNow, syncing };
+  return { syncNow, syncing, storageError: listFailed || syncFailed };
 }
