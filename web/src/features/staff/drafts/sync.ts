@@ -30,8 +30,13 @@ export type SyncReport = {
 export type SyncOptions = {
   /** Dibatalkan saat pengguna keluar/berganti. */
   signal?: AbortSignal | undefined;
-  /** Pengguna sesi saat ini (cookie); dicek sebelum tiap request. */
+  /** Pengguna sesi saat ini (cache); dicek sebelum tiap request. */
   currentUserId?: (() => string | null) | undefined;
+  /**
+   * Pengguna sesi dibaca segar dari server di awal tiap putaran (null = tanpa sesi): cache bisa
+   * basi bila orang lain masuk dari tab lain, padahal cookie dipakai bersama.
+   */
+  freshUserId?: (() => Promise<string | null>) | undefined;
 };
 
 type Stop = NonNullable<SyncReport["stopped"]>;
@@ -87,6 +92,19 @@ async function reject(
 }
 
 type Outcome = "sent" | "rejected" | Stop;
+
+/** Sesi segar bukan pemilik draf → tanpa request sama sekali; tak terbaca → berhenti sementara. */
+async function sessionStop(
+  userId: string,
+  opts: SyncOptions,
+): Promise<Stop | null> {
+  if (!opts.freshUserId) return null;
+  try {
+    return (await opts.freshUserId()) === userId ? null : "unauthorized";
+  } catch (error) {
+    return (error instanceof ApiError && stopFor(error)) || "offline";
+  }
+}
 
 /** Galat request → berhenti (sementara) atau draf ditolak; galat penyimpan HP tetap dilempar. */
 async function failed(
@@ -150,6 +168,8 @@ async function sendQueued(
   opts: SyncOptions,
 ): Promise<SyncReport> {
   const report: SyncReport = { sent: [], rejected: [], stopped: null };
+  const stop = await sessionStop(userId, opts);
+  if (stop) return { ...report, stopped: stop };
   const tried = new Set<string>();
   // Baca ulang tiap putaran: draf yang diantre selama sync ikut terkirim.
   for (;;) {

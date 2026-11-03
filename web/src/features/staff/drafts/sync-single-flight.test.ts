@@ -1,7 +1,16 @@
 import { describe, expect, test } from "vitest";
 import type { StaffReceipt } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { syncDrafts } from "./sync";
-import { draft, fakeApi, gate, ids, photo, storeWith } from "./sync-fixtures";
+import {
+  apiError,
+  draft,
+  fakeApi,
+  gate,
+  ids,
+  networkError,
+  photo,
+  storeWith,
+} from "./sync-fixtures";
 
 describe("syncDrafts: satu pengiriman pada satu waktu", () => {
   test("dua syncDrafts bersamaan → satu POST", async () => {
@@ -115,5 +124,48 @@ describe("syncDrafts: tidak pernah mengirim draf atas nama pengguna lain", () =>
       ).stopped,
     ).toBe("unauthorized");
     expect(calls).toEqual([]);
+  });
+
+  test("tab lain: sesi segar di awal putaran milik Budi, cache masih Rina → tanpa request; draf tidak diubah", async () => {
+    const store = await storeWith(draft("d1", { photo: photo() }));
+    const { api, calls } = fakeApi();
+    let reads = 0;
+    expect(
+      await syncDrafts(store, "u-rina", api, {
+        currentUserId: () => "u-rina",
+        freshUserId: async () => {
+          reads += 1;
+          return "u-budi";
+        },
+      }),
+    ).toEqual({ sent: [], rejected: [], stopped: "unauthorized" });
+    expect(reads).toBe(1);
+    expect(calls).toEqual([]);
+    expect(await store.list()).toEqual([draft("d1", { photo: photo() })]);
+  });
+
+  test("sesi segar tidak bisa dibaca → berhenti sementara tanpa request; sesi cocok → terkirim", async () => {
+    const store = await storeWith(draft("d1"));
+    const { api, calls } = fakeApi();
+    expect(
+      (
+        await syncDrafts(store, "u-rina", api, {
+          freshUserId: () => Promise.reject(networkError()),
+        })
+      ).stopped,
+    ).toBe("offline");
+    expect(
+      (
+        await syncDrafts(store, "u-rina", api, {
+          freshUserId: () => Promise.reject(apiError(403, "STAFF_LAN_ONLY")),
+        })
+      ).stopped,
+    ).toBe("lan");
+    expect(calls).toEqual([]);
+    expect(
+      await syncDrafts(store, "u-rina", api, {
+        freshUserId: async () => "u-rina",
+      }),
+    ).toEqual({ sent: ["d1"], rejected: [], stopped: null });
   });
 });

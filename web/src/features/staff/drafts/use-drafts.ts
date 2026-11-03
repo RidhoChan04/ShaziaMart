@@ -12,10 +12,12 @@ import {
   useRef,
   useState,
 } from "react";
+import { ApiError } from "@/shared/api/fetcher";
 import type { Session } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import {
   getGetStaffSessionQueryKey,
   getListStaffReceiptsQueryKey,
+  getStaffSession,
 } from "@/shared/api/gen/staff/staff";
 import { useServerHealth } from "@/shared/hooks/use-server-health";
 import { type DraftStore, indexedDbDraftStore } from "./draft-store";
@@ -96,6 +98,26 @@ const sessionUserId = (client: QueryClient) => () =>
   null;
 
 /**
+ * Sesi dibaca segar dari server di awal tiap putaran sync. Beda dengan cache (orang lain masuk
+ * dari tab lain) → sesi dimuat ulang lewat query gerbang; 401 tidak menyentuh sesi (R26).
+ */
+const freshSessionUserId = (client: QueryClient) => async () => {
+  const fresh = await getStaffSession().then(
+    (s) => s.user.id,
+    (error: unknown) => {
+      if (error instanceof ApiError && error.code === "UNAUTHORIZED") {
+        return null;
+      }
+      throw error;
+    },
+  );
+  if (fresh !== null && fresh !== sessionUserId(client)()) {
+    void client.invalidateQueries({ queryKey: getGetStaffSessionQueryKey() });
+  }
+  return fresh;
+};
+
+/**
  * Kirim draf antre: saat login (mount), event `online`, server kembali tersambung, dan tiap
  * 30 dtk selama masih ada draf antre. Pengguna berganti → sync pengguna lama dihentikan.
  * `storageError` = penyimpanan HP gagal (sync tidak bisa jalan); tampilkan peringatan.
@@ -130,6 +152,7 @@ export function useDraftSync(userId: string | null): {
       const report = await syncDrafts(store, userId, realSyncApi, {
         signal: own.controller.signal,
         currentUserId: sessionUserId(client),
+        freshUserId: freshSessionUserId(client),
       });
       setSyncFailed(false);
       if (report.sent.length > 0) {
