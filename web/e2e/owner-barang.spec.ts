@@ -2,7 +2,7 @@
 import type { Page } from "@playwright/test";
 import { expect, expectNoA11yViolations, test } from "./fixtures.ts";
 import { openShift } from "./kasir-helpers.ts";
-import { loginOwner, stubBarcodeCamera } from "./owner-helpers.ts";
+import { loginOwner, scanCode, stubBarcodeCamera } from "./owner-helpers.ts";
 
 const TEMPLATE_FIXTURE = "src/test/fixtures/data-barang-contoh.xlsx";
 const BIMOLI_BARCODE = "8992696404441";
@@ -30,24 +30,38 @@ async function openProduct(page: Page, name: string) {
   await expect(page.getByRole("heading", { name, level: 1 })).toBeVisible();
 }
 
-/** Elemen angka/teks tidak terpotong: isinya muat tanpa "…". */
+/** Elemen angka/teks tidak terpotong: isinya muat tanpa "…" (ditunggu sampai ukuran huruf selesai menyesuaikan). */
 async function expectNotClipped(locator: ReturnType<Page["locator"]>) {
   await expect(locator).toBeVisible();
-  const box = await locator.evaluate((el) => ({
-    scrollWidth: el.scrollWidth,
-    clientWidth: el.clientWidth,
-    text: el.textContent ?? "",
-    overflow: getComputedStyle(el).textOverflow,
-  }));
-  expect(box.scrollWidth).toBeLessThanOrEqual(box.clientWidth);
-  expect(box.text).not.toContain("…");
-  expect(box.overflow).not.toBe("ellipsis");
+  await expect
+    .poll(() =>
+      locator.evaluate((el) => ({
+        overflowPx: el.scrollWidth - el.clientWidth,
+        ellipsis:
+          (el.textContent ?? "").includes("…") ||
+          getComputedStyle(el).textOverflow === "ellipsis",
+      })),
+    )
+    .toEqual({ overflowPx: 0, ellipsis: false });
+}
+
+/** Isian form 360px tidak menciut jadi garis: tiap `form input` minimal 64px. */
+async function expectUsableInputs(page: Page) {
+  const narrow = await page.locator("form input").evaluateAll((els) =>
+    els
+      .map((el) => ({
+        id: el.id,
+        width: Math.round(el.getBoundingClientRect().width),
+      }))
+      .filter((x) => x.width < 64),
+  );
+  expect(narrow).toEqual([]);
 }
 
 test("tambah barang dengan scan kamera: detail menghitung untung, daftar menandai stok belum dihitung", async ({
   page,
 }) => {
-  await stubBarcodeCamera(page, SCANNED_BARCODE);
+  await stubBarcodeCamera(page);
   await loginOwner(page, "/owner/barang");
   await page.getByRole("link", { name: "Tambah barang" }).click();
   await expect(
@@ -65,6 +79,7 @@ test("tambah barang dengan scan kamera: detail menghitung untung, daftar menanda
   const scanner = page.getByRole("dialog", { name: "Scan barcode" });
   await expect(scanner).toBeVisible();
   await expect(scanner).toContainText("Barcode eceran");
+  await scanCode(page, SCANNED_BARCODE);
   await expect(scanner).toBeHidden();
   await expect(page.getByLabel("Barcode").first()).toHaveValue(SCANNED_BARCODE);
 
@@ -246,7 +261,7 @@ test("360px: tile laba kotor besar dan kartu harga tidak terpotong atau meluber"
   await loginOwner(page);
   const laba = page.getByText("Laba kotor", { exact: true }).locator("..");
   await expect(laba).toContainText("Rp16");
-  await expectNotClipped(laba.locator("b, strong, p, span").last());
+  await expectNotClipped(laba.getByText(/^Rp[\d.]+$/));
   await expectNoHorizontalScroll(page);
 
   await page.goto("/owner/barang");
@@ -274,10 +289,16 @@ test("360px: tile laba kotor besar dan kartu harga tidak terpotong atau meluber"
     page.getByRole("heading", { name: "Ubah barang" }),
   ).toBeVisible();
   await expectNoHorizontalScroll(page);
+  await expectUsableInputs(page);
 
   await page.goto("/owner/barang/impor");
   await expect(
     page.getByRole("heading", { name: "Impor dari Excel" }),
+  ).toBeVisible();
+  await expectNoHorizontalScroll(page);
+  await page.locator("input[type=file]").setInputFiles(TEMPLATE_FIXTURE);
+  await expect(
+    page.getByRole("button", { name: "Impor 4 barang" }),
   ).toBeVisible();
   await expectNoHorizontalScroll(page);
 });
@@ -300,7 +321,7 @@ test("aksesibilitas detail barang", async ({ page }) => {
 });
 
 test("aksesibilitas form ubah barang dan layar scan", async ({ page }) => {
-  await stubBarcodeCamera(page, null);
+  await stubBarcodeCamera(page);
   await openProduct(page, "Indomie Goreng");
   await page.getByRole("link", { name: "Ubah" }).click();
   await expect(

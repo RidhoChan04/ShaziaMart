@@ -19,19 +19,24 @@ export async function loginOwner(page: Page, path = "/owner") {
 }
 
 /**
- * Kamera palsu untuk layar scan: `BarcodeDetector` yang selalu membaca `code`, dan
- * `getUserMedia` yang mengembalikan aliran dari `canvas.captureStream()`.
- * `code` null = kamera tidak menemukan apa pun (layar scan tetap terbuka).
+ * Kamera palsu untuk layar scan: `BarcodeDetector` yang membaca kode dari `window.__scanCode`
+ * (awalnya [] = kamera tidak menemukan apa pun, layar scan tetap terbuka), dan `getUserMedia`
+ * yang mengembalikan aliran dari `canvas.captureStream()`. Test mengisi kode lewat `scanCode`
+ * setelah memeriksa layar scan, agar layar tidak tertutup sebelum sempat diperiksa.
  * Dipasang sebelum halaman dimuat, jadi panggil sebelum `page.goto`.
  */
-export async function stubBarcodeCamera(page: Page, code: string | null) {
-  await page.addInitScript((value) => {
+export async function stubBarcodeCamera(page: Page) {
+  await page.addInitScript(() => {
+    const w = window as Window & { __scanCode?: string[] };
+    w.__scanCode = [];
     class FakeBarcodeDetector {
       static getSupportedFormats() {
         return Promise.resolve(["ean_13", "ean_8", "upc_a", "itf"]);
       }
       detect() {
-        return Promise.resolve(value === null ? [] : [{ rawValue: value }]);
+        return Promise.resolve(
+          (w.__scanCode ?? []).map((rawValue) => ({ rawValue })),
+        );
       }
     }
     Object.defineProperty(window, "BarcodeDetector", {
@@ -46,5 +51,12 @@ export async function stubBarcodeCamera(page: Page, code: string | null) {
       configurable: true,
       value: { getUserMedia: () => Promise.resolve(canvas.captureStream()) },
     });
+  });
+}
+
+/** Kamera palsu (lihat `stubBarcodeCamera`) mulai "melihat" `code`. */
+export async function scanCode(page: Page, code: string) {
+  await page.evaluate((value) => {
+    (window as Window & { __scanCode?: string[] }).__scanCode = [value];
   }, code);
 }
