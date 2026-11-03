@@ -1,5 +1,11 @@
 import type { SupplierDebt } from "@/shared/api/gen/shaziaMartAPI.schemas";
-import { formatIsoDayMonth, isoDaysBetween } from "@/shared/lib/business-day";
+import {
+  formatIsoDate,
+  formatIsoDayMonth,
+  isoDaysBetween,
+  jakartaIsoDate,
+} from "@/shared/lib/business-day";
+import { paidSummary } from "@/shared/lib/payment-labels";
 import { debtStage } from "@/shared/lib/receipt-rules";
 
 export type DebtGroup = {
@@ -55,4 +61,9 @@ export function dueText(dueDate: string, today: string): string {
   const days = isoDaysBetween(today, dueDate);
   if (days < 0) return base;
   return days === 0 ? `${base} · hari ini` : `${base} · ${days} hari lagi`;
+}
+
+/** Baris `Sudah lunas` (R31): "Lunas 2 Nov 2026 · Tunai · Uang pemilik" — tanggal lunas menurut kalender Jakarta. */
+export function paidText(paid: NonNullable<SupplierDebt["paid"]>): string {
+  return `Lunas ${formatIsoDate(jakartaIsoDate(paid.at))} · ${paidSummary(paid)}`;
 }

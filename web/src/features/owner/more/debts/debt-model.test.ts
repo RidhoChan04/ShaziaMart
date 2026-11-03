@@ -1,6 +1,11 @@
 import { expect, test } from "vitest";
 import type { SupplierDebt } from "@/shared/api/gen/shaziaMartAPI.schemas";
-import { dueText, groupBySupplier, unpaidSummary } from "./debt-model";
+import {
+  dueText,
+  groupBySupplier,
+  paidText,
+  unpaidSummary,
+} from "./debt-model";
 
 const TODAY = "2026-11-02";
 
@@ -70,4 +75,26 @@ test("groupBySupplier: belum lunas saja, jatuh tempo terdekat dulu", () => {
     ["Toko Grosir Makmur", 2_645_000, ["a", "b"]],
     ["CV Sumber Rejeki", 1_442_000, ["c"]],
   ]);
+});
+
+test("paidText: tanggal lunas kalender Jakarta + cara bayar (R31)", () => {
+  // 16.59 UTC = 23.59 WIB (masih 2 Nov); 17.00 UTC = 00.00 WIB (3 Nov).
+  const at = (hourUtc: number, minute: number) =>
+    Date.UTC(2026, 10, 2, hourUtc, minute);
+  expect(
+    paidText({
+      at: at(16, 59),
+      method: "tunai",
+      cashSource: "laci",
+      byName: "Pak Ahmad",
+    }),
+  ).toBe("Lunas 2 Nov 2026 · Tunai · Dari laci kasir");
+  expect(
+    paidText({
+      at: at(17, 0),
+      method: "transfer",
+      cashSource: null,
+      byName: "Pak Ahmad",
+    }),
+  ).toBe("Lunas 3 Nov 2026 · Transfer");
 });

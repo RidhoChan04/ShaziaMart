@@ -75,12 +75,13 @@ test("jatuh tempo 5 Nov → '3 hari lagi' + 'Segera jatuh tempo'", async () => {
   expect(row).toHaveTextContent("Segera jatuh tempo");
 });
 
-test("bagian 'Sudah lunas' memuat nota yang sudah dibayar dengan cara bayarnya", async () => {
+test("bagian 'Sudah lunas' (R31): 'Nota {tanggal nota}' / 'Lunas {tanggal lunas WIB} · {cara bayar}'", async () => {
   mockDb.update((s) => {
     const r = s.receipts.find((x) => x.id === "nota-a");
     if (r) {
       r.paid = {
-        at: DEBT_NOW,
+        // 2 Nov 01.00 WIB = 1 Nov UTC: tanggal lunas mengikuti kalender Jakarta.
+        at: Date.UTC(2026, 10, 1, 18),
         method: "tunai",
         cashSource: "pemilik",
         byName: "Pak Ahmad",
@@ -92,8 +93,16 @@ test("bagian 'Sudah lunas' memuat nota yang sudah dibayar dengan cara bayarnya",
   expect(screen.getByText("2 nota · 2 supplier")).toBeInTheDocument();
   expect(screen.queryByText(/lewat jatuh tempo/)).not.toBeInTheDocument();
   const lunas = screen.getByRole("region", { name: "Sudah lunas" });
-  expect(lunas).toHaveTextContent("Nota 20 Okt 2026");
-  expect(lunas).toHaveTextContent("Tunai · Uang pemilik");
+  const [row] = within(lunas).getAllByRole("listitem");
+  expect(
+    within(row as HTMLElement).getByText("Nota 20 Okt 2026"),
+  ).toBeVisible();
+  expect(
+    within(row as HTMLElement).getByText(
+      "Lunas 2 Nov 2026 · Tunai · Uang pemilik",
+    ),
+  ).toBeVisible();
+  expect(row).toHaveTextContent("Rp1.275.000");
 });
 
 test("tanpa utang: 'Tidak ada utang supplier'", async () => {

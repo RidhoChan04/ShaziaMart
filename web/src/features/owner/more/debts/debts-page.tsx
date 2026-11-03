@@ -10,12 +10,16 @@ import {
 } from "@/shared/lib/business-day";
 import { pesanError } from "@/shared/lib/error-messages";
 import { formatRupiah } from "@/shared/lib/money";
-import { paidSummary } from "@/shared/lib/payment-labels";
 import { Button } from "@/shared/ui/button";
 import { FitAmount } from "../../common/fit-amount";
 import { SubPageHeader } from "../../common/sub-page-header";
 import { RowList, Section } from "../../products/detail/section";
-import { dueText, groupBySupplier, unpaidSummary } from "./debt-model";
+import {
+  dueText,
+  groupBySupplier,
+  paidText,
+  unpaidSummary,
+} from "./debt-model";
 import { DueBadge } from "./due-badge";
 
 const rowClass =
@@ -51,7 +55,7 @@ function DebtRow({
           </span>
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-muted">
             {paid && debt.paid ? (
-              <span>{paidSummary(debt.paid)}</span>
+              <span>{paidText(debt.paid)}</span>
             ) : (
               <>
                 <span>{dueText(debt.dueDate, today)}</span>
