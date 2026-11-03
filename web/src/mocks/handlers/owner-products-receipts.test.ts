@@ -138,6 +138,25 @@ describe("barang menunggu harga jual", () => {
     expect(mockDb.get().products).toEqual(before);
   });
 
+  test("PUT prices barang menunggu → 422 'Isi harga jual dulu' (hanya form barang yang mengaktifkan, R20)", async () => {
+    await receiveTeh();
+    const teh = productId(TEH);
+    const before = mockDb.get();
+    const res = await put(`/api/owner/products/${teh}/prices`, {
+      lines: [
+        { unitId: unitOf(TEH, "botol").id, tierMinQty: null, price: 4000 },
+      ],
+    });
+    expect(res.status).toBe(422);
+    expect(await codeAndDetail(res)).toMatchObject({
+      code: "VALIDATION",
+      detail: "Isi harga jual dulu",
+    });
+    const after = mockDb.get();
+    expect(after.products).toEqual(before.products);
+    expect(after.priceHistory).toEqual(before.priceHistory);
+  });
+
   test("PUT barang menunggu dengan price 4000 & bigUnit.price 90000 → status aktif, awaitingPriceCount 0, priceHistory oldPrice null (tanpa 'Rp0')", async () => {
     await receiveTeh();
     const teh = productId(TEH);

@@ -602,3 +602,38 @@ describe("printSale & listTodaySales", () => {
     expect((await fetch("/api/sales/today")).status).toBe(401);
   });
 });
+
+describe("barang menunggu harga jual (R19)", () => {
+  test("item barang menunggu_harga → 410 PRODUCT_NO_PRICE; tidak ada penjualan, stok & shift tetap", async () => {
+    await loginWithShift();
+    mockDb.update((s) => {
+      const p = s.products.find((x) => x.name === BIMOLI);
+      if (p) p.status = "menunggu_harga";
+    });
+    const before = mockDb.get();
+    for (const body of [
+      cashSale(1),
+      // Satu barang menunggu di antara barang lain tetap menolak seluruh penjualan.
+      cashSale(1, {
+        items: [
+          saleItem(GULA, { qtyBase: 1000 }, 18000),
+          saleItem(BIMOLI, { qtyBase: 1 }, 36000),
+        ],
+        payments: [{ method: "cash", amount: 54000 }],
+        cashReceived: 54000,
+      }),
+    ]) {
+      const res = await post("/api/sales", body);
+      expect(res.status).toBe(410);
+      expect(await json<Problem>(res)).toMatchObject({
+        code: "PRODUCT_NO_PRICE",
+        detail: "Barang belum punya harga jual",
+      });
+    }
+    const after = mockDb.get();
+    expect(placedSales(after)).toEqual([]);
+    expect(after.stock).toEqual(before.stock);
+    expect(after.shift).toEqual(before.shift);
+    expect(after.saleSeq).toEqual(before.saleSeq);
+  });
+});

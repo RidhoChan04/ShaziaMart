@@ -1,10 +1,8 @@
 import { HttpResponse, http } from "msw";
-import {
-  type FieldError,
-  type ImportResult,
-  type ImportRow,
-  type PriceLineInput,
-  ProductStatus,
+import type {
+  FieldError,
+  ImportResult,
+  ImportRow,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { type MockProduct, type MockState, mockDb } from "../db";
 import {
@@ -14,8 +12,9 @@ import {
   saveApplied,
 } from "../products/apply";
 import { draftFromInput } from "../products/drafts";
+import { pricesBlocked, statusChange } from "../products/guards";
 import { checkImport, commitImport, readImportRows } from "../products/import";
-import { applyPriceLines } from "../products/prices";
+import { applyPriceLines, readPriceLines } from "../products/prices";
 import {
   movementsOf,
   soldUnitIds,
@@ -26,8 +25,6 @@ import { withScenario } from "../scenarios";
 import { invalid, problem, readJson, requireOwnerSession } from "./respond";
 
 const BASE = "/api/owner/products";
-const isStatus = (x: unknown): x is ProductStatus =>
-  (Object.values(ProductStatus) as unknown[]).includes(x);
 
 type Found = { state: Readonly<MockState>; product: MockProduct };
 
@@ -70,30 +67,6 @@ function saveOrFail(
     after?.(s, result.product.id);
   });
   return ownerProduct(result.product.id, status);
-}
-
-function readPriceLines(
-  body: Record<string, unknown> | null,
-): PriceLineInput[] | null {
-  const lines = body?.lines;
-  if (!Array.isArray(lines) || lines.length === 0) return null;
-  const out: PriceLineInput[] = [];
-  for (const line of lines as unknown[]) {
-    if (typeof line !== "object" || line === null) return null;
-    const {
-      unitId,
-      tierMinQty = null,
-      price,
-    } = line as Record<string, unknown>;
-    if (typeof unitId !== "string") return null;
-    if (tierMinQty !== null && typeof tierMinQty !== "number") return null;
-    out.push({
-      unitId,
-      tierMinQty,
-      price: typeof price === "number" ? price : Number.NaN,
-    });
-  }
-  return out;
 }
 
 type ImportInput = { state: Readonly<MockState>; rows: ImportRow[] };
@@ -196,24 +169,13 @@ export const ownerProductHandlers = [
     withScenario(async ({ params, request }) => {
       const found = findProduct(String(params.productId));
       if (found instanceof Response) return found;
-      const body = await readJson(request);
-      const status = body?.status;
-      const scarce = body?.scarce;
-      if (!isStatus(status) || typeof scarce !== "boolean") {
-        return invalid("Status barang tidak valid");
-      }
-      // K2: keluar dari menunggu harga hanya lewat form dengan harga jual.
-      if (
-        status === "menunggu_harga" ||
-        found.product.status === "menunggu_harga"
-      ) {
-        return invalid("Isi harga jual dulu");
-      }
+      const change = statusChange(found.product, await readJson(request));
+      if (typeof change === "string") return invalid(change);
       mockDb.update((s) => {
         const p = s.products.find((x) => x.id === found.product.id);
         if (!p) return;
-        p.status = status;
-        p.scarce = scarce;
+        p.status = change.status;
+        p.scarce = change.scarce;
       });
       return ownerProduct(found.product.id);
     }),
@@ -223,6 +185,8 @@ export const ownerProductHandlers = [
     withScenario(async ({ params, request }) => {
       const found = findProduct(String(params.productId));
       if (found instanceof Response) return found;
+      const blocked = pricesBlocked(found.product);
+      if (blocked !== null) return invalid(blocked);
       const lines = readPriceLines(await readJson(request));
       if (lines === null) return validationFailed([]);
       const now = Date.now();

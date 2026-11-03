@@ -8,6 +8,7 @@ import type {
 import { jakartaDateKey } from "@/shared/lib/business-day";
 import { type MockSale, type MockState, type MockUser, mockDb } from "../db";
 import { appendCredit } from "../ledger";
+import { NO_PRICE_DETAIL, sellsAwaitingPrice } from "../products/guards";
 import { productOfUnit } from "../products/views";
 import { formatSaleNumber } from "../sale-number";
 import {
@@ -101,6 +102,11 @@ function priceRequest(
 ): { state: Readonly<MockState>; items: PricedItem[] } | Response {
   let state = mockDb.get();
   let items = priceItems(state.products, rawItems);
+  // R19: barang menunggu harga jual tidak bisa dijual, termasuk yang sudah di keranjang.
+  const ids = isRejection(items) ? [] : items.map((p) => p.productId);
+  if (sellsAwaitingPrice(state, ids)) {
+    return problem(410, "PRODUCT_NO_PRICE", NO_PRICE_DETAIL);
+  }
   if (!isRejection(items) && bumpFirstPrice(saleId, items)) {
     state = mockDb.get();
     items = priceItems(state.products, rawItems);

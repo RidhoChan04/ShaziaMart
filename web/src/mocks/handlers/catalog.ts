@@ -1,6 +1,7 @@
 import { HttpResponse, http } from "msw";
 import type { CatalogMatch } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { type MockProduct, type MockUnit, mockDb } from "../db";
+import { NO_PRICE_DETAIL } from "../products/guards";
 import { eceranOf, toKasirProduct } from "../products/views";
 import { withScenario } from "../scenarios";
 import { invalid, problem } from "./respond";
@@ -23,7 +24,7 @@ function sellable(product: MockProduct, unit: MockUnit): Response {
     return problem(410, "PRODUCT_INACTIVE", "Barang ini tidak dijual lagi");
   }
   if (product.status === "menunggu_harga") {
-    return problem(410, "PRODUCT_NO_PRICE", "Barang belum punya harga jual");
+    return problem(410, "PRODUCT_NO_PRICE", NO_PRICE_DETAIL);
   }
   return HttpResponse.json(matchOf(product, unit));
 }

@@ -76,6 +76,31 @@ function withPrices(
   return product;
 }
 
+/** Body `PriceLinesInput` → baris harga (harga bukan angka = NaN, ditolak per field); bentuk salah → null. */
+export function readPriceLines(
+  body: Record<string, unknown> | null,
+): PriceLineInput[] | null {
+  const lines = body?.lines;
+  if (!Array.isArray(lines) || lines.length === 0) return null;
+  const out: PriceLineInput[] = [];
+  for (const line of lines as unknown[]) {
+    if (typeof line !== "object" || line === null) return null;
+    const {
+      unitId,
+      tierMinQty = null,
+      price,
+    } = line as Record<string, unknown>;
+    if (typeof unitId !== "string") return null;
+    if (tierMinQty !== null && typeof tierMinQty !== "number") return null;
+    out.push({
+      unitId,
+      tierMinQty,
+      price: typeof price === "number" ? price : Number.NaN,
+    });
+  }
+  return out;
+}
+
 /**
  * Lembar ubah harga: ganti harga baris (eceran, tier grosir eceran, satuan besar aktif)
  * lalu validasi hanya field harga, agar isian lain barang tidak menghalangi.
