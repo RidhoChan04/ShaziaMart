@@ -196,25 +196,31 @@ export const RECEIPT_LINES_MISMATCH = "Baris nota tidak cocok — muat ulang";
 export const RECEIPT_PAYMENT_LOCKED =
   "Cara bayar tidak bisa diubah — sudah dibayar";
 
-/** Total berjalan atas baris yang jumlah & harganya sah; galat sekali di baris yang melewati batas. */
+type RunningTotal = { total: number; over: boolean };
+
+/** Tambah subtotal baris sah ke total berjalan; galat sekali di baris yang melewati batas aman. */
 function totalError(
-  l: CheckLine,
-  running: { total: number; over: boolean },
+  lineId: string,
+  qty: number,
+  unitCost: number,
+  running: RunningTotal,
 ): ReceiptError | null {
-  if (running.over || l.qty === null || l.unitCost === null) return null;
-  if (qtyError(l) !== null || unitCostError(l) !== null) return null;
-  const total = running.total + l.qty * l.unitCost;
-  if (Number.isSafeInteger(l.qty * l.unitCost) && Number.isSafeInteger(total)) {
+  if (running.over) return null;
+  const subtotal = qty * unitCost;
+  const total = running.total + subtotal;
+  if (Number.isSafeInteger(subtotal) && Number.isSafeInteger(total)) {
     running.total = total;
     return null;
   }
   running.over = true;
-  return err(l.lineId, "unitCost", RECEIPT_TOO_LARGE);
+  return err(lineId, "unitCost", RECEIPT_TOO_LARGE);
 }
 
+/** Galat satu baris (masing-masing aturan sekali); hanya baris dengan jumlah & harga sah ikut total berjalan. */
 function lineErrors(
   l: CheckLine,
   seen: { names: Set<string>; barcodes: Set<string> },
+  running: RunningTotal,
 ): ReceiptError[] {
   const out: ReceiptError[] = [];
   const choice = productChoiceError(l);
@@ -225,9 +231,22 @@ function lineErrors(
   if (l.newProduct !== null) {
     out.push(...newProductErrors(l.lineId, l.newProduct, seen));
   }
-  for (const e of [qtyError(l), unitCostError(l)]) if (e !== null) out.push(e);
+  const qtyErr = qtyError(l);
+  const costErr = unitCostError(l);
+  if (qtyErr !== null) out.push(qtyErr);
+  if (costErr !== null) out.push(costErr);
   if (l.expiryDate !== null && !isIsoDate(l.expiryDate)) {
     out.push(err(l.lineId, "expiryDate", "Tanggal kedaluwarsa tidak valid"));
+  }
+  // Tanpa galat jumlah/harga, keduanya pasti bilangan (pengecekan null hanya untuk penyempitan tipe).
+  if (
+    qtyErr === null &&
+    costErr === null &&
+    l.qty !== null &&
+    l.unitCost !== null
+  ) {
+    const tooLarge = totalError(l.lineId, l.qty, l.unitCost, running);
+    if (tooLarge !== null) out.push(tooLarge);
   }
   return out;
 }
@@ -261,12 +280,8 @@ export function validateReceipt(
     out.push(err(null, "lines", "Belum ada barang di nota"));
   }
   const seen = { names: new Set<string>(), barcodes: new Set<string>() };
-  const running = { total: 0, over: false };
-  for (const l of r.lines) {
-    out.push(...lineErrors(l, seen));
-    const tooLarge = totalError(l, running);
-    if (tooLarge !== null) out.push(tooLarge);
-  }
+  const running: RunningTotal = { total: 0, over: false };
+  for (const l of r.lines) out.push(...lineErrors(l, seen, running));
   out.push(...validatePayment(r.payment, r.notaDate, ctx.shiftOpen));
   return out;
 }
