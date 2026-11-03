@@ -1,7 +1,8 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Truck } from "lucide-react";
 import { useStaffSession } from "../auth/staff-session";
-import { useDraftSync, useDrafts } from "../drafts/use-drafts";
+import { useStaffSync } from "../drafts/sync-context";
+import { useDrafts } from "../drafts/use-drafts";
 import { DraftStorageBanner } from "../receipt/draft-banner";
 import { Card, SectionHeading } from "../receipt/form-ui";
 import { DraftRow } from "../receipt/receipt-row";
@@ -11,7 +12,7 @@ export function StaffBerandaPage() {
   const userId = useStaffSession().data?.user.id ?? "";
   const navigate = useNavigate();
   const { drafts, storageError } = useDrafts(userId);
-  const sync = useDraftSync(userId === "" ? null : userId);
+  const sync = useStaffSync();
   const unsent = drafts.filter((d) => d.status !== "editing");
   return (
     <div className="max-w-md">

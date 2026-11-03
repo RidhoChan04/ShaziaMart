@@ -5,7 +5,8 @@ import { pesanError } from "@/shared/lib/error-messages";
 import { buttonVariants } from "@/shared/ui/button";
 import { useStaffSession } from "../auth/staff-session";
 import type { ReceiptDraft } from "../drafts/draft-types";
-import { useDraftSync, useDrafts } from "../drafts/use-drafts";
+import { useStaffSync } from "../drafts/sync-context";
+import { useDrafts } from "../drafts/use-drafts";
 import { DraftStorageBanner } from "./draft-banner";
 import { Card, SectionHeading } from "./form-ui";
 import { DraftRow, ReceiptRow } from "./receipt-row";
@@ -16,7 +17,7 @@ export function MasukPage() {
   const navigate = useNavigate();
   const { drafts, storageError } = useDrafts(userId);
   // Draf antre dikirim otomatis di sini juga (tab ditutup lalu dibuka lagi).
-  const sync = useDraftSync(userId === "" ? null : userId);
+  const sync = useStaffSync();
   const receipts = useListStaffReceipts();
   const unsent = drafts.filter((d) => d.status !== "editing");
   const editing = drafts.filter((d) => d.status === "editing");

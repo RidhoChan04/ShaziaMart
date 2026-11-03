@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { ApiError } from "@/shared/api/fetcher";
 import type {
@@ -19,11 +19,11 @@ import { jakartaIsoDate } from "@/shared/lib/business-day";
 import { pesanError } from "@/shared/lib/error-messages";
 import { paymentSummary } from "@/shared/lib/payment-labels";
 import { validateReceipt } from "@/shared/lib/receipt-rules";
-import { Button } from "@/shared/ui/button";
 import type { ReceiptForm } from "../drafts/draft-types";
 import { toPayment } from "../drafts/to-input";
 import { formFromReceipt, toReceiptEdit } from "./edit-model";
 import { onNotaStep } from "./form-model";
+import { LeaveButton } from "./leave-dialog";
 import { toCheckLine } from "./line-model";
 import { NotaStep } from "./nota-step";
 import { PaymentStep } from "./payment-step";
@@ -72,7 +72,17 @@ export function EditForm({ receipt }: { receipt: StaffReceipt }) {
     );
   const toList = () => void navigate({ to: "/staff/masuk" });
   const clearFor = (match: (e: ReceiptError) => boolean) =>
-    setErrors(errors.filter((e) => !match(e)));
+    setErrors((prev) => prev.filter((e) => !match(e)));
+  const initial = useRef(
+    JSON.stringify(toReceiptEdit(formFromReceipt(receipt, null))),
+  );
+  const dirty = JSON.stringify(toReceiptEdit(form)) !== initial.current;
+  // Pembayaran terkunci tidak punya isian: galat pembayaran dari server tampil di bawah ringkasannya.
+  const lockedErrors = locked
+    ? errors
+        .filter((e) => e.lineId === null && !onNotaStep(e))
+        .map((e) => e.message)
+    : [];
 
   const next = () => {
     const found = problems().filter(onNotaStep);
@@ -125,9 +135,7 @@ export function EditForm({ receipt }: { receipt: StaffReceipt }) {
   return (
     <div className="mx-auto max-w-xl pb-6">
       <header className="flex items-center gap-3 py-3">
-        <Button variant="outline" onClick={toList}>
-          Batal
-        </Button>
+        <LeaveButton dirty={dirty} onLeave={toList} />
         <h1 className="text-[20px] leading-tight font-bold">Barang masuk</h1>
       </header>
       {failure && (
@@ -148,6 +156,7 @@ export function EditForm({ receipt }: { receipt: StaffReceipt }) {
           edit={{
             fixedPayment: locked ? paymentSummary(receipt.payment) : null,
             note: offline ? OFFLINE_NOTE : null,
+            errors: lockedErrors,
             offline,
           }}
           onPayment={(change) => {

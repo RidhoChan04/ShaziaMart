@@ -5,7 +5,12 @@ import { expect } from "vitest";
 import { AppProviders } from "@/app/providers";
 import { createAppRouter } from "@/app/router";
 import { mockDb } from "@/mocks/db";
-import { loginWithShift, staffLogin } from "@/mocks/handlers/test-helpers";
+import {
+  loginWithShift,
+  post,
+  receiptInput,
+  staffLogin,
+} from "@/mocks/handlers/test-helpers";
 import { server } from "@/mocks/node";
 import type { DraftLine } from "@/shared/lib/receipt-rules";
 import { createTestQueryClient } from "@/test/render-app";
@@ -124,6 +129,27 @@ export function capturePosts() {
       request.method === "POST" &&
       new URL(request.url).pathname === RECEIPTS
     ) {
+      bodies.push(await request.clone().json());
+    }
+  });
+  return bodies;
+}
+
+/** Nota mockup (CV Sumber Rejeki) tersimpan di server palsu atas nama Rina, shift terbuka. */
+export async function seedReceipt(
+  patch: Parameters<typeof receiptInput>[0] = {},
+) {
+  await loginRina(true);
+  const res = await post(RECEIPTS, receiptInput(patch));
+  expect(res.status).toBe(201);
+}
+
+/** Isi PUT ubah nota yang masuk ke server palsu. */
+export function capturePuts() {
+  const bodies: unknown[] = [];
+  server.events.on("request:start", async ({ request }) => {
+    const { pathname } = new URL(request.url);
+    if (request.method === "PUT" && pathname.startsWith(RECEIPTS)) {
       bodies.push(await request.clone().json());
     }
   });

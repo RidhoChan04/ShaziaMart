@@ -6,7 +6,7 @@ import { formatRupiah } from "@/shared/lib/money";
 import { Button } from "@/shared/ui/button";
 import type { DraftPayment, ReceiptForm } from "../drafts/draft-types";
 import { formTotal, lineCount } from "./form-model";
-import { Card, SectionHeading } from "./form-ui";
+import { Card, FieldError, SectionHeading } from "./form-ui";
 import { PaymentFields } from "./payment-fields";
 
 type Props = {
@@ -18,7 +18,13 @@ type Props = {
   shiftUnknown: boolean;
   busy: boolean;
   /** Ubah nota: tombol simpan, ringkasan hanya-baca bila pembayaran terkunci, dan catatan di bawah tombol. */
-  edit?: { fixedPayment: string | null; note: string | null; offline: boolean };
+  edit?: {
+    fixedPayment: string | null;
+    note: string | null;
+    offline: boolean;
+    /** Galat pembayaran dari server saat pembayaran terkunci (tanpa isian). */
+    errors?: readonly string[];
+  };
   onPayment: (change: (p: DraftPayment) => DraftPayment) => void;
   onBack: () => void;
   onSave: () => void;
@@ -59,6 +65,7 @@ export function PaymentStep({
           <p className="flex min-h-14 items-center px-4 font-medium">
             {edit.fixedPayment}
           </p>
+          <FieldError messages={edit.errors ?? []} />
         </Card>
       ) : (
         <PaymentFields

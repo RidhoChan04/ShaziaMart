@@ -7,8 +7,9 @@ import { useGetStaffShift } from "@/shared/api/gen/staff/staff";
 import { jakartaIsoDate } from "@/shared/lib/business-day";
 import { Button } from "@/shared/ui/button";
 import { useStaffSession } from "../auth/staff-session";
+import { useStaffSync } from "../drafts/sync-context";
 import { formProblems } from "../drafts/to-input";
-import { useDraftStore, useDraftSync } from "../drafts/use-drafts";
+import { useDraftStore } from "../drafts/use-drafts";
 import { CancelDialog } from "./cancel-dialog";
 import { onNotaStep } from "./form-model";
 import { NotaStep } from "./nota-step";
@@ -20,6 +21,8 @@ const STORAGE_BANNER =
   "Draf tidak bisa disimpan di HP. Selesaikan dan simpan nota sekarang, jangan tutup halaman ini.";
 const SAVE_FAILED =
   "Gagal menyimpan draf di HP — coba lagi, atau catat nota di kertas dulu.";
+const OLD_DRAFT_STUCK =
+  "Nota baru sudah antre; draf lama gagal dihapus — buang manual";
 const bannerClass =
   "mb-3 rounded-lg bg-danger-soft px-4 py-3 text-[14px] font-medium text-danger-ink";
 
@@ -29,7 +32,7 @@ export function ReceiptFormPage() {
   const navigate = useNavigate();
   const today = jakartaIsoDate(Date.now());
   const form = useFormDraft(userId, draf, today);
-  const sync = useDraftSync(userId === "" ? null : userId);
+  const sync = useStaffSync();
   const store = useDraftStore();
   const shiftQuery = useGetStaffShift();
   const shift = shiftQuery.data?.shift ?? null;
@@ -139,15 +142,22 @@ export function ReceiptFormPage() {
     submitting.current = true;
     setBusy(true);
     setFailure(null);
+    form.freeze();
     try {
-      form.freeze();
       await form.save(renewIds(draft));
-      await store.remove(draft.id);
     } catch {
       form.unfreeze();
       setFailure(SAVE_FAILED);
       submitting.current = false;
       setBusy(false);
+      return;
+    }
+    // Salinan baru sudah antre di HP: tombol tetap nonaktif agar tidak ada salinan kedua.
+    try {
+      await store.remove(draft.id);
+    } catch {
+      toast.error(OLD_DRAFT_STUCK);
+      await toList();
       return;
     }
     const report = await sync.syncNow().catch(() => null);

@@ -35,7 +35,9 @@ export function ReceiptEditPage() {
       </div>
     );
   }
-  if (!receipt) return null;
+  if (!receipt) {
+    return <p className="text-muted">Memuat…</p>;
+  }
   if (receipt.status === "aktif") {
     return <EditForm key={receipt.id} receipt={receipt} />;
   }

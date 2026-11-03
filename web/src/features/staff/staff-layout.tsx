@@ -5,6 +5,7 @@ import { useServerHealth } from "@/shared/hooks/use-server-health";
 import { cn } from "@/shared/lib/cn";
 import { StaffGate } from "./auth/staff-gate";
 import { useStaffSession } from "./auth/staff-session";
+import { StaffSyncProvider } from "./drafts/sync-context";
 import { StaffNav, useStaffTabRoot } from "./staff-nav";
 import { StaffPageHeader } from "./staff-page-header";
 
@@ -66,6 +67,16 @@ function StaffShell() {
   );
 }
 
+/** Kirim otomatis draf berjalan di semua tab selama pengguna masuk. */
+function SyncedShell() {
+  const userId = useStaffSession().data?.user.id ?? null;
+  return (
+    <StaffSyncProvider userId={userId}>
+      <StaffShell />
+    </StaffSyncProvider>
+  );
+}
+
 export function StaffLayout() {
   // Di <html> (bukan wrapper) agar portal Radix (dialog, sheet) ikut token app pemilik.
   useLayoutEffect(() => {
@@ -76,7 +87,7 @@ export function StaffLayout() {
   }, []);
   return (
     <StaffGate>
-      <StaffShell />
+      <SyncedShell />
     </StaffGate>
   );
 }

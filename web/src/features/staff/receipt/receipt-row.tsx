@@ -1,6 +1,6 @@
 import { Ban, Clock, TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
-import { formatIsoDate } from "@/shared/lib/business-day";
+import { formatIsoDate, isIsoDate } from "@/shared/lib/business-day";
 import { formatRupiah } from "@/shared/lib/money";
 import type { ReceiptDraft } from "../drafts/draft-types";
 import { formTotal } from "./form-model";
@@ -49,7 +49,7 @@ export function ReceiptRow({
           {supplierName.trim() || "Tanpa supplier"}
         </span>
         <span className="block text-[13px] text-muted tabular-nums">
-          {`${formatIsoDate(notaDate)} · ${lineCount} barang`}
+          {`${isIsoDate(notaDate) ? formatIsoDate(notaDate) : "—"} · ${lineCount} barang`}
         </span>
         {m && (
           <span

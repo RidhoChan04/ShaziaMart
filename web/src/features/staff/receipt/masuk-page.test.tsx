@@ -164,3 +164,59 @@ test("Beranda: 'Belum terkirim (1)' berisi draf antre; draf yang sedang diisi ti
   expect(screen.getByText("UD Antre Jaya")).toBeVisible();
   expect(DRAFT_ID).toBeTruthy();
 });
+
+const broken = (store: ReturnType<typeof memoryDraftStore>) => {
+  const { form: _form, ...noForm } = queued("d-rusak", "x");
+  return store.put(noForm as never);
+};
+
+test("draf rusak: ketuk → form kosong; Batal → alertdialog → 'Buang draf' menghapusnya dari HP dan daftar", async () => {
+  await loginRina(true);
+  const store = memoryDraftStore();
+  await broken(store);
+  const { router } = renderForm(store, "/staff/masuk");
+  const user = userEvent.setup();
+  await user.click(await screen.findByText("Tanpa supplier"));
+  await waitFor(() =>
+    expect(router.state.location.search).toEqual({ draf: "d-rusak" }),
+  );
+  await user.click(await screen.findByRole("button", { name: "Batal" }));
+  const dialog = await screen.findByRole("alertdialog");
+  await user.click(within(dialog).getByRole("button", { name: "Buang draf" }));
+  await waitFor(() =>
+    expect(router.state.location.pathname).toBe("/staff/masuk"),
+  );
+  expect(await store.get("d-rusak")).toBeUndefined();
+  expect(await screen.findByText("Belum ada barang masuk")).toBeVisible();
+});
+
+test("penyimpanan HP gagal dibaca → spanduk draf tidak bisa dibaca", async () => {
+  await loginRina(true);
+  const store = {
+    ...memoryDraftStore(),
+    list: () => Promise.reject(new Error("IDB mati")),
+  };
+  renderForm(store, "/staff/masuk");
+  expect(
+    await screen.findByText(/Draf tidak bisa dibaca dari HP/),
+  ).toBeVisible();
+});
+
+test("R29: kirim otomatis jalan di tab lain (Lainnya) dan hanya satu kali POST", async () => {
+  await loginRina(true);
+  const store = memoryDraftStore();
+  await store.put(queued("d-antre", "UD Antre Jaya"));
+  let posts = 0;
+  server.events.on("request:start", ({ request }) => {
+    if (
+      request.method === "POST" &&
+      request.url.endsWith("/api/staff/receipts")
+    ) {
+      posts += 1;
+    }
+  });
+  renderForm(store, "/staff/lainnya");
+  await waitFor(async () => expect(await store.list()).toEqual([]));
+  expect(posts).toBe(1);
+  server.events.removeAllListeners();
+});

@@ -5,12 +5,17 @@ import { toast } from "sonner";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { mockDb } from "@/mocks/db";
 import { problem } from "@/mocks/handlers/respond";
-import { post, receiptInput } from "@/mocks/handlers/test-helpers";
 import { server } from "@/mocks/node";
 import { setScenario } from "@/mocks/scenarios";
 import { getGetHealthQueryKey } from "@/shared/api/gen/system/system";
 import { memoryDraftStore } from "../drafts/draft-store";
-import { loginRina, NOW, renderForm } from "./form-test-kit";
+import {
+  capturePuts,
+  loginRina,
+  NOW,
+  renderForm,
+  seedReceipt,
+} from "./form-test-kit";
 
 const RECEIPTS = "/api/staff/receipts";
 const PAGE = "/staff/masuk/draf-1";
@@ -25,23 +30,6 @@ afterEach(() => {
   server.events.removeAllListeners();
   vi.useRealTimers();
 });
-
-async function seedReceipt(patch: Parameters<typeof receiptInput>[0] = {}) {
-  await loginRina(true);
-  const res = await post(RECEIPTS, receiptInput(patch));
-  expect(res.status).toBe(201);
-}
-
-function capturePuts() {
-  const bodies: unknown[] = [];
-  server.events.on("request:start", async ({ request }) => {
-    const { pathname } = new URL(request.url);
-    if (request.method === "PUT" && pathname.startsWith(RECEIPTS)) {
-      bodies.push(await request.clone().json());
-    }
-  });
-  return bodies;
-}
 
 const toPayment = async (user: ReturnType<typeof userEvent.setup>) =>
   user.click(

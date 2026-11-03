@@ -1,5 +1,6 @@
-import { screen, waitFor } from "@testing-library/react";
+import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { HttpResponse, http } from "msw";
 import { toast } from "sonner";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { mockDb } from "@/mocks/db";
@@ -25,6 +26,8 @@ afterEach(() => {
   server.events.removeAllListeners();
   vi.useRealTimers();
 });
+
+const RECEIPTS = "/api/staff/receipts";
 
 const takenDraft = (message: string) => ({
   ...makeDraft({ lines: mockupLines(), supplierName: "CV Sumber Rejeki" }),
@@ -72,4 +75,42 @@ test("galat lain tidak menawarkan 'Kirim sebagai nota baru'", async () => {
   expect(
     screen.queryByRole("button", { name: "Kirim sebagai nota baru" }),
   ).toBeNull();
+});
+
+test("draf lama gagal dihapus → pesan 'buang manual', satu salinan baru antre, ketukan kedua tidak menggandakan", async () => {
+  await loginRina(true);
+  const inner = memoryDraftStore();
+  const store = {
+    ...inner,
+    remove: async (id: string) => {
+      if (id === DRAFT_ID) throw new Error("IDB mati");
+      return inner.remove(id);
+    },
+  };
+  await store.put(takenDraft(ID_TAKEN_MESSAGE));
+  server.use(http.post(RECEIPTS, () => HttpResponse.error()));
+  let posts = 0;
+  server.events.on("request:start", ({ request }) => {
+    if (request.method === "POST" && request.url.endsWith(RECEIPTS)) posts += 1;
+  });
+  const { router } = renderForm(store);
+  const button = await screen.findByRole("button", {
+    name: "Kirim sebagai nota baru",
+  });
+  await act(async () => {
+    button.click();
+    button.click();
+  });
+  expect(
+    await screen.findByText(
+      "Nota baru sudah antre; draf lama gagal dihapus — buang manual",
+    ),
+  ).toBeVisible();
+  await waitFor(() =>
+    expect(router.state.location.pathname).toBe("/staff/masuk"),
+  );
+  const all = await store.list();
+  expect(all.filter((d) => d.status === "queued")).toHaveLength(1);
+  expect(all.filter((d) => d.id === DRAFT_ID)).toHaveLength(1);
+  expect(posts).toBeLessThanOrEqual(1);
 });

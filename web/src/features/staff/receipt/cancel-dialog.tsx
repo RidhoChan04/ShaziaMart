@@ -9,7 +9,7 @@ import {
   DialogTrigger,
 } from "@/shared/ui/dialog";
 
-/** Batal: buang draf atau simpan sebagai draf. Fokus kembali ke tombol Batal saat ditutup. */
+/** Batal (konfirmasi alertdialog): buang draf atau simpan sebagai draf. Fokus kembali ke tombol Batal saat ditutup. */
 export function CancelDialog({
   onDiscard,
   onKeep,
@@ -22,7 +22,11 @@ export function CancelDialog({
       <DialogTrigger asChild>
         <Button variant="outline">Batal</Button>
       </DialogTrigger>
-      <DialogContent showCloseButton={false}>
+      <DialogContent
+        role="alertdialog"
+        showCloseButton={false}
+        onInteractOutside={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle>Buang draf ini?</DialogTitle>
           <DialogDescription>
