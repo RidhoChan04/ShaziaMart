@@ -1,17 +1,11 @@
 import { newId } from "@/shared/lib/id";
+import { laciPaidOf } from "@/shared/lib/payment-labels";
 import type { MockCashOut, MockReceipt, MockShift, MockState } from "../db";
 import { receiptTotalOf } from "./views";
 
-/** Uang laci yang dipakai nota: total bila dibayar (sekarang atau lunas) tunai dari laci, selain itu 0. */
-export function laciPaid(r: MockReceipt): number {
-  const { payment: p, paid } = r;
-  const fromLaci =
-    (p.timing === "sekarang" &&
-      p.method === "tunai" &&
-      p.cashSource === "laci") ||
-    (paid !== null && paid.method === "tunai" && paid.cashSource === "laci");
-  return fromLaci ? receiptTotalOf(r) : 0;
-}
+/** Uang laci yang dipakai nota — aturan bersama `laciPaidOf` (app pemilik memakai yang sama). */
+export const laciPaid = (r: MockReceipt): number =>
+  laciPaidOf({ payment: r.payment, paid: r.paid, total: receiptTotalOf(r) });
 
 /**
  * Uang keluar laci (`amount` > 0 keluar, < 0 kembali ke laci) di shift yang sedang buka.
