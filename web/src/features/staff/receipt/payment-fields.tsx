@@ -6,6 +6,7 @@ import { addIsoDays } from "@/shared/lib/business-day";
 import {
   CASH_SOURCE_LABEL,
   PAYMENT_METHOD_LABEL,
+  PAYMENT_TIMING_LABEL,
 } from "@/shared/lib/payment-labels";
 import type { DraftPayment, ReceiptForm } from "../drafts/draft-types";
 import { DateRow } from "./date-row";
@@ -47,8 +48,8 @@ export function PaymentFields({
           label="Kapan dibayar"
           value={p.timing}
           options={[
-            { value: "sekarang", label: "Bayar sekarang" },
-            { value: "nanti", label: "Bayar nanti" },
+            { value: "sekarang", label: PAYMENT_TIMING_LABEL.sekarang },
+            { value: "nanti", label: PAYMENT_TIMING_LABEL.nanti },
           ]}
           onChange={(timing) =>
             onPayment((x) => ({

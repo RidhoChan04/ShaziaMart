@@ -9,6 +9,7 @@ import type {
 import { jakartaIsoDate } from "@/shared/lib/business-day";
 import {
   newProductUnits,
+  RECEIPT_PHOTO_MISSING,
   RECEIPT_TOO_LARGE,
   validateReceipt,
 } from "@/shared/lib/receipt-rules";
@@ -183,7 +184,7 @@ export function checkReceipt(
     input.photoId !== null &&
     mockPhotos.load(input.photoId)?.ownerId !== userId
   ) {
-    errors.push(err(null, "photoId", "Foto nota belum terkirim"));
+    errors.push(err(null, "photoId", RECEIPT_PHOTO_MISSING));
   }
   return errors.length > 0 ? errors : overflowErrors(state, input.lines);
 }

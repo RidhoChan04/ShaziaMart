@@ -11,6 +11,11 @@ export const PAYMENT_METHOD_LABEL = {
   transfer: "Transfer",
 } as const;
 
+export const PAYMENT_TIMING_LABEL = {
+  sekarang: "Bayar sekarang",
+  nanti: "Bayar nanti",
+} as const;
+
 export const CASH_SOURCE_LABEL = {
   laci: "Dari laci kasir",
   pemilik: "Uang pemilik",
@@ -29,10 +34,10 @@ export function paidSummary(
 export function paymentSummary(p: ReceiptPayment): string {
   if (p.timing === "nanti") {
     const due = p.dueDate === null ? "—" : formatIsoDate(p.dueDate);
-    return `Bayar nanti · jatuh tempo ${due}`;
+    return `${PAYMENT_TIMING_LABEL.nanti} · jatuh tempo ${due}`;
   }
   const method = p.method ?? "tunai";
-  return `Bayar sekarang · ${paidSummary({ method, cashSource: p.cashSource })}`;
+  return `${PAYMENT_TIMING_LABEL.sekarang} · ${paidSummary({ method, cashSource: p.cashSource })}`;
 }
 
 /** Uang laci yang dipakai nota: total bila dibayar (sekarang atau lunas) tunai dari laci, selain itu 0. */

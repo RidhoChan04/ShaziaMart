@@ -192,6 +192,13 @@ export const RECEIPT_TOO_LARGE =
 /** Ubah nota: baris tidak bisa ditambah/dihapus (K5); lineId harus tepat sama dengan nota tersimpan. */
 export const RECEIPT_LINES_MISMATCH = "Baris nota tidak cocok — muat ulang";
 
+/** Tunai dari laci tanpa shift kasir buka (R8); juga detail 409 SHIFT_CLOSED saat pelunasan utang. */
+export const NO_SHIFT_LACI =
+  "Tidak ada shift kasir yang buka — pilih Uang pemilik atau Transfer";
+
+/** Foto nota belum diunggah oleh pengirim nota (atau tidak ada di server). */
+export const RECEIPT_PHOTO_MISSING = "Foto nota belum terkirim";
+
 /** Ubah nota: pembayaran hanya bisa diubah selama Bayar nanti belum lunas (K5). */
 export const RECEIPT_PAYMENT_LOCKED =
   "Cara bayar tidak bisa diubah — sudah dibayar";
@@ -345,11 +352,7 @@ function cashSourceError(
     );
   }
   if (p.cashSource === "laci" && !shiftOpen) {
-    return err(
-      null,
-      "cashSource",
-      "Tidak ada shift kasir yang buka — pilih Uang pemilik atau Transfer",
-    );
+    return err(null, "cashSource", NO_SHIFT_LACI);
   }
   return null;
 }
