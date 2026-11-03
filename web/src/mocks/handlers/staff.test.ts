@@ -101,6 +101,14 @@ describe("login & sesi orang toko", () => {
     expect(mockDb.get().staffSession).toBeNull();
   });
 
+  test("percobaan pemilik tidak dihitung ke kunci PIN staf", async () => {
+    for (let i = 0; i < 5; i++) {
+      const res = await staffLogin("Pak Ahmad", "999999");
+      expect(res.status).toBe(401);
+    }
+    expect(mockDb.get().staffPinFailures).toEqual({});
+  });
+
   test("PIN salah → 401 PIN_INVALID; userId tak dikenal → 401; body salah → 422", async () => {
     const wrong = await staffLogin("Rina", "000000");
     expect(wrong.status).toBe(401);
@@ -245,6 +253,12 @@ describe("header terowongan", () => {
     const ok = (await call({})) as Response;
     expect(await ok.json()).toEqual({ ok: true });
     expect(resolver).toHaveBeenCalledOnce();
+  });
+
+  test("header huruf besar, query string, dan garis miring akhir tetap ditolak", async () => {
+    const res = await get("/api/staff/products/?q=x", { "CF-RAY": "1" });
+    expect(res.status).toBe(403);
+    expect(await code(res)).toBe("STAFF_LAN_ONLY");
   });
 
   test("header terowongan dicek sebelum skenario server-mati", async () => {
