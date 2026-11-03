@@ -130,7 +130,12 @@ const HEADERS = [
 /** Tabel pratinjau; < 1024px bergulir di wadahnya sendiri sehingga halaman tidak bergulir ke samping. */
 export function PreviewTable({ rows }: { rows: PreviewRow[] }) {
   return (
-    <div className="overflow-x-auto">
+    <section
+      aria-label="Pratinjau impor"
+      // biome-ignore lint/a11y/noNoninteractiveTabindex: wilayah gulir harus bisa difokus keyboard
+      tabIndex={0}
+      className="overflow-x-auto focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary"
+    >
       <table className="w-full min-w-[860px] table-fixed border-collapse text-[15px] lg:min-w-0">
         <thead>
           <tr className="border-y border-border bg-bg/60">
@@ -154,6 +159,6 @@ export function PreviewTable({ rows }: { rows: PreviewRow[] }) {
           ))}
         </tbody>
       </table>
-    </div>
+    </section>
   );
 }

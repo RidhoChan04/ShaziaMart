@@ -30,7 +30,7 @@ export function ProductRow({
       <Link
         to="/owner/barang/$productId"
         params={{ productId: row.id }}
-        className="flex min-h-16 items-center gap-3 px-4 py-2.5 hover:bg-primary-soft focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary"
+        className="flex min-h-16 items-center gap-3 px-4 py-2.5 hover:bg-bg focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary"
       >
         <div className="min-w-0 flex-1">
           <p className="text-[17px] leading-snug font-semibold">{row.name}</p>

@@ -27,6 +27,8 @@
   --color-danger-soft: #fde8e6;
   --color-danger-ink: #9b1c12;
   --color-scan-bg: #000000;
+  /* `--color-*: initial` membuang putih bawaan; layar scan memakainya untuk teks dan tombol di atas hitam. */
+  --color-white: #ffffff;
 
   --font-sans: "Inter Variable", system-ui, sans-serif;
   --radius-md: 8px;
