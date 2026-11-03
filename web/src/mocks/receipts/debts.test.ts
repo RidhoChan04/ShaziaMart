@@ -5,7 +5,7 @@ import type {
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import type { MockReceipt, MockState, MockUser } from "../db";
 import { createSeedState } from "../seed-data";
-import { debtAttention, debtsOf, paidSummary, toSupplierDebt } from "./debts";
+import { debtAttention, debtsOf, toSupplierDebt } from "./debts";
 import { applyReceipt } from "./receive";
 
 const NOW = Date.UTC(2026, 10, 2, 3); // 2 Nov 2026 10.00 WIB
@@ -95,18 +95,6 @@ describe("utang supplier (murni)", () => {
       paidNew.id,
       paidOld.id,
     ]);
-  });
-
-  test("paidSummary: tunai laci / tunai pemilik / transfer", () => {
-    expect(paidSummary({ method: "tunai", cashSource: "laci" })).toBe(
-      "Tunai · Dari laci kasir",
-    );
-    expect(paidSummary({ method: "tunai", cashSource: "pemilik" })).toBe(
-      "Tunai · Uang pemilik",
-    );
-    expect(paidSummary({ method: "transfer", cashSource: null })).toBe(
-      "Transfer",
-    );
   });
 
   test("toSupplierDebt: amount = Σ qty × harga beli (bukan subtotal tersalin); nama supplier", () => {

@@ -4,6 +4,7 @@ import type {
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { formatIsoDate } from "@/shared/lib/business-day";
 import { formatRupiah } from "@/shared/lib/money";
+import { paymentSummary } from "@/shared/lib/payment-labels";
 import type { MockReceipt } from "../db";
 
 /** K6: koreksi uang laci tanpa shift buka tidak dicatat di shift mana pun. */
@@ -12,16 +13,6 @@ export const CASH_NOT_RECORDED =
 
 const dateOrDash = (iso: string | null): string =>
   iso === null ? "—" : formatIsoDate(iso);
-
-/** "Bayar sekarang · Tunai · Dari laci kasir" | "Bayar sekarang · Transfer" | "Bayar nanti · jatuh tempo 16 Nov 2026" */
-export function paymentSummary(p: ReceiptPayment): string {
-  if (p.timing === "nanti") {
-    return `Bayar nanti · jatuh tempo ${dateOrDash(p.dueDate)}`;
-  }
-  if (p.method === "transfer") return "Bayar sekarang · Transfer";
-  const source = p.cashSource === "laci" ? "Dari laci kasir" : "Uang pemilik";
-  return `Bayar sekarang · Tunai · ${source}`;
-}
 
 function lineChanges(a: ReceiptLine, b: ReceiptLine): string[] {
   const out: string[] = [];

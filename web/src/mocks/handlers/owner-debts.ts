@@ -5,10 +5,11 @@ import type {
   SupplierDebtList,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { newId } from "@/shared/lib/id";
+import { paidSummary } from "@/shared/lib/payment-labels";
 import { validatePayment } from "@/shared/lib/receipt-rules";
 import { mockDb } from "../db";
 import { addCashOut, laciPaid } from "../receipts/cash";
-import { debtsOf, paidSummary, toSupplierDebt } from "../receipts/debts";
+import { debtsOf, toSupplierDebt } from "../receipts/debts";
 import { withScenario } from "../scenarios";
 import { invalid, problem, readJson, requireOwnerSession } from "./respond";
 

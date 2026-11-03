@@ -4,7 +4,7 @@ import type {
   ReceiptPayment,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import type { MockReceipt } from "../db";
-import { editChanges, paymentSummary } from "./audit";
+import { editChanges } from "./audit";
 
 const line = (patch: Partial<ReceiptLine> = {}): ReceiptLine => ({
   lineId: "l1",
@@ -71,23 +71,6 @@ const names: Record<string, string> = {
   s2: "Toko Grosir Makmur",
 };
 const supplierName = (id: string) => names[id] ?? "";
-
-describe("paymentSummary", () => {
-  test.each<[ReceiptPayment, string]>([
-    [laci, "Bayar sekarang · Tunai · Dari laci kasir"],
-    [
-      { ...laci, cashSource: "pemilik" },
-      "Bayar sekarang · Tunai · Uang pemilik",
-    ],
-    [
-      { ...laci, method: "transfer", cashSource: null },
-      "Bayar sekarang · Transfer",
-    ],
-    [nanti("2026-11-16"), "Bayar nanti · jatuh tempo 16 Nov 2026"],
-  ])("%o → %s", (p, text) => {
-    expect(paymentSummary(p)).toBe(text);
-  });
-});
 
 describe("editChanges", () => {
   test("tanpa perubahan → []", () => {

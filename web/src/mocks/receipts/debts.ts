@@ -1,5 +1,4 @@
 import type {
-  DebtPayment,
   SupplierDebt,
   SupplierDebtAttention,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
@@ -36,16 +35,6 @@ export function debtsOf(state: Readonly<MockState>): MockReceipt[] {
     .filter((r) => r.paid !== null)
     .sort((a, b) => (b.paid?.at ?? 0) - (a.paid?.at ?? 0));
   return [...unpaid, ...paid];
-}
-
-/** Ringkas pelunasan untuk audit: "Tunai · Dari laci kasir" | "Tunai · Uang pemilik" | "Transfer". */
-export function paidSummary(
-  p: Pick<DebtPayment, "method" | "cashSource">,
-): string {
-  if (p.method === "transfer") return "Transfer";
-  return p.cashSource === "laci"
-    ? "Tunai · Dari laci kasir"
-    : "Tunai · Uang pemilik";
 }
 
 /** `amount` selalu dihitung dari baris nota (ubah nominal ikut), tidak pernah disalin. */
