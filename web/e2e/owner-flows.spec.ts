@@ -223,8 +223,13 @@ test("utang supplier: bayar nanti 14 hari, pemilik menandai lunas dari uang pemi
   await expect(sheet.getByText("Uang dari")).toHaveCount(0);
   await sheet.getByRole("button", { name: "Tandai lunas" }).click();
 
-  await expect(page.getByText("Sudah lunas")).toBeVisible();
-  await expect(page.getByText("Tunai · Uang pemilik")).toBeVisible();
+  // R31: baris lunas = "Lunas {d Mmm yyyy}" (tanggal Jakarta saat dilunasi) / cara bayar.
+  const settled = page.getByRole("region", { name: "Sudah lunas" });
+  const paidRow = settled.getByRole("link", {
+    name: /Lunas \d{1,2} [A-Z][a-z]{2} \d{4}/,
+  });
+  await expect(paidRow).toBeVisible();
+  await expect(paidRow).toContainText("Tunai · Uang pemilik");
   await expectNoHorizontalScroll(page);
   await expectNoA11yViolations(page);
 });
