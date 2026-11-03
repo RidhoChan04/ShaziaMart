@@ -32,6 +32,7 @@ import { activeBigUnit, validateDraft } from "@/shared/lib/product-rules";
 import { Button } from "@/shared/ui/button";
 import { pillClass } from "../../common/sub-page-header";
 import { ProductNotFound } from "../detail/product-detail-page";
+import { ScanButton } from "../scan/scan-button";
 import { FormSection, fieldId, SectionNote, TextField } from "./form-section";
 import {
   clearBigValues,
@@ -80,7 +81,35 @@ export type BarcodeTarget = "barcode" | "bigBarcode";
 export type ScanSlot = (
   target: BarcodeTarget,
   apply: (code: string) => void,
+  manual: () => void,
 ) => ReactNode;
+
+const NEXT_FIELDS: Record<BarcodeTarget, readonly ProductField[]> = {
+  barcode: ["cost", "price"],
+  bigBarcode: ["bigCost", "bigPrice"],
+};
+
+/** Tombol kamera bawaan: purpose mengikuti isian barcode. */
+const cameraSlot: ScanSlot = (target, apply, manual) => (
+  <ScanButton
+    purpose={target === "barcode" ? "eceran" : "besar"}
+    onDetected={apply}
+    onManual={manual}
+  />
+);
+
+/** Fokus setelah dialog kamera tertutup (Radix sempat memindahkan fokus). */
+function focusLater(ids: readonly ProductField[]) {
+  setTimeout(() => {
+    for (const f of ids) {
+      const el = document.getElementById(fieldId(f));
+      if (el) {
+        el.focus();
+        return;
+      }
+    }
+  }, 0);
+}
 
 function Datalist({ id, options }: { id: string; options: readonly string[] }) {
   return (
@@ -223,7 +252,14 @@ function FormBody({
   };
 
   const scan = (target: BarcodeTarget) =>
-    renderScan?.(target, (code) => set(target)(code));
+    renderScan?.(
+      target,
+      (code) => {
+        set(target)(code);
+        focusLater(NEXT_FIELDS[target]);
+      },
+      () => focusLater([target]),
+    );
 
   return (
     <form
@@ -419,7 +455,11 @@ function EditLoader({
 }
 
 /** Tambah barang (tanpa `productId` di URL) atau ubah barang. */
-export function ProductFormPage({ renderScan }: { renderScan?: ScanSlot }) {
+export function ProductFormPage({
+  renderScan = cameraSlot,
+}: {
+  renderScan?: ScanSlot;
+}) {
   const { productId } = useParams({ strict: false });
   if (productId === undefined) {
     return <FormBody product={null} renderScan={renderScan} />;

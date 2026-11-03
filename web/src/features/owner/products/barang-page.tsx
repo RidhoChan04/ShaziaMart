@@ -28,6 +28,7 @@ import {
 } from "@/shared/ui/sheet";
 import { categoryChips, filterProducts } from "./product-model";
 import { ProductRow, priceColumnWidth } from "./product-row";
+import { ScanButton } from "./scan/scan-button";
 
 const iconButton =
   "inline-flex size-11 shrink-0 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary";
@@ -138,6 +139,7 @@ export function BarangPage() {
       setText(q);
     }
   }, [q]);
+  const searchRef = useRef<HTMLInputElement>(null);
   const deferredText = useDeferredValue(text);
   const [listRef, listWidth] = useElementWidth();
   const products = useListOwnerProducts();
@@ -193,8 +195,20 @@ export function BarangPage() {
               pushed.current.push(e.target.value);
               setSearch({ q: e.target.value, kategori, nonaktif });
             }}
-            className="h-11 w-full rounded-full bg-surface pr-4 pl-9 text-base shadow-sm outline-none placeholder:text-muted focus-visible:ring-2 focus-visible:ring-primary"
+            ref={searchRef}
+            className="h-11 w-full rounded-full bg-surface pr-12 pl-9 text-base shadow-sm outline-none placeholder:text-muted focus-visible:ring-2 focus-visible:ring-primary"
           />
+          <div className="absolute top-0 right-0">
+            <ScanButton
+              purpose="cari"
+              onDetected={(code) => {
+                setText(code);
+                pushed.current.push(code);
+                setSearch({ q: code, kategori, nonaktif });
+              }}
+              onManual={() => setTimeout(() => searchRef.current?.focus(), 0)}
+            />
+          </div>
         </div>
         <MoreMenu />
         <Link

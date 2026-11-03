@@ -6,7 +6,9 @@
     // Kode hasil generate orval: jangan dinilai manual.
     "src/shared/api/gen/**",
     // Komponen shadcn diperlakukan seperti library: ekspor standarnya boleh tidak terpakai.
-    "src/shared/ui/**"
+    "src/shared/ui/**",
+    // Deklarasi tipe global (BarcodeDetector); dipakai compiler, bukan lewat import.
+    "src/features/owner/products/scan/barcode-detector.d.ts"
   ],
   "ignoreDependencies": [
     // Di-import lewat @import di src/app/styles.css; knip tidak membaca CSS.
