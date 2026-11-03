@@ -485,7 +485,11 @@ export const UpdateOwnerProductResponse = zod.object({
 })
 
 /**
- * Hanya barang yang belum pernah terjual; selain itu 409 PRODUCT_HAS_SALES (gunakan nonaktif).
+ * Hanya barang yang belum pernah terjual dan tidak ada di nota barang masuk aktif (hasReceipts);
+ * selain itu 409 PRODUCT_HAS_SALES (gunakan nonaktif). Detail menyebut alasannya:
+ * terjual → "Barang yang sudah pernah terjual tidak bisa dihapus — gunakan Nonaktif.",
+ * ada di barang masuk → "Barang ini sudah ada di barang masuk — pakai Nonaktif".
+ * Setelah nota dibatalkan, barang bisa dihapus lagi (bila belum pernah terjual).
  * @summary Hapus barang permanen
  */
 export const DeleteOwnerProductParams = zod.object({

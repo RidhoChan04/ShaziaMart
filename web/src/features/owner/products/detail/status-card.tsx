@@ -11,7 +11,12 @@ import {
 } from "@/shared/api/gen/owner/owner";
 import type { OwnerProduct } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { cn } from "@/shared/lib/cn";
-import { pesanError } from "@/shared/lib/error-messages";
+import {
+  PRODUCT_HAS_RECEIPTS_MESSAGE,
+  PRODUCT_HAS_SALES_MESSAGE,
+  pesanError,
+  pesanHapusBarang,
+} from "@/shared/lib/error-messages";
 import { Button } from "@/shared/ui/button";
 import {
   Dialog,
@@ -139,7 +144,7 @@ function DeleteButton({ product }: { product: OwnerProduct }) {
         </DialogHeader>
         {remove.isError && (
           <p role="alert" className="text-sm font-medium text-danger">
-            {pesanError(remove.error)}
+            {pesanHapusBarang(remove.error)}
           </p>
         )}
         <DialogFooter>
@@ -161,18 +166,23 @@ function DeleteButton({ product }: { product: OwnerProduct }) {
   );
 }
 
-/** Status, tanda Sedang langka, dan hapus (hanya barang yang belum pernah terjual). */
+/** Alasan barang tidak bisa dihapus (terjual, atau ada di nota barang masuk aktif — R32); null = boleh. */
+function deleteBlockedReason(product: OwnerProduct): string | null {
+  if (product.hasSales) return PRODUCT_HAS_SALES_MESSAGE;
+  if (product.hasReceipts) return PRODUCT_HAS_RECEIPTS_MESSAGE;
+  return null;
+}
+
+/** Status, tanda Sedang langka, dan hapus (hanya barang yang belum pernah terjual dan tanpa barang masuk aktif). */
 export function StatusCard({ product }: { product: OwnerProduct }) {
+  const blocked = deleteBlockedReason(product);
   return (
     <Section title="Pengaturan">
       <div className="divide-y divide-border">
         <StatusSheet product={product} />
         <ScarceSwitch product={product} />
-        {product.hasSales ? (
-          <p className="px-4 py-3 text-[13px] text-muted">
-            Barang yang sudah pernah terjual tidak bisa dihapus — gunakan
-            Nonaktif.
-          </p>
+        {blocked !== null ? (
+          <p className="px-4 py-3 text-[13px] text-muted">{blocked}</p>
         ) : (
           <DeleteButton product={product} />
         )}

@@ -617,7 +617,12 @@ paths:
       tags: [owner]
       operationId: deleteOwnerProduct
       summary: Hapus barang permanen
-      description: Hanya barang yang belum pernah terjual; selain itu 409 PRODUCT_HAS_SALES (gunakan nonaktif).
+      description: |
+        Hanya barang yang belum pernah terjual dan tidak ada di nota barang masuk aktif (hasReceipts);
+        selain itu 409 PRODUCT_HAS_SALES (gunakan nonaktif). Detail menyebut alasannya:
+        terjual → "Barang yang sudah pernah terjual tidak bisa dihapus — gunakan Nonaktif.",
+        ada di barang masuk → "Barang ini sudah ada di barang masuk — pakai Nonaktif".
+        Setelah nota dibatalkan, barang bisa dihapus lagi (bila belum pernah terjual).
       security:
         - ownerCookieAuth: []
       parameters:
@@ -1397,7 +1402,7 @@ components:
           schema:
             $ref: "#/components/schemas/ProductValidationProblem"
     ProductHasSales:
-      description: Barang sudah pernah terjual sehingga tidak bisa dihapus (PRODUCT_HAS_SALES)
+      description: Barang sudah pernah terjual atau ada di nota barang masuk aktif sehingga tidak bisa dihapus (PRODUCT_HAS_SALES)
       content:
         application/problem+json:
           schema:

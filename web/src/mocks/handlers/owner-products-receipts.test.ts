@@ -250,3 +250,33 @@ describe("modal hanya-baca setelah barang masuk (K16)", () => {
     });
   });
 });
+
+describe("hapus barang yang ada di barang masuk (R32)", () => {
+  const del = (id: string) =>
+    fetch(`/api/owner/products/${id}`, { method: "DELETE" });
+
+  test("nota aktif → 409 PRODUCT_HAS_SALES 'Barang ini sudah ada di barang masuk — pakai Nonaktif', barang tetap; setelah nota dibatalkan → hasReceipts false, hapus 204", async () => {
+    await receiveTeh();
+    const teh = productId(TEH);
+    expect((await detail(teh)).hasSales).toBe(false);
+
+    const blocked = await del(teh);
+    expect(blocked.status).toBe(409);
+    expect(await codeAndDetail(blocked)).toMatchObject({
+      code: "PRODUCT_HAS_SALES",
+      detail: "Barang ini sudah ada di barang masuk — pakai Nonaktif",
+    });
+    expect(mockDb.get().products.some((p) => p.id === teh)).toBe(true);
+
+    // Nota tetap bisa dibatalkan (barangnya masih ada).
+    const receiptId = mockDb.get().receipts[0]?.id;
+    const cancelled = await post(`/api/owner/receipts/${receiptId}/cancel`, {});
+    expect(cancelled.status).toBe(200);
+    expect((await detail(teh)).hasReceipts).toBe(false);
+
+    expect((await del(teh)).status).toBe(204);
+    expect(mockDb.get().products.some((p) => p.id === teh)).toBe(false);
+    // Nota yang dibatalkan tetap bisa dibuka setelah barangnya dihapus.
+    expect((await fetch(`/api/owner/receipts/${receiptId}`)).status).toBe(200);
+  });
+});

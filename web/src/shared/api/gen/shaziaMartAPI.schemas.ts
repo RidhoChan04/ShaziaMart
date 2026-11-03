@@ -1521,7 +1521,7 @@ export type ValidationFailedResponse = Problem;
 export type ProductValidationFailedResponse = ProductValidationProblem;
 
 /**
- * Barang sudah pernah terjual sehingga tidak bisa dihapus (PRODUCT_HAS_SALES)
+ * Barang sudah pernah terjual atau ada di nota barang masuk aktif sehingga tidak bisa dihapus (PRODUCT_HAS_SALES)
  */
 export type ProductHasSalesResponse = Problem;
 

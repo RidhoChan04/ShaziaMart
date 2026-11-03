@@ -4,6 +4,10 @@ import type {
   ImportResult,
   ImportRow,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
+import {
+  PRODUCT_HAS_RECEIPTS_MESSAGE,
+  PRODUCT_HAS_SALES_MESSAGE,
+} from "@/shared/lib/error-messages";
 import { type MockProduct, type MockState, mockDb } from "../db";
 import {
   type ApplyOptions,
@@ -16,6 +20,7 @@ import { pricesBlocked, statusChange } from "../products/guards";
 import { checkImport, commitImport, readImportRows } from "../products/import";
 import { applyPriceLines, readPriceLines } from "../products/prices";
 import {
+  hasReceipts,
   movementsOf,
   soldUnitIds,
   toOwnerProduct,
@@ -145,13 +150,13 @@ export const ownerProductHandlers = [
       if (found instanceof Response) return found;
       const sold = soldUnitIds(found.state);
       if (found.product.units.some((u) => sold.has(u.id))) {
-        return problem(
-          409,
-          "PRODUCT_HAS_SALES",
-          "Barang yang sudah pernah terjual tidak bisa dihapus — gunakan Nonaktif.",
-        );
+        return problem(409, "PRODUCT_HAS_SALES", PRODUCT_HAS_SALES_MESSAGE);
       }
       const id = found.product.id;
+      // R32: nota aktif merujuk barang ini; menghapusnya membuat nota tidak bisa diubah/dibatalkan.
+      if (hasReceipts(found.state, id)) {
+        return problem(409, "PRODUCT_HAS_SALES", PRODUCT_HAS_RECEIPTS_MESSAGE);
+      }
       mockDb.update((s) => {
         s.products = s.products.filter((p) => p.id !== id);
         s.priceHistory = s.priceHistory.filter((e) => e.productId !== id);

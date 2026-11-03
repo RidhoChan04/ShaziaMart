@@ -1,6 +1,10 @@
 import { expect, test } from "vitest";
 import { ApiError } from "../api/fetcher";
-import { pesanError, pesanPembayaran } from "./error-messages";
+import {
+  pesanError,
+  pesanHapusBarang,
+  pesanPembayaran,
+} from "./error-messages";
 
 test.each([
   ["NETWORK", "Server tidak tersambung — coba lagi"],
@@ -68,3 +72,20 @@ test("pesanPembayaran: galat lain sama dengan pesanError", () =>
   expect(
     pesanPembayaran(new ApiError({ status: 409, code: "DEBT_ALREADY_PAID" })),
   ).toBe("Utang ini sudah lunas"));
+
+test("pesanHapusBarang: PRODUCT_HAS_SALES memakai alasan server (barang masuk, R32); tanpa detail / galat lain = pesanError", () => {
+  const detail = "Barang ini sudah ada di barang masuk — pakai Nonaktif";
+  expect(
+    pesanHapusBarang(
+      new ApiError({ status: 409, code: "PRODUCT_HAS_SALES", detail }),
+    ),
+  ).toBe(detail);
+  expect(
+    pesanHapusBarang(new ApiError({ status: 409, code: "PRODUCT_HAS_SALES" })),
+  ).toBe(
+    "Barang yang sudah pernah terjual tidak bisa dihapus — gunakan Nonaktif.",
+  );
+  expect(pesanHapusBarang(new ApiError({ status: 0, code: "NETWORK" }))).toBe(
+    "Server tidak tersambung — coba lagi",
+  );
+});
