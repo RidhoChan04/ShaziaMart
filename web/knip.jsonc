@@ -8,7 +8,7 @@
     // Komponen shadcn diperlakukan seperti library: ekspor standarnya boleh tidak terpakai.
     "src/shared/ui/**",
     // Deklarasi tipe global (BarcodeDetector); dipakai compiler, bukan lewat import.
-    "src/features/owner/products/scan/barcode-detector.d.ts"
+    "src/shared/components/scan/barcode-detector.d.ts"
   ],
   "ignoreDependencies": [
     // Di-import lewat @import di src/app/styles.css; knip tidak membaca CSS.

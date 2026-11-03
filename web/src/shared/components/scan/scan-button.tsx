@@ -4,13 +4,14 @@ import { BarcodeScanner, type ScanPurpose } from "./barcode-scanner";
 import { useBarcodeSupport } from "./use-barcode-support";
 
 type Props = {
+  label: string;
   purpose: ScanPurpose;
   onDetected: (code: string) => void;
   onManual: () => void;
 };
 
 /** Tombol kamera; tidak tampil bila browser tanpa BarcodeDetector (isian tetap bisa diketik). */
-export function ScanButton({ purpose, onDetected, onManual }: Props) {
+export function ScanButton({ label, purpose, onDetected, onManual }: Props) {
   const supported = useBarcodeSupport();
   const [open, setOpen] = useState(false);
   if (!supported) return null;
@@ -18,7 +19,7 @@ export function ScanButton({ purpose, onDetected, onManual }: Props) {
     <>
       <button
         type="button"
-        aria-label="Scan dengan kamera"
+        aria-label={label}
         onClick={() => setOpen(true)}
         className="inline-flex size-11 shrink-0 items-center justify-center rounded-full text-primary outline-none focus-visible:ring-2 focus-visible:ring-primary"
       >

@@ -15,6 +15,7 @@ import {
   useState,
 } from "react";
 import { useListOwnerProducts } from "@/shared/api/gen/owner/owner";
+import { ScanButton } from "@/shared/components/scan/scan-button";
 import { cn } from "@/shared/lib/cn";
 import { pesanError } from "@/shared/lib/error-messages";
 import { Button } from "@/shared/ui/button";
@@ -28,7 +29,6 @@ import {
 } from "@/shared/ui/sheet";
 import { categoryChips, filterProducts } from "./product-model";
 import { ProductRow, priceColumnWidth } from "./product-row";
-import { ScanButton } from "./scan/scan-button";
 
 const iconButton =
   "inline-flex size-11 shrink-0 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary";
@@ -200,6 +200,7 @@ export function BarangPage() {
           />
           <div className="absolute top-0 right-0">
             <ScanButton
+              label="Scan dengan kamera"
               purpose="cari"
               onDetected={(code) => {
                 setText(code);

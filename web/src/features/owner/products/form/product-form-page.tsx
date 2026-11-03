@@ -26,13 +26,13 @@ import {
   productValidationProblemSchema,
   readProblem,
 } from "@/shared/api/problem";
+import { ScanButton } from "@/shared/components/scan/scan-button";
 import { pesanError } from "@/shared/lib/error-messages";
 import { formatRupiah } from "@/shared/lib/money";
 import { activeBigUnit, validateDraft } from "@/shared/lib/product-rules";
 import { Button } from "@/shared/ui/button";
 import { pillClass } from "../../common/sub-page-header";
 import { ProductNotFound } from "../detail/product-detail-page";
-import { ScanButton } from "../scan/scan-button";
 import { FormSection, fieldId, SectionNote, TextField } from "./form-section";
 import {
   clearBigValues,
@@ -93,6 +93,7 @@ const NEXT_FIELDS: Record<BarcodeTarget, readonly ProductField[]> = {
 /** Tombol kamera bawaan: purpose mengikuti isian barcode. */
 const cameraSlot: ScanSlot = (target, apply, manual) => (
   <ScanButton
+    label="Scan dengan kamera"
     purpose={target === "barcode" ? "eceran" : "besar"}
     onDetected={apply}
     onManual={manual}
