@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import type {
   CatalogMatch,
   KasirSettings,
+  OwnerTodaySummary,
   ProductStatus,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { mockDb } from "../db";
@@ -9,8 +10,11 @@ import {
   BIMOLI,
   cashSale,
   loginWithShift,
+  ownerLogin,
   post,
+  receiptInput,
   saleItem,
+  staffLogin,
 } from "./test-helpers";
 
 const json = async <T>(res: Response): Promise<T> => (await res.json()) as T;
@@ -222,5 +226,70 @@ describe("katalog", () => {
       [BIMOLI, "pcs"],
       ["Indomie Goreng", "dus"],
     ]);
+  });
+
+  test("barang baru dari nota → awaitingPriceCount 1; kasir lookup 8996001600269 → 410 PRODUCT_NO_PRICE; search 'teh pucuk' → []", async () => {
+    expect((await staffLogin()).status).toBe(200);
+    const res = await post(
+      "/api/staff/receipts",
+      receiptInput({
+        lines: [
+          {
+            lineId: "l1",
+            productId: null,
+            unitId: null,
+            newProduct: {
+              name: "Teh Pucuk Harum 350 ml",
+              sellUnit: "botol",
+              notaUnit: "dus",
+              notaUnitSize: 24,
+              barcode: "8996001600269",
+            },
+            qty: 2,
+            unitCost: 80_000,
+            expiryDate: null,
+          },
+        ],
+        payment: {
+          timing: "sekarang",
+          method: "transfer",
+          cashSource: null,
+          dueDate: null,
+        },
+      }),
+    );
+    expect(res.status).toBe(201);
+    const teh = mockDb
+      .get()
+      .products.find((p) => p.name === "Teh Pucuk Harum 350 ml");
+    expect(teh?.status).toBe("menunggu_harga");
+    mockDb.update((s) => {
+      if (teh) s.settings.quickCurahProductIds.push(teh.id);
+    });
+
+    expect((await ownerLogin()).status).toBe(200);
+    const summary = await json<OwnerTodaySummary>(
+      await fetch("/api/owner/summary/today"),
+    );
+    expect(summary.attention.awaitingPriceCount).toBe(1);
+
+    for (const code of ["8996001600269", teh?.storeCode]) {
+      const lookup = await fetch(`/api/catalog/lookup?code=${code}`);
+      expect(lookup.status).toBe(410);
+      expect(
+        await json<{ code: string; detail: string }>(lookup),
+      ).toMatchObject({
+        code: "PRODUCT_NO_PRICE",
+        detail: "Barang belum punya harga jual",
+      });
+    }
+    const search = await fetch("/api/catalog/search?q=teh%20pucuk");
+    expect(await json<CatalogMatch[]>(search)).toEqual([]);
+    const curah = await json<CatalogMatch[]>(
+      await fetch("/api/catalog/quick-curah"),
+    );
+    expect(curah.map((h) => h.product.name)).not.toContain(
+      "Teh Pucuk Harum 350 ml",
+    );
   });
 });

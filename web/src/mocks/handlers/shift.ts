@@ -6,6 +6,7 @@ import type {
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { newId } from "@/shared/lib/id";
 import { type MockShift, mockDb } from "../db";
+import { supplierPaymentsOf } from "../receipts/cash";
 import { withScenario } from "../scenarios";
 import { invalid, problem, readJson, requireSession } from "./respond";
 
@@ -75,12 +76,15 @@ export const shiftHandlers = [
       if (!shift) {
         return problem(409, "SHIFT_CLOSED", "Tidak ada shift yang terbuka");
       }
-      const expectedCash = shift.openingCash + shift.cashSales;
+      // Uang keluar laci ke supplier (barang masuk, koreksi nota, pelunasan) mengurangi kas seharusnya.
+      const supplierPayments = supplierPaymentsOf(shift);
+      const expectedCash =
+        shift.openingCash + shift.cashSales - supplierPayments;
       const closure: ShiftClosure = {
         shiftId: shift.id,
         openingCash: shift.openingCash,
         cashSales: shift.cashSales,
-        supplierPayments: 0,
+        supplierPayments,
         expectedCash,
         countedCash,
         difference: countedCash - expectedCash,

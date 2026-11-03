@@ -51,19 +51,22 @@ function ClosureResult({
   result: ShiftClosure;
   onDone: () => void;
 }) {
-  const { expectedCash, countedCash, difference } = result;
+  const { supplierPayments, expectedCash, countedCash, difference } = result;
   return (
     <div className="grid gap-4">
       <dl className="grid gap-2 text-base">
+        {supplierPayments !== 0 && (
+          // Uang keluar ke supplier mengurangi laci; bersih masuk (koreksi) bertanda +.
+          <ResultRow
+            label="Bayar supplier"
+            value={signedRupiah(-supplierPayments)}
+          />
+        )}
         <ResultRow label="Uang seharusnya" value={formatRupiah(expectedCash)} />
         <ResultRow label="Uang fisik" value={formatRupiah(countedCash)} />
         <ResultRow
           label="Selisih"
-          value={
-            difference > 0
-              ? `+${formatRupiah(difference)}`
-              : formatRupiah(difference)
-          }
+          value={signedRupiah(difference)}
           className={cn("text-lg", difference < 0 && "text-danger")}
         />
       </dl>
@@ -75,6 +78,10 @@ function ClosureResult({
     </div>
   );
 }
+
+/** Rupiah bertanda: `+Rp…` bila positif, `-Rp…` bila negatif. */
+const signedRupiah = (n: number): string =>
+  n > 0 ? `+${formatRupiah(n)}` : formatRupiah(n);
 
 function ResultRow({
   label,

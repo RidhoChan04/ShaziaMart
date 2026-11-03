@@ -18,15 +18,17 @@ function facts(p: MockProduct, minStock: number | null): string[] {
   const eceran = eceranOf(p);
   const big = activeBigUnit(p);
   const tier = eceran.wholesaleTiers[0];
+  // Barang menunggu harga jual belum punya harga (0 = belum diisi, bukan Rp0).
+  const sell = (n: number) => (p.status === "menunggu_harga" ? NONE : rp(n));
   return [
     p.category ?? NONE,
     eceran.name,
     eceran.barcodes[0] ?? NONE,
     rp(unitCost(p.cost, eceran.unitSize)),
-    rp(eceran.price),
+    sell(eceran.price),
     tier ? `beli ${tier.minQty} · ${rp(tier.price)}` : NONE,
     big
-      ? `${big.name} isi ${big.unitSize / eceran.unitSize} · ${rp(big.price)}`
+      ? `${big.name} isi ${big.unitSize / eceran.unitSize} · ${sell(big.price)}`
       : NONE,
     big?.barcodes[0] ?? NONE,
     minStock === null

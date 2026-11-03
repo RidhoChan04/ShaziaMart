@@ -102,6 +102,17 @@ export function stockAlertOf(
   return min !== undefined && stock < min ? "menipis" : "none";
 }
 
+/** Barang ada di baris nota barang masuk yang tidak dibatalkan (modal mengikuti barang masuk, K16). */
+export function hasReceipts(
+  state: Readonly<MockState>,
+  productId: string,
+): boolean {
+  return state.receipts.some(
+    (r) =>
+      r.status === "aktif" && r.lines.some((l) => l.productId === productId),
+  );
+}
+
 /** Satuan yang pernah masuk penjualan, selesai maupun dibatalkan. */
 export function soldUnitIds(state: Readonly<MockState>): Set<string> {
   return new Set(state.sales.flatMap((s) => s.items.map((i) => i.unitId)));
@@ -197,7 +208,7 @@ export function toOwnerProduct(
     minStock: state.minStock[p.id] ?? null,
     stockAlert: stockAlertOf(state, p),
     hasSales: p.units.some((u) => sold.has(u.id)),
-    hasReceipts: false,
+    hasReceipts: hasReceipts(state, p.id),
     costAlert: meaningfulCostAlert(state, p),
     recentMovements: movementsOf(state, p.id).slice(0, RECENT_MOVEMENTS),
     priceHistory: state.priceHistory

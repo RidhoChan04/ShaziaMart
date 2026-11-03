@@ -186,6 +186,9 @@ describe("Perlu perhatian: stok (K5), modal berubah, dan habis", () => {
     [{ stockCounted: false }, -3, "none"],
     [{ status: "nonaktif" }, 5, "none"],
     [{ status: "nonaktif" }, -1, "none"],
+    // Barang menunggu harga jual diperlakukan seperti aktif.
+    [{ status: "menunggu_harga" }, 5, "menipis"],
+    [{ status: "menunggu_harga" }, -1, "minus"],
   ])("stockAlertOf %o stok %i (batas 10) → %s", (flags, stock, alert) => {
     const s = fresh();
     const p = s.products.find((x) => x.name === "Kopi Kapal Api 165 g");
@@ -300,5 +303,23 @@ describe("Perlu perhatian: stok (K5), modal berubah, dan habis", () => {
       .map((p) => ({ productId: p.id, productName: p.name }))
       .sort((x, y) => x.productName.localeCompare(y.productName, "id"));
     expect(ownerTodaySummary(s, NOW).attention.stockOuts).toEqual(expected);
+  });
+});
+
+describe("Perlu perhatian: barang menunggu harga jual dan utang supplier", () => {
+  test("awaitingPriceCount = jumlah barang menunggu_harga; seed 0", () => {
+    const s = fresh();
+    expect(ownerTodaySummary(s, NOW).attention.awaitingPriceCount).toBe(0);
+    for (const p of s.products.slice(0, 2)) p.status = "menunggu_harga";
+    expect(ownerTodaySummary(s, NOW).attention.awaitingPriceCount).toBe(2);
+  });
+
+  test("supplierDebts: seed tanpa utang → semua nol", () => {
+    expect(ownerTodaySummary(fresh(), NOW).attention.supplierDebts).toEqual({
+      overdueCount: 0,
+      overdueTotal: 0,
+      dueSoonCount: 0,
+      dueSoonTotal: 0,
+    });
   });
 });

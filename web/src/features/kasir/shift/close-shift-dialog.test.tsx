@@ -73,6 +73,70 @@ test("tutup shift hitung buta: uang seharusnya tidak tampil sebelum kirim; hasil
   expect(onClose).toHaveBeenCalledOnce();
 });
 
+test("hasil tutup shift: 'Bayar supplier' '-Rp1.442.000' di atas 'Uang seharusnya' 'Rp208.000'; Selisih '-Rp5.000'", async () => {
+  // Modal 1.500.000 + tunai 150.000 − barang masuk dibayar dari laci 1.442.000.
+  mockDb.update((s) => {
+    if (!s.shift) return;
+    s.shift.openingCash = 1_500_000;
+    s.shift.cashOuts.push({
+      id: "c1",
+      at: 1,
+      amount: 1_442_000,
+      receiptId: "draf-1",
+      kind: "bayar",
+    });
+  });
+  const { user, counted, submit, result } = setup();
+  await user.type(counted(), "203.000");
+  expect(screen.queryByText("Bayar supplier")).toBeNull();
+  await user.click(submit());
+
+  expect(await screen.findByText("Bayar supplier")).toBeInTheDocument();
+  const ui = result();
+  const labels = ui.getAllByRole("term").map((t) => t.textContent);
+  expect(labels).toEqual([
+    "Bayar supplier",
+    "Uang seharusnya",
+    "Uang fisik",
+    "Selisih",
+  ]);
+  const row = (label: string) =>
+    ui.getByText(label).closest("div") as HTMLElement;
+  expect(within(row("Bayar supplier")).getByText("-Rp1.442.000")).toBeVisible();
+  expect(within(row("Uang seharusnya")).getByText("Rp208.000")).toBeVisible();
+  expect(within(row("Selisih")).getByText("-Rp5.000")).toHaveClass(
+    "text-danger",
+  );
+});
+
+test("koreksi bersih masuk ke laci → 'Bayar supplier' bertanda +", async () => {
+  mockDb.update((s) => {
+    s.shift?.cashOuts.push({
+      id: "c1",
+      at: 1,
+      amount: -32_400,
+      receiptId: "draf-1",
+      kind: "koreksi",
+    });
+  });
+  const { user, counted, submit, result } = setup();
+  await user.type(counted(), "380.000");
+  await user.click(submit());
+  await screen.findByText("Bayar supplier");
+  const row = (label: string) =>
+    result().getByText(label).closest("div") as HTMLElement;
+  expect(within(row("Bayar supplier")).getByText("+Rp32.400")).toBeVisible();
+  expect(within(row("Uang seharusnya")).getByText("Rp382.400")).toBeVisible();
+});
+
+test("tanpa uang keluar → tidak ada baris 'Bayar supplier'", async () => {
+  const { user, counted, submit } = setup();
+  await user.type(counted(), "350.000");
+  await user.click(submit());
+  expect(await screen.findByText("Uang seharusnya")).toBeInTheDocument();
+  expect(screen.queryByText("Bayar supplier")).toBeNull();
+});
+
 test("selisih lebih tampil dengan tanda +", async () => {
   const { user, counted, submit } = setup();
   await user.type(counted(), "360.000");

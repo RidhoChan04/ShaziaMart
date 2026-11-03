@@ -6,6 +6,7 @@ import type {
 import {
   type ProductDraft,
   sellUnitKind,
+  unitCost,
   validateDraft,
 } from "@/shared/lib/product-rules";
 import type { MockProduct, MockState } from "../db";
@@ -20,7 +21,9 @@ import {
 } from "./checks";
 import { noteCostChange, sameCost } from "./cost-alert";
 import { draftFromProduct } from "./drafts";
-import { soldUnitIds } from "./views";
+import { eceranOf, hasReceipts, soldUnitIds } from "./views";
+
+const RECEIPT_COST_NOTE = "Modal diabaikan — mengikuti barang masuk";
 
 export type ApplyOptions = {
   /** replace = form: field kosong menghapus; merge = impor: field kosong mempertahankan nilai lama (K4). */
@@ -52,6 +55,46 @@ function mergeDraft(draft: ProductDraft, old: ProductDraft): ProductDraft {
 }
 
 /**
+ * Draft yang diperiksa: impor digabung dengan isi barang (K4). K16: barang yang punya
+ * barang masuk aktif memakai HPP-nya sendiri; modal yang diketik diabaikan (bukan 422)
+ * dan aturan "di bawah modal" memakai modal eceran HPP itu.
+ */
+function draftFor(
+  state: Readonly<MockState>,
+  target: MockProduct | null,
+  draft: ProductDraft,
+  mode: ApplyOptions["mode"],
+): { d: ProductDraft; costLocked: boolean } {
+  if (target === null) return { d: draft, costLocked: false };
+  const merged =
+    mode === "merge"
+      ? mergeDraft(draft, draftFromProduct(state, target))
+      : draft;
+  if (!hasReceipts(state, target.id)) return { d: merged, costLocked: false };
+  const cost = unitCost(target.cost, eceranOf(target).unitSize);
+  return { d: { ...merged, cost, bigCost: null }, costLocked: true };
+}
+
+/** K16: HPP barang masuk dipertahankan; K2: barang menunggu harga jual menjadi aktif. */
+function settleFromReceipts(
+  product: MockProduct,
+  target: MockProduct,
+  costLocked: boolean,
+): void {
+  if (costLocked) product.cost = target.cost;
+  if (target.status === "menunggu_harga") product.status = "aktif";
+}
+
+/** Harga 0 barang menunggu bukan harga lama: semua baris dicatat sebagai baru (oldPrice null). */
+const priceBase = (target: MockProduct): MockProduct =>
+  target.status === "menunggu_harga" ? { ...target, units: [] } : target;
+
+const receiptCostNotes = (costLocked: boolean, draft: ProductDraft) =>
+  costLocked && (draft.cost !== null || draft.bigCost !== null)
+    ? [RECEIPT_COST_NOTE]
+    : [];
+
+/**
  * Terapkan draft ke barang (`target` null = barang baru) tanpa memutasi state:
  * validasi, keunikan, kunci barang terjual, lalu barang hasil beserta changes,
  * notes, dan entri riwayat harga.
@@ -62,10 +105,7 @@ export function applyDraft(
   draft: ProductDraft,
   opts: ApplyOptions,
 ): ApplyResult {
-  const d =
-    target !== null && opts.mode === "merge"
-      ? mergeDraft(draft, draftFromProduct(state, target))
-      : draft;
+  const { d, costLocked } = draftFor(state, target, draft, opts.mode);
   const sold = soldUnitIds(state);
   const matched = matchBig(target, d, opts.mode, opts.bigUnitId);
   const others = otherUnits(target, matched, sold);
@@ -78,6 +118,7 @@ export function applyDraft(
   if (errors.length > 0 || kind === null) return { ok: false, errors };
 
   const { product, newCategory } = buildProduct(ctx, kind, opts);
+  if (target !== null) settleFromReceipts(product, target, costLocked);
   const minStock =
     d.minStock === null ? null : Math.round(d.minStock * kind.unitSize);
   return {
@@ -87,9 +128,9 @@ export function applyDraft(
     changes: target
       ? changesOf(target, state.minStock[target.id] ?? null, product, minStock)
       : [],
-    notes: notesOf(d, newCategory),
+    notes: [...receiptCostNotes(costLocked, draft), ...notesOf(d, newCategory)],
     priceEntries: target
-      ? priceEntriesOf(target, product, opts.source, opts.now)
+      ? priceEntriesOf(priceBase(target), product, opts.source, opts.now)
       : [],
     costChanged: target !== null && !sameCost(target.cost, product.cost),
     minStock,

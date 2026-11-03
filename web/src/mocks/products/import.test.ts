@@ -16,6 +16,8 @@ import {
   loginWithShift,
   ownerLogin,
   post,
+  receiptInput,
+  staffLogin,
 } from "../handlers/test-helpers";
 import { createSeedState } from "../seed-data";
 import { checkImport, draftFromImportRow } from "./import";
@@ -412,6 +414,107 @@ describe("impor barang", () => {
     expect(mockDb.get().products.some((p) => p.name === NEW_ROW.name)).toBe(
       false,
     );
+  });
+});
+
+describe("impor barang yang punya barang masuk (K16)", () => {
+  const RECEIPT_NOTE = "Modal diabaikan — mengikuti barang masuk";
+
+  beforeEach(async () => {
+    expect((await ownerLogin()).status).toBe(200);
+    expect((await staffLogin()).status).toBe(200);
+    mockDb.update((s) => {
+      s.stock[product("Indomie Goreng").id] = 60;
+    });
+    const res = await post(
+      "/api/staff/receipts",
+      receiptInput({
+        payment: {
+          timing: "sekarang",
+          method: "transfer",
+          cashSource: null,
+          dueDate: null,
+        },
+      }),
+    );
+    expect(res.status).toBe(201);
+  });
+
+  test("impor modal Indomie → notes memuat 'Modal diabaikan — mengikuti barang masuk'; HPP tetap {380000,140}", async () => {
+    const rows = [
+      importRow(3, { name: "Indomie Goreng", bigCost: "120000" }),
+      importRow(4, { name: "Indomie Goreng ", cost: "2700", price: "3200" }),
+    ];
+    expect((await check(rows.slice(0, 1))).rows).toEqual([
+      ok(3, "tidak_berubah", [], [RECEIPT_NOTE]),
+    ]);
+    expect((await check(rows.slice(1))).rows).toEqual([
+      ok(4, "diperbarui", ["Harga jual Rp3.100 → Rp3.200"], [RECEIPT_NOTE]),
+    ]);
+    const alerts = mockDb.get().costAlerts;
+    expect(await commit(rows.slice(1))).toEqual({
+      created: 0,
+      updated: 1,
+      skipped: 0,
+    });
+    const indomie = product("Indomie Goreng");
+    expect(indomie.cost).toEqual({ amount: 380_000, qtyBase: 140 });
+    expect(indomie.units[0]?.price).toBe(3200);
+    expect(mockDb.get().costAlerts).toEqual(alerts);
+  });
+
+  test("impor harga jual barang menunggu → diperbarui 'Harga jual — → Rp4.000'; status aktif; riwayat harga tanpa harga lama", async () => {
+    const res = await post(
+      "/api/staff/receipts",
+      receiptInput({
+        id: "draf-2",
+        lines: [
+          {
+            lineId: "l1",
+            productId: null,
+            unitId: null,
+            newProduct: {
+              name: "Teh Pucuk Harum 350 ml",
+              sellUnit: "botol",
+              notaUnit: "botol",
+              notaUnitSize: 1,
+              barcode: null,
+            },
+            qty: 24,
+            unitCost: 3000,
+            expiryDate: null,
+          },
+        ],
+        payment: {
+          timing: "sekarang",
+          method: "transfer",
+          cashSource: null,
+          dueDate: null,
+        },
+      }),
+    );
+    expect(res.status).toBe(201);
+    const row = importRow(3, { name: "Teh Pucuk Harum 350 ml", price: "4000" });
+    expect((await check([row])).rows).toEqual([
+      ok(3, "diperbarui", ["Harga jual — → Rp4.000"]),
+    ]);
+    await commit([row]);
+    const teh = product("Teh Pucuk Harum 350 ml");
+    expect(teh.status).toBe("aktif");
+    expect(teh.cost).toEqual({ amount: 72_000, qtyBase: 24 });
+    expect(
+      mockDb
+        .get()
+        .priceHistory.filter((e) => e.productId === teh.id)
+        .map((e) => [e.oldPrice, e.newPrice, e.source]),
+    ).toEqual([[null, 4000, "impor"]]);
+  });
+
+  test("impor tanpa sel modal → tanpa catatan", async () => {
+    expect(
+      (await check([importRow(3, { name: "Indomie Goreng", price: "3200" })]))
+        .rows,
+    ).toEqual([ok(3, "diperbarui", ["Harga jual Rp3.100 → Rp3.200"])]);
   });
 });
 

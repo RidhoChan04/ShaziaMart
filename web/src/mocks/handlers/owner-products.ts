@@ -202,6 +202,13 @@ export const ownerProductHandlers = [
       if (!isStatus(status) || typeof scarce !== "boolean") {
         return invalid("Status barang tidak valid");
       }
+      // K2: keluar dari menunggu harga hanya lewat form dengan harga jual.
+      if (
+        status === "menunggu_harga" ||
+        found.product.status === "menunggu_harga"
+      ) {
+        return invalid("Isi harga jual dulu");
+      }
       mockDb.update((s) => {
         const p = s.products.find((x) => x.id === found.product.id);
         if (!p) return;

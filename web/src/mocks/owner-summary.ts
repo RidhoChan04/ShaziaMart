@@ -17,6 +17,7 @@ import type { MockState } from "./db";
 import { oldestUnpaidAt } from "./ledger";
 import { meaningfulCostAlert } from "./products/cost-alert";
 import { eceranOf, stockAlertOf } from "./products/views";
+import { debtAttention } from "./receipts/debts";
 
 const WEEKDAYS = [
   "Minggu",
@@ -68,13 +69,10 @@ function attention(state: Readonly<MockState>, now: number): Attention {
       )
       .map((p) => ({ productId: p.id, productName: p.name }))
       .sort((a, b) => a.productName.localeCompare(b.productName, "id")),
-    supplierDebts: {
-      overdueCount: 0,
-      overdueTotal: 0,
-      dueSoonCount: 0,
-      dueSoonTotal: 0,
-    },
-    awaitingPriceCount: 0,
+    supplierDebts: debtAttention(state, now),
+    awaitingPriceCount: state.products.filter(
+      (p) => p.status === "menunggu_harga",
+    ).length,
   };
 }
 

@@ -2,6 +2,7 @@ import { authHandlers } from "./auth";
 import { catalogHandlers } from "./catalog";
 import { customerHandlers } from "./customers";
 import { ownerHandlers } from "./owner";
+import { ownerDebtHandlers } from "./owner-debts";
 import { ownerProductHandlers } from "./owner-products";
 import { ownerReceiptHandlers } from "./owner-receipts";
 import { salesHandlers } from "./sales";
@@ -25,6 +26,7 @@ export const handlers = [
   ...ownerHandlers,
   ...ownerProductHandlers,
   ...ownerReceiptHandlers,
+  ...ownerDebtHandlers,
   ...staffHandlers,
   ...staffReceiptHandlers,
 ];

@@ -8,7 +8,9 @@ import { invalid, problem } from "./respond";
 const MAX_RESULTS = 8;
 const MIN_QUERY = 2;
 
-const isSold = (p: MockProduct): boolean => p.status !== "nonaktif";
+/** Muncul di pencarian & curah cepat: bukan nonaktif dan sudah punya harga jual (K2). */
+const isSold = (p: MockProduct): boolean =>
+  p.status !== "nonaktif" && p.status !== "menunggu_harga";
 
 const matchOf = (product: MockProduct, unit: MockUnit): CatalogMatch => ({
   product: toKasirProduct(product),
@@ -17,8 +19,11 @@ const matchOf = (product: MockProduct, unit: MockUnit): CatalogMatch => ({
 
 /** K6: kode milik barang/satuan nonaktif ditolak; yang sudah di keranjang tetap terjual. */
 function sellable(product: MockProduct, unit: MockUnit): Response {
-  if (!isSold(product) || !unit.active) {
+  if (product.status === "nonaktif" || !unit.active) {
     return problem(410, "PRODUCT_INACTIVE", "Barang ini tidak dijual lagi");
+  }
+  if (product.status === "menunggu_harga") {
+    return problem(410, "PRODUCT_NO_PRICE", "Barang belum punya harga jual");
   }
   return HttpResponse.json(matchOf(product, unit));
 }
