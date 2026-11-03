@@ -1,6 +1,6 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { http } from "msw";
+import { HttpResponse, http } from "msw";
 import { toast } from "sonner";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { mockDb } from "@/mocks/db";
@@ -202,4 +202,44 @@ test("pemilik melunasi saat diubah: 422 RECEIPT_PAYMENT_LOCKED → nota dimuat u
   expect(
     mockDb.get().receipts.find((r) => r.id === "draf-2")?.lines[2]?.qty,
   ).toBe(48);
+});
+
+test("nota nanti sudah lunas: tanggal nota digeser melewati jatuh tempo → tanpa galat di HP, PUT terkirim", async () => {
+  const nanti = {
+    timing: "nanti",
+    method: null,
+    cashSource: null,
+    dueDate: "2026-10-25",
+  } as const;
+  await seedReceipt({ id: "draf-2", notaDate: "2026-10-20", payment: nanti });
+  mockDb.update((s) => {
+    const r = s.receipts.find((x) => x.id === "draf-2");
+    if (r) {
+      r.paid = {
+        at: NOW,
+        method: "tunai",
+        cashSource: "pemilik",
+        byName: "Pak Ahmad",
+      };
+    }
+  });
+  server.use(http.put(`${RECEIPTS}/:id`, () => HttpResponse.json({})));
+  const puts = capturePuts();
+  renderForm(memoryDraftStore(), "/staff/masuk/draf-2");
+  const user = userEvent.setup();
+  fireEvent.change(await screen.findByLabelText("Tanggal nota"), {
+    target: { value: "2026-10-30" },
+  });
+  await user.click(
+    screen.getByRole("button", { name: "Lanjut ke pembayaran" }),
+  );
+  await user.click(
+    await screen.findByRole("button", { name: "Simpan perubahan" }),
+  );
+  expect(await screen.findByText("Perubahan tersimpan")).toBeVisible();
+  expect(
+    screen.queryByText("Jatuh tempo tidak boleh sebelum tanggal nota"),
+  ).toBeNull();
+  expect(puts).toHaveLength(1);
+  expect(puts[0]).toMatchObject({ notaDate: "2026-10-30", payment: nanti });
 });

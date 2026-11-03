@@ -67,6 +67,8 @@ export function EditForm({ receipt }: { receipt: StaffReceipt }) {
   const shiftOpen =
     locked || shift.isPending || shift.isError || shift.data.shift !== null;
 
+  // Pembayaran terkunci tidak bisa diubah dan tidak dinilai ulang di HP (mis. nota lunas yang
+  // tanggalnya digeser melewati jatuh tempo): server yang memutuskan.
   const problems = () =>
     validateReceipt(
       {
@@ -76,7 +78,7 @@ export function EditForm({ receipt }: { receipt: StaffReceipt }) {
         payment: toPayment(form.payment),
       },
       { today, shiftOpen },
-    );
+    ).filter((e) => !locked || onNotaStep(e));
   const toList = () => void navigate({ to: "/staff/masuk" });
   const clearFor = (match: (e: ReceiptError) => boolean) =>
     setErrors((prev) => prev.filter((e) => !match(e)));
