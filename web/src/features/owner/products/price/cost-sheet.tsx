@@ -1,6 +1,6 @@
 import { useNavigate } from "@tanstack/react-router";
 import { X } from "lucide-react";
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { ApiError } from "@/shared/api/fetcher";
 import {
   useDismissOwnerCostAlert,
@@ -41,7 +41,10 @@ function isPriceField(value: unknown): value is PriceField {
   return value === "price" || value === "tierPrice" || value === "bigPrice";
 }
 
-/** Pesan 422 per field harga; sisanya (field lain, bentuk tak dikenal) menjadi pesan umum. */
+/**
+ * Kontrak `FieldError` hanya memuat `field` + `message` (tanpa indeks baris), jadi pesan dipetakan
+ * per field; model barang punya satu tier grosir sehingga tidak ada dua baris berbagi field.
+ * Pesan 422 per field harga; sisanya (field lain, bentuk tak dikenal) menjadi pesan umum. */
 function splitErrors(error: unknown): {
   fields: FieldMessages;
   general: string | null;
@@ -184,7 +187,9 @@ function Block({
           value={text}
           onChange={(e) => onText(e.target.value)}
           aria-invalid={invalid || error !== undefined}
-          aria-describedby={`${uid}-note`}
+          aria-describedby={
+            error === undefined ? `${uid}-note` : `${uid}-note ${uid}-err`
+          }
           className="tabular-nums"
         />
       </div>
@@ -192,7 +197,11 @@ function Block({
         {note}
       </p>
       {error !== undefined && (
-        <p role="alert" className="px-1 text-sm font-medium text-danger">
+        <p
+          id={`${uid}-err`}
+          role="alert"
+          className="px-1 text-sm font-medium text-danger"
+        >
           {error}
         </p>
       )}
@@ -204,10 +213,12 @@ function CostSheetBody({
   product,
   lines,
   onDone,
+  onBusy,
 }: {
   product: OwnerProduct;
   lines: CostLine[];
   onDone: () => void;
+  onBusy: (busy: boolean) => void;
 }) {
   const alert = product.costAlert;
   const eceranUnitId = product.units[0]?.id;
@@ -225,15 +236,20 @@ function CostSheetBody({
     const t = (texts[l.key] ?? "").trim();
     return t !== "" && parseRupiah(t) === null;
   });
-  // Harga yang diketik menang; tanpa ketikan dipakai saran; tanpa keduanya baris tidak dikirim.
+  // Harga yang diketik menang; tanpa ketikan dipakai saran. Tanpa harga, atau bila sama dengan
+  // harga sekarang, baris tidak dikirim (tidak ada perubahan yang perlu dicatat).
   const payload = lines.flatMap((l): PriceLineInput[] => {
     const t = (texts[l.key] ?? "").trim();
     const price = t === "" ? l.suggested : parseRupiah(t);
-    return price === null
+    return price === null || price === l.price
       ? []
       : [{ unitId: l.unitId, tierMinQty: l.tierMinQty, price }];
   });
   const busy = save.isPending || keep.isPending;
+  useEffect(() => {
+    onBusy(busy);
+    return () => onBusy(false);
+  }, [busy, onBusy]);
   const errors = save.isError
     ? splitErrors(save.error)
     : { fields: {} as FieldMessages, general: null };
@@ -251,6 +267,7 @@ function CostSheetBody({
         </div>
         <SheetClose
           aria-label="Tutup"
+          disabled={busy}
           className="-mt-1 -mr-2 grid size-11 shrink-0 place-items-center rounded-full text-muted hover:bg-primary-soft focus-visible:outline-2 focus-visible:outline-primary"
         >
           <X aria-hidden="true" className="size-5" />
@@ -319,13 +336,15 @@ export function CostSheet({
   const navigate = useNavigate({ from: "/owner/barang/$productId" });
   const lines = costLines(product);
   const open = requested && lines.length > 0;
+  const [busy, setBusy] = useState(false);
   const clearParam = () => void navigate({ search: {}, replace: true });
 
   return (
     <Sheet
       open={open}
       onOpenChange={(next) => {
-        if (!next) clearParam();
+        // Selama menyimpan, Esc / klik luar / Tutup diabaikan agar hasilnya tidak hilang dari layar.
+        if (!next && !busy) clearParam();
       }}
     >
       <SheetContent
@@ -333,7 +352,12 @@ export function CostSheet({
         showCloseButton={false}
         className="max-h-[92dvh] gap-4 overflow-y-auto rounded-t-lg p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] lg:mx-auto lg:max-w-[480px]"
       >
-        <CostSheetBody product={product} lines={lines} onDone={clearParam} />
+        <CostSheetBody
+          product={product}
+          lines={lines}
+          onDone={clearParam}
+          onBusy={setBusy}
+        />
       </SheetContent>
     </Sheet>
   );

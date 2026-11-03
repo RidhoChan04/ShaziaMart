@@ -1,8 +1,10 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { HttpResponse, http } from "msw";
 import { beforeEach, expect, test } from "vitest";
 import { mockDb } from "@/mocks/db";
 import { ownerLogin } from "@/mocks/handlers/test-helpers";
+import { server } from "@/mocks/node";
 import type {
   PriceSource,
   ProductCost,
@@ -360,4 +362,118 @@ test("?lembar=harga tanpa peringatan modal -> lembar tidak terbuka", async () =>
   renderApp(`/owner/barang/${indomie().id}?lembar=harga`);
   await screen.findByRole("heading", { level: 1, name: INDOMIE });
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+});
+
+test("harga saran sama dengan harga sekarang -> tidak ada yang dikirim, tombol nonaktif, riwayat harga tidak bertambah", async () => {
+  const id = indomie().id;
+  mockDb.update((s) => {
+    const p = s.products.find((x) => x.id === id);
+    const [eceran, dus] = p?.units ?? [];
+    const tier = eceran?.wholesaleTiers[0];
+    if (!eceran || !dus || !tier) throw new Error("seed");
+    eceran.price = 3000;
+    tier.price = 2500;
+  });
+  // 2600 -> 2599 per pcs: semua saran jatuh persis di harga sekarang
+  seedCostAlert({ amount: 103960, qtyBase: 40 });
+  const before = mockDb.get().priceHistory.length;
+  const { sheet } = await openFromBeranda("Harga modal Indomie Goreng turun");
+
+  expect(
+    within(block(sheet, "Eceran · per pcs")).getByText(/^Harga saran Rp3\.000/),
+  ).toBeInTheDocument();
+  expect(
+    within(sheet).getByRole("button", { name: "Pakai harga ini" }),
+  ).toBeDisabled();
+  expect(mockDb.get().priceHistory.length).toBe(before);
+
+  await userEvent.click(
+    within(sheet).getByRole("button", { name: "Harga tetap" }),
+  );
+  await waitFor(() =>
+    expect(
+      screen.queryByRole("dialog", { name: /^Harga modal/ }),
+    ).not.toBeInTheDocument(),
+  );
+  expect(mockDb.get().priceHistory.length).toBe(before);
+});
+
+test("ketik harga yang sama dengan harga sekarang tidak dikirim", async () => {
+  seedCostAlert();
+  const { sheet } = await openFromBeranda();
+  await userEvent.type(
+    within(block(sheet, "Eceran · per pcs")).getByRole("textbox", {
+      name: "atau ketik harga sendiri",
+    }),
+    "3.100",
+  );
+  await userEvent.click(
+    within(sheet).getByRole("button", { name: "Simpan harga" }),
+  );
+  await waitFor(() =>
+    expect(
+      screen.queryByRole("dialog", { name: /^Harga modal/ }),
+    ).not.toBeInTheDocument(),
+  );
+  expect(prices()).toEqual([
+    { eceran: 3100, tiers: [3000] },
+    { eceran: 116500, tiers: [] },
+  ]);
+});
+
+test("galat 422 ditautkan ke isiannya lewat aria-describedby", async () => {
+  seedCostAlert();
+  const { sheet } = await openFromBeranda();
+  const eceran = block(sheet, "Eceran · per pcs");
+  const input = within(eceran).getByRole("textbox", {
+    name: "atau ketik harga sendiri",
+  });
+  await userEvent.type(input, "2.500");
+  await userEvent.click(
+    within(sheet).getByRole("button", { name: "Simpan harga" }),
+  );
+  const alert = await within(eceran).findByRole("alert");
+  expect(alert.id).not.toBe("");
+  expect(input.getAttribute("aria-describedby")?.split(" ")).toContain(
+    alert.id,
+  );
+  expect(input).toBeInvalid();
+});
+
+test("Esc menutup lembar dan menghapus parameter; fokus tidak tertinggal di lembar", async () => {
+  seedCostAlert();
+  const { router } = await openFromBeranda();
+  await userEvent.keyboard("{Escape}");
+  await waitFor(() =>
+    expect(
+      screen.queryByRole("dialog", { name: /^Harga modal/ }),
+    ).not.toBeInTheDocument(),
+  );
+  expect(router.state.location.search).toEqual({});
+  expect(document.activeElement).not.toBeNull();
+  expect(document.activeElement?.closest('[role="dialog"]')).toBeNull();
+});
+
+test("saat menyimpan, permintaan tutup diabaikan", async () => {
+  seedCostAlert();
+  let release: () => void = () => {};
+  const gate = new Promise<void>((r) => {
+    release = r;
+  });
+  server.use(
+    http.put("/api/owner/products/:id/prices", async () => {
+      await gate;
+      return HttpResponse.json({}, { status: 500 });
+    }),
+  );
+  const { sheet } = await openFromBeranda();
+  await userEvent.click(
+    within(sheet).getByRole("button", { name: "Pakai harga ini" }),
+  );
+  await waitFor(() =>
+    expect(within(sheet).getByRole("button", { name: "Tutup" })).toBeDisabled(),
+  );
+  await userEvent.keyboard("{Escape}");
+  expect(screen.getByRole("dialog", { name: /^Harga modal/ })).toBe(sheet);
+  release();
 });
