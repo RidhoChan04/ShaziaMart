@@ -32,6 +32,8 @@ export default defineConfig(({ command, mode }) => {
     },
     // Fixture .xlsx di test dimuat lewat `?inline` (data URL).
     assetsInclude: ["**/*.xlsx"],
+    // Test kontrak membaca ../api/openapi.yaml?raw (di luar root web).
+    server: { fs: { allow: [".", "../api"] } },
     test: {
       environment: "jsdom",
       setupFiles: ["./vitest.setup.ts"],

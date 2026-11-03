@@ -22,6 +22,7 @@ const MESSAGES: Record<string, string> = {
   PRODUCT_NO_PRICE: "Barang belum punya harga jual",
   RECEIPT_CANCELLED: "Nota ini sudah dibatalkan",
   DEBT_ALREADY_PAID: "Utang ini sudah lunas",
+  ID_TAKEN: "Data ini milik pengguna lain",
   INTERNAL: GENERIC,
 };
 

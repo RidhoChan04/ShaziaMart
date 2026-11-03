@@ -1763,8 +1763,11 @@ export const getCancelOwnerReceiptUrl = (receiptId: string,) => {
 
 /**
  * Membuat entri balik: stok (batal_masuk), HPP (PriceSource ubah_nota), utang yang belum lunas
- * dihapus, dan uang keluar laci dikoreksi di shift yang sedang buka (tanpa shift buka: tidak
- * dicatat, audit memuat catatannya). Idempoten: nota yang sudah dibatalkan dikembalikan apa adanya.
+ * dihapus, dan uang keluar laci dikoreksi. Idempoten: nota yang sudah dibatalkan dikembalikan
+ * apa adanya.
+ * Boleh setelah shift saat nota dicatat ditutup; koreksi uang laci dicatat sebagai baris uang
+ * keluar baru di shift yang sedang buka (shift lama tidak diubah; tanpa shift buka: tidak
+ * dicatat, audit memuat catatannya).
  * @summary Batalkan nota barang masuk
  */
 export const cancelOwnerReceipt = async (receiptId: string, options?: Parameters<typeof customFetch>[1]): Promise<OwnerReceipt> => {

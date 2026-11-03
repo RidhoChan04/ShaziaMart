@@ -2,6 +2,7 @@ import { expect, expectTypeOf, test } from "vitest";
 import { z } from "zod";
 import type {
   DebtPayment,
+  DrawerShift,
   OwnerReceipt,
   OwnerReceiptRow,
   ReceiptError,
@@ -13,6 +14,7 @@ import type {
   StaffProduct,
   StaffReceipt,
   StaffReceiptRow,
+  StaffShift,
   StaffUnit,
   SupplierDebt,
   SupplierDebtList,
@@ -295,6 +297,102 @@ function propertyNames(schema: unknown, out = new Set<string>()): Set<string> {
   return out;
 }
 
+const USER = ["id", "name", "role"];
+const RECEIPT = [
+  "id",
+  "supplierName",
+  "notaDate",
+  "photoId",
+  "lines",
+  "lineId",
+  "productId",
+  "productName",
+  "unitId",
+  "unitName",
+  "unitSize",
+  "qty",
+  "unitCost",
+  "subtotal",
+  "expiryDate",
+  "newProduct",
+  "payment",
+  "timing",
+  "method",
+  "cashSource",
+  "dueDate",
+  "paymentEditable",
+  "total",
+  "status",
+  "createdAt",
+  "createdByName",
+  "editedAt",
+  "editedByName",
+];
+
+/** Allowlist: setiap respons /api/staff hanya boleh memuat key ini (di kedalaman mana pun). */
+const STAFF_RESPONSE_KEYS: Record<string, readonly string[]> = {
+  ListStaffUsersResponse: USER,
+  StaffLoginResponse: ["user", ...USER],
+  GetStaffSessionResponse: ["user", ...USER],
+  StaffLogoutResponse: [],
+  GetStaffShiftResponse: ["shift", "kasirName", "openedAt"],
+  SearchStaffProductsResponse: [
+    "id",
+    "name",
+    "category",
+    "isCurah",
+    "baseUnit",
+    "status",
+    "units",
+    "unitSize",
+    "barcodes",
+  ],
+  ListStaffSuppliersResponse: ["id", "name"],
+  CreateStaffReceiptResponse: RECEIPT,
+  ListStaffReceiptsResponse: [
+    "id",
+    "supplierName",
+    "notaDate",
+    "total",
+    "lineCount",
+    "status",
+    "createdAt",
+  ],
+  GetStaffReceiptResponse: RECEIPT,
+  UpdateStaffReceiptResponse: RECEIPT,
+  PutStaffReceiptPhotoResponse: [],
+  GetStaffReceiptPhotoResponse: [],
+};
+
+const keysOf = (schema: unknown): string[] =>
+  [
+    ...propertyNames(
+      z.toJSONSchema(schema as z.ZodType, { unrepresentable: "any" }),
+    ),
+  ].sort();
+
+const staffResponses = Object.entries(staffZod).filter(
+  ([name, value]) => name.endsWith("Response") && value instanceof z.ZodType,
+);
+
+test("allowlist respons /api/staff: setiap respons punya daftar key, tanpa key lain", () => {
+  // Endpoint staf baru wajib didaftarkan di allowlist.
+  expect(staffResponses.map(([name]) => name).sort()).toEqual(
+    Object.keys(STAFF_RESPONSE_KEYS).sort(),
+  );
+  for (const [name, schema] of staffResponses) {
+    const allowed = new Set(STAFF_RESPONSE_KEYS[name]);
+    expect({
+      name,
+      extra: keysOf(schema).filter((k) => !allowed.has(k)),
+    }).toEqual({ name, extra: [] });
+  }
+  // Penjaga: penelusuran benar-benar menemukan key bersarang (lines[].unitCost).
+  expect(keysOf(staffZod.GetStaffReceiptResponse)).toEqual(
+    [...new Set(RECEIPT)].sort(),
+  );
+});
+
 test("HPP tidak pernah ke staf: respons /api/staff tanpa key modal, harga jual, atau stok", () => {
   const forbidden = [
     "cost",
@@ -305,35 +403,27 @@ test("HPP tidak pernah ke staf: respons /api/staff tanpa key modal, harga jual, 
     "price",
     "stock",
     "grossProfit",
+    "openingCash",
   ];
-  const responses = Object.entries(staffZod).filter(
-    ([name, value]) => name.endsWith("Response") && value instanceof z.ZodType,
-  );
-  expect(responses.map(([name]) => name)).toEqual(
-    expect.arrayContaining([
-      "SearchStaffProductsResponse",
-      "CreateStaffReceiptResponse",
-      "GetStaffReceiptResponse",
-      "UpdateStaffReceiptResponse",
-      "ListStaffReceiptsResponse",
-      "GetStaffShiftResponse",
-    ]),
-  );
-  const keysOf = (schema: unknown) =>
-    propertyNames(
-      z.toJSONSchema(schema as z.ZodType, { unrepresentable: "any" }),
-    );
-  // Penjaga: penelusuran benar-benar menemukan key bersarang (lines[].unitCost).
-  expect([...keysOf(staffZod.GetStaffReceiptResponse)]).toEqual(
-    expect.arrayContaining(["unitCost", "subtotal", "total", "payment"]),
-  );
-  for (const [name, schema] of responses) {
+  for (const [name, schema] of staffResponses) {
     const keys = keysOf(schema);
-    expect({ name, leaked: forbidden.filter((k) => keys.has(k)) }).toEqual({
-      name,
-      leaked: [],
-    });
+    expect({ name, leaked: forbidden.filter((k) => keys.includes(k)) }).toEqual(
+      { name, leaked: [] },
+    );
   }
+});
+
+test("staf: shift laci hanya kasirName & openedAt", () => {
+  expectTypeOf<keyof StaffShift>().toEqualTypeOf<"shift">();
+  expectTypeOf<StaffShift["shift"]>().toEqualTypeOf<DrawerShift | null>();
+  expect(
+    staffZod.GetStaffShiftResponse.safeParse({
+      shift: { kasirName: "Sari", openedAt: 1793590000000 },
+    }).success,
+  ).toBe(true);
+  expect(
+    staffZod.GetStaffShiftResponse.safeParse({ shift: null }).success,
+  ).toBe(true);
 });
 
 test("respons staf: StaffProduct maks. 20; nota tersimpan valid", () => {

@@ -87,8 +87,8 @@ test("creditLimitProblemSchema cocok dengan tipe hasil generate", () => {
   expect(ok.success).toBe(true);
 });
 
-test("ErrorCode 20 nilai termasuk 4 kode baru", () => {
-  expect(Object.values(ErrorCode)).toHaveLength(20);
+test("ErrorCode 21 nilai termasuk 5 kode baru", () => {
+  expect(Object.values(ErrorCode)).toHaveLength(21);
   expect(Object.values(ErrorCode)).toEqual(
     expect.arrayContaining([
       "PRODUCT_INACTIVE",
@@ -97,6 +97,7 @@ test("ErrorCode 20 nilai termasuk 4 kode baru", () => {
       "PRODUCT_NO_PRICE",
       "RECEIPT_CANCELLED",
       "DEBT_ALREADY_PAID",
+      "ID_TAKEN",
     ]),
   );
   expect(ErrorCode.LOGIN_INVALID).toBe("LOGIN_INVALID");

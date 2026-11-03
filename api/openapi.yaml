@@ -849,8 +849,11 @@ paths:
       summary: Batalkan nota barang masuk
       description: |
         Membuat entri balik: stok (batal_masuk), HPP (PriceSource ubah_nota), utang yang belum lunas
-        dihapus, dan uang keluar laci dikoreksi di shift yang sedang buka (tanpa shift buka: tidak
-        dicatat, audit memuat catatannya). Idempoten: nota yang sudah dibatalkan dikembalikan apa adanya.
+        dihapus, dan uang keluar laci dikoreksi. Idempoten: nota yang sudah dibatalkan dikembalikan
+        apa adanya.
+        Boleh setelah shift saat nota dicatat ditutup; koreksi uang laci dicatat sebagai baris uang
+        keluar baru di shift yang sedang buka (shift lama tidak diubah; tanpa shift buka: tidak
+        dicatat, audit memuat catatannya).
       security:
         - ownerCookieAuth: []
       parameters:
@@ -965,8 +968,9 @@ paths:
       summary: Masuk orang toko dengan PIN kasir
       description: |
         PIN_INVALID (401) bila PIN salah atau akun bukan kasir; LOCKED_OUT (423) bila terlalu banyak
-        percobaan. Hitungan PIN salah dibagi dengan login kasir (akun yang sama). Sukses mengeset
-        cookie staff_session tanpa menyentuh kasir_session atau owner_session.
+        percobaan. Hitungan PIN salah dan kunci realm orang toko terpisah dari login kasir; gagal di
+        HP tidak mengunci PC kasir, dan sebaliknya. Sukses mengeset cookie staff_session tanpa
+        menyentuh kasir_session atau owner_session.
       requestBody:
         required: true
         content:
@@ -1012,8 +1016,6 @@ paths:
       operationId: staffLogout
       summary: Keluar orang toko
       description: Selalu 204 (idempoten), juga tanpa sesi; hanya menghapus staff_session.
-      security:
-        - staffCookieAuth: []
       responses:
         "204":
           description: Sesi orang toko dihapus
@@ -1028,11 +1030,11 @@ paths:
         - staffCookieAuth: []
       responses:
         "200":
-          description: Shift saat ini; shift bernilai null bila tidak ada yang buka
+          description: Shift laci saat ini; shift bernilai null bila tidak ada yang buka
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/CurrentShift"
+                $ref: "#/components/schemas/StaffShift"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -1095,9 +1097,14 @@ paths:
       operationId: createStaffReceipt
       summary: Simpan nota barang masuk
       description: |
-        Idempoten menurut id (ID draf dari HP): id yang sudah tersimpan mengembalikan nota lama
-        dengan 200 tanpa validasi ulang dan tanpa mencatat ulang stok, HPP, uang keluar, atau utang.
+        Idempoten menurut (pembuat, id) — id = ID draf dari HP: id yang sudah disimpan pengguna ini
+        mengembalikan nota lama dengan 200 tanpa validasi ulang dan tanpa mencatat ulang stok, HPP,
+        uang keluar, atau utang. id sudah dipakai pengguna lain → 409 ID_TAKEN tanpa isi nota; nota
+        milik pengguna lain tidak pernah dikembalikan.
         Atomik: 422 ReceiptProblem dengan galat per baris/field, tanpa perubahan sebagian.
+        cashSource laci tanpa shift kasir yang buka → 422 dengan field cashSource; server tidak
+        pernah mengubahnya menjadi uang pemilik. photoId yang bukan diunggah pengguna ini → 422
+        dengan field photoId.
         Batas min/max di skema adalah panduan klien; server selalu memvalidasi isi mentah.
       security:
         - staffCookieAuth: []
@@ -1124,6 +1131,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/LanOnly"
+        "409":
+          $ref: "#/components/responses/IdTaken"
         "422":
           $ref: "#/components/responses/ReceiptValidationFailed"
     get:
@@ -1176,6 +1185,9 @@ paths:
         Hanya staf pembuatnya (nota orang lain 404). Baris tidak bisa ditambah atau dihapus; barang
         dan satuannya tetap. payment hanya bisa diubah selama paymentEditable. Atomik: 422
         ReceiptProblem tanpa perubahan sebagian; 409 RECEIPT_CANCELLED bila nota sudah dibatalkan.
+        Boleh setelah shift saat nota dicatat ditutup; koreksi uang laci dicatat sebagai baris uang
+        keluar baru di shift yang sedang buka (shift lama tidak diubah; tanpa shift buka: tidak
+        dicatat, audit memuat catatannya).
       security:
         - staffCookieAuth: []
       parameters:
@@ -1209,7 +1221,9 @@ paths:
       operationId: putStaffReceiptPhoto
       summary: Unggah foto nota
       description: |
-        Idempoten menurut photoId (ID dari HP): unggah ulang dengan id yang sama tetap 204.
+        Foto terikat ke pengunggahnya. Idempoten menurut (pengunggah, photoId): unggah ulang oleh
+        pengguna yang sama tetap 204 tanpa mengubah foto tersimpan. photoId yang sudah diunggah
+        pengguna lain → 409 ID_TAKEN, tidak pernah ditimpa.
         JPEG, paling besar 1 MB; selain itu 422 VALIDATION.
       security:
         - staffCookieAuth: []
@@ -1229,12 +1243,15 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/LanOnly"
+        "409":
+          $ref: "#/components/responses/IdTaken"
         "422":
           $ref: "#/components/responses/ValidationFailed"
     get:
       tags: [staff]
       operationId: getStaffReceiptPhoto
       summary: Foto nota (JPEG)
+      description: Foto yang bukan diunggah pengguna ini juga 404.
       security:
         - staffCookieAuth: []
       parameters:
@@ -1295,8 +1312,8 @@ components:
         application/problem+json:
           schema:
             $ref: "#/components/schemas/Problem"
-    ProductNoPrice:
-      description: Barang menunggu harga jual (PRODUCT_NO_PRICE)
+    IdTaken:
+      description: id dari HP sudah dipakai pengguna lain (ID_TAKEN); data pengguna lain tidak dikembalikan
       content:
         application/problem+json:
           schema:
@@ -1385,12 +1402,6 @@ components:
         application/problem+json:
           schema:
             $ref: "#/components/schemas/Problem"
-    ProductInactive:
-      description: Kode cocok dengan barang/satuan nonaktif (PRODUCT_INACTIVE)
-      content:
-        application/problem+json:
-          schema:
-            $ref: "#/components/schemas/Problem"
   schemas:
     Health:
       type: object
@@ -1427,6 +1438,7 @@ components:
         - PRODUCT_NO_PRICE
         - RECEIPT_CANCELLED
         - DEBT_ALREADY_PAID
+        - ID_TAKEN
     Problem:
       type: object
       required: [type, title, status, code]
@@ -2547,6 +2559,8 @@ components:
         sekarang: method wajib; cashSource wajib bila tunai (laci = uang keluar di shift yang sedang
         buka), null bila transfer; dueDate null. nanti: method dan cashSource null (dipilih saat
         pemilik menandai lunas); dueDate wajib, tidak sebelum notaDate.
+        cashSource laci tanpa shift kasir yang buka → 422 dengan field cashSource; server tidak
+        pernah mengubahnya menjadi uang pemilik.
       required: [timing, method, cashSource, dueDate]
       properties:
         timing:
@@ -2645,7 +2659,7 @@ components:
         photoId:
           type: string
           nullable: true
-          description: Foto nota yang sudah diunggah lewat putStaffReceiptPhoto.
+          description: Foto nota yang sudah diunggah lewat putStaffReceiptPhoto; harus diunggah oleh pengguna ini; selain itu 422 dengan field photoId.
         lines:
           type: array
           minItems: 1
@@ -2917,6 +2931,15 @@ components:
         openedAt:
           type: integer
           format: int64
+    StaffShift:
+      type: object
+      description: Shift laci untuk orang toko; tanpa uang modal atau angka kas.
+      required: [shift]
+      properties:
+        shift:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/DrawerShift"
     SupplierDebtList:
       type: object
       required: [debts, drawerShift]

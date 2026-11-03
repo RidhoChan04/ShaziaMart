@@ -74,6 +74,7 @@ export const ErrorCode = {
   PRODUCT_NO_PRICE: 'PRODUCT_NO_PRICE',
   RECEIPT_CANCELLED: 'RECEIPT_CANCELLED',
   DEBT_ALREADY_PAID: 'DEBT_ALREADY_PAID',
+  ID_TAKEN: 'ID_TAKEN',
 } as const;
 
 export interface Problem {
@@ -1050,6 +1051,8 @@ export const ReceiptPaymentCashSource = {
  * sekarang: method wajib; cashSource wajib bila tunai (laci = uang keluar di shift yang sedang
  * buka), null bila transfer; dueDate null. nanti: method dan cashSource null (dipilih saat
  * pemilik menandai lunas); dueDate wajib, tidak sebelum notaDate.
+ * cashSource laci tanpa shift kasir yang buka → 422 dengan field cashSource; server tidak
+ * pernah mengubahnya menjadi uang pemilik.
  */
 export interface ReceiptPayment {
   timing: ReceiptPaymentTiming;
@@ -1141,7 +1144,7 @@ export interface ReceiptInput {
   /** Tidak boleh setelah hari ini. */
   notaDate: string;
   /**
-     * Foto nota yang sudah diunggah lewat putStaffReceiptPhoto.
+     * Foto nota yang sudah diunggah lewat putStaffReceiptPhoto; harus diunggah oleh pengguna ini; selain itu 422 dengan field photoId.
      * @nullable
      */
   photoId: string | null;
@@ -1346,6 +1349,13 @@ export interface DrawerShift {
   openedAt: number;
 }
 
+/**
+ * Shift laci untuk orang toko; tanpa uang modal atau angka kas.
+ */
+export interface StaffShift {
+  shift: DrawerShift | null;
+}
+
 export interface SupplierDebtList {
   /** Belum lunas urut jatuh tempo, lalu lunas terbaru dulu. */
   debts: SupplierDebt[];
@@ -1441,9 +1451,9 @@ export type ReceiptProblem = Problem & {
 export type LanOnlyResponse = Problem;
 
 /**
- * Barang menunggu harga jual (PRODUCT_NO_PRICE)
+ * id dari HP sudah dipakai pengguna lain (ID_TAKEN); data pengguna lain tidak dikembalikan
  */
-export type ProductNoPriceResponse = Problem;
+export type IdTakenResponse = Problem;
 
 /**
  * Nota sudah dibatalkan (RECEIPT_CANCELLED)
@@ -1514,11 +1524,6 @@ export type ProductValidationFailedResponse = ProductValidationProblem;
  * Barang sudah pernah terjual sehingga tidak bisa dihapus (PRODUCT_HAS_SALES)
  */
 export type ProductHasSalesResponse = Problem;
-
-/**
- * Kode cocok dengan barang/satuan nonaktif (PRODUCT_INACTIVE)
- */
-export type ProductInactiveResponse = Problem;
 
 export type LookupCatalogParams = {
 /**

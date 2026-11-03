@@ -44,8 +44,9 @@ export const ListStaffUsersResponse = zod.array(ListStaffUsersResponseItem)
 
 /**
  * PIN_INVALID (401) bila PIN salah atau akun bukan kasir; LOCKED_OUT (423) bila terlalu banyak
- * percobaan. Hitungan PIN salah dibagi dengan login kasir (akun yang sama). Sukses mengeset
- * cookie staff_session tanpa menyentuh kasir_session atau owner_session.
+ * percobaan. Hitungan PIN salah dan kunci realm orang toko terpisah dari login kasir; gagal di
+ * HP tidak mengunci PC kasir, dan sebaliknya. Sukses mengeset cookie staff_session tanpa
+ * menyentuh kasir_session atau owner_session.
  * @summary Masuk orang toko dengan PIN kasir
  */
 export const staffLoginBodyPinRegExp = new RegExp('^\\d{6}$');
@@ -86,13 +87,10 @@ export const StaffLogoutResponse = zod.void()
  */
 export const GetStaffShiftResponse = zod.object({
   "shift": zod.union([zod.object({
-  "id": zod.string(),
-  "kasirId": zod.string(),
   "kasirName": zod.string(),
-  "openedAt": zod.int(),
-  "openingCash": zod.int()
-}),zod.null()])
-})
+  "openedAt": zod.int()
+}).describe('Shift kasir yang sedang buka (tujuan uang keluar Dari laci kasir).'),zod.null()])
+}).describe('Shift laci untuk orang toko; tanpa uang modal atau angka kas.')
 
 /**
  * Nama (mengandung, tanpa beda huruf besar/kecil), barcode, atau kode toko (persis); tanpa
@@ -134,9 +132,14 @@ export const ListStaffSuppliersResponseItem = zod.object({
 export const ListStaffSuppliersResponse = zod.array(ListStaffSuppliersResponseItem)
 
 /**
- * Idempoten menurut id (ID draf dari HP): id yang sudah tersimpan mengembalikan nota lama
- * dengan 200 tanpa validasi ulang dan tanpa mencatat ulang stok, HPP, uang keluar, atau utang.
+ * Idempoten menurut (pembuat, id) — id = ID draf dari HP: id yang sudah disimpan pengguna ini
+ * mengembalikan nota lama dengan 200 tanpa validasi ulang dan tanpa mencatat ulang stok, HPP,
+ * uang keluar, atau utang. id sudah dipakai pengguna lain → 409 ID_TAKEN tanpa isi nota; nota
+ * milik pengguna lain tidak pernah dikembalikan.
  * Atomik: 422 ReceiptProblem dengan galat per baris/field, tanpa perubahan sebagian.
+ * cashSource laci tanpa shift kasir yang buka → 422 dengan field cashSource; server tidak
+ * pernah mengubahnya menjadi uang pemilik. photoId yang bukan diunggah pengguna ini → 422
+ * dengan field photoId.
  * Batas min/max di skema adalah panduan klien; server selalu memvalidasi isi mentah.
  * @summary Simpan nota barang masuk
  */
@@ -164,7 +167,7 @@ export const CreateStaffReceiptBody = zod.object({
   "id": zod.string().min(1).max(createStaffReceiptBodyIdMax).describe('ID draf dari HP (idempotensi); id yang sama mengembalikan nota lama dengan 200.'),
   "supplierName": zod.string().min(1).max(createStaffReceiptBodySupplierNameMax).describe('Supplier lama (nama sama, tanpa beda huruf) atau baru.'),
   "notaDate": zod.iso.date().describe('Tidak boleh setelah hari ini.'),
-  "photoId": zod.string().nullable().describe('Foto nota yang sudah diunggah lewat putStaffReceiptPhoto.'),
+  "photoId": zod.string().nullable().describe('Foto nota yang sudah diunggah lewat putStaffReceiptPhoto; harus diunggah oleh pengguna ini; selain itu 422 dengan field photoId.'),
   "lines": zod.array(zod.object({
   "lineId": zod.string().min(1).max(createStaffReceiptBodyLinesItemLineIdMax),
   "productId": zod.string().nullable(),
@@ -185,7 +188,7 @@ export const CreateStaffReceiptBody = zod.object({
   "method": zod.union([zod.literal('tunai'),zod.literal('transfer'),zod.literal(null)]).nullable(),
   "cashSource": zod.union([zod.literal('laci'),zod.literal('pemilik'),zod.literal(null)]).nullable(),
   "dueDate": zod.iso.date().nullable()
-}).describe('sekarang: method wajib; cashSource wajib bila tunai (laci = uang keluar di shift yang sedang\nbuka), null bila transfer; dueDate null. nanti: method dan cashSource null (dipilih saat\npemilik menandai lunas); dueDate wajib, tidak sebelum notaDate.\n')
+}).describe('sekarang: method wajib; cashSource wajib bila tunai (laci = uang keluar di shift yang sedang\nbuka), null bila transfer; dueDate null. nanti: method dan cashSource null (dipilih saat\npemilik menandai lunas); dueDate wajib, tidak sebelum notaDate.\ncashSource laci tanpa shift kasir yang buka → 422 dengan field cashSource; server tidak\npernah mengubahnya menjadi uang pemilik.\n')
 })
 
 
@@ -214,7 +217,7 @@ export const CreateStaffReceiptResponse = zod.object({
   "method": zod.union([zod.literal('tunai'),zod.literal('transfer'),zod.literal(null)]).nullable(),
   "cashSource": zod.union([zod.literal('laci'),zod.literal('pemilik'),zod.literal(null)]).nullable(),
   "dueDate": zod.iso.date().nullable()
-}).describe('sekarang: method wajib; cashSource wajib bila tunai (laci = uang keluar di shift yang sedang\nbuka), null bila transfer; dueDate null. nanti: method dan cashSource null (dipilih saat\npemilik menandai lunas); dueDate wajib, tidak sebelum notaDate.\n'),
+}).describe('sekarang: method wajib; cashSource wajib bila tunai (laci = uang keluar di shift yang sedang\nbuka), null bila transfer; dueDate null. nanti: method dan cashSource null (dipilih saat\npemilik menandai lunas); dueDate wajib, tidak sebelum notaDate.\ncashSource laci tanpa shift kasir yang buka → 422 dengan field cashSource; server tidak\npernah mengubahnya menjadi uang pemilik.\n'),
   "paymentEditable": zod.boolean().describe('Bayar nanti yang belum dilunasi.'),
   "total": zod.int().describe('Σ subtotal (rupiah).'),
   "status": zod.enum(['aktif', 'dibatalkan']),
@@ -272,7 +275,7 @@ export const GetStaffReceiptResponse = zod.object({
   "method": zod.union([zod.literal('tunai'),zod.literal('transfer'),zod.literal(null)]).nullable(),
   "cashSource": zod.union([zod.literal('laci'),zod.literal('pemilik'),zod.literal(null)]).nullable(),
   "dueDate": zod.iso.date().nullable()
-}).describe('sekarang: method wajib; cashSource wajib bila tunai (laci = uang keluar di shift yang sedang\nbuka), null bila transfer; dueDate null. nanti: method dan cashSource null (dipilih saat\npemilik menandai lunas); dueDate wajib, tidak sebelum notaDate.\n'),
+}).describe('sekarang: method wajib; cashSource wajib bila tunai (laci = uang keluar di shift yang sedang\nbuka), null bila transfer; dueDate null. nanti: method dan cashSource null (dipilih saat\npemilik menandai lunas); dueDate wajib, tidak sebelum notaDate.\ncashSource laci tanpa shift kasir yang buka → 422 dengan field cashSource; server tidak\npernah mengubahnya menjadi uang pemilik.\n'),
   "paymentEditable": zod.boolean().describe('Bayar nanti yang belum dilunasi.'),
   "total": zod.int().describe('Σ subtotal (rupiah).'),
   "status": zod.enum(['aktif', 'dibatalkan']),
@@ -286,6 +289,9 @@ export const GetStaffReceiptResponse = zod.object({
  * Hanya staf pembuatnya (nota orang lain 404). Baris tidak bisa ditambah atau dihapus; barang
  * dan satuannya tetap. payment hanya bisa diubah selama paymentEditable. Atomik: 422
  * ReceiptProblem tanpa perubahan sebagian; 409 RECEIPT_CANCELLED bila nota sudah dibatalkan.
+ * Boleh setelah shift saat nota dicatat ditutup; koreksi uang laci dicatat sebagai baris uang
+ * keluar baru di shift yang sedang buka (shift lama tidak diubah; tanpa shift buka: tidak
+ * dicatat, audit memuat catatannya).
  * @summary Ubah nota milik sendiri
  */
 export const UpdateStaffReceiptParams = zod.object({
@@ -317,7 +323,7 @@ export const UpdateStaffReceiptBody = zod.object({
   "method": zod.union([zod.literal('tunai'),zod.literal('transfer'),zod.literal(null)]).nullable(),
   "cashSource": zod.union([zod.literal('laci'),zod.literal('pemilik'),zod.literal(null)]).nullable(),
   "dueDate": zod.iso.date().nullable()
-}).describe('sekarang: method wajib; cashSource wajib bila tunai (laci = uang keluar di shift yang sedang\nbuka), null bila transfer; dueDate null. nanti: method dan cashSource null (dipilih saat\npemilik menandai lunas); dueDate wajib, tidak sebelum notaDate.\n')
+}).describe('sekarang: method wajib; cashSource wajib bila tunai (laci = uang keluar di shift yang sedang\nbuka), null bila transfer; dueDate null. nanti: method dan cashSource null (dipilih saat\npemilik menandai lunas); dueDate wajib, tidak sebelum notaDate.\ncashSource laci tanpa shift kasir yang buka → 422 dengan field cashSource; server tidak\npernah mengubahnya menjadi uang pemilik.\n')
 }).describe('Semua baris nota (tepat sama dengan lineId yang ada); baris tidak bisa ditambah atau dihapus.')
 
 
@@ -346,7 +352,7 @@ export const UpdateStaffReceiptResponse = zod.object({
   "method": zod.union([zod.literal('tunai'),zod.literal('transfer'),zod.literal(null)]).nullable(),
   "cashSource": zod.union([zod.literal('laci'),zod.literal('pemilik'),zod.literal(null)]).nullable(),
   "dueDate": zod.iso.date().nullable()
-}).describe('sekarang: method wajib; cashSource wajib bila tunai (laci = uang keluar di shift yang sedang\nbuka), null bila transfer; dueDate null. nanti: method dan cashSource null (dipilih saat\npemilik menandai lunas); dueDate wajib, tidak sebelum notaDate.\n'),
+}).describe('sekarang: method wajib; cashSource wajib bila tunai (laci = uang keluar di shift yang sedang\nbuka), null bila transfer; dueDate null. nanti: method dan cashSource null (dipilih saat\npemilik menandai lunas); dueDate wajib, tidak sebelum notaDate.\ncashSource laci tanpa shift kasir yang buka → 422 dengan field cashSource; server tidak\npernah mengubahnya menjadi uang pemilik.\n'),
   "paymentEditable": zod.boolean().describe('Bayar nanti yang belum dilunasi.'),
   "total": zod.int().describe('Σ subtotal (rupiah).'),
   "status": zod.enum(['aktif', 'dibatalkan']),
@@ -357,7 +363,9 @@ export const UpdateStaffReceiptResponse = zod.object({
 })
 
 /**
- * Idempoten menurut photoId (ID dari HP): unggah ulang dengan id yang sama tetap 204.
+ * Foto terikat ke pengunggahnya. Idempoten menurut (pengunggah, photoId): unggah ulang oleh
+ * pengguna yang sama tetap 204 tanpa mengubah foto tersimpan. photoId yang sudah diunggah
+ * pengguna lain → 409 ID_TAKEN, tidak pernah ditimpa.
  * JPEG, paling besar 1 MB; selain itu 422 VALIDATION.
  * @summary Unggah foto nota
  */
@@ -368,6 +376,7 @@ export const PutStaffReceiptPhotoParams = zod.object({
 export const PutStaffReceiptPhotoResponse = zod.void()
 
 /**
+ * Foto yang bukan diunggah pengguna ini juga 404.
  * @summary Foto nota (JPEG)
  */
 export const GetStaffReceiptPhotoParams = zod.object({

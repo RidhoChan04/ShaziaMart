@@ -48,7 +48,7 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
-  CurrentShift,
+  IdTakenResponse,
   LanOnlyResponse,
   LockedOutResponse,
   NotFoundResponse,
@@ -63,6 +63,7 @@ import type {
   StaffProduct,
   StaffReceipt,
   StaffReceiptRow,
+  StaffShift,
   Supplier,
   UnauthorizedResponse,
   User,
@@ -203,8 +204,9 @@ export const getStaffLoginUrl = () => {
 
 /**
  * PIN_INVALID (401) bila PIN salah atau akun bukan kasir; LOCKED_OUT (423) bila terlalu banyak
- * percobaan. Hitungan PIN salah dibagi dengan login kasir (akun yang sama). Sukses mengeset
- * cookie staff_session tanpa menyentuh kasir_session atau owner_session.
+ * percobaan. Hitungan PIN salah dan kunci realm orang toko terpisah dari login kasir; gagal di
+ * HP tidak mengunci PC kasir, dan sebaliknya. Sukses mengeset cookie staff_session tanpa
+ * menyentuh kasir_session atau owner_session.
  * @summary Masuk orang toko dengan PIN kasir
  */
 export const staffLogin = async (pinLoginRequest: PinLoginRequest, options?: Parameters<typeof customFetch>[1]): Promise<Session> => {
@@ -468,9 +470,9 @@ export const useStaffLogout = <TError = ErrorType<LanOnlyResponse>,
 /**
  * @summary Shift kasir yang sedang buka (untuk pilihan Dari laci kasir)
  */
-export const getStaffShift = async ( options?: Parameters<typeof customFetch>[1]): Promise<CurrentShift> => {
+export const getStaffShift = async ( options?: Parameters<typeof customFetch>[1]): Promise<StaffShift> => {
 
-  return customFetch<CurrentShift>(getGetStaffShiftUrl(),
+  return customFetch<StaffShift>(getGetStaffShiftUrl(),
   {
     ...options,
     method: 'GET'
@@ -776,9 +778,14 @@ export const getCreateStaffReceiptUrl = () => {
 }
 
 /**
- * Idempoten menurut id (ID draf dari HP): id yang sudah tersimpan mengembalikan nota lama
- * dengan 200 tanpa validasi ulang dan tanpa mencatat ulang stok, HPP, uang keluar, atau utang.
+ * Idempoten menurut (pembuat, id) — id = ID draf dari HP: id yang sudah disimpan pengguna ini
+ * mengembalikan nota lama dengan 200 tanpa validasi ulang dan tanpa mencatat ulang stok, HPP,
+ * uang keluar, atau utang. id sudah dipakai pengguna lain → 409 ID_TAKEN tanpa isi nota; nota
+ * milik pengguna lain tidak pernah dikembalikan.
  * Atomik: 422 ReceiptProblem dengan galat per baris/field, tanpa perubahan sebagian.
+ * cashSource laci tanpa shift kasir yang buka → 422 dengan field cashSource; server tidak
+ * pernah mengubahnya menjadi uang pemilik. photoId yang bukan diunggah pengguna ini → 422
+ * dengan field photoId.
  * Batas min/max di skema adalah panduan klien; server selalu memvalidasi isi mentah.
  * @summary Simpan nota barang masuk
  */
@@ -813,7 +820,7 @@ return customFetch<StaffReceipt>(getCreateStaffReceiptUrl(),
 
 export const getCreateStaffReceiptMutationKey = () => ['createStaffReceipt'] as const;
 
-export const getCreateStaffReceiptMutationOptions = <TError = ErrorType<UnauthorizedResponse | LanOnlyResponse | ReceiptValidationFailedResponse>,
+export const getCreateStaffReceiptMutationOptions = <TError = ErrorType<UnauthorizedResponse | LanOnlyResponse | IdTakenResponse | ReceiptValidationFailedResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createStaffReceipt>>, TError,CreateStaffReceiptMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof createStaffReceipt>>, TError,CreateStaffReceiptMutationVariables, TContext> => {
 
@@ -842,13 +849,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type CreateStaffReceiptMutationResult = NonNullable<Awaited<ReturnType<typeof createStaffReceipt>>>
     export type CreateStaffReceiptMutationBody = ReceiptInput
-    export type CreateStaffReceiptMutationError = ErrorType<UnauthorizedResponse | LanOnlyResponse | ReceiptValidationFailedResponse>
+    export type CreateStaffReceiptMutationError = ErrorType<UnauthorizedResponse | LanOnlyResponse | IdTakenResponse | ReceiptValidationFailedResponse>
     export type CreateStaffReceiptMutationVariables = {data: ReceiptInput}
 
     /**
  * @summary Simpan nota barang masuk
  */
-export const useCreateStaffReceipt = <TError = ErrorType<UnauthorizedResponse | LanOnlyResponse | ReceiptValidationFailedResponse>,
+export const useCreateStaffReceipt = <TError = ErrorType<UnauthorizedResponse | LanOnlyResponse | IdTakenResponse | ReceiptValidationFailedResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createStaffReceipt>>, TError,CreateStaffReceiptMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof createStaffReceipt>>,
@@ -1071,6 +1078,9 @@ export const getUpdateStaffReceiptUrl = (receiptId: string,) => {
  * Hanya staf pembuatnya (nota orang lain 404). Baris tidak bisa ditambah atau dihapus; barang
  * dan satuannya tetap. payment hanya bisa diubah selama paymentEditable. Atomik: 422
  * ReceiptProblem tanpa perubahan sebagian; 409 RECEIPT_CANCELLED bila nota sudah dibatalkan.
+ * Boleh setelah shift saat nota dicatat ditutup; koreksi uang laci dicatat sebagai baris uang
+ * keluar baru di shift yang sedang buka (shift lama tidak diubah; tanpa shift buka: tidak
+ * dicatat, audit memuat catatannya).
  * @summary Ubah nota milik sendiri
  */
 export const updateStaffReceipt = async (receiptId: string,
@@ -1159,7 +1169,9 @@ export const useUpdateStaffReceipt = <TError = ErrorType<UnauthorizedResponse | 
 }
 
 /**
- * Idempoten menurut photoId (ID dari HP): unggah ulang dengan id yang sama tetap 204.
+ * Foto terikat ke pengunggahnya. Idempoten menurut (pengunggah, photoId): unggah ulang oleh
+ * pengguna yang sama tetap 204 tanpa mengubah foto tersimpan. photoId yang sudah diunggah
+ * pengguna lain → 409 ID_TAKEN, tidak pernah ditimpa.
  * JPEG, paling besar 1 MB; selain itu 422 VALIDATION.
  * @summary Unggah foto nota
  */
@@ -1195,7 +1207,7 @@ return customFetch<void>(getPutStaffReceiptPhotoUrl(photoId),
 
 export const getPutStaffReceiptPhotoMutationKey = () => ['putStaffReceiptPhoto'] as const;
 
-export const getPutStaffReceiptPhotoMutationOptions = <TError = ErrorType<UnauthorizedResponse | LanOnlyResponse | ValidationFailedResponse>,
+export const getPutStaffReceiptPhotoMutationOptions = <TError = ErrorType<UnauthorizedResponse | LanOnlyResponse | IdTakenResponse | ValidationFailedResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putStaffReceiptPhoto>>, TError,PutStaffReceiptPhotoMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof putStaffReceiptPhoto>>, TError,PutStaffReceiptPhotoMutationVariables, TContext> => {
 
@@ -1224,13 +1236,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type PutStaffReceiptPhotoMutationResult = NonNullable<Awaited<ReturnType<typeof putStaffReceiptPhoto>>>
     export type PutStaffReceiptPhotoMutationBody = Blob
-    export type PutStaffReceiptPhotoMutationError = ErrorType<UnauthorizedResponse | LanOnlyResponse | ValidationFailedResponse>
+    export type PutStaffReceiptPhotoMutationError = ErrorType<UnauthorizedResponse | LanOnlyResponse | IdTakenResponse | ValidationFailedResponse>
     export type PutStaffReceiptPhotoMutationVariables = {photoId: string;data: Blob}
 
     /**
  * @summary Unggah foto nota
  */
-export const usePutStaffReceiptPhoto = <TError = ErrorType<UnauthorizedResponse | LanOnlyResponse | ValidationFailedResponse>,
+export const usePutStaffReceiptPhoto = <TError = ErrorType<UnauthorizedResponse | LanOnlyResponse | IdTakenResponse | ValidationFailedResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putStaffReceiptPhoto>>, TError,PutStaffReceiptPhotoMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof putStaffReceiptPhoto>>,
@@ -1249,6 +1261,7 @@ export const usePutStaffReceiptPhoto = <TError = ErrorType<UnauthorizedResponse 
 }
 
 /**
+ * Foto yang bukan diunggah pengguna ini juga 404.
  * @summary Foto nota (JPEG)
  */
 export const getStaffReceiptPhoto = async (photoId: string, options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {

@@ -813,7 +813,7 @@ export const ListOwnerReceiptsResponseItem = zod.object({
   "method": zod.union([zod.literal('tunai'),zod.literal('transfer'),zod.literal(null)]).nullable(),
   "cashSource": zod.union([zod.literal('laci'),zod.literal('pemilik'),zod.literal(null)]).nullable(),
   "dueDate": zod.iso.date().nullable()
-}).describe('sekarang: method wajib; cashSource wajib bila tunai (laci = uang keluar di shift yang sedang\nbuka), null bila transfer; dueDate null. nanti: method dan cashSource null (dipilih saat\npemilik menandai lunas); dueDate wajib, tidak sebelum notaDate.\n'),
+}).describe('sekarang: method wajib; cashSource wajib bila tunai (laci = uang keluar di shift yang sedang\nbuka), null bila transfer; dueDate null. nanti: method dan cashSource null (dipilih saat\npemilik menandai lunas); dueDate wajib, tidak sebelum notaDate.\ncashSource laci tanpa shift kasir yang buka → 422 dengan field cashSource; server tidak\npernah mengubahnya menjadi uang pemilik.\n'),
   "paid": zod.union([zod.object({
   "at": zod.int(),
   "method": zod.enum(['tunai', 'transfer']),
@@ -859,7 +859,7 @@ export const GetOwnerReceiptResponse = zod.object({
   "method": zod.union([zod.literal('tunai'),zod.literal('transfer'),zod.literal(null)]).nullable(),
   "cashSource": zod.union([zod.literal('laci'),zod.literal('pemilik'),zod.literal(null)]).nullable(),
   "dueDate": zod.iso.date().nullable()
-}).describe('sekarang: method wajib; cashSource wajib bila tunai (laci = uang keluar di shift yang sedang\nbuka), null bila transfer; dueDate null. nanti: method dan cashSource null (dipilih saat\npemilik menandai lunas); dueDate wajib, tidak sebelum notaDate.\n'),
+}).describe('sekarang: method wajib; cashSource wajib bila tunai (laci = uang keluar di shift yang sedang\nbuka), null bila transfer; dueDate null. nanti: method dan cashSource null (dipilih saat\npemilik menandai lunas); dueDate wajib, tidak sebelum notaDate.\ncashSource laci tanpa shift kasir yang buka → 422 dengan field cashSource; server tidak\npernah mengubahnya menjadi uang pemilik.\n'),
   "paymentEditable": zod.boolean().describe('Bayar nanti yang belum dilunasi.'),
   "total": zod.int().describe('Σ subtotal (rupiah).'),
   "status": zod.enum(['aktif', 'dibatalkan']),
@@ -886,8 +886,11 @@ export const GetOwnerReceiptResponse = zod.object({
 
 /**
  * Membuat entri balik: stok (batal_masuk), HPP (PriceSource ubah_nota), utang yang belum lunas
- * dihapus, dan uang keluar laci dikoreksi di shift yang sedang buka (tanpa shift buka: tidak
- * dicatat, audit memuat catatannya). Idempoten: nota yang sudah dibatalkan dikembalikan apa adanya.
+ * dihapus, dan uang keluar laci dikoreksi. Idempoten: nota yang sudah dibatalkan dikembalikan
+ * apa adanya.
+ * Boleh setelah shift saat nota dicatat ditutup; koreksi uang laci dicatat sebagai baris uang
+ * keluar baru di shift yang sedang buka (shift lama tidak diubah; tanpa shift buka: tidak
+ * dicatat, audit memuat catatannya).
  * @summary Batalkan nota barang masuk
  */
 export const CancelOwnerReceiptParams = zod.object({
@@ -920,7 +923,7 @@ export const CancelOwnerReceiptResponse = zod.object({
   "method": zod.union([zod.literal('tunai'),zod.literal('transfer'),zod.literal(null)]).nullable(),
   "cashSource": zod.union([zod.literal('laci'),zod.literal('pemilik'),zod.literal(null)]).nullable(),
   "dueDate": zod.iso.date().nullable()
-}).describe('sekarang: method wajib; cashSource wajib bila tunai (laci = uang keluar di shift yang sedang\nbuka), null bila transfer; dueDate null. nanti: method dan cashSource null (dipilih saat\npemilik menandai lunas); dueDate wajib, tidak sebelum notaDate.\n'),
+}).describe('sekarang: method wajib; cashSource wajib bila tunai (laci = uang keluar di shift yang sedang\nbuka), null bila transfer; dueDate null. nanti: method dan cashSource null (dipilih saat\npemilik menandai lunas); dueDate wajib, tidak sebelum notaDate.\ncashSource laci tanpa shift kasir yang buka → 422 dengan field cashSource; server tidak\npernah mengubahnya menjadi uang pemilik.\n'),
   "paymentEditable": zod.boolean().describe('Bayar nanti yang belum dilunasi.'),
   "total": zod.int().describe('Σ subtotal (rupiah).'),
   "status": zod.enum(['aktif', 'dibatalkan']),
