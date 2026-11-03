@@ -21,6 +21,9 @@ export const CASH_SOURCE_LABEL = {
   pemilik: "Uang pemilik",
 } as const;
 
+/** Keterangan di bawah "Dari laci kasir" yang nonaktif (R24). */
+export const NO_SHIFT_NOTE = "Tidak ada shift buka";
+
 /** "Tunai · Dari laci kasir" | "Tunai · Uang pemilik" | "Transfer". */
 export function paidSummary(
   p: Pick<DebtPayment, "method" | "cashSource">,

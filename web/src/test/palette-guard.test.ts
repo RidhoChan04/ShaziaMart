@@ -17,7 +17,7 @@ const NOT_A_COLOUR =
   /^(xs|sm|base|md|lg|xl|left|right|center|justify|start|end|wrap|nowrap|balance|pretty|ellipsis|clip|none|solid|dashed|dotted|double|hidden|collapse|separate|inset|inner|auto|fixed|cover|contain|repeat|no-repeat|offset(-\d+)?|linear-(\d+|to-[a-z]+)|[xytblrse](-\d+)?)$/;
 
 const COLOUR_CLASS =
-  /(?<![\w-])(?:bg|text|border(?:-[xytblrse])?|ring(?:-offset)?|outline|divide|fill|stroke|from|via|to|shadow|decoration|accent|caret|placeholder)-([a-z][a-z0-9]*(?:-[a-z0-9]+)*)(?:\/[\w.[\]]+)?(?![\w-])/g;
+  /(?<![\w./-])(?:bg|text|border(?:-[xytblrse])?|ring(?:-offset)?|outline|divide|fill|stroke|from|via|to|shadow|decoration|accent|caret|placeholder)-([a-z][a-z0-9]*(?:-[a-z0-9]+)*)(?:\/[\w.[\]]+)?(?![\w-])/g;
 
 /** Kelas warna di `text` yang namanya bukan token, sebagai `baris kelas`. */
 function offenders(text: string): string[] {
@@ -55,6 +55,12 @@ test("penjaga mengenali kelas palet bawaan dan meloloskan token serta utilitas b
   expect(
     offenders(
       'className="text-sm text-right bg-primary/10 border-t border-border outline-none outline-offset-2 divide-y shadow-sm bg-linear-to-t from-bg to-transparent text-white/80 placeholder:text-muted/70"',
+    ),
+  ).toEqual([]);
+  // Path impor bukan kelas: `../drafts/to-input` pernah terbaca sebagai `to-input`.
+  expect(
+    offenders(
+      'import { x } from "../drafts/to-input"; import "./bg-tile.css";',
     ),
   ).toEqual([]);
 });

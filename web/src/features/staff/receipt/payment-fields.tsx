@@ -5,6 +5,7 @@ import type {
 import { addIsoDays } from "@/shared/lib/business-day";
 import {
   CASH_SOURCE_LABEL,
+  NO_SHIFT_NOTE,
   PAYMENT_METHOD_LABEL,
   PAYMENT_TIMING_LABEL,
 } from "@/shared/lib/payment-labels";
@@ -88,7 +89,7 @@ export function PaymentFields({
                 },
                 { value: "pemilik", label: CASH_SOURCE_LABEL.pemilik },
               ]}
-              note={laciOk ? undefined : "Tidak ada shift buka"}
+              note={laciOk ? undefined : NO_SHIFT_NOTE}
               onChange={(cashSource) =>
                 onPayment((x) => ({ ...x, cashSource }))
               }
