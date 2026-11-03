@@ -24,7 +24,7 @@ import {
   validateReceipt,
 } from "@/shared/lib/receipt-rules";
 import type { ReceiptForm } from "../drafts/draft-types";
-import { toPayment } from "../drafts/to-input";
+import { toPayment } from "../drafts/receipt-input";
 import { formFromReceipt, toReceiptEdit } from "./edit-model";
 import { onNotaStep } from "./form-model";
 import { LeaveButton } from "./leave-dialog";

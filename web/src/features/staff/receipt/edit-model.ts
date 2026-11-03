@@ -7,7 +7,7 @@ import type {
 import { formatAngka } from "@/shared/lib/money";
 import type { DraftLine } from "@/shared/lib/receipt-rules";
 import type { ReceiptForm } from "../drafts/draft-types";
-import { toPayment } from "../drafts/to-input";
+import { toPayment } from "../drafts/receipt-input";
 import { parseCost } from "./line-model";
 
 /** Salinan barang untuk lembar baris: dari daftar bila ada, selain itu hanya satuan nota baris itu. */

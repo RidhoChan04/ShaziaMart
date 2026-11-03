@@ -14,7 +14,7 @@ import { pesanError } from "@/shared/lib/error-messages";
 import { CORRUPT_DRAFT } from "./draft-shape";
 import type { DraftStore } from "./draft-store";
 import type { ReceiptDraft } from "./draft-types";
-import { toReceiptInput } from "./to-input";
+import { toReceiptInput } from "./receipt-input";
 
 export type SyncApi = {
   putPhoto(photoId: string, blob: Blob): Promise<void>;

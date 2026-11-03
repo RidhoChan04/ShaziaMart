@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import type { DraftLine } from "@/shared/lib/receipt-rules";
 import { emptyForm } from "./draft-store";
 import type { DraftPayment, ReceiptDraft } from "./draft-types";
-import { formProblems, toReceiptInput } from "./to-input";
+import { formProblems, toReceiptInput } from "./receipt-input";
 
 const TODAY = "2026-11-03";
 
