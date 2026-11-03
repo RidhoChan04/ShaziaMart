@@ -5,18 +5,16 @@ import { toast } from "sonner";
 import type { ReceiptError } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { useGetStaffShift } from "@/shared/api/gen/staff/staff";
 import { jakartaIsoDate } from "@/shared/lib/business-day";
+import { Button } from "@/shared/ui/button";
 import { useStaffSession } from "../auth/staff-session";
 import { formProblems } from "../drafts/to-input";
 import { useDraftStore, useDraftSync } from "../drafts/use-drafts";
 import { CancelDialog } from "./cancel-dialog";
+import { onNotaStep } from "./form-model";
 import { NotaStep } from "./nota-step";
 import { PaymentStep } from "./payment-step";
+import { isIdTaken, renewIds } from "./resend";
 import { useFormDraft } from "./use-form-draft";
-
-/** Galat tingkat nota atau baris dibetulkan di langkah nota; sisanya (pembayaran) di langkah bayar. */
-const onNotaStep = (e: ReceiptError) =>
-  e.lineId !== null ||
-  ["supplierName", "notaDate", "lines", "photoId"].includes(e.field);
 
 const STORAGE_BANNER =
   "Draf tidak bisa disimpan di HP. Selesaikan dan simpan nota sekarang, jangan tutup halaman ini.";
@@ -135,6 +133,32 @@ export function ReceiptFormPage() {
     }
   };
 
+  // R25: ID nota dipakai pengguna lain; kirim ulang dengan ID nota dan foto baru.
+  const resend = async () => {
+    if (submitting.current) return;
+    submitting.current = true;
+    setBusy(true);
+    setFailure(null);
+    try {
+      form.freeze();
+      await form.save(renewIds(draft));
+      await store.remove(draft.id);
+    } catch {
+      form.unfreeze();
+      setFailure(SAVE_FAILED);
+      submitting.current = false;
+      setBusy(false);
+      return;
+    }
+    const report = await sync.syncNow().catch(() => null);
+    toast(
+      report && report.sent.length > 0
+        ? "Barang masuk tersimpan"
+        : "Belum terkirim — dikirim otomatis saat tersambung",
+    );
+    await toList();
+  };
+
   const clearFor = (match: (e: ReceiptError) => boolean) =>
     setErrors(shown.filter((e) => !match(e)));
 
@@ -157,6 +181,16 @@ export function ReceiptFormPage() {
         <p role="alert" className={bannerClass}>
           {STORAGE_BANNER}
         </p>
+      )}
+      {isIdTaken(draft) && (
+        <Button
+          variant="outline"
+          className="mb-3 w-full"
+          disabled={busy}
+          onClick={() => void resend()}
+        >
+          Kirim sebagai nota baru
+        </Button>
       )}
       {failure && (
         <p role="alert" className={bannerClass}>

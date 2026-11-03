@@ -12,7 +12,7 @@ import type { DraftPayment, ReceiptDraft } from "./draft-types";
  * Pilihan form → kontrak. sekarang: tanpa jatuh tempo (R12); transfer tanpa sumber uang.
  * nanti: cara bayar dipilih saat pelunasan. "Dari laci" tidak pernah diubah diam-diam (R8).
  */
-function toPayment(p: DraftPayment): ReceiptPayment {
+export function toPayment(p: DraftPayment): ReceiptPayment {
   if (p.timing === "nanti") {
     return {
       timing: "nanti",

@@ -2,5 +2,7 @@
 
 export { StaffBerandaPage } from "./home/beranda-page";
 export { StaffLainnyaPage, StaffPlaceholderPage } from "./pages";
+export { MasukPage } from "./receipt/masuk-page";
+export { ReceiptEditPage } from "./receipt/receipt-edit-page";
 export { ReceiptFormPage } from "./receipt/receipt-form-page";
 export { StaffLayout } from "./staff-layout";

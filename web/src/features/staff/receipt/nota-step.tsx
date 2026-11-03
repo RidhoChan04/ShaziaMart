@@ -18,6 +18,8 @@ type Props = {
   photo: DraftPhoto | null;
   errors: readonly ReceiptError[];
   today: string;
+  /** Ubah nota: barang tetap, tanpa Tambah barang dan tanpa foto. */
+  locked?: boolean;
   onForm: (change: (f: ReceiptForm) => ReceiptForm) => void;
   onPhoto: (p: DraftPhoto) => void;
   onNext: () => void;
@@ -76,6 +78,7 @@ export function NotaStep({
   photo,
   errors,
   today,
+  locked = false,
   onForm,
   onPhoto,
   onNext,
@@ -146,7 +149,7 @@ export function NotaStep({
           onChange={(iso) => onForm((f) => ({ ...f, notaDate: iso }))}
         />
         <FieldError id="err-nota-date" messages={dateErr} />
-        <PhotoField photo={photo} onChange={onPhoto} />
+        {!locked && <PhotoField photo={photo} onChange={onPhoto} />}
         <FieldError messages={photoErr} />
       </Card>
 
@@ -162,14 +165,16 @@ export function NotaStep({
             onOpen={() => setSheet({ open: true, line })}
           />
         ))}
-        <button
-          type="button"
-          onClick={() => setSheet({ open: true, line: null })}
-          className="flex min-h-12 w-full items-center gap-2 px-4 font-medium text-primary outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset"
-        >
-          <Plus aria-hidden="true" className="size-5" />
-          Tambah barang
-        </button>
+        {!locked && (
+          <button
+            type="button"
+            onClick={() => setSheet({ open: true, line: null })}
+            className="flex min-h-12 w-full items-center gap-2 px-4 font-medium text-primary outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset"
+          >
+            <Plus aria-hidden="true" className="size-5" />
+            Tambah barang
+          </button>
+        )}
         <FieldError messages={noteErr} />
       </Card>
 
@@ -188,7 +193,7 @@ export function NotaStep({
       <LineSheet
         open={sheet.open}
         line={sheet.line}
-        locked={false}
+        locked={locked}
         otherLines={form.lines.filter((l) => l.lineId !== sheet.line?.lineId)}
         onSave={(line) => {
           saveLine(line);

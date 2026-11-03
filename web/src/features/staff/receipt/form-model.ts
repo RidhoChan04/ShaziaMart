@@ -1,4 +1,7 @@
-import type { DrawerShift } from "@/shared/api/gen/shaziaMartAPI.schemas";
+import type {
+  DrawerShift,
+  ReceiptError,
+} from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { jakartaTime } from "@/shared/lib/business-day";
 import { formatRupiah } from "@/shared/lib/money";
 import { receiptTotal } from "@/shared/lib/receipt-rules";
@@ -38,3 +41,8 @@ export function drawerNote(
 export function photoCaption(p: DraftPhoto): string {
   return `Diambil ${jakartaTime(p.takenAt)} · ${Math.round(p.bytes / 1024)} KB`;
 }
+
+/** Galat tingkat nota atau baris dibetulkan di langkah nota; sisanya (pembayaran) di langkah bayar. */
+export const onNotaStep = (e: ReceiptError): boolean =>
+  e.lineId !== null ||
+  ["supplierName", "notaDate", "lines", "photoId"].includes(e.field);

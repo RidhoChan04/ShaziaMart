@@ -1,5 +1,8 @@
 import { ApiError } from "../api/fetcher";
 
+/** Pesan 409 ID_TAKEN; draf yang ditolak karenanya ditawari kirim sebagai nota baru. */
+export const ID_TAKEN_MESSAGE = "Data ini milik pengguna lain";
+
 const GENERIC = "Terjadi kesalahan di server";
 
 const MESSAGES: Record<string, string> = {
@@ -22,7 +25,7 @@ const MESSAGES: Record<string, string> = {
   PRODUCT_NO_PRICE: "Barang belum punya harga jual",
   RECEIPT_CANCELLED: "Nota ini sudah dibatalkan",
   DEBT_ALREADY_PAID: "Utang ini sudah lunas",
-  ID_TAKEN: "Data ini milik pengguna lain",
+  ID_TAKEN: ID_TAKEN_MESSAGE,
   INTERNAL: GENERIC,
 };
 

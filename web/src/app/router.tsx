@@ -208,7 +208,7 @@ const staffIndexRoute = createRoute({
 const staffMasukRoute = createRoute({
   getParentRoute: () => staffRoute,
   path: "masuk",
-  component: lazyRouteComponent(loadStaff, "StaffPlaceholderPage"),
+  component: lazyRouteComponent(loadStaff, "MasukPage"),
 });
 
 const staffMasukBaruRoute = createRoute({
@@ -228,7 +228,7 @@ const staffMasukBaruRoute = createRoute({
 const staffMasukDetailRoute = createRoute({
   getParentRoute: () => staffRoute,
   path: "masuk/$receiptId",
-  component: lazyRouteComponent(loadStaff, "StaffPlaceholderPage"),
+  component: lazyRouteComponent(loadStaff, "ReceiptEditPage"),
 });
 
 const staffOpnameRoute = createRoute({

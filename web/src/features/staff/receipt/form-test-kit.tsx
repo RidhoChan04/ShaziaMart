@@ -106,7 +106,7 @@ export function renderForm(
       <AppProviders router={router} queryClient={queryClient} />
     </DraftStoreContext.Provider>,
   );
-  return { ...utils, router, store };
+  return { ...utils, router, store, queryClient };
 }
 
 export async function loginRina(withShift: boolean) {
