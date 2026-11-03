@@ -83,7 +83,7 @@ export function lineSummary(line: DraftLine): {
 type DraftNewProduct = NonNullable<DraftLine["newProduct"]>;
 
 /** Isian teks barang baru → masukan kontrak; Isi 1 bila satuan nota sama dengan Dijual per. */
-export function newProductInput(n: DraftNewProduct): NewProductInput {
+function newProductInput(n: DraftNewProduct): NewProductInput {
   const same =
     n.sellUnit.trim().toLowerCase() === n.notaUnit.trim().toLowerCase();
   const barcode = n.barcode.trim();

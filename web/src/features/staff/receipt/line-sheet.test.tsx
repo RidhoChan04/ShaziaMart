@@ -230,6 +230,45 @@ test("nama barang baru sama dengan baris lain → 'Nama sama dengan baris lain'"
   expect(sheet.getByText("Nama sama dengan baris lain")).toBeVisible();
 });
 
+test("scan tanpa hasil → kamera menutup dan fokus ke isian cari (bukan body)", async () => {
+  server.use(
+    http.get("/api/staff/products", () =>
+      HttpResponse.json([] satisfies StaffProduct[]),
+    ),
+  );
+  const cam = installCamera();
+  const { user, sheet } = await openSheet();
+  await user.click(await sheet.findByRole("button", SCAN));
+  cam.state.detections = ["089686010947"];
+  expect(await sheet.findByText("Tidak ada barang yang cocok")).toBeVisible();
+  await waitFor(() => expect(sheet.getByLabelText(SEARCH)).toHaveFocus());
+});
+
+test("satu huruf → 'Ketik minimal 2 huruf'; dua huruf → petunjuk hilang", async () => {
+  const { user, sheet } = await openSheet();
+  await user.type(sheet.getByLabelText(SEARCH), "i");
+  expect(sheet.getByText("Ketik minimal 2 huruf")).toBeVisible();
+  await user.type(sheet.getByLabelText(SEARCH), "n");
+  expect(sheet.queryByText("Ketik minimal 2 huruf")).toBeNull();
+});
+
+test("pencarian gagal (500) → 'Gagal memuat barang'; 'Coba lagi' memuat ulang", async () => {
+  server.use(
+    http.get("/api/staff/products", () =>
+      HttpResponse.json({ code: "INTERNAL", message: "x" }, { status: 500 }),
+    ),
+  );
+  const { user, sheet } = await openSheet();
+  await user.type(sheet.getByLabelText(SEARCH), "indomie goreng");
+  expect(await sheet.findByText("Gagal memuat barang")).toBeVisible();
+  server.resetHandlers();
+  await user.click(sheet.getByRole("button", { name: "Coba lagi" }));
+  expect(
+    await sheet.findByRole("button", { name: /Indomie Goreng/ }),
+  ).toBeVisible();
+  expect(sheet.queryByText("Gagal memuat barang")).toBeNull();
+});
+
 test("tanpa pilihan barang → 'Pilih barang atau buat barang baru' dan fokus ke isian cari", async () => {
   const { user, sheet } = await openSheet();
   await user.click(sheet.getByRole("button", { name: "Tambahkan ke nota" }));

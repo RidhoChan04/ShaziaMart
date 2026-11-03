@@ -30,6 +30,7 @@ import { ScanButton } from "@/shared/components/scan/scan-button";
 import { pesanError } from "@/shared/lib/error-messages";
 import { formatRupiah } from "@/shared/lib/money";
 import { activeBigUnit, validateDraft } from "@/shared/lib/product-rules";
+import { BIG_UNITS, SMALL_UNITS } from "@/shared/lib/units";
 import { Button } from "@/shared/ui/button";
 import { pillClass } from "../../common/sub-page-header";
 import { ProductNotFound } from "../detail/product-detail-page";
@@ -46,29 +47,6 @@ import {
 } from "./form-state";
 import { MoneyField } from "./money-field";
 
-const SMALL_UNITS = [
-  "pcs",
-  "bungkus",
-  "buah",
-  "botol",
-  "kaleng",
-  "sachet",
-  "butir",
-  "kg",
-  "ons",
-  "liter",
-];
-const BIG_UNITS = [
-  "dus",
-  "slop",
-  "renceng",
-  "pak",
-  "lusin",
-  "karton",
-  "bal",
-  "karung",
-  "krat",
-];
 const LOCKED_SOLD = "Tidak bisa diubah — barang sudah terjual";
 const LOCKED_STOCK = "Tidak bisa diubah — barang sudah punya stok";
 

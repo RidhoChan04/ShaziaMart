@@ -3,35 +3,12 @@ import type { ReceiptField } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { ScanButton } from "@/shared/components/scan/scan-button";
 import { cn } from "@/shared/lib/cn";
 import type { DraftLine } from "@/shared/lib/receipt-rules";
+import { BIG_UNITS, SMALL_UNITS } from "@/shared/lib/units";
 
 export type NewProductDraft = NonNullable<DraftLine["newProduct"]>;
 export type FieldErrors = Partial<Record<ReceiptField, string>>;
 
 export const fieldId = (field: ReceiptField): string => `lb-${field}`;
-
-const SMALL_UNITS = [
-  "pcs",
-  "bungkus",
-  "buah",
-  "botol",
-  "kaleng",
-  "sachet",
-  "butir",
-  "kg",
-  "ons",
-  "liter",
-];
-const BIG_UNITS = [
-  "dus",
-  "slop",
-  "renceng",
-  "pak",
-  "lusin",
-  "karton",
-  "bal",
-  "karung",
-  "krat",
-];
 
 const inputClass =
   "h-11 w-full min-w-0 rounded-md border border-border bg-surface px-3 text-[17px] outline-none placeholder:text-muted/70 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary aria-invalid:border-danger";

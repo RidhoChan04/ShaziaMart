@@ -38,6 +38,13 @@ export function ProductPicker({ inputId, error, onPick, onNew }: Props) {
     if (scanned !== null && scanned === q && only) onPick(only);
   }, [scanned, q, only, onPick]);
 
+  // Scan tanpa pilihan otomatis (0 atau beberapa hasil): kamera sudah menutup, fokus ke isian cari.
+  const scanUnresolved =
+    scanned !== null && scanned === q && results !== undefined && !only;
+  useEffect(() => {
+    if (scanUnresolved) inputRef.current?.focus();
+  }, [scanUnresolved]);
+
   const errorId = `${inputId}-error`;
   return (
     <div className="grid gap-2">
@@ -79,6 +86,23 @@ export function ProductPicker({ inputId, error, onPick, onNew }: Props) {
         <p id={errorId} className="text-[13px] font-medium text-danger">
           {error}
         </p>
+      )}
+      {typed.length === 1 && (
+        <p className="text-[13px] text-muted">Ketik minimal 2 huruf</p>
+      )}
+      {enabled && typed === q && search.isError && (
+        <div className="flex items-center justify-between gap-2 rounded-lg bg-danger-soft p-3">
+          <p role="alert" className="text-[15px] text-danger-ink">
+            Gagal memuat barang
+          </p>
+          <button
+            type="button"
+            onClick={() => void search.refetch()}
+            className="min-h-11 rounded-md border border-danger px-3 text-[15px] font-semibold text-danger-ink outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            Coba lagi
+          </button>
+        </div>
       )}
       {results && results.length > 0 && !autoPicking && (
         <ul className="grid gap-1">
