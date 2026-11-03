@@ -17,6 +17,7 @@ import { pesanError } from "@/shared/lib/error-messages";
 import { formatRupiah } from "@/shared/lib/money";
 import { Button } from "@/shared/ui/button";
 import { clearOwnerSession } from "../auth/owner-session";
+import { FitAmount } from "../common/fit-amount";
 import { RowList } from "../products/detail/section";
 import { unpaidSummary } from "./debts/debt-model";
 
@@ -71,7 +72,14 @@ export function LainnyaPage() {
               <RowIcon icon={HandCoins} />
               <span className="min-w-0 flex-1">Utang supplier</span>
               {unpaid && unpaid.total > 0 && (
-                <Value>{formatRupiah(unpaid.total)}</Value>
+                <span className="max-w-[45%] min-w-0 shrink-0 basis-[9rem] text-muted tabular-nums">
+                  <FitAmount
+                    text={formatRupiah(unpaid.total)}
+                    max={15}
+                    min={11}
+                    className="text-right"
+                  />
+                </span>
               )}
               <ChevronRight
                 aria-hidden="true"

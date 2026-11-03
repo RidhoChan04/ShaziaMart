@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
@@ -76,6 +76,26 @@ test("foto nota: thumbnail membuka dialog 'Foto nota', fokus kembali ke baris", 
   ).toHaveAttribute("src", "/api/owner/receipt-photos/foto-1");
   await user.click(within(dialog).getByRole("button", { name: "Tutup" }));
   await waitFor(() => expect(row).toHaveFocus());
+});
+
+test("foto gagal dimuat (404): thumbnail diganti placeholder, dialog 'Foto tidak bisa dimuat'", async () => {
+  const user = userEvent.setup();
+  mockDb.update((s) => {
+    const r = s.receipts.find((x) => x.id === "nota-a");
+    if (r) r.photoId = "foto-hilang";
+  });
+  renderApp(DETAIL);
+  await screen.findByRole("heading", { level: 1, name: TITLE });
+  const row = screen.getByRole("button", { name: /Foto nota/ });
+  fireEvent.error(row.querySelector("img") as HTMLImageElement);
+  await waitFor(() => expect(row.querySelector("img")).toBeNull());
+  await user.click(row);
+  const dialog = await screen.findByRole("dialog", { name: "Foto nota" });
+  fireEvent.error(within(dialog).getByRole("img", { name: "Foto nota" }));
+  expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+    "Foto tidak bisa dimuat",
+  );
+  expect(within(dialog).queryByRole("img")).toBeNull();
 });
 
 test("nota tanpa foto: baris statis 'Tanpa foto'", async () => {

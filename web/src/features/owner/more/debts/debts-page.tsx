@@ -39,9 +39,14 @@ function DebtRow({
       >
         <span className="grid min-w-0 flex-1 gap-0.5">
           <span className="flex items-baseline justify-between gap-3">
-            <span className="text-base">{`Nota ${formatIsoDate(debt.notaDate)}`}</span>
-            <span className="shrink-0 font-semibold tabular-nums">
-              {formatRupiah(debt.amount)}
+            <span className="shrink-0 text-base">{`Nota ${formatIsoDate(debt.notaDate)}`}</span>
+            <span className="min-w-0 flex-1 font-semibold tabular-nums">
+              <FitAmount
+                text={formatRupiah(debt.amount)}
+                max={16}
+                min={12}
+                className="text-right"
+              />
             </span>
           </span>
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-muted">

@@ -69,6 +69,17 @@ test("rute Barang: validateSearch menyimpan q, kategori, nonaktif; nonaktif=sala
   expect(validate({ nonaktif: "true" })).toEqual({ nonaktif: true });
 });
 
+test("rute Barang: menunggu=true dan menunggu:true terbaca; nilai lain dibuang (R3)", async () => {
+  await ownerLogin();
+  const { router } = renderApp("/owner/barang?menunggu=true");
+  await screen.findByRole("heading", { level: 1, name: "Barang" });
+  expect(router.state.matches.at(-1)?.search).toEqual({ menunggu: true });
+  const validate = router.routesByPath["/owner/barang"].options.validateSearch;
+  if (typeof validate !== "function") throw new Error("tanpa validateSearch");
+  expect(validate({ menunggu: true })).toEqual({ menunggu: true });
+  expect(validate({ menunggu: "ya" })).toEqual({});
+});
+
 test("rute sub-halaman Barang: baru, impor, detail (lembar valid saja), ubah", async () => {
   await ownerLogin();
   const { router } = renderApp("/owner/barang/abc?lembar=harga");

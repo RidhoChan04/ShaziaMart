@@ -63,12 +63,22 @@ export function ReceiptPhotoRow({
       <DialogTrigger
         className={`${rowClass} focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary`}
       >
-        <img
-          src={src}
-          alt=""
-          loading="lazy"
-          className="size-11 shrink-0 rounded-md bg-bg object-cover"
-        />
+        {failed ? (
+          <span
+            aria-hidden="true"
+            className="grid size-11 shrink-0 place-items-center rounded-md bg-bg text-muted"
+          >
+            <ImageOff className="size-5" />
+          </span>
+        ) : (
+          <img
+            src={src}
+            alt=""
+            loading="lazy"
+            onError={() => setFailed(true)}
+            className="size-11 shrink-0 rounded-md bg-bg object-cover"
+          />
+        )}
         {label}
       </DialogTrigger>
       <DialogContent
