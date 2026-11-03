@@ -1,4 +1,5 @@
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { useListOwnerSupplierDebts } from "@/shared/api/gen/owner/owner";
 import {
   formatIsoDate,
@@ -28,6 +29,15 @@ export function DebtDetailPage() {
   const now = Date.now();
   const today = jakartaIsoDate(now);
   const debt = query.data?.debts.find((d) => d.receiptId === receiptId);
+  // Setelah 409 DEBT_ALREADY_PAID / RECEIPT_CANCELLED: fokus ke judul begitu data baru tampil
+  // (nota lunas atau hilang dari daftar), bukan jatuh ke body saat lembar terlepas.
+  const [focusTitle, setFocusTitle] = useState(false);
+  const settled = query.data !== undefined && (!debt || debt.paid !== null);
+  useEffect(() => {
+    if (!focusTitle || !settled) return;
+    setFocusTitle(false);
+    document.querySelector<HTMLElement>("main h1")?.focus();
+  }, [focusTitle, settled]);
 
   if (!query.data) {
     return query.isError ? (
@@ -48,7 +58,10 @@ export function DebtDetailPage() {
   if (!debt) {
     return (
       <div className="grid justify-items-start gap-4 pt-6">
-        <h1 className="text-[28px] leading-tight font-bold tracking-[-0.025em]">
+        <h1
+          tabIndex={-1}
+          className="text-[28px] leading-tight font-bold tracking-[-0.025em]"
+        >
           Utang tidak ditemukan
         </h1>
         <Link
@@ -111,6 +124,7 @@ export function DebtDetailPage() {
             debt={debt}
             drawerShift={query.data.drawerShift}
             onPaid={() => void navigate({ to: "/owner/lainnya/utang" })}
+            onGone={() => setFocusTitle(true)}
           />
         )}
       </div>

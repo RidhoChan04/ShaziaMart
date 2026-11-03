@@ -171,16 +171,39 @@ test("Batal menutup lembar dan fokus kembali ke 'Tandai lunas'", async () => {
   await waitFor(() => expect(trigger).toHaveFocus());
 });
 
-test("409 DEBT_ALREADY_PAID → 'Utang ini sudah lunas' di lembar", async () => {
+test("409 DEBT_ALREADY_PAID → lembar tertutup, toast 'Utang ini sudah lunas', fokus ke judul halaman", async () => {
   const { user, sheet } = await openPaySheet();
   await post("/api/owner/supplier-debts/nota-a/pay", {
     method: "transfer",
     cashSource: null,
   });
   await submit(user, sheet);
-  expect(await within(sheet).findByRole("alert")).toHaveTextContent(
-    "Utang ini sudah lunas",
+  expect(await screen.findByText("Utang ini sudah lunas")).toBeVisible();
+  await waitFor(() =>
+    expect(screen.queryByRole("dialog", { name: "Tandai lunas" })).toBeNull(),
   );
+  const heading = screen.getByRole("heading", { level: 1, name: TITLE });
+  await waitFor(() => expect(heading).toHaveFocus());
+  // Halaman sudah memuat data baru: nota lunas, tanpa tombol bayar.
+  expect(screen.queryByRole("button", { name: "Tandai lunas" })).toBeNull();
+  expect(screen.getByText("Lunas")).toBeInTheDocument();
+});
+
+test("409 RECEIPT_CANCELLED → lembar tertutup, toast 'Nota ini sudah dibatalkan', fokus ke judul 'Utang tidak ditemukan'", async () => {
+  const { user, sheet } = await openPaySheet();
+  expect((await post("/api/owner/receipts/nota-a/cancel", {})).status).toBe(
+    200,
+  );
+  await submit(user, sheet);
+  expect(await screen.findByText("Nota ini sudah dibatalkan")).toBeVisible();
+  await waitFor(() =>
+    expect(screen.queryByRole("dialog", { name: "Tandai lunas" })).toBeNull(),
+  );
+  const heading = await screen.findByRole("heading", {
+    level: 1,
+    name: "Utang tidak ditemukan",
+  });
+  await waitFor(() => expect(heading).toHaveFocus());
 });
 
 test("shift tertutup saat membayar dari laci: pesan server, pilihan laci tetap terlihat dan tidak diganti diam-diam", async () => {
@@ -198,6 +221,10 @@ test("shift tertutup saat membayar dari laci: pesan server, pilihan laci tetap t
   await waitFor(() =>
     expect(within(sheet).getByLabelText("Dari laci kasir")).toBeDisabled(),
   );
+  // Satu kalimat saja (R11): catatan laci tidak mengulang pesan server dengan teks lain.
+  expect(
+    within(sheet).getAllByText(/Tidak ada shift (kasir yang )?buka/),
+  ).toHaveLength(1);
   expect(within(sheet).getByLabelText("Dari laci kasir")).toBeChecked();
   expect(
     within(sheet).getByRole("button", { name: "Tandai lunas" }),

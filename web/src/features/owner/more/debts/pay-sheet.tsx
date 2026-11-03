@@ -1,5 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { toast } from "sonner";
+import { ApiError } from "@/shared/api/fetcher";
 import {
   getGetOwnerTodaySummaryQueryKey,
   getListOwnerSupplierDebtsQueryKey,
@@ -13,12 +15,13 @@ import type {
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { formatIsoDate } from "@/shared/lib/business-day";
 import { cn } from "@/shared/lib/cn";
-import { pesanPembayaran } from "@/shared/lib/error-messages";
+import { pesanError, pesanPembayaran } from "@/shared/lib/error-messages";
 import { formatRupiah } from "@/shared/lib/money";
 import {
   CASH_SOURCE_LABEL,
   PAYMENT_METHOD_LABEL,
 } from "@/shared/lib/payment-labels";
+import { NO_SHIFT_LACI } from "@/shared/lib/receipt-rules";
 import { Button } from "@/shared/ui/button";
 import {
   Sheet,
@@ -29,6 +32,9 @@ import {
   SheetTrigger,
 } from "@/shared/ui/sheet";
 import { FitAmount } from "../../common/fit-amount";
+
+/** Utang tidak bisa dibayar lagi: daftar dimuat ulang akan melepas lembar ini, jadi pesannya lewat toast. */
+const GONE_CODES = new Set(["DEBT_ALREADY_PAID", "RECEIPT_CANCELLED"]);
 
 const SOURCE_NOTE = `"${CASH_SOURCE_LABEL.laci}" dicatat sebagai uang keluar di shift yang sedang buka.`;
 
@@ -74,18 +80,24 @@ function Choice<T extends string>({
  * `Uang dari` hanya muncul bila Tunai dan ada shift buka (`drawerShift`); selain itu uang pemilik.
  * Bila server menjawab SHIFT_CLOSED, pilihan laci tetap terlihat (nonaktif) dan pemilik harus memilih ulang —
  * sumber uang tidak pernah diganti diam-diam.
+ * DEBT_ALREADY_PAID / RECEIPT_CANCELLED: lembar ditutup, pesan lewat toast, lalu `onGone`
+ * (halaman memindahkan fokus ke judulnya setelah data baru tampil).
  */
 export function PaySheet({
   debt,
   drawerShift,
   onPaid,
+  onGone,
 }: {
   debt: SupplierDebt;
   drawerShift: DrawerShift | null;
   onPaid: () => void;
+  onGone: () => void;
 }) {
   const client = useQueryClient();
   const [open, setOpen] = useState(false);
+  // Fokus tidak dikembalikan ke pemicu yang akan hilang; halaman yang memindahkannya.
+  const gone = useRef(false);
   const [method, setMethod] = useState<DebtPaymentMethod>("tunai");
   const [source, setSource] = useState<NonNullable<DebtPaymentCashSource>>(
     drawerShift ? "laci" : "pemilik",
@@ -105,10 +117,20 @@ export function PaySheet({
         onPaid();
       },
       // Daftar dimuat ulang agar `drawerShift` mutakhir (shift bisa tertutup sejak halaman dibuka).
-      onError: () =>
-        client.invalidateQueries({
+      onError: (error) => {
+        if (error instanceof ApiError && GONE_CODES.has(error.code)) {
+          gone.current = true;
+          toast.error(pesanError(error));
+          setOpen(false);
+          onGone();
+        }
+        void client.invalidateQueries({
           queryKey: getListOwnerSupplierDebtsQueryKey(),
-        }),
+        });
+        void client.invalidateQueries({
+          queryKey: getGetOwnerTodaySummaryQueryKey(),
+        });
+      },
     },
   });
 
@@ -116,6 +138,7 @@ export function PaySheet({
   const showSource =
     method === "tunai" && (!laciUnavailable || source === "laci");
   const blocked = showSource && laciUnavailable;
+  const errorText = pay.isError ? pesanPembayaran(pay.error) : null;
 
   return (
     <Sheet
@@ -123,6 +146,7 @@ export function PaySheet({
       onOpenChange={(next) => {
         setOpen(next);
         if (next) {
+          gone.current = false;
           pay.reset();
           setMethod("tunai");
           setSource(drawerShift ? "laci" : "pemilik");
@@ -136,6 +160,9 @@ export function PaySheet({
         side="bottom"
         showCloseButton={false}
         className="gap-3 rounded-t-lg p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] lg:mx-auto lg:max-w-md"
+        onCloseAutoFocus={(e) => {
+          if (gone.current) e.preventDefault();
+        }}
       >
         <SheetTitle className="text-[20px] font-bold">Tandai lunas</SheetTitle>
         <SheetDescription>{`${debt.supplierName} · nota ${formatIsoDate(debt.notaDate)}`}</SheetDescription>
@@ -188,17 +215,15 @@ export function PaySheet({
             {source === "laci" && !laciUnavailable && (
               <p className="text-[13px] text-muted">{SOURCE_NOTE}</p>
             )}
-            {blocked && (
-              <p className="text-[13px] text-muted">
-                Tidak ada shift buka — pilih {CASH_SOURCE_LABEL.pemilik} atau
-                Transfer.
-              </p>
+            {/* Setelah 409 SHIFT_CLOSED kalimat yang sama sudah tampil sebagai galat: tidak diulang. */}
+            {blocked && errorText !== NO_SHIFT_LACI && (
+              <p className="text-[13px] text-muted">{NO_SHIFT_LACI}</p>
             )}
           </fieldset>
         )}
-        {pay.isError && (
+        {errorText !== null && (
           <p role="alert" className="text-sm font-medium text-danger">
-            {pesanPembayaran(pay.error)}
+            {errorText}
           </p>
         )}
         <Button
