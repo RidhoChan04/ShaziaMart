@@ -1,6 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
-import { ApiError } from "@/shared/api/fetcher";
 import {
   getGetOwnerReceiptQueryKey,
   getGetOwnerTodaySummaryQueryKey,
@@ -23,18 +22,7 @@ import {
   DialogTrigger,
 } from "@/shared/ui/dialog";
 
-/** Muat ulang daftar dan detail nota (status berubah di server, mis. dibatalkan dari tab lain). */
-function useRefreshReceipt(receiptId: string) {
-  const client = useQueryClient();
-  return () => {
-    void client.invalidateQueries({
-      queryKey: getGetOwnerReceiptQueryKey(receiptId),
-    });
-    void client.invalidateQueries({ queryKey: getListOwnerReceiptsQueryKey() });
-  };
-}
-
-/** Setelah batal: daftar nota, utang, barang (stok dan modal berubah), dan ringkasan Beranda dimuat ulang. */
+/** Setelah batal (juga batal ulang: server idempoten, 200 dengan nota apa adanya): daftar nota, utang, barang (stok dan modal berubah), dan ringkasan Beranda dimuat ulang. */
 function useInvalidateAfterCancel(receiptId: string) {
   const client = useQueryClient();
   return (saved: OwnerReceipt) => {
@@ -61,18 +49,12 @@ export function CancelReceipt({ receipt }: { receipt: OwnerReceipt }) {
   // Hanya setelah berhasil tombol pemicu hilang; selain itu fokus kembali ke pemicu (bawaan).
   const succeeded = useRef(false);
   const done = useInvalidateAfterCancel(receipt.id);
-  const refresh = useRefreshReceipt(receipt.id);
   const cancel = useCancelOwnerReceipt({
     mutation: {
       onSuccess: (saved) => {
         succeeded.current = true;
         done(saved);
         setOpen(false);
-      },
-      onError: (error) => {
-        if (error instanceof ApiError && error.code === "RECEIPT_CANCELLED") {
-          refresh();
-        }
       },
     },
   });

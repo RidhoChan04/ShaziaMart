@@ -137,21 +137,20 @@ test("Escape menutup konfirmasi tanpa membatalkan; fokus kembali ke tombol 'Bata
   expect(mockDb.get().receipts[0]?.status).toBe("aktif");
 });
 
-const CANCELLED_PROBLEM = {
+const SERVER_PROBLEM = {
   type: "about:blank",
-  title: "Conflict",
-  status: 409,
-  code: "RECEIPT_CANCELLED",
-  detail: "Nota ini sudah dibatalkan",
+  title: "Internal Server Error",
+  status: 500,
+  code: "INTERNAL",
 };
 const PROBLEM_HEADERS = { "Content-Type": "application/problem+json" };
 
-test("409 RECEIPT_CANCELLED: pesan 'Nota ini sudah dibatalkan' tampil sebagai alert di konfirmasi", async () => {
+test("server gagal: pesan galat tampil sebagai alert di konfirmasi, nota tetap aktif", async () => {
   const user = userEvent.setup();
   server.use(
     http.post("/api/owner/receipts/draf-1/cancel", () =>
-      HttpResponse.json(CANCELLED_PROBLEM, {
-        status: 409,
+      HttpResponse.json(SERVER_PROBLEM, {
+        status: 500,
         headers: PROBLEM_HEADERS,
       }),
     ),
@@ -164,37 +163,32 @@ test("409 RECEIPT_CANCELLED: pesan 'Nota ini sudah dibatalkan' tampil sebagai al
     within(dialog).getByRole("button", { name: "Batalkan nota" }),
   );
   expect(await within(dialog).findByRole("alert")).toHaveTextContent(
-    "Nota ini sudah dibatalkan",
+    "Terjadi kesalahan di server",
   );
+  expect(mockDb.get().receipts[0]?.status).toBe("aktif");
 });
 
-test("409 RECEIPT_CANCELLED (tab lain sudah membatalkan): detail dan daftar dimuat ulang, 'Batalkan nota' tak ditawarkan lagi", async () => {
+test("batal kedua (tab lain sudah membatalkan): server idempoten 200 → jalur berhasil, tanda 'Dibatalkan', tombol hilang, fokus ke judul", async () => {
   const user = userEvent.setup();
   renderApp(DETAIL);
   await screen.findByRole("heading", { level: 1, name: TITLE });
   await user.click(screen.getByRole("button", { name: "Batalkan nota" }));
   const dialog = await screen.findByRole("alertdialog");
+  // Tab lain membatalkan lebih dulu; halaman ini masih menampilkan nota aktif.
   mockDb.update((s) => {
     const r = s.receipts[0];
     if (r) r.status = "dibatalkan";
   });
-  server.use(
-    http.post("/api/owner/receipts/draf-1/cancel", () =>
-      HttpResponse.json(CANCELLED_PROBLEM, {
-        status: 409,
-        headers: PROBLEM_HEADERS,
-      }),
-    ),
-  );
   await user.click(
     within(dialog).getByRole("button", { name: "Batalkan nota" }),
   );
   await waitFor(() =>
-    expect(
-      screen.queryByRole("button", { name: "Batalkan nota" }),
-    ).not.toBeInTheDocument(),
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument(),
   );
-  expect(screen.getAllByText("Dibatalkan").length).toBeGreaterThan(0);
+  expect(await screen.findByText("Dibatalkan")).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Batalkan nota" })).toBeNull();
+  expect(screen.queryByRole("alert")).toBeNull();
+  expect(screen.getByRole("heading", { level: 1, name: TITLE })).toHaveFocus();
 });
 
 test("saat menunggu server: kedua tombol nonaktif, klik kedua tidak mengirim permintaan lagi", async () => {
@@ -204,8 +198,8 @@ test("saat menunggu server: kedua tombol nonaktif, klik kedua tidak mengirim per
     http.post("/api/owner/receipts/draf-1/cancel", async () => {
       calls += 1;
       await delay(300);
-      return HttpResponse.json(CANCELLED_PROBLEM, {
-        status: 409,
+      return HttpResponse.json(SERVER_PROBLEM, {
+        status: 500,
         headers: PROBLEM_HEADERS,
       });
     }),
