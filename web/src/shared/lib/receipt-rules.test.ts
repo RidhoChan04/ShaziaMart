@@ -145,7 +145,8 @@ describe("validateReceipt", () => {
   test.each<[Partial<CheckReceipt>, string | null, string, string]>([
     [{ supplierName: " " }, null, "supplierName", "Supplier belum diisi"],
     [{ notaDate: "" }, null, "notaDate", "Tanggal nota belum diisi"],
-    [{ notaDate: "2026-02-30" }, null, "notaDate", "Tanggal nota belum diisi"],
+    [{ notaDate: "2026-02-30" }, null, "notaDate", "Format tanggal tidak sah"],
+    [{ notaDate: "  " }, null, "notaDate", "Tanggal nota belum diisi"],
     [
       { notaDate: "2026-11-03" },
       null,
@@ -167,7 +168,19 @@ describe("validateReceipt", () => {
     ],
     [{ lines: [line({ qty: 0 })] }, "l1", "qty", "Jumlah minimal 1"],
     [{ lines: [line({ qty: null })] }, "l1", "qty", "Jumlah minimal 1"],
-    [{ lines: [line({ qty: 1.5 })] }, "l1", "qty", "Jumlah minimal 1"],
+    [
+      { lines: [line({ qty: 1.5 })] },
+      "l1",
+      "qty",
+      "Jumlah harus bilangan bulat",
+    ],
+    [
+      { lines: [line({ qty: 0.5 })] },
+      "l1",
+      "qty",
+      "Jumlah harus bilangan bulat",
+    ],
+    [{ lines: [line({ qty: -2 })] }, "l1", "qty", "Jumlah minimal 1"],
     [
       { lines: [line({ unitCost: null })] },
       "l1",
@@ -184,7 +197,7 @@ describe("validateReceipt", () => {
       { lines: [line({ unitCost: 99.5 })] },
       "l1",
       "unitCost",
-      "Harga beli: ketik angka saja, mis. 3500",
+      "Harga harus bilangan bulat",
     ],
     [
       { lines: [line({ expiryDate: "2027-02-30" })] },
@@ -383,7 +396,7 @@ describe("validateReceipt", () => {
         (e) => e.field === "notaDate",
       ),
     ).toEqual([
-      { lineId: null, field: "notaDate", message: "Tanggal nota belum diisi" },
+      { lineId: null, field: "notaDate", message: "Format tanggal tidak sah" },
     ]);
   });
 
@@ -471,7 +484,7 @@ describe("validatePayment", () => {
     [
       { timing: "sekarang", method: "tunai", cashSource: null, dueDate: null },
       "cashSource",
-      "Uang dari belum dipilih",
+      "Pilih uang dari mana: laci atau uang pemilik",
     ],
     [
       {
@@ -511,7 +524,7 @@ describe("validatePayment", () => {
         dueDate: "2026-11-31",
       },
       "dueDate",
-      "Jatuh tempo belum diisi",
+      "Format tanggal tidak sah",
     ],
   ])("tidak sah: %o → %s: %s", (p, field, message) =>
     expect(validatePayment(p, TODAY, true)).toEqual([
@@ -596,6 +609,61 @@ describe("newProductUnits", () => {
   });
 });
 
+describe("validateReceipt: barang terdaftar ATAU barang baru", () => {
+  const productErrors = (l: CheckLine) =>
+    validateReceipt(receipt({ lines: [l] }), ctx).filter(
+      (e) => e.field === "product",
+    );
+
+  test("keduanya diisi → galat product", () =>
+    expect(
+      productErrors({ ...newLine(), productId: "p-indomie", unitId: "u-pcs" }),
+    ).toEqual([
+      {
+        lineId: "l1",
+        field: "product",
+        message: "Pilih salah satu: barang terdaftar atau barang baru",
+      },
+    ]));
+
+  test("tidak satu pun → galat product", () =>
+    expect(productErrors(line({ productId: null, unitId: null }))).toEqual([
+      {
+        lineId: "l1",
+        field: "product",
+        message: "Pilih barang atau buat barang baru",
+      },
+    ]));
+
+  test("salah satu saja → lolos", () => {
+    expect(productErrors(line())).toEqual([]);
+    expect(productErrors(newLine())).toEqual([]);
+  });
+});
+
+describe("tanggal kosong vs format salah", () => {
+  test("jatuh tempo string kosong → belum diisi; format salah → format tidak sah", () => {
+    const nanti = (dueDate: string): ReceiptPayment => ({
+      timing: "nanti",
+      method: null,
+      cashSource: null,
+      dueDate,
+    });
+    expect(validatePayment(nanti(""), TODAY, true)).toEqual([
+      { lineId: null, field: "dueDate", message: "Jatuh tempo belum diisi" },
+    ]);
+    expect(validatePayment(nanti("16-11-2026"), TODAY, true)).toEqual([
+      { lineId: null, field: "dueDate", message: "Format tanggal tidak sah" },
+    ]);
+  });
+
+  test("tanggal nota format salah → format tidak sah", () =>
+    expect(validateReceipt(receipt({ notaDate: "2/11/2026" }), ctx)).toEqual([
+      { lineId: null, field: "notaDate", message: "Format tanggal tidak sah" },
+    ]));
+});
+
+// Boleh dihapus setelah Task 8 meng-import DraftLine (hanya menjaga knip & bentuk salinan offline).
 describe("DraftLine", () => {
   test("barang dari pencarian staf (StaffProduct) bisa disalin apa adanya ke baris draf", () => {
     const indomie: StaffProduct = {

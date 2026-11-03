@@ -147,30 +147,58 @@ function newProductErrors(
   return out;
 }
 
+/** Tepat salah satu: barang terdaftar (`productId`) atau barang baru (`newProduct`). */
+function productChoiceError(l: CheckLine): ReceiptError | null {
+  if (l.productId === null && l.newProduct === null) {
+    return err(l.lineId, "product", "Pilih barang atau buat barang baru");
+  }
+  if (l.productId !== null && l.newProduct !== null) {
+    return err(
+      l.lineId,
+      "product",
+      "Pilih salah satu: barang terdaftar atau barang baru",
+    );
+  }
+  return null;
+}
+
+function qtyError(l: CheckLine): ReceiptError | null {
+  if (l.qty === null || l.qty <= 0) {
+    return err(l.lineId, "qty", "Jumlah minimal 1");
+  }
+  if (!Number.isSafeInteger(l.qty)) {
+    return err(l.lineId, "qty", "Jumlah harus bilangan bulat");
+  }
+  return null;
+}
+
+function unitCostError(l: CheckLine): ReceiptError | null {
+  if (l.unitCost === null) {
+    return err(l.lineId, "unitCost", "Harga beli belum diisi");
+  }
+  if (l.unitCost < 0) {
+    return err(l.lineId, "unitCost", "Harga beli: ketik angka saja, mis. 3500");
+  }
+  if (!Number.isSafeInteger(l.unitCost)) {
+    return err(l.lineId, "unitCost", "Harga harus bilangan bulat");
+  }
+  return null;
+}
+
 function lineErrors(
   l: CheckLine,
   seen: { names: Set<string>; barcodes: Set<string> },
 ): ReceiptError[] {
   const out: ReceiptError[] = [];
-  if (l.productId === null && l.newProduct === null) {
-    out.push(err(l.lineId, "product", "Pilih barang atau buat barang baru"));
-  }
+  const choice = productChoiceError(l);
+  if (choice !== null) out.push(choice);
   if (l.productId !== null && l.unitId === null) {
     out.push(err(l.lineId, "unit", "Satuan ini tidak dipakai lagi"));
   }
   if (l.newProduct !== null) {
     out.push(...newProductErrors(l.lineId, l.newProduct, seen));
   }
-  if (l.qty === null || !Number.isSafeInteger(l.qty) || l.qty < 1) {
-    out.push(err(l.lineId, "qty", "Jumlah minimal 1"));
-  }
-  if (l.unitCost === null) {
-    out.push(err(l.lineId, "unitCost", "Harga beli belum diisi"));
-  } else if (!Number.isSafeInteger(l.unitCost) || l.unitCost < 0) {
-    out.push(
-      err(l.lineId, "unitCost", "Harga beli: ketik angka saja, mis. 3500"),
-    );
-  }
+  for (const e of [qtyError(l), unitCostError(l)]) if (e !== null) out.push(e);
   if (l.expiryDate !== null && !isIsoDate(l.expiryDate)) {
     out.push(err(l.lineId, "expiryDate", "Tanggal kedaluwarsa tidak valid"));
   }
@@ -190,8 +218,13 @@ export function validateReceipt(
   if (r.supplierName.trim() === "") {
     out.push(err(null, "supplierName", "Supplier belum diisi"));
   }
-  if (!isIsoDate(r.notaDate)) {
-    out.push(err(null, "notaDate", "Tanggal nota belum diisi"));
+  const notaDateErr = dateError(
+    r.notaDate,
+    "notaDate",
+    "Tanggal nota belum diisi",
+  );
+  if (notaDateErr !== null) {
+    out.push(notaDateErr);
   } else if (r.notaDate > ctx.today) {
     out.push(
       err(null, "notaDate", "Tanggal nota tidak boleh setelah hari ini"),
@@ -206,19 +239,37 @@ export function validateReceipt(
   return out;
 }
 
+/** Tanggal wajib: kosong → `emptyMessage`; bukan `YYYY-MM-DD` sah → format tidak sah. */
+function dateError(
+  value: string | null,
+  field: ReceiptField,
+  emptyMessage: string,
+): ReceiptError | null {
+  if (value === null || value.trim() === "") {
+    return err(null, field, emptyMessage);
+  }
+  return isIsoDate(value) ? null : err(null, field, "Format tanggal tidak sah");
+}
+
 function laterPaymentErrors(
   p: ReceiptPayment,
   notaDate: string,
 ): ReceiptError[] {
   const out: ReceiptError[] = [];
+  // Penjaga sisi server: UI orang toko tidak pernah mengirim cara bayar untuk Bayar nanti.
   if (p.method !== null || p.cashSource !== null) {
     out.push(
       err(null, "payment", "Cara bayar dipilih saat pemilik menandai lunas"),
     );
   }
-  if (p.dueDate === null || !isIsoDate(p.dueDate)) {
-    out.push(err(null, "dueDate", "Jatuh tempo belum diisi"));
-  } else if (isIsoDate(notaDate) && p.dueDate < notaDate) {
+  const dueErr = dateError(p.dueDate, "dueDate", "Jatuh tempo belum diisi");
+  if (dueErr !== null) {
+    out.push(dueErr);
+  } else if (
+    isIsoDate(notaDate) &&
+    p.dueDate !== null &&
+    p.dueDate < notaDate
+  ) {
     out.push(
       err(null, "dueDate", "Jatuh tempo tidak boleh sebelum tanggal nota"),
     );
@@ -240,7 +291,11 @@ function cashSourceError(
         );
   }
   if (p.cashSource === null) {
-    return err(null, "cashSource", "Uang dari belum dipilih");
+    return err(
+      null,
+      "cashSource",
+      "Pilih uang dari mana: laci atau uang pemilik",
+    );
   }
   if (p.cashSource === "laci" && !shiftOpen) {
     return err(
