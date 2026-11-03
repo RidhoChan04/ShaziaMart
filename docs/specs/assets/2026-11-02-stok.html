@@ -1,0 +1,786 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mockup Stok (F3b-2)</title><style>body{margin:0;padding:24px;background:#e9ece9;font-family:Inter,system-ui,sans-serif}h2{margin:0 0 4px;font-size:18px}.subtitle{margin:0 0 16px;color:#5e6b65}</style></head><body><style>
+  @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+  .fs-row { display: flex; gap: 44px 34px; flex-wrap: wrap; justify-content: center; align-items: flex-start; padding: 10px 0 24px; }
+  .fs-col { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .fs-col > h3 { margin: 16px 0 0; }
+  .fs-col > p { margin: 0; max-width: 330px; text-align: center; font-size: 13px; opacity: .8; }
+
+  /* ---------- rangka HP ---------- */
+  .fs-phone { width: 330px; height: 690px; border-radius: 44px; overflow: hidden; position: relative; background: #f2f2f7;
+    box-shadow: 0 0 0 10px #1d1d1f, 0 24px 60px rgba(0,0,0,.28);
+    font-family: Inter, -apple-system, "SF Pro Text", system-ui, sans-serif; color: #1c2421; font-size: 16px;
+    letter-spacing: -.01em; line-height: 1.3; text-align: left; }
+  .fs-phone * { box-sizing: border-box; }
+  .fs-num { font-variant-numeric: tabular-nums; }
+  .fs-ic { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; display: block; }
+  .fs-ic.fs-s { width: 16px; height: 16px; }
+  .fs-ic.fs-xs { width: 13px; height: 13px; stroke-width: 2.4; }
+  .fs-c { padding: 14px 16px 120px; }
+  .fs-date { font-size: 13px; font-weight: 600; color: #6e6e73; display: flex; align-items: center; gap: 5px; }
+  .fs-tbar { display: flex; justify-content: space-between; align-items: center; margin: 2px 0 12px; }
+  .fs-tbar b { font-size: 32px; font-weight: 700; letter-spacing: -.025em; line-height: 1.15; }
+  .fs-rbtn { width: 36px; height: 36px; border-radius: 50%; background: #fff; color: #1f7a4d; display: grid; place-items: center; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+  .fs-sec { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 19px; font-weight: 700;
+    letter-spacing: -.02em; margin: 16px 4px 7px; white-space: nowrap; }
+  .fs-sec a { font-size: 15px; font-weight: 600; color: #1f7a4d; letter-spacing: -.01em; text-decoration: none; }
+  .fs-card { background: #fff; border-radius: 20px; overflow: hidden; }
+  .fs-hl { position: relative; }
+  .fs-hl + .fs-hl::before { content: ""; position: absolute; top: 0; left: 16px; right: 0; border-top: .5px solid #c6c6c8; }
+  .fs-muted { color: #6e6e73; }
+  .fs-chev { color: #c4c4c7; }
+
+  /* badge status: selalu ikon + teks */
+  .fs-badge { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; font-weight: 600; line-height: 1;
+    padding: 3px 7px 3px 5px; border-radius: 99px; white-space: nowrap; letter-spacing: 0; }
+  .fs-warn { background: #fff0d9; color: #8a4b00; }
+  .fs-bad { background: #fde8e6; color: #9b1c12; }
+  .fs-ok { background: #e6f2ea; color: #17603c; }
+  .fs-info { background: #e5eef9; color: #1d4f91; }
+
+  /* tab bar kaca */
+  .fs-glassbar { position: absolute; left: 14px; right: 14px; bottom: 22px; height: 62px; border-radius: 31px; z-index: 6;
+    display: flex; justify-content: space-around; align-items: center; padding: 0 6px;
+    background: rgba(255,255,255,.6); backdrop-filter: blur(22px) saturate(180%); -webkit-backdrop-filter: blur(22px) saturate(180%);
+    border: .5px solid rgba(255,255,255,.75); box-shadow: 0 10px 30px rgba(0,0,0,.14), inset 0 1px 0 rgba(255,255,255,.9); }
+  .fs-tab { flex: 1; height: 50px; border-radius: 25px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 2px; font-size: 11px; font-weight: 600; color: #3a3a3c; white-space: nowrap; }
+  .fs-tab .fs-ic { width: 22px; height: 22px; }
+  .fs-tab.fs-on { color: #1f7a4d; background: rgba(31,122,77,.12); }
+
+  /* bar judul kecil / bar modal */
+  .fs-mnav { position: absolute; top: 0; left: 0; right: 0; height: 56px; z-index: 6; display: flex; align-items: center; justify-content: center;
+    font-size: 17px; font-weight: 600; background: rgba(242,242,247,.82); backdrop-filter: blur(22px) saturate(180%);
+    -webkit-backdrop-filter: blur(22px) saturate(180%); }
+  .fs-mnav.fs-line { border-bottom: .5px solid rgba(0,0,0,.1); }
+  .fs-mnav .fs-l { position: absolute; left: 12px; top: 10px; }
+  .fs-mnav .fs-r { position: absolute; right: 12px; top: 10px; }
+  .fs-mt { text-align: center; line-height: 1.15; }
+  .fs-mt small { display: flex; align-items: center; justify-content: center; gap: 3px; font-size: 12px; font-weight: 500; color: #6e6e73; }
+  .fs-pill { display: inline-flex; align-items: center; gap: 2px; height: 36px; padding: 0 14px 0 8px; border-radius: 18px; background: #fff;
+    color: #1f7a4d; font-size: 16px; font-weight: 500; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+  .fs-pill.fs-solo { padding: 0 16px; }
+  .fs-nav { display: flex; align-items: center; justify-content: space-between; height: 40px; margin: 0 -4px 10px; }
+
+  /* form */
+  .fs-fc { padding: 66px 16px 150px; }
+  .fs-gh { font-size: 13px; font-weight: 600; color: #6e6e73; margin: 16px 16px 6px; display: flex; justify-content: space-between; }
+  .fs-gh:first-child { margin-top: 4px; }
+  .fs-gh em { font-style: normal; font-weight: 500; }
+  .fs-gf { font-size: 13px; color: #6e6e73; margin: 6px 16px 0; line-height: 1.35; }
+  .fs-gf b { color: #1c2421; font-weight: 600; }
+  .fs-f { display: flex; align-items: center; gap: 10px; min-height: 46px; padding: 0 14px 0 16px; font-size: 16px; }
+  .fs-f > span:first-child { flex: none; }
+  .fs-f small.fs-opt { font-size: 13px; color: #6e6e73; margin-left: 4px; }
+  .fs-f .fs-v { margin-left: auto; text-align: right; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+  .fs-f .fs-v.fs-sel { color: #6e6e73; }
+  .fs-f .fs-v b { font-weight: 600; color: #1c2421; }
+  .fs-btn { height: 50px; border-radius: 14px; background: #1f7a4d; color: #fff; display: grid; place-items: center; font-weight: 600; font-size: 17px;
+    box-shadow: 0 6px 16px rgba(31,122,77,.22); }
+  .fs-btn.fs-off { background: #e3e3e8; color: #48484a; box-shadow: none; }
+  .fs-fbtn { position: absolute; left: 16px; right: 16px; bottom: 26px; z-index: 7; }
+  .fs-fade { position: absolute; left: 0; right: 0; bottom: 0; height: 110px; z-index: 5; background: linear-gradient(rgba(242,242,247,0), #f2f2f7 45%); }
+  .fs-seg { display: flex; padding: 2px; border-radius: 10px; background: rgba(118,118,128,.12); }
+  .fs-seg span { flex: 1; text-align: center; padding: 7px 4px; border-radius: 8px; font-size: 14px; font-weight: 500; color: #1c2421; white-space: nowrap; }
+  .fs-seg span.fs-on { background: #fff; font-weight: 700; box-shadow: 0 1px 3px rgba(0,0,0,.12), 0 0 0 .5px rgba(0,0,0,.04); }
+  .fs-segrow { padding: 10px 14px 12px 16px; }
+  .fs-segrow > small { display: block; font-size: 13px; font-weight: 600; color: #6e6e73; margin: 0 0 6px 2px; }
+
+  /* sheet */
+  .fs-dim { position: absolute; inset: 0; background: rgba(0,0,0,.36); z-index: 8; }
+  .fs-sheet { position: absolute; left: 0; right: 0; bottom: 0; z-index: 9; background: #f2f2f7; border-radius: 30px 30px 0 0;
+    padding: 8px 16px 20px; box-shadow: 0 -8px 30px rgba(0,0,0,.18); }
+  .fs-grab { width: 38px; height: 5px; border-radius: 3px; background: #c7c7cc; margin: 0 auto 8px; }
+  .fs-shead { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+  .fs-shead b { font-size: 21px; font-weight: 700; letter-spacing: -.02em; display: block; }
+  .fs-shead small { font-size: 14px; color: #6e6e73; display: block; margin-top: 1px; }
+  .fs-x { width: 32px; height: 32px; border-radius: 50%; background: #e3e3e8; color: #3a3a3c; display: grid; place-items: center; flex: none; }
+
+  /* ---------- 1 · login ---------- */
+  .fs-login { padding: 46px 20px 0; display: flex; flex-direction: column; align-items: center; }
+  .fs-appic { width: 54px; height: 54px; border-radius: 14px; background: linear-gradient(155deg, #1f7a4d, #155c3b); color: #fff; display: grid; place-items: center;
+    box-shadow: 0 6px 16px rgba(31,122,77,.25); }
+  .fs-appic .fs-ic { width: 28px; height: 28px; }
+  .fs-brand { text-align: center; margin-top: 10px; }
+  .fs-brand b { display: block; font-size: 22px; font-weight: 700; letter-spacing: -.02em; }
+  .fs-brand small { font-size: 14px; color: #6e6e73; }
+  .fs-who { display: flex; gap: 18px; margin: 20px 0 16px; }
+  .fs-av { display: flex; flex-direction: column; align-items: center; gap: 5px; font-size: 13px; font-weight: 500; position: relative; }
+  .fs-av i { width: 54px; height: 54px; border-radius: 50%; background: #fff; display: grid; place-items: center; font-style: normal; font-size: 19px;
+    font-weight: 600; color: #3a3a3c; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+  .fs-av.fs-on i { background: #1f7a4d; color: #fff; box-shadow: 0 0 0 3px #f2f2f7, 0 0 0 5px #1f7a4d; }
+  .fs-av.fs-on { font-weight: 700; }
+  .fs-av .fs-tick { position: absolute; left: 38px; top: 38px; width: 20px; height: 20px; border-radius: 50%; background: #fff; color: #1f7a4d;
+    display: grid; place-items: center; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
+  .fs-pinlbl { font-size: 15px; font-weight: 600; }
+  .fs-dots { display: flex; gap: 14px; margin: 10px 0 18px; }
+  .fs-dots i { width: 13px; height: 13px; border-radius: 50%; border: 1.5px solid #6e6e73; }
+  .fs-dots i.fs-on { background: #1c2421; border-color: #1c2421; }
+  .fs-keys { display: grid; grid-template-columns: repeat(3, 68px); gap: 10px 26px; }
+  .fs-key { width: 68px; height: 68px; border-radius: 50%; background: #fff; display: grid; place-items: center; font-size: 28px; font-weight: 500;
+    box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+  .fs-key.fs-ghost { background: none; box-shadow: none; color: #3a3a3c; }
+  .fs-lan { display: flex; align-items: center; gap: 6px; margin-top: 16px; font-size: 13px; font-weight: 600; color: #3a3a3c;
+    background: #e6e6eb; padding: 6px 12px; border-radius: 99px; }
+
+  /* ---------- 2 · beranda ---------- */
+  .fs-acts2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .fs-act { border-radius: 20px; padding: 14px; min-height: 112px; display: flex; flex-direction: column; justify-content: space-between; background: #fff; }
+  .fs-act .fs-aic { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: #e6f2ea; color: #1f7a4d; }
+  .fs-act b { display: block; font-size: 17px; font-weight: 700; letter-spacing: -.015em; margin-top: 12px; }
+  .fs-act small { font-size: 13px; color: #6e6e73; }
+  .fs-act.fs-hero { background: linear-gradient(155deg, #1f7a4d 0%, #155c3b 100%); color: #fff; box-shadow: 0 10px 24px rgba(31,122,77,.26); }
+  .fs-act.fs-hero .fs-aic { background: rgba(255,255,255,.2); color: #fff; }
+  .fs-act.fs-hero small { color: #fff; }
+  .fs-item { display: flex; align-items: center; gap: 8px; padding: 8px 12px 8px 16px; min-height: 50px; }
+  .fs-item .fs-txt { min-width: 0; flex: 1; }
+  .fs-nm { font-size: 15px; font-weight: 500; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .fs-sub { font-size: 13px; color: #6e6e73; margin-top: 2px; }
+
+  /* ---------- 3 · barang masuk ---------- */
+  .fs-photo { display: flex; align-items: center; gap: 12px; padding: 10px 14px 10px 16px; }
+  .fs-thumb { width: 44px; height: 58px; border-radius: 6px; flex: none; transform: rotate(-3deg); position: relative; overflow: hidden;
+    background: repeating-linear-gradient(#fbfaf5 0 6px, #d6d3c8 6px 7px) 6px 12px / 30px 40px no-repeat, #fbfaf5;
+    box-shadow: 0 1px 4px rgba(0,0,0,.18), 0 0 0 .5px rgba(0,0,0,.12); }
+  .fs-thumb::before { content: ""; position: absolute; left: 6px; top: 5px; width: 22px; height: 4px; border-radius: 1px; background: #8e8e93; }
+  .fs-thumb::after { content: ""; position: absolute; right: 5px; bottom: 5px; width: 16px; height: 4px; border-radius: 1px; background: #3a3a3c; }
+  .fs-photo .fs-txt { flex: 1; min-width: 0; }
+  .fs-photo .fs-txt b { display: block; font-size: 16px; font-weight: 500; }
+  .fs-photo .fs-txt small { font-size: 13px; color: #6e6e73; }
+  .fs-tbtn { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px; border-radius: 17px; background: #e6f2ea; color: #17603c;
+    font-size: 14px; font-weight: 600; white-space: nowrap; }
+  .fs-line { display: flex; align-items: center; gap: 10px; padding: 10px 14px 10px 16px; min-height: 58px; }
+  .fs-line .fs-txt { flex: 1; min-width: 0; }
+  .fs-line .fs-txt b { display: block; font-size: 15px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .fs-line .fs-txt small { font-size: 13px; color: #6e6e73; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+  .fs-line .fs-amt { font-size: 15px; font-weight: 600; white-space: nowrap; }
+  .fs-add { display: flex; align-items: center; gap: 8px; padding: 0 16px; min-height: 46px; color: #1f7a4d; font-weight: 600; font-size: 16px; }
+  .fs-foot { position: absolute; left: 0; right: 0; bottom: 0; z-index: 7; padding: 10px 16px 26px;
+    background: rgba(242,242,247,.86); backdrop-filter: blur(22px) saturate(180%); -webkit-backdrop-filter: blur(22px) saturate(180%);
+    border-top: .5px solid rgba(0,0,0,.08); }
+  .fs-foot .fs-tot { display: flex; justify-content: space-between; align-items: baseline; margin: 0 4px 10px; }
+  .fs-foot .fs-tot span { font-size: 13px; font-weight: 600; color: #6e6e73; }
+  .fs-foot .fs-tot b { font-size: 21px; font-weight: 700; letter-spacing: -.02em; }
+  .fs-foot .fs-hint { font-size: 13px; color: #3a3a3c; text-align: center; margin: 0 0 8px; display: flex; align-items: center; justify-content: center; gap: 5px; }
+  .fs-total { display: flex; justify-content: space-between; align-items: baseline; padding: 14px 16px; }
+  .fs-total span { font-size: 16px; }
+  .fs-total b { font-size: 24px; font-weight: 700; letter-spacing: -.02em; }
+  .fs-chips { display: flex; gap: 8px; padding: 0 16px 12px; }
+  .fs-chip { height: 32px; padding: 0 12px; border-radius: 16px; background: #f2f2f7; display: inline-flex; align-items: center; gap: 4px; font-size: 14px; font-weight: 500; }
+  .fs-chip.fs-on { background: #1f7a4d; color: #fff; font-weight: 600; }
+
+  /* ---------- 4 · tambah baris ---------- */
+  .fs-srow { display: flex; gap: 8px; margin: 12px 0 10px; }
+  .fs-search { flex: 1; display: flex; align-items: center; gap: 8px; height: 44px; border-radius: 12px; background: #fff; padding: 0 12px; font-size: 16px; color: #6e6e73; }
+  .fs-search b { color: #1c2421; font-weight: 400; }
+  .fs-cam { width: 44px; height: 44px; border-radius: 12px; background: #1f7a4d; color: #fff; display: grid; place-items: center; flex: none; }
+  .fs-picked { display: flex; align-items: center; gap: 12px; padding: 10px 14px 10px 12px; }
+  .fs-pimg { width: 40px; height: 40px; border-radius: 10px; background: #e5eef9; color: #1d4f91; display: grid; place-items: center; flex: none; }
+  .fs-picked .fs-txt { flex: 1; min-width: 0; }
+  .fs-picked b { display: block; font-size: 16px; font-weight: 600; line-height: 1.2; }
+  .fs-picked small { font-size: 13px; color: #6e6e73; }
+  .fs-stepper { display: inline-flex; align-items: center; background: #f2f2f7; border-radius: 10px; height: 36px; }
+  .fs-stepper span { width: 38px; height: 36px; display: grid; place-items: center; color: #1f7a4d; }
+  .fs-stepper b { min-width: 34px; text-align: center; font-size: 19px; font-weight: 700; }
+  .fs-eq { font-size: 13px; color: #6e6e73; margin-right: 6px; }
+
+  /* ---------- 5 · opname kategori ---------- */
+  .fs-lead { font-size: 15px; color: #3a3a3c; margin: -4px 4px 4px; line-height: 1.35; }
+  .fs-cat { display: flex; align-items: center; gap: 12px; padding: 9px 12px 9px 14px; min-height: 58px; }
+  .fs-cat + .fs-cat::before { left: 58px; }
+  .fs-tile { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; flex: none; color: #fff; }
+  .fs-cat .fs-txt { flex: 1; min-width: 0; }
+  .fs-cat .fs-txt div { font-size: 16px; font-weight: 500; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .fs-cat .fs-txt div em { font-style: normal; font-size: 13px; font-weight: 500; color: #6e6e73; }
+  .fs-cat .fs-txt small { font-size: 13px; color: #6e6e73; }
+
+  /* ---------- 6 · menghitung ---------- */
+  .fs-prog { position: absolute; top: 56px; left: 0; right: 0; height: 4px; background: #e3e3e8; z-index: 6; }
+  .fs-prog i { display: block; height: 100%; background: #1f7a4d; border-radius: 0 2px 2px 0; }
+  .fs-scanrow { display: flex; gap: 8px; }
+  .fs-bigbtn { flex: 1; height: 48px; border-radius: 14px; background: #1f7a4d; color: #fff; display: flex; align-items: center; justify-content: center; gap: 8px;
+    font-weight: 600; font-size: 16px; }
+  .fs-sqbtn { height: 48px; padding: 0 16px; border-radius: 14px; background: #fff; color: #1f7a4d; display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 16px; }
+  .fs-cur { margin-top: 12px; }
+  .fs-curtop { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px 0; }
+  .fs-eyebrow { font-size: 13px; font-weight: 600; color: #6e6e73; }
+  .fs-curname { font-size: 22px; font-weight: 700; letter-spacing: -.02em; padding: 3px 16px 10px; }
+  .fs-stp { display: flex; justify-content: space-between; align-items: center; padding: 9px 14px 9px 16px; }
+  .fs-stp b { display: block; font-size: 16px; font-weight: 600; }
+  .fs-stp small { font-size: 13px; color: #6e6e73; }
+  .fs-stp .fs-stepper { height: 40px; }
+  .fs-stp .fs-stepper span { height: 40px; width: 42px; }
+  .fs-stp .fs-stepper b { font-size: 21px; min-width: 40px; }
+  .fs-sumrow { display: flex; justify-content: space-between; align-items: baseline; padding: 12px 16px 14px; background: #f7faf8; }
+  .fs-sumrow span { font-size: 15px; font-weight: 500; }
+  .fs-sumrow b { font-size: 26px; font-weight: 700; letter-spacing: -.02em; color: #17603c; }
+  .fs-note { display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; font-weight: 600; color: #3a3a3c; margin: 10px 0; }
+  .fs-todo { display: flex; align-items: center; gap: 10px; padding: 0 14px 0 16px; min-height: 46px; font-size: 15px; }
+  .fs-todo .fs-ring { width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid #aeaeb2; flex: none; }
+  .fs-todo span:nth-child(2) { flex: 1; }
+
+  /* ---------- 7 · selisih ---------- */
+  .fs-h1 { font-size: 26px; font-weight: 700; letter-spacing: -.025em; line-height: 1.15; margin: 2px 0 12px; }
+  .fs-okrow { display: flex; align-items: center; gap: 12px; padding: 11px 12px 11px 14px; }
+  .fs-okrow .fs-txt { flex: 1; }
+  .fs-okrow b { display: block; font-size: 16px; font-weight: 600; }
+  .fs-okrow small { font-size: 13px; color: #6e6e73; }
+  .fs-diff { padding: 12px 14px 14px 16px; margin-top: 10px; }
+  .fs-diff.fs-need { box-shadow: inset 0 0 0 1.5px #c4271b; }
+  .fs-dtop { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+  .fs-dtop b { font-size: 16px; font-weight: 600; }
+  .fs-dmeta { font-size: 13px; color: #6e6e73; margin-top: 3px; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+  .fs-dmeta strong { color: #1c2421; font-weight: 600; }
+  .fs-rlbl { font-size: 13px; font-weight: 600; color: #6e6e73; margin: 10px 0 6px; display: flex; align-items: center; gap: 4px; }
+  .fs-rlbl.fs-req { color: #9b1c12; }
+  .fs-reasons { display: flex; flex-wrap: wrap; gap: 6px; }
+  .fs-rc { height: 32px; padding: 0 12px; border-radius: 16px; background: #f2f2f7; display: inline-flex; align-items: center; gap: 4px; font-size: 14px; font-weight: 500; }
+  .fs-rc.fs-on { background: #1f7a4d; color: #fff; font-weight: 600; padding-left: 9px; }
+  .fs-bwrap { position: absolute; left: 0; right: 0; bottom: 0; z-index: 7; padding: 30px 16px 26px; background: linear-gradient(rgba(242,242,247,0), #f2f2f7 30%); }
+  .fs-bwrap .fs-hint { font-size: 13px; color: #9b1c12; font-weight: 600; text-align: center; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 5px; }
+
+  /* ---------- 8 · kedaluwarsa ---------- */
+  .fs-grp { display: flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 700; margin: 18px 4px 8px; }
+  .fs-grp em { font-style: normal; font-weight: 500; color: #6e6e73; }
+  .fs-gbad { color: #9b1c12; }
+  .fs-gwarn { color: #8a4b00; }
+  .fs-ed { display: flex; align-items: center; gap: 8px; padding: 10px 10px 10px 16px; min-height: 64px; }
+  .fs-ed .fs-txt { flex: 1; min-width: 0; }
+  .fs-ed .fs-sub b { color: #1c2421; font-weight: 600; }
+  .fs-when { font-size: 13px; font-weight: 600; white-space: nowrap; }
+  .fs-wbad { color: #9b1c12; }
+  .fs-wwarn { color: #8a4b00; }
+  .fs-more { width: 32px; height: 32px; border-radius: 50%; background: #f2f2f7; color: #3a3a3c; display: grid; place-items: center; flex: none; }
+  .fs-log { display: flex; align-items: center; gap: 12px; padding: 10px 14px; }
+  .fs-log .fs-txt { flex: 1; font-size: 14px; line-height: 1.3; }
+  .fs-log small { display: block; font-size: 13px; color: #6e6e73; }
+  .fs-asheet { position: absolute; left: 10px; right: 10px; bottom: 24px; z-index: 9; display: flex; flex-direction: column; gap: 8px; }
+  .fs-agrp { border-radius: 16px; overflow: hidden; background: rgba(255,255,255,.94); backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%); }
+  .fs-ahead { text-align: center; padding: 14px 16px 12px; }
+  .fs-ahead b { display: block; font-size: 14px; font-weight: 600; color: #3a3a3c; }
+  .fs-ahead small { display: block; font-size: 13px; color: #6e6e73; margin-top: 2px; }
+  .fs-aopt { display: flex; align-items: center; justify-content: center; gap: 8px; height: 56px; font-size: 18px; font-weight: 500; color: #1f7a4d; position: relative; }
+  .fs-aopt::before { content: ""; position: absolute; top: 0; left: 0; right: 0; border-top: .5px solid rgba(60,60,67,.29); }
+  .fs-aopt.fs-del { color: #b3261e; }
+  .fs-aopt small { font-size: 13px; color: #6e6e73; font-weight: 400; }
+  .fs-aopt.fs-two { flex-direction: column; gap: 0; height: 64px; }
+  .fs-aopt.fs-two span { display: flex; align-items: center; gap: 8px; }
+  .fs-acancel { height: 56px; border-radius: 16px; background: #fff; display: grid; place-items: center; font-size: 18px; font-weight: 600; color: #1f7a4d; }
+
+  /* ---------- 9 · utang supplier ---------- */
+  .fs-sum9 { padding: 14px 16px; }
+  .fs-sum9 .fs-cap { font-size: 13px; font-weight: 600; color: #6e6e73; }
+  .fs-sum9 .fs-big { font-size: 32px; font-weight: 700; letter-spacing: -.03em; margin: 2px 0 6px; }
+  .fs-sum9 .fs-meta { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #6e6e73; }
+  .fs-sh { display: flex; justify-content: space-between; align-items: baseline; font-size: 17px; font-weight: 700; letter-spacing: -.015em; margin: 18px 4px 7px; }
+  .fs-sh span { font-size: 14px; font-weight: 600; color: #6e6e73; letter-spacing: 0; }
+  .fs-debt { display: flex; align-items: center; gap: 8px; padding: 10px 10px 10px 16px; min-height: 64px; }
+  .fs-debt .fs-txt { flex: 1; min-width: 0; }
+  .fs-debt .fs-txt div { font-size: 15px; font-weight: 500; display: flex; justify-content: space-between; gap: 8px; }
+  .fs-debt .fs-txt div b { font-weight: 600; }
+  .fs-debt .fs-txt small { font-size: 13px; color: #6e6e73; display: flex; align-items: center; gap: 6px; margin-top: 2px; flex-wrap: wrap; }
+  .fs-debt .fs-amt { font-size: 15px; font-weight: 600; white-space: nowrap; }
+  .fs-compact { position: absolute; top: 0; left: 0; right: 0; height: 52px; z-index: 6; display: flex; align-items: center; justify-content: center;
+    font-size: 17px; font-weight: 600; background: rgba(255,255,255,.72); backdrop-filter: blur(22px) saturate(180%);
+    -webkit-backdrop-filter: blur(22px) saturate(180%); border-bottom: .5px solid rgba(0,0,0,.08); }
+  .fs-compact .fs-back { position: absolute; left: 10px; top: 8px; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; color: #1f7a4d; background: rgba(255,255,255,.9); }
+</style>
+<h2>Stok (F3b-2) — layar-layar utama</h2>
+<p class="subtitle">Silakan beri komentar di terminal: layar mana yang pas, mana yang perlu diubah (sebut nomornya, misalnya "6: tombol dus terlalu kecil").</p>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="fs-i-house" viewBox="0 0 24 24"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+  <symbol id="fs-i-package" viewBox="0 0 24 24"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><path d="m3.3 7 7.703 4.734a2 2 0 0 0 1.994 0L20.7 7"/><path d="m7.5 4.27 9 5.15"/></symbol>
+  <symbol id="fs-i-chart" viewBox="0 0 24 24"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></symbol>
+  <symbol id="fs-i-notebook" viewBox="0 0 24 24"><path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"/><path d="M2 6h4"/><path d="M2 10h4"/><path d="M2 14h4"/><path d="M2 18h4"/><path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/></symbol>
+  <symbol id="fs-i-dots" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></symbol>
+  <symbol id="fs-i-truck" viewBox="0 0 24 24"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/></symbol>
+  <symbol id="fs-i-clip" viewBox="0 0 24 24"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></symbol>
+  <symbol id="fs-i-hour" viewBox="0 0 24 24"><path d="M5 22h14"/><path d="M5 2h14"/><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"/><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"/></symbol>
+  <symbol id="fs-i-wifi" viewBox="0 0 24 24"><path d="M12 20h.01"/><path d="M2 8.82a15 15 0 0 1 20 0"/><path d="M5 12.859a10 10 0 0 1 14 0"/><path d="M8.5 16.429a5 5 0 0 1 7 0"/></symbol>
+  <symbol id="fs-i-camera" viewBox="0 0 24 24"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></symbol>
+  <symbol id="fs-i-cal" viewBox="0 0 24 24"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></symbol>
+  <symbol id="fs-i-eyeoff" viewBox="0 0 24 24"><path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/></symbol>
+  <symbol id="fs-i-octa" viewBox="0 0 24 24"><path d="M12 16h.01"/><path d="M12 8v4"/><path d="M15.312 2a2 2 0 0 1 1.414.586l4.688 4.688A2 2 0 0 1 22 8.688v6.624a2 2 0 0 1-.586 1.414l-4.688 4.688a2 2 0 0 1-1.414.586H8.688a2 2 0 0 1-1.414-.586l-4.688-4.688A2 2 0 0 1 2 15.312V8.688a2 2 0 0 1 .586-1.414l4.688-4.688A2 2 0 0 1 8.688 2z"/></symbol>
+  <symbol id="fs-i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+  <symbol id="fs-i-pkgminus" viewBox="0 0 24 24"><path d="M16 16h6"/><path d="M21 10V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l2-1.14"/><path d="m7.5 4.27 9 5.15"/><path d="M3.29 7 12 12l8.71-5"/><path d="M12 22V12"/></symbol>
+  <symbol id="fs-i-del" viewBox="0 0 24 24"><path d="M10 5a2 2 0 0 0-1.344.519l-6.328 5.74a1 1 0 0 0 0 1.481l6.328 5.741A2 2 0 0 0 10 19h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2z"/><path d="m12 9 6 6"/><path d="m18 9-6 6"/></symbol>
+  <symbol id="fs-i-lock" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+  <symbol id="fs-i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+  <symbol id="fs-i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+  <symbol id="fs-i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+  <symbol id="fs-i-chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+  <symbol id="fs-i-back" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+  <symbol id="fs-i-tri" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
+  <symbol id="fs-i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="fs-i-checkc" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="fs-i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+  <symbol id="fs-i-scan" viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M8 7v10"/><path d="M12 7v10"/><path d="M17 7v10"/></symbol>
+  <symbol id="fs-i-arrow" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></symbol>
+  <symbol id="fs-i-spark" viewBox="0 0 24 24"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></symbol>
+  <symbol id="fs-i-drop" viewBox="0 0 24 24"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/></symbol>
+  <symbol id="fs-i-coffee" viewBox="0 0 24 24"><path d="M10 2v2"/><path d="M14 2v2"/><path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1"/><path d="M6 2v2"/></symbol>
+  <symbol id="fs-i-list" viewBox="0 0 24 24"><path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/></symbol>
+  <symbol id="fs-i-user" viewBox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+  <symbol id="fs-i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></symbol>
+  <symbol id="fs-i-cloud" viewBox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/><path d="m9 14 2 2 4-4"/></symbol>
+  <symbol id="fs-i-bread" viewBox="0 0 24 24"><path d="M5 11a3 3 0 0 1 0-6h14a3 3 0 0 1 0 6v8a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z"/></symbol>
+</defs></svg>
+
+<div class="fs-row">
+
+  <!-- ============ 1 · LOGIN ============ -->
+  <div class="fs-col">
+    <div class="fs-phone"><div class="fs-login">
+      <span class="fs-appic"><svg class="fs-ic"><use href="#fs-i-package"/></svg></span>
+      <div class="fs-brand"><b>ShaziaMart · Stok</b><small>Masuk dengan akun kasir</small></div>
+      <div class="fs-who">
+        <div class="fs-av fs-on"><i>R</i><span class="fs-tick"><svg class="fs-ic fs-xs" style="stroke-width:3"><use href="#fs-i-check"/></svg></span>Rina</div>
+        <div class="fs-av"><i>D</i>Dedi</div>
+        <div class="fs-av"><i>S</i>Sari</div>
+        <div class="fs-av"><i>Y</i>Yanti</div>
+      </div>
+      <div class="fs-pinlbl">Masukkan PIN Rina</div>
+      <div class="fs-dots" aria-label="2 dari 6 digit"><i class="fs-on"></i><i class="fs-on"></i><i></i><i></i><i></i><i></i></div>
+      <div class="fs-keys fs-num">
+        <span class="fs-key">1</span><span class="fs-key">2</span><span class="fs-key">3</span>
+        <span class="fs-key">4</span><span class="fs-key">5</span><span class="fs-key">6</span>
+        <span class="fs-key">7</span><span class="fs-key">8</span><span class="fs-key">9</span>
+        <span class="fs-key fs-ghost"></span><span class="fs-key">0</span><span class="fs-key fs-ghost" aria-label="Hapus"><svg class="fs-ic" style="width:26px;height:26px"><use href="#fs-i-del"/></svg></span>
+      </div>
+      <div class="fs-lan"><svg class="fs-ic fs-s"><use href="#fs-i-wifi"/></svg>Hanya bisa dipakai di Wi-Fi toko</div>
+    </div></div>
+    <h3>1 · Masuk (HP orang toko)</h3>
+    <p>Pilih nama akun kasir lalu PIN 6 digit; sesi HP terpisah dari PC kasir dan hanya jalan lewat Wi-Fi toko.</p>
+  </div>
+
+  <!-- ============ 2 · BERANDA ============ -->
+  <div class="fs-col">
+    <div class="fs-phone"><div class="fs-c">
+      <div class="fs-date"><svg class="fs-ic fs-xs"><use href="#fs-i-wifi"/></svg>Rina · Wi-Fi toko</div>
+      <div class="fs-tbar"><b>Stok</b><span class="fs-rbtn" aria-label="Akun"><svg class="fs-ic"><use href="#fs-i-user"/></svg></span></div>
+      <div class="fs-acts2">
+        <div class="fs-act fs-hero"><span class="fs-aic"><svg class="fs-ic"><use href="#fs-i-truck"/></svg></span>
+          <div><b>Barang masuk</b><small>Catat nota supplier</small></div></div>
+        <div class="fs-act"><span class="fs-aic"><svg class="fs-ic"><use href="#fs-i-clip"/></svg></span>
+          <div><b>Stok opname</b><small>Disarankan: Mi Instan</small></div></div>
+      </div>
+      <div class="fs-sec">Segera kedaluwarsa (3)<a>Lihat semua</a></div>
+      <div class="fs-card">
+        <div class="fs-item fs-hl"><div class="fs-txt"><div class="fs-nm">Roti Sari Roti Tawar</div><div class="fs-sub fs-num">±3 bungkus · ED 31 Okt</div></div>
+          <span class="fs-badge fs-bad"><svg class="fs-ic fs-xs"><use href="#fs-i-octa"/></svg>Sudah lewat</span></div>
+        <div class="fs-item fs-hl"><div class="fs-txt"><div class="fs-nm">Sari Roti Sobek Coklat</div><div class="fs-sub fs-num">±5 bungkus · ED 4 Nov</div></div>
+          <span class="fs-badge fs-warn"><svg class="fs-ic fs-xs"><use href="#fs-i-clock"/></svg>2 hari lagi</span></div>
+        <div class="fs-item fs-hl"><div class="fs-txt"><div class="fs-nm">SKM Frisian Flag 370 g</div><div class="fs-sub fs-num">±6 kaleng · ED 15 Nov</div></div>
+          <span class="fs-badge fs-warn"><svg class="fs-ic fs-xs"><use href="#fs-i-clock"/></svg>13 hari lagi</span></div>
+      </div>
+      <div class="fs-sec">Stok menipis (7)<a>Lihat semua</a></div>
+      <div class="fs-card">
+        <div class="fs-item fs-hl"><div class="fs-txt"><div class="fs-nm">Minyak Goreng Bimoli 2 L</div><div class="fs-sub fs-num">Sisa 4 pcs · batas 6</div></div>
+          <span class="fs-badge fs-warn"><svg class="fs-ic fs-xs"><use href="#fs-i-tri"/></svg>Menipis</span></div>
+        <div class="fs-item fs-hl"><div class="fs-txt"><div class="fs-nm">Gudang Garam Filter 12</div><div class="fs-sub fs-num">Sisa 3 bungkus · batas 10</div></div>
+          <span class="fs-badge fs-warn"><svg class="fs-ic fs-xs"><use href="#fs-i-tri"/></svg>Menipis</span></div>
+      </div>
+    </div>
+    <div class="fs-glassbar">
+      <div class="fs-tab"><svg class="fs-ic"><use href="#fs-i-truck"/></svg>Barang masuk</div>
+      <div class="fs-tab"><svg class="fs-ic"><use href="#fs-i-clip"/></svg>Opname</div>
+      <div class="fs-tab"><svg class="fs-ic"><use href="#fs-i-hour"/></svg>Kedaluwarsa</div>
+      <div class="fs-tab"><svg class="fs-ic"><use href="#fs-i-dots"/></svg>Lainnya</div>
+    </div></div>
+    <h3>2 · Beranda orang toko</h3>
+    <p>Dua tugas utama sebagai kartu besar, lalu ringkasan kedaluwarsa dan stok menipis (lihat saja, tanpa harga modal).</p>
+  </div>
+
+  <!-- ============ 3a · BARANG MASUK (atas) ============ -->
+  <div class="fs-col">
+    <div class="fs-phone">
+      <div class="fs-mnav"><span class="fs-pill fs-solo fs-l">Batal</span>
+        <span class="fs-mt">Barang masuk<small><svg class="fs-ic fs-xs"><use href="#fs-i-cloud"/></svg>Draf tersimpan di HP</small></span></div>
+      <div class="fs-fc">
+        <div class="fs-gh">Nota</div>
+        <div class="fs-card">
+          <div class="fs-f fs-hl"><span>Supplier</span><span class="fs-v fs-sel"><b>CV Sumber Rejeki</b><svg class="fs-ic fs-s fs-chev"><use href="#fs-i-chev"/></svg></span></div>
+          <div class="fs-f fs-hl"><span>Tanggal nota</span><span class="fs-v fs-sel fs-num"><b>2 Nov 2026</b><svg class="fs-ic fs-s fs-chev"><use href="#fs-i-chev"/></svg></span></div>
+          <div class="fs-photo fs-hl"><span class="fs-thumb" aria-label="Foto nota"></span>
+            <div class="fs-txt"><b>1 lembar</b><small class="fs-num">Diambil 14.12 · 214 KB</small></div>
+            <span class="fs-tbtn"><svg class="fs-ic fs-s"><use href="#fs-i-camera"/></svg>Foto nota</span></div>
+        </div>
+        <div class="fs-gh">Barang <em class="fs-num">3 baris</em></div>
+        <div class="fs-card">
+          <div class="fs-line fs-hl"><div class="fs-txt"><b>Indomie Goreng 85 g</b><small class="fs-num">2 dus × Rp112.000 <span style="white-space:nowrap">· ED 20 Apr 2027</span></small></div><span class="fs-amt fs-num">Rp224.000</span></div>
+          <div class="fs-line fs-hl"><div class="fs-txt"><b>Minyak Goreng Bimoli 2 L</b><small class="fs-num">2 dus × Rp204.000</small></div><span class="fs-amt fs-num">Rp408.000</span></div>
+          <div class="fs-line fs-hl"><div class="fs-txt"><b>Gula Pasir curah</b><small class="fs-num">50 kg × Rp16.200</small></div><span class="fs-amt fs-num">Rp810.000</span></div>
+          <div class="fs-add fs-hl"><svg class="fs-ic"><use href="#fs-i-plus"/></svg>Tambah barang</div>
+        </div>
+      </div>
+      <div class="fs-foot">
+        <div class="fs-tot"><span>Total berjalan</span><b class="fs-num">Rp1.442.000</b></div>
+        <div class="fs-btn">Lanjut ke pembayaran</div>
+      </div>
+    </div>
+    <h3>3a · Barang masuk — nota</h3>
+    <p>Satu nota = satu catatan: supplier, tanggal, foto nota, baris barang dengan subtotal, dan total berjalan untuk dicocokkan.</p>
+  </div>
+
+  <!-- ============ 3b · BARANG MASUK (bayar sekarang) ============ -->
+  <div class="fs-col">
+    <div class="fs-phone">
+      <div class="fs-mnav fs-line"><span class="fs-pill fs-solo fs-l">Batal</span>
+        <span class="fs-mt">Barang masuk<small><svg class="fs-ic fs-xs"><use href="#fs-i-cloud"/></svg>Draf tersimpan di HP</small></span></div>
+      <div class="fs-fc">
+        <div class="fs-gh">Total</div>
+        <div class="fs-card">
+          <div class="fs-total"><span>3 barang</span><b class="fs-num">Rp1.442.000</b></div>
+        </div>
+        <div class="fs-gf">Sudah sama dengan total di nota? Kalau beda, periksa jumlah dan harga per baris.</div>
+        <div class="fs-gh">Pembayaran</div>
+        <div class="fs-card">
+          <div class="fs-segrow fs-hl"><small>Kapan dibayar</small><div class="fs-seg"><span class="fs-on">Bayar sekarang</span><span>Bayar nanti</span></div></div>
+          <div class="fs-segrow fs-hl"><small>Cara bayar</small><div class="fs-seg"><span class="fs-on">Tunai</span><span>Transfer</span></div></div>
+          <div class="fs-segrow fs-hl"><small>Uang dari</small><div class="fs-seg"><span class="fs-on">Dari laci kasir</span><span>Uang pemilik</span></div></div>
+        </div>
+        <div class="fs-gf fs-num">Dicatat sebagai uang keluar di shift Rina (buka 07.00). Di tutup shift muncul <b>Bayar supplier −Rp1.442.000</b>.</div>
+      </div>
+      <div class="fs-fade"></div>
+      <div class="fs-btn fs-fbtn">Simpan barang masuk</div>
+    </div>
+    <h3>3b · Barang masuk — bayar sekarang</h3>
+    <p>Tunai dari laci kasir mengurangi uang seharusnya di shift yang sedang buka; tanpa shift buka, pilihan laci tidak muncul.</p>
+  </div>
+
+  <!-- ============ 3c · BARANG MASUK (bayar nanti) ============ -->
+  <div class="fs-col">
+    <div class="fs-phone">
+      <div class="fs-mnav fs-line"><span class="fs-pill fs-solo fs-l">Batal</span>
+        <span class="fs-mt">Barang masuk<small><svg class="fs-ic fs-xs"><use href="#fs-i-cloud"/></svg>Draf tersimpan di HP</small></span></div>
+      <div class="fs-fc">
+        <div class="fs-gh">Total</div>
+        <div class="fs-card">
+          <div class="fs-total"><span>3 barang</span><b class="fs-num">Rp1.442.000</b></div>
+        </div>
+        <div class="fs-gh">Pembayaran</div>
+        <div class="fs-card">
+          <div class="fs-segrow fs-hl"><small>Kapan dibayar</small><div class="fs-seg"><span>Bayar sekarang</span><span class="fs-on">Bayar nanti</span></div></div>
+          <div class="fs-f fs-hl"><span>Jatuh tempo</span><span class="fs-v fs-sel fs-num"><b>16 Nov 2026</b><svg class="fs-ic fs-s fs-chev"><use href="#fs-i-chev"/></svg></span></div>
+          <div class="fs-chips fs-num"><span class="fs-chip">7 hari</span><span class="fs-chip fs-on"><svg class="fs-ic fs-xs" style="stroke-width:3"><use href="#fs-i-check"/></svg>14 hari</span><span class="fs-chip">30 hari</span></div>
+        </div>
+        <div class="fs-gf">Nota masuk daftar <b>Utang supplier</b> di aplikasi pemilik. Cara bayar dipilih saat pemilik menandai lunas.</div>
+      </div>
+      <div class="fs-fade"></div>
+      <div class="fs-btn fs-fbtn">Simpan barang masuk</div>
+    </div>
+    <h3>3c · Barang masuk — bayar nanti</h3>
+    <p>Cukup isi jatuh tempo (pilihan cepat 7/14/30 hari); stok tetap langsung bertambah saat disimpan.</p>
+  </div>
+
+  <!-- ============ 4 · TAMBAH BARIS (sheet) ============ -->
+  <div class="fs-col">
+    <div class="fs-phone">
+      <div class="fs-mnav"><span class="fs-pill fs-solo fs-l">Batal</span><span class="fs-mt">Barang masuk<small>Draf tersimpan di HP</small></span></div>
+      <div class="fs-fc">
+        <div class="fs-gh">Nota</div>
+        <div class="fs-card"><div class="fs-f fs-hl"><span>Supplier</span><span class="fs-v"><b>CV Sumber Rejeki</b></span></div></div>
+      </div>
+      <div class="fs-dim"></div>
+      <div class="fs-sheet" style="top:62px">
+        <div class="fs-grab"></div>
+        <div class="fs-shead"><div><b>Tambah barang</b><small>Isi sesuai yang tertulis di nota</small></div>
+          <span class="fs-x" aria-label="Tutup"><svg class="fs-ic fs-s"><use href="#fs-i-x"/></svg></span></div>
+        <div class="fs-srow">
+          <div class="fs-search"><svg class="fs-ic fs-s"><use href="#fs-i-search"/></svg><b>frisian</b></div>
+          <span class="fs-cam" aria-label="Scan barcode dengan kamera"><svg class="fs-ic"><use href="#fs-i-scan"/></svg></span>
+        </div>
+        <div class="fs-card">
+          <div class="fs-picked fs-hl"><span class="fs-pimg"><svg class="fs-ic"><use href="#fs-i-coffee"/></svg></span>
+            <div class="fs-txt"><b>Susu Kental Manis Frisian Flag 370 g</b><small>Susu &amp; kopi</small></div>
+            <svg class="fs-ic fs-s" style="color:#1f7a4d"><use href="#fs-i-checkc"/></svg></div>
+          <div class="fs-segrow fs-hl"><small>Satuan di nota</small><div class="fs-seg"><span>kaleng</span><span class="fs-on">dus (isi 24)</span></div></div>
+          <div class="fs-f fs-hl"><span>Jumlah</span><span class="fs-v"><span class="fs-eq fs-num">= 24 kaleng</span><span class="fs-stepper"><span><svg class="fs-ic fs-s"><use href="#fs-i-minus"/></svg></span><b class="fs-num">1</b><span><svg class="fs-ic fs-s"><use href="#fs-i-plus"/></svg></span></span></span></div>
+          <div class="fs-f fs-hl"><span>Harga beli / dus</span><span class="fs-v fs-num"><b>Rp288.000</b></span></div>
+          <div class="fs-f fs-hl"><span>Kedaluwarsa<small class="fs-opt">opsional</small></span><span class="fs-v fs-sel fs-num"><b>18 Jun 2027</b><svg class="fs-ic fs-s" style="color:#1f7a4d"><use href="#fs-i-cal"/></svg></span></div>
+          <div class="fs-f fs-hl" style="background:#f7faf8"><span>Subtotal</span><span class="fs-v fs-num"><b style="font-size:18px">Rp288.000</b></span></div>
+        </div>
+        <div class="fs-gf">Isi tanggal ED bila ada di kemasan, agar muncul di daftar kedaluwarsa.</div>
+      </div>
+      <div class="fs-btn fs-fbtn" style="z-index:10">Tambahkan ke nota</div>
+    </div>
+    <h3>4 · Tambah baris barang masuk</h3>
+    <p>Cari nama atau scan kamera, pilih satuan sesuai nota, jumlah, harga beli per satuan, lalu tanggal ED bila ada.</p>
+  </div>
+
+  <!-- ============ 5 · OPNAME PILIH KATEGORI ============ -->
+  <div class="fs-col">
+    <div class="fs-phone"><div class="fs-c">
+      <div class="fs-date"><svg class="fs-ic fs-xs"><use href="#fs-i-wifi"/></svg>Rina · Wi-Fi toko</div>
+      <div class="fs-tbar"><b>Stok opname</b></div>
+      <p class="fs-lead">Satu rak, 15–30 menit. Toko tetap buka.</p>
+      <div class="fs-gh" style="margin-top:10px">Kategori · paling lama dihitung di atas</div>
+      <div class="fs-card">
+        <div class="fs-cat fs-hl" style="background:#f4f9f6"><span class="fs-tile" style="background:#c2410c"><svg class="fs-ic fs-s"><use href="#fs-i-package"/></svg></span>
+          <div class="fs-txt"><div>Mi Instan <em class="fs-num">14 barang</em><span class="fs-badge fs-ok"><svg class="fs-ic fs-xs"><use href="#fs-i-spark"/></svg>Disarankan</span></div><small class="fs-num">terakhir dihitung 41 hari lalu</small></div>
+          <svg class="fs-ic fs-s fs-chev"><use href="#fs-i-chev"/></svg></div>
+        <div class="fs-cat fs-hl"><span class="fs-tile" style="background:#a35f00"><svg class="fs-ic fs-s"><use href="#fs-i-drop"/></svg></span>
+          <div class="fs-txt"><div>Minyak &amp; lemak <em class="fs-num">9 barang</em></div><small class="fs-num">terakhir dihitung 23 hari lalu</small></div>
+          <svg class="fs-ic fs-s fs-chev"><use href="#fs-i-chev"/></svg></div>
+        <div class="fs-cat fs-hl"><span class="fs-tile" style="background:#7a5c2e"><svg class="fs-ic fs-s"><use href="#fs-i-package"/></svg></span>
+          <div class="fs-txt"><div>Beras &amp; gula <em class="fs-num">12 barang</em></div><small class="fs-num">terakhir dihitung 18 hari lalu</small></div>
+          <svg class="fs-ic fs-s fs-chev"><use href="#fs-i-chev"/></svg></div>
+        <div class="fs-cat fs-hl"><span class="fs-tile" style="background:#2a6fb0"><svg class="fs-ic fs-s"><use href="#fs-i-coffee"/></svg></span>
+          <div class="fs-txt"><div>Susu &amp; kopi <em class="fs-num">16 barang</em></div><small class="fs-num">terakhir dihitung 9 hari lalu</small></div>
+          <svg class="fs-ic fs-s fs-chev"><use href="#fs-i-chev"/></svg></div>
+        <div class="fs-cat fs-hl"><span class="fs-tile" style="background:#8a5a2b"><svg class="fs-ic fs-s"><use href="#fs-i-bread"/></svg></span>
+          <div class="fs-txt"><div>Roti &amp; snack <em class="fs-num">15 barang</em></div><small class="fs-num">terakhir dihitung 3 hari lalu</small></div>
+          <svg class="fs-ic fs-s fs-chev"><use href="#fs-i-chev"/></svg></div>
+      </div>
+      <div class="fs-gh">Hitung semua</div>
+      <div class="fs-card">
+        <div class="fs-cat fs-hl"><span class="fs-tile" style="background:#1f7a4d"><svg class="fs-ic fs-s"><use href="#fs-i-list"/></svg></span>
+          <div class="fs-txt"><div>Semua barang (stok awal)</div><small class="fs-num">214 barang · untuk hitungan pertama</small></div>
+          <svg class="fs-ic fs-s fs-chev"><use href="#fs-i-chev"/></svg></div>
+      </div>
+    </div>
+    <div class="fs-glassbar">
+      <div class="fs-tab"><svg class="fs-ic"><use href="#fs-i-truck"/></svg>Barang masuk</div>
+      <div class="fs-tab fs-on"><svg class="fs-ic"><use href="#fs-i-clip"/></svg>Opname</div>
+      <div class="fs-tab"><svg class="fs-ic"><use href="#fs-i-hour"/></svg>Kedaluwarsa</div>
+      <div class="fs-tab"><svg class="fs-ic"><use href="#fs-i-dots"/></svg>Lainnya</div>
+    </div></div>
+    <h3>5 · Opname — pilih kategori</h3>
+    <p>Aplikasi menyarankan rak yang paling lama belum dihitung; "Semua barang" dipakai sekali untuk stok awal.</p>
+  </div>
+
+  <!-- ============ 6 · OPNAME MENGHITUNG ============ -->
+  <div class="fs-col">
+    <div class="fs-phone">
+      <div class="fs-mnav"><span class="fs-pill fs-solo fs-l">Jeda</span><span class="fs-mt">Mi Instan<small class="fs-num">8 dari 14</small></span></div>
+      <div class="fs-prog"><i style="width:50%"></i></div>
+      <div class="fs-c" style="padding-top:72px">
+        <div class="fs-scanrow">
+          <span class="fs-bigbtn"><svg class="fs-ic"><use href="#fs-i-scan"/></svg>Scan barcode</span>
+          <span class="fs-sqbtn"><svg class="fs-ic fs-s"><use href="#fs-i-search"/></svg>Cari</span>
+        </div>
+        <div class="fs-card fs-cur">
+          <div class="fs-curtop"><span class="fs-eyebrow">Sedang dihitung</span><span class="fs-badge fs-ok fs-num"><svg class="fs-ic fs-xs"><use href="#fs-i-check"/></svg>Ter-scan 10.42</span></div>
+          <div class="fs-curname">Indomie Goreng 85 g</div>
+          <div class="fs-stp fs-hl"><div><b>Dus</b><small>isi 40 pcs</small></div>
+            <span class="fs-stepper"><span><svg class="fs-ic fs-s"><use href="#fs-i-minus"/></svg></span><b class="fs-num">3</b><span><svg class="fs-ic fs-s"><use href="#fs-i-plus"/></svg></span></span></div>
+          <div class="fs-stp fs-hl"><div><b>Pcs</b><small>lepasan</small></div>
+            <span class="fs-stepper"><span><svg class="fs-ic fs-s"><use href="#fs-i-minus"/></svg></span><b class="fs-num">5</b><span><svg class="fs-ic fs-s"><use href="#fs-i-plus"/></svg></span></span></div>
+          <div class="fs-sumrow fs-hl"><span>Jumlah fisik</span><b class="fs-num">= 125 pcs</b></div>
+        </div>
+        <div class="fs-note"><svg class="fs-ic fs-s"><use href="#fs-i-eyeoff"/></svg>Stok sistem disembunyikan sampai selesai</div>
+        <div class="fs-btn">Simpan, lanjut barang berikutnya</div>
+        <div class="fs-gh">Belum dihitung <em class="fs-num">6</em></div>
+        <div class="fs-card">
+          <div class="fs-todo fs-hl"><span class="fs-ring"></span><span>Indomie Soto Mie 75 g</span><svg class="fs-ic fs-s fs-chev"><use href="#fs-i-chev"/></svg></div>
+          <div class="fs-todo fs-hl"><span class="fs-ring"></span><span>Mie Sedaap Goreng 90 g</span><svg class="fs-ic fs-s fs-chev"><use href="#fs-i-chev"/></svg></div>
+        </div>
+      </div>
+    </div>
+    <h3>6 · Opname — menghitung (hitung buta)</h3>
+    <p>Scan atau ketuk barang, isi dus + pcs dan aplikasi menjumlahkan; stok sistem tidak terlihat selama menghitung.</p>
+  </div>
+
+  <!-- ============ 7a · SELISIH (atas) ============ -->
+  <div class="fs-col">
+    <div class="fs-phone">
+      <div class="fs-c">
+        <div class="fs-date fs-num">Mi Instan · selesai 10.58</div>
+        <div class="fs-h1" style="font-size:32px;margin-bottom:12px">Hasil opname</div>
+        <div class="fs-card">
+          <div class="fs-okrow"><span class="fs-tile" style="background:#1f7a4d"><svg class="fs-ic fs-s" style="stroke-width:2.6"><use href="#fs-i-check"/></svg></span>
+            <div class="fs-txt"><b class="fs-num">11 cocok</b><small>Langsung beres, tanpa alasan</small></div>
+            <svg class="fs-ic fs-s fs-chev"><use href="#fs-i-chev"/></svg></div>
+        </div>
+        <div class="fs-gh" style="margin-top:18px">3 selisih · wajib beri alasan</div>
+        <div class="fs-card fs-diff" style="margin-top:0">
+          <div class="fs-dtop"><b>Indomie Goreng 85 g</b></div>
+          <div class="fs-dmeta fs-num">Sistem <strong>132</strong><svg class="fs-ic fs-xs"><use href="#fs-i-arrow"/></svg>hitungan <strong>125</strong><span style="margin-left:auto" class="fs-badge fs-bad fs-num"><svg class="fs-ic fs-xs"><use href="#fs-i-minus"/></svg>Kurang 7 pcs</span></div>
+          <div class="fs-rlbl">Alasan</div>
+          <div class="fs-reasons"><span class="fs-rc">Rusak</span><span class="fs-rc fs-on"><svg class="fs-ic fs-xs" style="stroke-width:3"><use href="#fs-i-check"/></svg>Hilang</span><span class="fs-rc">Kedaluwarsa</span><span class="fs-rc">Salah input sebelumnya</span></div>
+        </div>
+        <div class="fs-card fs-diff">
+          <div class="fs-dtop"><b>Mie Sedaap Goreng 90 g</b></div>
+          <div class="fs-dmeta fs-num">Sistem <strong>36</strong><svg class="fs-ic fs-xs"><use href="#fs-i-arrow"/></svg>hitungan <strong>40</strong><span style="margin-left:auto" class="fs-badge fs-info fs-num"><svg class="fs-ic fs-xs"><use href="#fs-i-plus"/></svg>Lebih 4 pcs</span></div>
+          <div class="fs-rlbl">Alasan</div>
+          <div class="fs-reasons"><span class="fs-rc">Rusak</span><span class="fs-rc">Hilang</span><span class="fs-rc">Kedaluwarsa</span><span class="fs-rc fs-on"><svg class="fs-ic fs-xs" style="stroke-width:3"><use href="#fs-i-check"/></svg>Salah input sebelumnya</span></div>
+        </div>
+      </div>
+      <div class="fs-bwrap">
+        <div class="fs-hint"><svg class="fs-ic fs-xs"><use href="#fs-i-tri"/></svg>1 barang belum diberi alasan</div>
+        <div class="fs-btn fs-off">Simpan hasil opname</div>
+      </div>
+    </div>
+    <h3>7a · Opname — selisih</h3>
+    <p>Setelah selesai baru stok sistem dibandingkan dengan hitungan; yang cocok dilipat, yang selisih wajib diberi alasan.</p>
+  </div>
+
+  <!-- ============ 7b · SELISIH (digulir) ============ -->
+  <div class="fs-col">
+    <div class="fs-phone">
+      <div class="fs-compact">Hasil opname</div>
+      <div class="fs-c" style="padding-top:52px">
+        <div class="fs-card fs-diff">
+          <div class="fs-dtop"><b>Mie Sedaap Goreng 90 g</b></div>
+          <div class="fs-dmeta fs-num">Sistem <strong>36</strong><svg class="fs-ic fs-xs"><use href="#fs-i-arrow"/></svg>hitungan <strong>40</strong><span style="margin-left:auto" class="fs-badge fs-info fs-num"><svg class="fs-ic fs-xs"><use href="#fs-i-plus"/></svg>Lebih 4 pcs</span></div>
+          <div class="fs-rlbl">Alasan</div>
+          <div class="fs-reasons"><span class="fs-rc">Rusak</span><span class="fs-rc">Hilang</span><span class="fs-rc">Kedaluwarsa</span><span class="fs-rc fs-on"><svg class="fs-ic fs-xs" style="stroke-width:3"><use href="#fs-i-check"/></svg>Salah input sebelumnya</span></div>
+        </div>
+        <div class="fs-card fs-diff fs-need">
+          <div class="fs-dtop"><b>Pop Mie Rasa Ayam</b></div>
+          <div class="fs-dmeta fs-num">Sistem <strong>12</strong><svg class="fs-ic fs-xs"><use href="#fs-i-arrow"/></svg>hitungan <strong>10</strong><span style="margin-left:auto" class="fs-badge fs-bad fs-num"><svg class="fs-ic fs-xs"><use href="#fs-i-minus"/></svg>Kurang 2 pcs</span></div>
+          <div class="fs-rlbl fs-req"><svg class="fs-ic fs-xs"><use href="#fs-i-tri"/></svg>Wajib pilih alasan</div>
+          <div class="fs-reasons"><span class="fs-rc">Rusak</span><span class="fs-rc">Hilang</span><span class="fs-rc">Kedaluwarsa</span><span class="fs-rc">Salah input sebelumnya</span></div>
+        </div>
+        <div class="fs-gf" style="margin-top:12px">Selisih dihitung terhadap stok sistem pada jam barang itu dihitung, jadi penjualan di sela-sela tidak membuat selisih palsu. Nilai rupiahnya hanya dilihat pemilik.</div>
+      </div>
+      <div class="fs-bwrap">
+        <div class="fs-hint"><svg class="fs-ic fs-xs"><use href="#fs-i-tri"/></svg>1 barang belum diberi alasan</div>
+        <div class="fs-btn fs-off">Simpan hasil opname</div>
+      </div>
+    </div>
+    <h3>7b · Opname — selisih (digulir)</h3>
+    <p>Barang tanpa alasan diberi garis merah dan tulisan "Wajib"; tombol Simpan aktif setelah semua diberi alasan.</p>
+  </div>
+
+  <!-- ============ 8a · KEDALUWARSA ============ -->
+  <div class="fs-col">
+    <div class="fs-phone"><div class="fs-c">
+      <div class="fs-date"><svg class="fs-ic fs-xs"><use href="#fs-i-wifi"/></svg>Rina · Wi-Fi toko</div>
+      <div class="fs-tbar"><b>Kedaluwarsa</b></div>
+      <p class="fs-lead">Jumlah adalah perkiraan: barang lama dianggap terjual lebih dulu.</p>
+      <div class="fs-grp fs-gbad"><svg class="fs-ic fs-s"><use href="#fs-i-octa"/></svg>Sudah lewat <em>1</em></div>
+      <div class="fs-card">
+        <div class="fs-ed fs-hl"><div class="fs-txt"><div class="fs-nm">Roti Sari Roti Tawar</div>
+          <div class="fs-sub fs-num">±3 bungkus · <b>ED 31 Okt 2026</b></div><div class="fs-when fs-wbad">Lewat 2 hari</div></div>
+          <span class="fs-more" aria-label="Pilihan"><svg class="fs-ic fs-s"><use href="#fs-i-dots"/></svg></span></div>
+      </div>
+      <div class="fs-grp fs-gwarn"><svg class="fs-ic fs-s"><use href="#fs-i-clock"/></svg>≤ 30 hari <em>2</em></div>
+      <div class="fs-card">
+        <div class="fs-ed fs-hl"><div class="fs-txt"><div class="fs-nm">Sari Roti Sobek Coklat</div>
+          <div class="fs-sub fs-num">±5 bungkus · <b>ED 4 Nov 2026</b></div><div class="fs-when fs-wwarn">2 hari lagi</div></div>
+          <span class="fs-more" aria-label="Pilihan"><svg class="fs-ic fs-s"><use href="#fs-i-dots"/></svg></span></div>
+        <div class="fs-ed fs-hl"><div class="fs-txt"><div class="fs-nm">Susu Kental Manis Frisian Flag 370 g</div>
+          <div class="fs-sub fs-num">±6 kaleng · <b>ED 15 Nov 2026</b></div><div class="fs-when fs-wwarn">13 hari lagi</div></div>
+          <span class="fs-more" aria-label="Pilihan"><svg class="fs-ic fs-s"><use href="#fs-i-dots"/></svg></span></div>
+      </div>
+      <div class="fs-gh" style="margin-top:18px">Baru dikeluarkan</div>
+      <div class="fs-card">
+        <div class="fs-log"><span class="fs-tile" style="background:#8e8e93;width:30px;height:30px"><svg class="fs-ic fs-s"><use href="#fs-i-pkgminus"/></svg></span>
+          <div class="fs-txt">Rina mengeluarkan 4 Roti Sari Roti Tawar<small>Kedaluwarsa · kemarin 16.20</small></div></div>
+      </div>
+    </div>
+    <div class="fs-glassbar">
+      <div class="fs-tab"><svg class="fs-ic"><use href="#fs-i-truck"/></svg>Barang masuk</div>
+      <div class="fs-tab"><svg class="fs-ic"><use href="#fs-i-clip"/></svg>Opname</div>
+      <div class="fs-tab fs-on"><svg class="fs-ic"><use href="#fs-i-hour"/></svg>Kedaluwarsa</div>
+      <div class="fs-tab"><svg class="fs-ic"><use href="#fs-i-dots"/></svg>Lainnya</div>
+    </div></div>
+    <h3>8a · Kedaluwarsa (orang toko)</h3>
+    <p>Dikelompokkan "Sudah lewat" (merah) dan "≤ 30 hari" (oranye), selalu dengan ikon dan tulisan; ⋯ membuka pilihan.</p>
+  </div>
+
+  <!-- ============ 8b · KEDALUWARSA ACTION SHEET ============ -->
+  <div class="fs-col">
+    <div class="fs-phone"><div class="fs-c">
+      <div class="fs-date"><svg class="fs-ic fs-xs"><use href="#fs-i-wifi"/></svg>Rina · Wi-Fi toko</div>
+      <div class="fs-tbar"><b>Kedaluwarsa</b></div>
+      <p class="fs-lead">Jumlah adalah perkiraan: barang lama dianggap terjual lebih dulu.</p>
+      <div class="fs-grp fs-gbad"><svg class="fs-ic fs-s"><use href="#fs-i-octa"/></svg>Sudah lewat <em>1</em></div>
+      <div class="fs-card">
+        <div class="fs-ed fs-hl"><div class="fs-txt"><div class="fs-nm">Roti Sari Roti Tawar</div>
+          <div class="fs-sub fs-num">±3 bungkus · <b>ED 31 Okt 2026</b></div><div class="fs-when fs-wbad">Lewat 2 hari</div></div>
+          <span class="fs-more"><svg class="fs-ic fs-s"><use href="#fs-i-dots"/></svg></span></div>
+      </div>
+      <div class="fs-grp fs-gwarn"><svg class="fs-ic fs-s"><use href="#fs-i-clock"/></svg>≤ 30 hari <em>2</em></div>
+      <div class="fs-card">
+        <div class="fs-ed fs-hl"><div class="fs-txt"><div class="fs-nm">Sari Roti Sobek Coklat</div>
+          <div class="fs-sub fs-num">±5 bungkus · <b>ED 4 Nov 2026</b></div><div class="fs-when fs-wwarn">2 hari lagi</div></div>
+          <span class="fs-more"><svg class="fs-ic fs-s"><use href="#fs-i-dots"/></svg></span></div>
+      </div>
+    </div>
+    <div class="fs-glassbar">
+      <div class="fs-tab"><svg class="fs-ic"><use href="#fs-i-truck"/></svg>Barang masuk</div>
+      <div class="fs-tab"><svg class="fs-ic"><use href="#fs-i-clip"/></svg>Opname</div>
+      <div class="fs-tab fs-on"><svg class="fs-ic"><use href="#fs-i-hour"/></svg>Kedaluwarsa</div>
+      <div class="fs-tab"><svg class="fs-ic"><use href="#fs-i-dots"/></svg>Lainnya</div>
+    </div>
+    <div class="fs-dim"></div>
+    <div class="fs-asheet">
+      <div class="fs-agrp">
+        <div class="fs-ahead"><b>Susu Kental Manis Frisian Flag 370 g</b><small class="fs-num">±6 kaleng · ED 15 Nov 2026 · CV Sumber Rejeki, 3 Agu</small></div>
+        <div class="fs-aopt"><svg class="fs-ic"><use href="#fs-i-cal"/></svg>Ubah tanggal ED</div>
+        <div class="fs-aopt fs-del fs-two"><span><svg class="fs-ic"><use href="#fs-i-pkgminus"/></svg>Keluarkan dari stok</span><small>Alasan: kedaluwarsa · tercatat atas nama Rina</small></div>
+      </div>
+      <div class="fs-acancel">Batal</div>
+    </div></div>
+    <h3>8b · Kedaluwarsa — pilihan baris</h3>
+    <p>Betulkan tanggal ED yang salah, atau keluarkan barang dari stok; pemilik melihat siapa yang melakukannya.</p>
+  </div>
+
+  <!-- ============ 9a · UTANG SUPPLIER (pemilik) ============ -->
+  <div class="fs-col">
+    <div class="fs-phone"><div class="fs-c">
+      <div class="fs-nav"><span class="fs-pill"><svg class="fs-ic"><use href="#fs-i-back"/></svg>Lainnya</span></div>
+      <div class="fs-date">Senin, 2 Nov</div>
+      <div class="fs-tbar"><b>Utang supplier</b></div>
+      <div class="fs-card">
+        <div class="fs-sum9"><div class="fs-cap">Belum dibayar</div><div class="fs-big fs-num">Rp4.087.000</div>
+          <div class="fs-meta fs-num">3 nota · 2 supplier <span class="fs-badge fs-bad"><svg class="fs-ic fs-xs"><use href="#fs-i-octa"/></svg>1 lewat jatuh tempo</span></div></div>
+      </div>
+      <div class="fs-sh">Toko Grosir Makmur<span class="fs-num">Rp2.645.000</span></div>
+      <div class="fs-card">
+        <div class="fs-debt fs-hl" style="background:#fffaf9"><div class="fs-txt"><div class="fs-num"><span>Nota 20 Okt 2026</span><b>Rp1.275.000</b></div>
+          <small class="fs-num">Jatuh tempo 30 Okt <span class="fs-badge fs-bad"><svg class="fs-ic fs-xs"><use href="#fs-i-octa"/></svg>Lewat jatuh tempo</span></small></div><svg class="fs-ic fs-s fs-chev"><use href="#fs-i-chev"/></svg></div>
+        <div class="fs-debt fs-hl"><div class="fs-txt"><div class="fs-num"><span>Nota 28 Okt 2026</span><b>Rp1.370.000</b></div>
+          <small class="fs-num">Jatuh tempo 11 Nov · 9 hari lagi</small></div><svg class="fs-ic fs-s fs-chev"><use href="#fs-i-chev"/></svg></div>
+      </div>
+      <div class="fs-sh">CV Sumber Rejeki<span class="fs-num">Rp1.442.000</span></div>
+      <div class="fs-card">
+        <div class="fs-debt fs-hl"><div class="fs-txt"><div class="fs-num"><span>Nota 2 Nov 2026</span><b>Rp1.442.000</b></div>
+          <small class="fs-num">Jatuh tempo 16 Nov · 14 hari lagi</small></div><svg class="fs-ic fs-s fs-chev"><use href="#fs-i-chev"/></svg></div>
+      </div>
+    </div>
+    <div class="fs-glassbar">
+      <div class="fs-tab"><svg class="fs-ic"><use href="#fs-i-house"/></svg>Beranda</div>
+      <div class="fs-tab"><svg class="fs-ic"><use href="#fs-i-package"/></svg>Barang</div>
+      <div class="fs-tab"><svg class="fs-ic"><use href="#fs-i-chart"/></svg>Laporan</div>
+      <div class="fs-tab"><svg class="fs-ic"><use href="#fs-i-notebook"/></svg>Kasbon</div>
+      <div class="fs-tab fs-on"><svg class="fs-ic"><use href="#fs-i-dots"/></svg>Lainnya</div>
+    </div></div>
+    <h3>9a · Utang supplier (app pemilik)</h3>
+    <p>Dari Lainnya: total yang belum dibayar, lalu nota "Bayar nanti" per supplier dengan jatuh tempo dan tanda lewat.</p>
+  </div>
+
+  <!-- ============ 9b · TANDAI LUNAS ============ -->
+  <div class="fs-col">
+    <div class="fs-phone">
+      <div class="fs-c">
+        <div class="fs-nav"><span class="fs-pill"><svg class="fs-ic"><use href="#fs-i-back"/></svg>Utang</span></div>
+        <div class="fs-eyebrow">Toko Grosir Makmur · nota 20 Okt 2026</div>
+        <div class="fs-h1 fs-num">Rp1.275.000</div>
+        <div class="fs-card">
+          <div class="fs-photo fs-hl"><span class="fs-thumb"></span><div class="fs-txt"><b>Foto nota</b><small>Dicatat Rina · 20 Okt 09.15</small></div></div>
+          <div class="fs-f fs-hl"><span>Jatuh tempo</span><span class="fs-v fs-num">30 Okt 2026</span></div>
+        </div>
+      </div>
+      <div class="fs-dim"></div>
+      <div class="fs-sheet" style="top:214px">
+        <div class="fs-grab"></div>
+        <div class="fs-shead"><div><b>Tandai lunas</b><small>Toko Grosir Makmur · nota 20 Okt 2026</small></div>
+          <span class="fs-x" aria-label="Tutup"><svg class="fs-ic fs-s"><use href="#fs-i-x"/></svg></span></div>
+        <div class="fs-card" style="margin-top:12px">
+          <div class="fs-f fs-hl"><span>Nominal</span><span class="fs-v fs-num"><b>Rp1.275.000</b></span></div>
+          <div class="fs-segrow fs-hl"><small>Cara bayar</small><div class="fs-seg"><span class="fs-on">Tunai</span><span>Transfer</span></div></div>
+          <div class="fs-segrow fs-hl"><small>Uang dari</small><div class="fs-seg"><span>Dari laci kasir</span><span class="fs-on">Uang pemilik</span></div></div>
+        </div>
+        <div class="fs-gf">"Dari laci kasir" dicatat sebagai uang keluar di shift yang sedang buka.</div>
+      </div>
+      <div class="fs-btn fs-fbtn" style="z-index:10">Tandai lunas</div>
+    </div>
+    <h3>9b · Tandai lunas</h3>
+    <p>Pilih tunai atau transfer; bila tunai, dari laci kasir atau uang pemilik — sama seperti di barang masuk.</p>
+  </div>
+
+</div>
+</body></html>

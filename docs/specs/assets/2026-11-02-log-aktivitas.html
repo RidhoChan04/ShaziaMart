@@ -1,0 +1,233 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mockup Log aktivitas (F3c)</title><style>body{margin:0;padding:24px;background:#e9ece9;font-family:Inter,system-ui,sans-serif}h2{margin:0 0 4px;font-size:18px}.subtitle{margin:0 0 16px;color:#5e6b65}</style></head><body><h2>Log aktivitas (app pemilik)</h2><p class="subtitle">Komentari di terminal.</p>
+<style>
+  @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+  .la-row { display: flex; gap: 44px 34px; flex-wrap: wrap; justify-content: center; align-items: flex-start; padding: 10px 0 24px; }
+  .la-col { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .la-col > h3 { margin: 16px 0 0; }
+  .la-col > p { margin: 0; max-width: 330px; text-align: center; font-size: 13px; opacity: .8; }
+  .la-phone { width: 330px; height: 690px; border-radius: 44px; overflow: hidden; position: relative; background: #f2f2f7;
+    box-shadow: 0 0 0 10px #1d1d1f, 0 24px 60px rgba(0,0,0,.28);
+    font-family: Inter, -apple-system, "SF Pro Text", system-ui, sans-serif; color: #1c2421; font-size: 16px;
+    letter-spacing: -.01em; line-height: 1.3; text-align: left; }
+  .la-phone * { box-sizing: border-box; }
+  .la-num { font-variant-numeric: tabular-nums; }
+  .la-ic { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; display: block; }
+  .la-ic.la-s { width: 16px; height: 16px; }
+  .la-ic.la-xs { width: 13px; height: 13px; stroke-width: 2.4; }
+  .la-c { padding: 14px 16px 120px; }
+  .la-back { display: inline-flex; align-items: center; color: #1f7a4d; font-size: 17px; font-weight: 500; margin-left: -6px; height: 32px; }
+  .la-title { font-size: 32px; font-weight: 700; letter-spacing: -.025em; line-height: 1.15; margin: 2px 0 12px; }
+  .la-card { background: #fff; border-radius: 20px; overflow: hidden; }
+  .la-hl { position: relative; }
+  .la-hl + .la-hl::before { content: ""; position: absolute; top: 0; left: 16px; right: 0; border-top: .5px solid #c6c6c8; }
+  .la-chev { color: #c4c4c7; }
+  .la-badge { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; font-weight: 600; line-height: 1; padding: 3px 7px 3px 5px; border-radius: 99px; white-space: nowrap; letter-spacing: 0; }
+  .la-bad { background: #fde8e6; color: #9b1c12; }
+  .la-warn { background: #fff0d9; color: #8a4b00; }
+
+  .la-glassbar { position: absolute; left: 14px; right: 14px; bottom: 22px; height: 62px; border-radius: 31px; z-index: 6;
+    display: flex; justify-content: space-around; align-items: center; padding: 0 6px;
+    background: rgba(255,255,255,.6); backdrop-filter: blur(22px) saturate(180%); -webkit-backdrop-filter: blur(22px) saturate(180%);
+    border: .5px solid rgba(255,255,255,.75); box-shadow: 0 10px 30px rgba(0,0,0,.14), inset 0 1px 0 rgba(255,255,255,.9); }
+  .la-tab { flex: 1; height: 50px; border-radius: 25px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 2px; font-size: 10.5px; font-weight: 600; color: #3a3a3c; white-space: nowrap; }
+  .la-tab .la-ic { width: 22px; height: 22px; }
+  .la-tab.la-on { color: #1f7a4d; background: rgba(31,122,77,.12); }
+  .la-fade { position: absolute; left: 0; right: 0; bottom: 0; height: 120px; z-index: 5; background: linear-gradient(rgba(242,242,247,0), #f2f2f7 60%); }
+
+  /* ringkasan */
+  .la-sumh { display: flex; justify-content: space-between; align-items: baseline; padding: 12px 16px 2px; }
+  .la-sumh b { font-size: 17px; font-weight: 700; letter-spacing: -.015em; }
+  .la-sumh span { font-size: 13px; color: #6e6e73; }
+  .la-stat { display: flex; align-items: center; gap: 10px; padding: 8px 12px 8px 16px; min-height: 42px; font-size: 14px; }
+  .la-stat .la-t { flex: 1; min-width: 0; line-height: 1.25; }
+  .la-stat .la-t b { font-weight: 700; }
+  .la-dot { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; flex: none; }
+  .la-dot.la-bad { background: #fde8e6; color: #9b1c12; }
+  .la-dot.la-warn { background: #fff0d9; color: #8a4b00; }
+
+  /* filter */
+  .la-chips { display: flex; gap: 8px; margin: 12px -16px 0; padding: 0 16px 2px; overflow: hidden; white-space: nowrap; }
+  .la-chip { height: 32px; padding: 0 13px; border-radius: 16px; background: #fff; display: inline-flex; align-items: center; font-size: 14px; font-weight: 500; flex: none; }
+  .la-chip.la-on { background: #1f7a4d; color: #fff; font-weight: 600; }
+  .la-who { display: inline-flex; align-items: center; gap: 4px; margin: 10px 0 0 2px; font-size: 14px; font-weight: 600; color: #1f7a4d; }
+
+  /* timeline */
+  .la-day { font-size: 13px; font-weight: 600; color: #6e6e73; margin: 14px 16px 6px; text-transform: none; }
+  .la-ev { display: flex; align-items: flex-start; gap: 8px; padding: 10px 12px 10px 12px; }
+  .la-time { width: 34px; flex: none; font-size: 12px; font-weight: 600; color: #6e6e73; padding-top: 6px; }
+  .la-av { position: relative; width: 30px; height: 30px; flex: none; }
+  .la-av i { width: 30px; height: 30px; border-radius: 50%; background: #e9e9ee; display: grid; place-items: center; font-style: normal; font-size: 13px; font-weight: 600; color: #3a3a3c; }
+  .la-av i.la-own { background: #1f7a4d; color: #fff; }
+  .la-av em { position: absolute; right: -5px; bottom: -4px; width: 17px; height: 17px; border-radius: 50%; display: grid; place-items: center;
+    background: #e5eef9; color: #1d4f91; box-shadow: 0 0 0 2px #fff; }
+  .la-av em.la-bad { background: #fde8e6; color: #9b1c12; }
+  .la-av em.la-warn { background: #fff0d9; color: #8a4b00; }
+  .la-av em.la-ok { background: #e6f2ea; color: #17603c; }
+  .la-av em .la-ic { width: 10px; height: 10px; stroke-width: 2.6; }
+  .la-ev .la-tx { flex: 1; min-width: 0; font-size: 13.5px; line-height: 1.32; padding-top: 1px; }
+  .la-ev .la-tx b { font-weight: 600; }
+  .la-ev .la-tx small { display: block; font-size: 12.5px; color: #6e6e73; margin-top: 2px; }
+  .la-ev .la-tx .la-badge { margin-top: 5px; }
+
+  /* sheet */
+  .la-dim { position: absolute; inset: 0; background: rgba(0,0,0,.36); z-index: 8; }
+  .la-sheet { position: absolute; left: 0; right: 0; bottom: 0; top: 40px; z-index: 9; background: #f2f2f7; border-radius: 30px 30px 0 0;
+    padding: 8px 16px 20px; box-shadow: 0 -8px 30px rgba(0,0,0,.18); }
+  .la-grab { width: 38px; height: 5px; border-radius: 3px; background: #c7c7cc; margin: 0 auto 8px; }
+  .la-shead { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+  .la-shead b { font-size: 21px; font-weight: 700; letter-spacing: -.02em; display: block; line-height: 1.2; }
+  .la-shead small { font-size: 14px; color: #6e6e73; display: flex; align-items: center; gap: 5px; margin-top: 3px; }
+  .la-x { width: 32px; height: 32px; border-radius: 50%; background: #e3e3e8; color: #3a3a3c; display: grid; place-items: center; flex: none; }
+  .la-gh { font-size: 13px; font-weight: 600; color: #6e6e73; margin: 10px 16px 5px; display: flex; justify-content: space-between; }
+  .la-gh em { font-style: normal; font-weight: 500; }
+  .la-kv { display: flex; align-items: center; gap: 10px; min-height: 36px; padding: 0 16px; font-size: 15px; }
+  .la-kv span:first-child { color: #6e6e73; font-size: 14px; }
+  .la-kv .la-v { margin-left: auto; text-align: right; font-weight: 500; display: flex; align-items: center; gap: 6px; }
+  .la-ln { display: flex; align-items: center; gap: 8px; padding: 5px 14px 5px 16px; min-height: 40px; font-size: 14px; }
+  .la-ln .la-n { flex: 1; min-width: 0; }
+  .la-ln .la-n small { display: block; font-size: 12.5px; color: #6e6e73; }
+  .la-ln .la-p { font-weight: 600; white-space: nowrap; font-size: 14px; }
+  .la-ln.la-gone { background: #fde8e6; box-shadow: inset 3px 0 0 #c4271b; }
+  .la-ln.la-gone .la-n b { text-decoration: line-through; font-weight: 500; color: #7a150d; }
+  .la-ln.la-gone small { color: #7a150d; }
+  .la-ln.la-gone .la-p { color: #9b1c12; text-decoration: line-through; }
+  .la-note { display: flex; gap: 9px; align-items: flex-start; margin-top: 10px; padding: 10px 14px; border-radius: 16px; background: #fde8e6; color: #7a150d; font-size: 14px; font-weight: 600; line-height: 1.35; }
+  .la-note .la-ic { margin-top: 1px; color: #9b1c12; }
+  .la-link { display: flex; align-items: center; justify-content: space-between; height: 46px; margin-top: 10px; padding: 0 16px; border-radius: 14px; background: #1f7a4d; color: #fff; font-weight: 600; font-size: 17px; }
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="la-i-house" viewBox="0 0 24 24"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+  <symbol id="la-i-package" viewBox="0 0 24 24"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><path d="m3.3 7 7.703 4.734a2 2 0 0 0 1.994 0L20.7 7"/><path d="m7.5 4.27 9 5.15"/></symbol>
+  <symbol id="la-i-chart" viewBox="0 0 24 24"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></symbol>
+  <symbol id="la-i-notebook" viewBox="0 0 24 24"><path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"/><path d="M2 6h4"/><path d="M2 10h4"/><path d="M2 14h4"/><path d="M2 18h4"/><path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/></symbol>
+  <symbol id="la-i-dots" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></symbol>
+  <symbol id="la-i-back" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+  <symbol id="la-i-chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+  <symbol id="la-i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="la-i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+  <symbol id="la-i-ban" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/></symbol>
+  <symbol id="la-i-eraser" viewBox="0 0 24 24"><path d="M10 5a2 2 0 0 0-1.344.519l-6.328 5.74a1 1 0 0 0 0 1.481l6.328 5.741A2 2 0 0 0 10 19h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2z"/><path d="m12 9 6 6"/><path d="m18 9-6 6"/></symbol>
+  <symbol id="la-i-wallet" viewBox="0 0 24 24"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></symbol>
+  <symbol id="la-i-tag" viewBox="0 0 24 24"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/></symbol>
+  <symbol id="la-i-truck" viewBox="0 0 24 24"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/></symbol>
+  <symbol id="la-i-pkgminus" viewBox="0 0 24 24"><path d="M16 16h6"/><path d="M21 10V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l2-1.14"/><path d="m7.5 4.27 9 5.15"/><path d="M3.29 7 12 12l8.71-5"/><path d="M12 22V12"/></symbol>
+  <symbol id="la-i-play" viewBox="0 0 24 24"><path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z"/></symbol>
+  <symbol id="la-i-stop" viewBox="0 0 24 24"><rect width="14" height="14" x="5" y="5" rx="2"/></symbol>
+  <symbol id="la-i-tri" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
+  <symbol id="la-i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></symbol>
+  <symbol id="la-i-user" viewBox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+  <symbol id="la-i-arrow" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></symbol>
+</defs></svg>
+
+<div class="la-row">
+
+  <!-- ============ 1 · DAFTAR ============ -->
+  <div class="la-col">
+    <div class="la-phone"><div class="la-c">
+      <div class="la-back"><svg class="la-ic"><use href="#la-i-back"/></svg>Lainnya</div>
+      <div class="la-title">Log aktivitas</div>
+
+      <div class="la-card">
+        <div class="la-sumh"><b>Minggu ini</b><span class="la-num">26 Okt – 2 Nov</span></div>
+        <div class="la-stat la-hl"><span class="la-dot la-bad"><svg class="la-ic la-s"><use href="#la-i-ban"/></svg></span><span class="la-t la-num"><b>3 pembatalan</b> · Rp210.000</span><svg class="la-ic la-s la-chev"><use href="#la-i-chev"/></svg></div>
+        <div class="la-stat la-hl"><span class="la-dot la-bad"><svg class="la-ic la-s"><use href="#la-i-eraser"/></svg></span><span class="la-t la-num"><b>12 baris</b> dihapus setelah di-scan</span><svg class="la-ic la-s la-chev"><use href="#la-i-chev"/></svg></div>
+        <div class="la-stat la-hl"><span class="la-dot la-warn"><svg class="la-ic la-s"><use href="#la-i-wallet"/></svg></span><span class="la-t la-num"><b>1 selisih kas</b></span><svg class="la-ic la-s la-chev"><use href="#la-i-chev"/></svg></div>
+      </div>
+
+      <div class="la-chips">
+        <span class="la-chip la-on">Semua</span><span class="la-chip">Pembatalan</span><span class="la-chip">Hapus baris</span><span class="la-chip">Kas &amp; shift</span><span class="la-chip">Stok</span><span class="la-chip">Harga</span>
+      </div>
+      <div class="la-who"><svg class="la-ic la-s"><use href="#la-i-user"/></svg>Semua orang<svg class="la-ic la-xs"><use href="#la-i-down"/></svg></div>
+
+      <div class="la-day">Hari ini</div>
+      <div class="la-card">
+        <div class="la-ev la-hl"><span class="la-time la-num">14.32</span>
+          <span class="la-av"><i>R</i><em class="la-bad"><svg class="la-ic"><use href="#la-i-ban"/></svg></em></span>
+          <div class="la-tx"><b>Rina membatalkan transaksi #0142</b> · Rp86.500<small>Alasan: salah input · disetujui PIN pemilik</small>
+            <span class="la-badge la-bad"><svg class="la-ic la-xs"><use href="#la-i-tri"/></svg>Pembatalan</span></div></div>
+        <div class="la-ev la-hl"><span class="la-time la-num">13.05</span>
+          <span class="la-av"><i>R</i><em class="la-bad"><svg class="la-ic"><use href="#la-i-eraser"/></svg></em></span>
+          <div class="la-tx"><b>Rina menghapus 2 baris setelah di-scan</b><small>Rokok Gudang Garam ×2 · transaksi tunai</small>
+            <span class="la-badge la-bad"><svg class="la-ic la-xs"><use href="#la-i-tri"/></svg>Perlu dicek</span></div></div>
+        <div class="la-ev la-hl"><span class="la-time la-num">07.02</span>
+          <span class="la-av"><i>D</i><em class="la-ok"><svg class="la-ic"><use href="#la-i-play"/></svg></em></span>
+          <div class="la-tx"><b>Dedi membuka shift</b> · modal Rp300.000</div></div>
+      </div>
+
+      <div class="la-day">Kemarin</div>
+      <div class="la-card">
+        <div class="la-ev la-hl"><span class="la-time la-num">21.10</span>
+          <span class="la-av"><i>D</i><em class="la-warn"><svg class="la-ic"><use href="#la-i-stop"/></svg></em></span>
+          <div class="la-tx"><b>Dedi menutup shift</b> · selisih kas −Rp20.000
+            <span class="la-badge la-warn"><svg class="la-ic la-xs"><use href="#la-i-tri"/></svg>Selisih kas</span></div></div>
+        <div class="la-ev la-hl"><span class="la-time la-num">15.40</span>
+          <span class="la-av"><i>R</i><em><svg class="la-ic"><use href="#la-i-truck"/></svg></em></span>
+          <div class="la-tx"><b>Rina mencatat barang masuk</b> · CV Sumber Rejeki · Rp1.442.000</div></div>
+        <div class="la-ev la-hl"><span class="la-time la-num">10.18</span>
+          <span class="la-av"><i class="la-own">P</i><em><svg class="la-ic"><use href="#la-i-tag"/></svg></em></span>
+          <div class="la-tx"><b>Pemilik mengubah harga Minyak Bimoli 2 L</b> · Rp36.000 → Rp38.500</div></div>
+      </div>
+
+      <div class="la-day">Sabtu, 31 Okt</div>
+      <div class="la-card">
+        <div class="la-ev la-hl"><span class="la-time la-num">16.25</span>
+          <span class="la-av"><i>R</i><em class="la-warn"><svg class="la-ic"><use href="#la-i-pkgminus"/></svg></em></span>
+          <div class="la-tx"><b>Rina mengeluarkan 6 Susu Bendera</b> · kedaluwarsa</div></div>
+      </div>
+    </div>
+    <div class="la-fade"></div>
+    <div class="la-glassbar">
+      <div class="la-tab"><svg class="la-ic"><use href="#la-i-house"/></svg>Beranda</div>
+      <div class="la-tab"><svg class="la-ic"><use href="#la-i-package"/></svg>Barang</div>
+      <div class="la-tab"><svg class="la-ic"><use href="#la-i-chart"/></svg>Laporan</div>
+      <div class="la-tab"><svg class="la-ic"><use href="#la-i-notebook"/></svg>Kasbon</div>
+      <div class="la-tab la-on"><svg class="la-ic"><use href="#la-i-dots"/></svg>Lainnya</div>
+    </div></div>
+    <h3>1 · Log aktivitas</h3>
+    <p>Ringkasan minggu ini bisa diketuk, filter jenis dan orang, lalu garis waktu per hari. Kejadian berisiko selalu pakai ikon, lencana teks, dan warna.</p>
+  </div>
+
+  <!-- ============ 2 · DETAIL ============ -->
+  <div class="la-col">
+    <div class="la-phone"><div class="la-c" aria-hidden="true">
+      <div class="la-back"><svg class="la-ic"><use href="#la-i-back"/></svg>Lainnya</div>
+      <div class="la-title">Log aktivitas</div>
+    </div>
+    <div class="la-dim"></div>
+    <div class="la-sheet">
+      <div class="la-grab"></div>
+      <div class="la-shead"><div><b>Rina menghapus 2 baris setelah di-scan</b>
+        <small><svg class="la-ic la-xs"><use href="#la-i-tri"/></svg><span style="color:#9b1c12;font-weight:600">Perlu dicek</span></small></div>
+        <span class="la-x" aria-label="Tutup"><svg class="la-ic la-s"><use href="#la-i-x"/></svg></span></div>
+
+      <div class="la-gh">Siapa dan kapan</div>
+      <div class="la-card">
+        <div class="la-kv la-hl"><span>Kasir</span><span class="la-v">Rina</span></div>
+        <div class="la-kv la-hl la-num"><span>Waktu</span><span class="la-v">Hari ini, 13.05</span></div>
+      </div>
+
+      <div class="la-gh">Transaksi <em class="la-num">#0145</em></div>
+      <div class="la-card">
+        <div class="la-kv la-hl la-num"><span>Total akhir</span><span class="la-v">Rp52.000</span></div>
+        <div class="la-kv la-hl"><span>Pembayaran</span><span class="la-v">Tunai</span></div>
+      </div>
+
+      <div class="la-gh">Baris sebelum dan sesudah <em class="la-num">2 dihapus</em></div>
+      <div class="la-card la-num">
+        <div class="la-ln la-hl"><div class="la-n"><b style="font-weight:500">Beras Premium 5 kg</b><small>1 × Rp68.000</small></div><span class="la-p">Rp68.000</span></div>
+        <div class="la-ln la-gone la-hl"><svg class="la-ic la-s" style="color:#9b1c12"><use href="#la-i-x"/></svg><div class="la-n"><b>Rokok Gudang Garam</b><small>Dihapus · 1 × Rp32.000</small></div><span class="la-p">Rp32.000</span></div>
+        <div class="la-ln la-gone la-hl"><svg class="la-ic la-s" style="color:#9b1c12"><use href="#la-i-x"/></svg><div class="la-n"><b>Rokok Gudang Garam</b><small>Dihapus · 1 × Rp32.000</small></div><span class="la-p">Rp32.000</span></div>
+        <div class="la-ln la-hl"><div class="la-n"><b style="font-weight:500">Telur 1 kg</b><small>1 × Rp52.000</small></div><span class="la-p">Rp52.000</span></div>
+      </div>
+
+      <div class="la-note"><svg class="la-ic"><use href="#la-i-tri"/></svg><span>Baris dihapus setelah pembeli dilayani — cek CCTV/laci bila perlu</span></div>
+      <div class="la-link"><span>Lihat transaksi</span><svg class="la-ic"><use href="#la-i-arrow"/></svg></div>
+    </div></div>
+    <h3>2 · Detail kejadian</h3>
+    <p>Ketuk baris "hapus baris": siapa, kapan, transaksinya, baris sebelum dan sesudah (yang dihapus ditandai merah), dan catatan tindak lanjut.</p>
+  </div>
+
+</div>
+</body></html>
