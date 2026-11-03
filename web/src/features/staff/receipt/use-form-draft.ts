@@ -134,6 +134,22 @@ export function useFormDraft(
     [],
   );
 
+  // Tab ditutup/HP ke latar sebelum 300 ms: simpan sekarang (unmount tidak selalu jalan).
+  useEffect(() => {
+    const onHide = () => {
+      if (timer.current) flushRef.current().catch(() => undefined);
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") onHide();
+    };
+    window.addEventListener("pagehide", onHide);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("pagehide", onHide);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
+
   return {
     draft,
     update,

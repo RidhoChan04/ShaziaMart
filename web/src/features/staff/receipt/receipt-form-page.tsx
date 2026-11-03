@@ -94,13 +94,21 @@ export function ReceiptFormPage() {
     submitting.current = true;
     setBusy(true);
     setFailure(null);
+    let queued = false;
     try {
       form.freeze();
       await form.save({ ...draft, status: "queued", errors: [] });
+      queued = true;
       await finish();
     } catch {
-      form.unfreeze();
-      setFailure(SAVE_FAILED);
+      if (queued) {
+        // Sudah tersimpan antre di HP; hanya pengirimannya yang gagal.
+        toast("Tersimpan di HP — dikirim saat tersambung");
+        await toList();
+      } else {
+        form.unfreeze();
+        setFailure(SAVE_FAILED);
+      }
     } finally {
       submitting.current = false;
       setBusy(false);

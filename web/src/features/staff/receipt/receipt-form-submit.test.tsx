@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { toast } from "sonner";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
@@ -140,17 +140,54 @@ test("422 Bimoli nonaktif → kembali ke langkah nota, 'Barang ini tidak dijual 
   );
 });
 
-test("Simpan diklik dua kali cepat → satu POST", async () => {
+test("Simpan diklik dua kali dalam satu tarikan → satu simpan antre, satu POST", async () => {
   await loginRina(true);
   const bodies = capturePosts();
-  renderForm(await storeWithDraft(), BAYAR);
-  const user = userEvent.setup();
+  const base = await storeWithDraft();
+  const put = vi.fn(base.put);
+  const { router } = renderForm({ ...base, put }, BAYAR);
   const save = await screen.findByRole("button", {
     name: "Simpan barang masuk",
   });
-  await Promise.all([user.click(save), user.click(save)]);
-  await screen.findByText("Barang masuk tersimpan");
+  act(() => {
+    save.click();
+    save.click();
+  });
+  await waitFor(() =>
+    expect(router.state.location.pathname).toBe("/staff/masuk"),
+  );
   expect(bodies).toHaveLength(1);
+  expect(put.mock.calls.filter(([d]) => d.status === "queued")).toHaveLength(1);
+});
+
+test("kirim gagal setelah draf tersimpan antre → bukan 'Gagal menyimpan'; toast tersimpan, ke daftar", async () => {
+  await loginRina(true);
+  const base = await storeWithDraft();
+  let queued = false;
+  const store = {
+    ...base,
+    put: async (d: Parameters<typeof base.put>[0]) => {
+      if (d.status === "queued") queued = true;
+      return base.put(d);
+    },
+    list: async () => {
+      if (queued) throw new Error("baca gagal");
+      return base.list();
+    },
+  };
+  const { router } = renderForm(store, BAYAR);
+  const user = userEvent.setup();
+  await user.click(
+    await screen.findByRole("button", { name: "Simpan barang masuk" }),
+  );
+  expect(
+    await screen.findByText("Tersimpan di HP — dikirim saat tersambung"),
+  ).toBeInTheDocument();
+  expect(screen.queryByText(/Gagal menyimpan draf/)).toBeNull();
+  await waitFor(() =>
+    expect(router.state.location.pathname).toBe("/staff/masuk"),
+  );
+  expect((await base.get(DRAFT_ID))?.status).toBe("queued");
 });
 
 test("galat tulis HP saat Simpan → tetap di form dengan pesan galat, tidak ada POST", async () => {

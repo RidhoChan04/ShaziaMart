@@ -46,7 +46,7 @@ export function equivalence(
 }
 
 /** Harga beli yang diketik; kosong → null, bukan angka → -1 (ditolak aturan nota). */
-function parseCost(text: string): number | null {
+export function parseCost(text: string): number | null {
   if (text.trim() === "") return null;
   return parseRupiah(text) ?? -1;
 }

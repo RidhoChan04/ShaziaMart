@@ -74,6 +74,9 @@ test("foto kecil: satu percobaan 1600/0.8, hasil JPEG, bitmap ditutup", async ()
   expect(s.canvas.width).toBe(1600);
   expect(s.canvas.height).toBe(1200);
   expect(s.close).toHaveBeenCalled();
+  expect(createImageBitmap).toHaveBeenCalledWith(expect.anything(), {
+    imageOrientation: "from-image",
+  });
 });
 
 test("tidak diperbesar bila foto lebih kecil dari 1600 px", async () => {

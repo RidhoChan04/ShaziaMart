@@ -1,5 +1,10 @@
 import { screen, within } from "@testing-library/react";
 import { expect, test } from "vitest";
+import {
+  DRAFT_ID,
+  renderForm,
+  storeWithDraft,
+} from "@/features/staff/receipt/form-test-kit";
 import { ownerLogin, staffLogin } from "@/mocks/handlers/test-helpers";
 import { setScenario } from "@/mocks/scenarios";
 import { renderApp } from "@/test/render-app";
@@ -143,4 +148,17 @@ test("rute /staff/masuk/baru: formulir nota sungguhan; validateSearch menyimpan 
   if (typeof validate !== "function") throw new Error("tanpa validateSearch");
   expect(validate({ draf: "", langkah: "ngawur" })).toEqual({});
   expect(validate({ draf: 5 })).toEqual({});
+});
+
+test("rute /staff/masuk/baru: draf milik pengguna + langkah=bayar bertahan, langkah bayar tampil", async () => {
+  await staffLogin("Rina");
+  const { router } = renderForm(
+    await storeWithDraft(),
+    `/staff/masuk/baru?draf=${DRAFT_ID}&langkah=bayar`,
+  );
+  await screen.findByRole("heading", { name: "Pembayaran" });
+  expect(router.state.location.search).toEqual({
+    draf: DRAFT_ID,
+    langkah: "bayar",
+  });
 });

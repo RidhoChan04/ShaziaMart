@@ -47,7 +47,7 @@ export async function compressPhoto(
 ): Promise<{ blob: Blob; bytes: number }> {
   let bitmap: ImageBitmap;
   try {
-    bitmap = await createImageBitmap(file);
+    bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
   } catch {
     throw new Error("Foto tidak bisa dibaca");
   }

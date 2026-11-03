@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { loginWithShift, staffLogin } from "@/mocks/handlers/test-helpers";
@@ -219,4 +219,44 @@ test("penyimpanan HP gagal → banner; Simpan draf menolak dan formulir tetap te
     screen.getByText(/Draf tidak bisa disimpan di HP/),
   ).toBeInTheDocument();
   expect(router.state.location.pathname).toBe("/staff/masuk/baru");
+});
+
+test("pagehide sebelum 300 ms → supplier langsung ada di store", async () => {
+  const store = await storeWithDraft({ lines: [], supplierName: "" });
+  renderForm(store);
+  const user = userEvent.setup();
+  await user.type(await screen.findByLabelText("Supplier"), "CV Sumber Rejeki");
+  act(() => {
+    window.dispatchEvent(new Event("pagehide"));
+  });
+  // Tanpa menunggu 300 ms simpan otomatis.
+  await act(async () => {});
+  expect((await store.get(DRAFT_ID))?.form.supplierName).toBe(
+    "CV Sumber Rejeki",
+  );
+});
+
+test("tab ke latar (visibilitychange hidden) sebelum 300 ms → tersimpan", async () => {
+  const store = await storeWithDraft({ lines: [], supplierName: "" });
+  renderForm(store);
+  const user = userEvent.setup();
+  await user.type(await screen.findByLabelText("Supplier"), "PT Baru");
+  vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+  act(() => {
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+  // Tanpa menunggu 300 ms simpan otomatis.
+  await act(async () => {});
+  expect((await store.get(DRAFT_ID))?.form.supplierName).toBe("PT Baru");
+});
+
+test("pindah halaman (unmount) sebelum 300 ms → tersimpan", async () => {
+  const store = await storeWithDraft({ lines: [], supplierName: "" });
+  const { unmount } = renderForm(store);
+  const user = userEvent.setup();
+  await user.type(await screen.findByLabelText("Supplier"), "Toko Lama");
+  unmount();
+  // Tanpa menunggu 300 ms simpan otomatis.
+  await act(async () => {});
+  expect((await store.get(DRAFT_ID))?.form.supplierName).toBe("Toko Lama");
 });

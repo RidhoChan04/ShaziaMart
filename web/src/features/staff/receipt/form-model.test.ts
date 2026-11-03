@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import type { DraftLine } from "@/shared/lib/receipt-rules";
+import { type DraftLine, receiptTotal } from "@/shared/lib/receipt-rules";
 import { emptyForm } from "../drafts/draft-store";
 import type { DraftPhoto } from "../drafts/draft-types";
 import {
@@ -64,4 +64,23 @@ test("drawerNote", () => {
     "Dicatat sebagai uang keluar di shift Rina (buka 07.00). Di tutup shift muncul Bayar supplier −Rp1.442.000.",
   );
   expect(drawerNote(null, 1_442_000)).toBeNull();
+});
+
+test("formTotal sama dengan receiptTotal untuk baris yang sama; di luar batas aman → null", () => {
+  const lines = [line("a", 2, "112.000"), line("b", 12, "34000")];
+  const f = { ...emptyForm("2026-11-02"), lines };
+  expect(formTotal(f)).toBe(
+    receiptTotal([
+      { qty: 2, unitCost: 112_000 },
+      { qty: 12, unitCost: 34_000 },
+    ]),
+  );
+  const huge = {
+    ...emptyForm("2026-11-02"),
+    lines: [line("a", 9_007_199_254_740_991, "2")],
+  };
+  expect(() =>
+    receiptTotal([{ qty: 9_007_199_254_740_991, unitCost: 2 }]),
+  ).toThrow(RangeError);
+  expect(formTotal(huge)).toBeNull();
 });
