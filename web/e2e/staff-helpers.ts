@@ -59,8 +59,12 @@ export async function goOffline(page: Page) {
   await page.evaluate(() => localStorage.setItem("e2e.offline", "1"));
 }
 
+/** Wi-Fi tersambung lagi; event `online` memicu kirim otomatis seperti di HP sungguhan. */
 export async function goOnline(page: Page) {
-  await page.evaluate(() => localStorage.removeItem("e2e.offline"));
+  await page.evaluate(() => {
+    localStorage.removeItem("e2e.offline");
+    window.dispatchEvent(new Event("online"));
+  });
 }
 
 /** Halaman HP orang toko baru (360×800) di konteks yang sama, tanpa mengosongkan state mock. */

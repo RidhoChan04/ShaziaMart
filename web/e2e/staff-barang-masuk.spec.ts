@@ -183,6 +183,7 @@ test("offline: draf tersimpan di HP, bertahan lewat muat ulang (R27), terkirim o
   await loginOwner(owner, "/owner/lainnya/barang-masuk");
   await expect(owner.getByText("Toko Grosir Mandiri")).toHaveCount(0);
 
+  // Event `online` memicu kirim saat itu juga (tanpa menunggu sync berkala 30 dtk).
   await goOnline(page);
   await page
     .getByRole("navigation", { name: "Navigasi orang toko" })
@@ -190,9 +191,7 @@ test("offline: draf tersimpan di HP, bertahan lewat muat ulang (R27), terkirim o
     .click();
   await expect(
     page.getByRole("heading", { name: "Terkirim", exact: true }),
-  ).toBeVisible({
-    timeout: 40_000,
-  });
+  ).toBeVisible({ timeout: 10_000 });
   await expect(
     page.getByRole("button", { name: /Toko Grosir Mandiri/ }),
   ).not.toContainText("Belum terkirim");
