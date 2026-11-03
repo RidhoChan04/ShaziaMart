@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, test, vi } from "vitest";
 import type { HourBucket } from "@/shared/api/gen/shaziaMartAPI.schemas";
+import { stubWidth } from "@/test/resize-observer";
 import { HourlyChart } from "./hourly-chart";
 import { buildChart } from "./hourly-chart-geometry";
 
@@ -30,27 +31,6 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
-
-/** ResizeObserver palsu yang langsung melaporkan lebar tertentu saat observe(). */
-function stubWidth(width: number) {
-  vi.stubGlobal(
-    "ResizeObserver",
-    class {
-      cb: ResizeObserverCallback;
-      constructor(cb: ResizeObserverCallback) {
-        this.cb = cb;
-      }
-      observe() {
-        this.cb(
-          [{ contentRect: { width } } as ResizeObserverEntry],
-          this as unknown as ResizeObserver,
-        );
-      }
-      disconnect() {}
-      unobserve() {}
-    },
-  );
-}
 
 const todayBars = (c: HTMLElement) =>
   Array.from(c.querySelectorAll("svg rect[data-series='today']"));

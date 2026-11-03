@@ -1,31 +1,11 @@
 import { render, screen } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
+import { stubWidth } from "@/test/resize-observer";
 import { FitAmount } from "./fit-amount";
 
 afterEach(() => {
   vi.unstubAllGlobals();
 });
-
-/** ResizeObserver palsu yang langsung melaporkan lebar tertentu saat observe(). */
-function stubWidth(width: number) {
-  vi.stubGlobal(
-    "ResizeObserver",
-    class {
-      cb: ResizeObserverCallback;
-      constructor(cb: ResizeObserverCallback) {
-        this.cb = cb;
-      }
-      observe() {
-        this.cb(
-          [{ contentRect: { width } } as ResizeObserverEntry],
-          this as unknown as ResizeObserver,
-        );
-      }
-      disconnect() {}
-      unobserve() {}
-    },
-  );
-}
 
 test("FitAmount: RO palsu lebar 132 → 'Rp12.345.678' font-size 18px, tanpa kelas truncate", () => {
   stubWidth(132);

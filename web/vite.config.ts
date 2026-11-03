@@ -35,6 +35,8 @@ export default defineConfig(({ command, mode }) => {
     test: {
       environment: "jsdom",
       setupFiles: ["./vitest.setup.ts"],
+      // Vitest mengosongkan impor CSS; penjaga palet membaca token dari styles.css?raw.
+      css: { include: [/src\/app\/styles\.css/] },
       exclude: ["e2e/**", "node_modules/**"],
       // Test integrasi layar kasir (render penuh + MSW) bisa > 5 dtk saat semua worker
       // mulai bersamaan di mesin sibuk; 15 dtk tetap menangkap test yang benar-benar macet.

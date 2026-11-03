@@ -4,6 +4,7 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { mockDb } from "@/mocks/db";
 import { ownerLogin } from "@/mocks/handlers/test-helpers";
 import { renderApp } from "@/test/render-app";
+import { stubWidth } from "@/test/resize-observer";
 
 beforeEach(async () => {
   await ownerLogin();
@@ -12,27 +13,6 @@ beforeEach(async () => {
 afterEach(() => {
   vi.unstubAllGlobals();
 });
-
-/** ResizeObserver palsu yang langsung melaporkan lebar tertentu saat observe(). */
-function stubWidth(width: number) {
-  vi.stubGlobal(
-    "ResizeObserver",
-    class {
-      cb: ResizeObserverCallback;
-      constructor(cb: ResizeObserverCallback) {
-        this.cb = cb;
-      }
-      observe() {
-        this.cb(
-          [{ contentRect: { width } } as ResizeObserverEntry],
-          this as unknown as ResizeObserver,
-        );
-      }
-      disconnect() {}
-      unobserve() {}
-    },
-  );
-}
 
 const main = () => within(screen.getByRole("main"));
 

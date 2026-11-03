@@ -21,6 +21,7 @@ import { setScenario } from "@/mocks/scenarios";
 import { getGetOwnerTodaySummaryQueryKey } from "@/shared/api/gen/owner/owner";
 import { newId } from "@/shared/lib/id";
 import { renderApp } from "@/test/render-app";
+import { stubWidth } from "@/test/resize-observer";
 
 const SUMMARY_KEY = getGetOwnerTodaySummaryQueryKey();
 
@@ -114,27 +115,6 @@ test("omzet, perbandingan, grafik, tile, dan perlu perhatian tampil dari mock", 
   ).toHaveAttribute("href", "/owner/kasbon");
   expect(screen.queryByText("Semua aman hari ini")).not.toBeInTheDocument();
 });
-
-/** ResizeObserver palsu yang langsung melaporkan lebar tertentu saat observe(). */
-function stubWidth(width: number) {
-  vi.stubGlobal(
-    "ResizeObserver",
-    class {
-      cb: ResizeObserverCallback;
-      constructor(cb: ResizeObserverCallback) {
-        this.cb = cb;
-      }
-      observe() {
-        this.cb(
-          [{ contentRect: { width } } as ResizeObserverEntry],
-          this as unknown as ResizeObserver,
-        );
-      }
-      disconnect() {}
-      unobserve() {}
-    },
-  );
-}
 
 test("omzet sangat besar di pita: ukuran huruf turun (30px di 296px), tidak dipotong", async () => {
   server.use(

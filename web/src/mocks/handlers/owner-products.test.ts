@@ -120,7 +120,7 @@ async function sellIndomie(): Promise<Sale> {
 describe("tanpa sesi pemilik", () => {
   test("tanpa sesi pemilik → 401 untuk semua endpoint barang", async () => {
     const id = productId(INDOMIE);
-    const before = mockDb.get().products;
+    const before = mockDb.get();
     const responses = [
       await fetch("/api/owner/products"),
       await post("/api/owner/products", TEH),
@@ -142,7 +142,7 @@ describe("tanpa sesi pemilik", () => {
       expect(res.status).toBe(401);
       expect((await json<{ code: string }>(res)).code).toBe("UNAUTHORIZED");
     }
-    expect(mockDb.get().products).toEqual(before);
+    expect(mockDb.get()).toEqual(before);
   });
 });
 
@@ -290,7 +290,7 @@ describe("barang pemilik", () => {
     expect(body.errors).toEqual([
       { field: "name", message: "Nama sudah dipakai barang lain" },
     ]);
-    expect(mockDb.get().products).toEqual(before.products);
+    expect(mockDb.get()).toEqual(before);
   });
 
   test("isi mentah divalidasi per field (bukan skema): tipe salah, nama 101 huruf, body kosong", async () => {
@@ -329,7 +329,7 @@ describe("barang pemilik", () => {
     const path = `/api/owner/products/${id}`;
     // Belum terjual di test ini? Seed riwayat bisa sudah menjualnya; pastikan terjual.
     await sellIndomie();
-    const before = mockDb.get().products.find((p) => p.id === id);
+    const before = mockDb.get();
 
     const kg = await put(path, indomieInput({ sellUnit: "kg" }));
     expect(kg.status).toBe(422);
@@ -350,7 +350,7 @@ describe("barang pemilik", () => {
         message: "Isi dus tidak bisa diubah — sudah terjual",
       },
     ]);
-    expect(mockDb.get().products.find((p) => p.id === id)).toEqual(before);
+    expect(mockDb.get()).toEqual(before);
 
     // Yang tidak dikunci tetap boleh: nama satuan eceran, nama satuan besar, harga.
     const ok = await put(
@@ -363,7 +363,9 @@ describe("barang pemilik", () => {
       ["bungkus", 1, true],
       ["karton", 40, true],
     ]);
-    expect(p.units[1]?.id).toBe(before?.units[1]?.id);
+    expect(p.units[1]?.id).toBe(
+      before.products.find((x) => x.id === id)?.units[1]?.id,
+    );
   });
 
   test("C11: Dijual per terkunci bila stok ≠ 0 walau belum terjual; barang baru stok 0 boleh diubah", async () => {
@@ -611,7 +613,7 @@ describe("barang pemilik", () => {
     const pcs = unitOf(INDOMIE, "pcs").id;
     // Dengan grosir 2.800, harga eceran < 2.600 juga membuat grosir tidak lebih murah: lepas grosir dulu.
     await put(`/api/owner/products/${id}`, indomieInput({ tier: null }));
-    const before = mockDb.get().products.find((p) => p.id === id);
+    const before = mockDb.get();
 
     const below = await put(path, {
       lines: [{ unitId: pcs, tierMinQty: null, price: 2500 }],
@@ -645,7 +647,7 @@ describe("barang pemilik", () => {
     ]);
     const empty = await put(path, { lines: [] });
     expect(empty.status).toBe(422);
-    expect(mockDb.get().products.find((p) => p.id === id)).toEqual(before);
+    expect(mockDb.get()).toEqual(before);
 
     // Barang bergrosir: harga eceran di bawah grosir ditolak pada baris grosir.
     await put(`/api/owner/products/${id}`, indomieInput());
