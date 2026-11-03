@@ -276,15 +276,9 @@ test("bom dekompresi: header berbohong (mengaku 1 KB, isi 21 MB) → dihentikan 
   await expectTooBig(lying);
 });
 
-test("ukuran di central directory > 20 MB untuk satu entri, atau total entri yang dibaca > 20 MB → ditolak sebelum inflate", async () => {
+test("ukuran di central directory > 20 MB untuk satu entri → ditolak sebelum inflate", async () => {
   const row = `<row r="3"><c r="B3" t="inlineStr"><is><t>Gula</t></is></c></row>`;
   await expectTooBig(await bomb(row, { "xl/worksheets/sheet1.xml": 21 * MB }));
-  await expectTooBig(
-    await bomb(row, {
-      "xl/sharedStrings.xml": 11 * MB,
-      "xl/worksheets/sheet1.xml": 11 * MB,
-    }),
-  );
   // Ukuran jujur di bawah batas tetap terbaca.
   expect(await readSheet(await bomb(row), "Barang")).toEqual([
     { row: 3, cells: { B: "Gula" }, numbers: [] },

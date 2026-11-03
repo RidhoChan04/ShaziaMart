@@ -6,6 +6,13 @@ and barcodes are text (a barcode stored as a number loses its leading zero). Row
 rows 15-50 only hold the template's Status formula, and column P (Catatan) is not imported.
 
 Usage: python scripts/make-import-fixture.py src/test/fixtures/data-barang-contoh.xlsx
+
+src/test/fixtures/data-barang-contoh-excel.xlsx is NOT generated here: it is this fixture opened
+and saved again by Microsoft Excel (shared strings, cached column A formula results, Excel's own
+zip layout). After regenerating data-barang-contoh.xlsx, recreate it by hand: open the new file in
+Excel, File > Info > Inspect Document > remove Document Properties and Personal Information, then
+Save As "Excel Workbook (*.xlsx)" under that name. The read-xlsx test checks that both files read
+to IMPORT_ROWS.
 """
 
 import subprocess

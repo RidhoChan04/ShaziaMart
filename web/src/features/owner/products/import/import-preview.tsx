@@ -105,7 +105,7 @@ export function ImportPreview({
     <>
       <section
         aria-label="Ringkasan"
-        className="grid gap-3 sm:grid-cols-3 lg:grid-cols-[1.9fr_1fr_1fr_1fr]"
+        className="grid grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-3 lg:grid-cols-[1.9fr_1fr_1fr_1fr]"
       >
         <div className="flex items-center gap-3.5 rounded-lg bg-surface p-4 sm:col-span-3 lg:col-span-1">
           <span
@@ -178,7 +178,16 @@ export function ImportPreview({
           </div>
           <p className="text-sm text-muted">Urut sesuai baris di Excel</p>
         </div>
-        <PreviewTable rows={visible} />
+        <p role="status" className="sr-only">
+          {`Menampilkan ${visible.length} baris`}
+        </p>
+        {visible.length > 0 ? (
+          <PreviewTable rows={visible} />
+        ) : (
+          <p className="border-t border-border px-4 py-6 text-center text-[15px] text-muted">
+            Tidak ada baris yang perlu diperbaiki
+          </p>
+        )}
       </section>
 
       <div className="glass sticky bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-10 mt-4 flex flex-wrap items-center gap-3 rounded-lg py-3 pr-3 pl-4 shadow-lg lg:bottom-4">

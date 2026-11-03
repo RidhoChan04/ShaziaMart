@@ -283,3 +283,20 @@ test("tanpa baris yang bisa diimpor → tombol 'Impor 0 barang' nonaktif; Batal 
     expect(router.state.location.pathname).toBe("/owner/barang"),
   );
 });
+
+test("jumlah baris yang tampil diumumkan; filter 'Perlu diperbaiki' tanpa hasil → keterangan kosong, bukan tabel kosong", async () => {
+  const { user } = await openImport();
+  const data = await makeXlsx({
+    rows: `<row r="3"><c r="B3" t="inlineStr"><is><t>Kerupuk Udang</t></is></c><c r="D3" t="inlineStr"><is><t>pcs</t></is></c><c r="F3"><v>1500</v></c><c r="G3"><v>2000</v></c></row>`,
+  });
+  await pick(user, new File([data], "rapi.xlsx", { type: XLSX_TYPE }));
+  await screen.findByRole("button", { name: "Semua 1" });
+  expect(screen.getByRole("status")).toHaveTextContent("Menampilkan 1 baris");
+
+  await user.click(screen.getByRole("button", { name: "Perlu diperbaiki 0" }));
+  expect(screen.getByRole("status")).toHaveTextContent("Menampilkan 0 baris");
+  expect(screen.queryByRole("table")).toBeNull();
+  expect(
+    screen.getByText("Tidak ada baris yang perlu diperbaiki"),
+  ).toBeInTheDocument();
+});
