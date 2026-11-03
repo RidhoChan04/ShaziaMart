@@ -8,7 +8,7 @@ import type { MockProduct, MockState, MockUnit } from "../db";
 import { type Ctx, key } from "./checks";
 import { eceranOf } from "./views";
 
-function nextStoreCode(state: Readonly<MockState>): string {
+export function nextStoreCode(state: Readonly<MockState>): string {
   const codes = state.products
     .map((p) => Number(p.storeCode))
     .filter(Number.isSafeInteger);

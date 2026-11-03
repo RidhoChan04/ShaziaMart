@@ -107,7 +107,7 @@ export function soldUnitIds(state: Readonly<MockState>): Set<string> {
   return new Set(state.sales.flatMap((s) => s.items.map((i) => i.unitId)));
 }
 
-/** Mutasi dari penjualan: jual saat dibuat, batal saat dibatalkan; terbaru dulu. */
+/** Mutasi dari penjualan (jual, batal) dan barang masuk (`stockEntries`); terbaru dulu. */
 export function movementsOf(
   state: Readonly<MockState>,
   productId: string,
@@ -137,6 +137,11 @@ export function movementsOf(
         kasirName,
       });
     }
+  }
+  for (const e of state.stockEntries) {
+    if (e.productId !== productId) continue;
+    const { id, at, kind, qtyBase, actorName: kasirName } = e;
+    out.push({ id, at, kind, qtyBase, kasirName });
   }
   // Batal di milidetik yang sama dengan jualnya tetap tampil di atas.
   const rank = (m: StockMovement) => (m.kind === "batal" ? 0 : 1);

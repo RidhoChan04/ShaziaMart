@@ -8,6 +8,7 @@ import { settingsHandlers } from "./settings";
 import { shiftHandlers } from "./shift";
 import { staffHandlers } from "./staff";
 import { staffTunnelGuard } from "./staff-realm";
+import { staffReceiptHandlers } from "./staff-receipts";
 import { systemHandlers } from "./system";
 
 export const handlers = [
@@ -23,4 +24,5 @@ export const handlers = [
   ...ownerHandlers,
   ...ownerProductHandlers,
   ...staffHandlers,
+  ...staffReceiptHandlers,
 ];

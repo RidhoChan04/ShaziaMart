@@ -11,6 +11,7 @@ import {
   DUE_SOON_DAYS,
   debtStage,
   newProductUnits,
+  RECEIPT_TOO_LARGE,
   receiptLineTotal,
   receiptTotal,
   validatePayment,
@@ -639,6 +640,51 @@ describe("validateReceipt: barang terdaftar ATAU barang baru", () => {
     expect(productErrors(line())).toEqual([]);
     expect(productErrors(newLine())).toEqual([]);
   });
+});
+
+describe("validateReceipt: angka di luar batas aman (R13)", () => {
+  const big = Number.MAX_SAFE_INTEGER;
+  const tooLarge = (lineId: string) => ({
+    lineId,
+    field: "unitCost",
+    message: RECEIPT_TOO_LARGE,
+  });
+
+  test("subtotal qty × harga melewati batas aman → galat unitCost di baris itu", () =>
+    expect(
+      validateReceipt(
+        receipt({ lines: [line({ qty: 2, unitCost: big })] }),
+        ctx,
+      ),
+    ).toEqual([tooLarge("l1")]));
+
+  test("total nota melewati batas aman → galat di baris yang membuatnya lewat, sekali saja", () => {
+    const lines = ["l1", "l2", "l3"].map((lineId) =>
+      line({ lineId, qty: 1, unitCost: big - 1 }),
+    );
+    expect(validateReceipt(receipt({ lines }), ctx)).toEqual([tooLarge("l2")]);
+  });
+
+  test("baris dengan jumlah/harga tidak sah tidak ikut dijumlahkan", () =>
+    expect(
+      validateReceipt(
+        receipt({
+          lines: [
+            line({ lineId: "l1", qty: 1, unitCost: big }),
+            line({ lineId: "l2", qty: null, unitCost: big }),
+          ],
+        }),
+        ctx,
+      ),
+    ).toEqual([{ lineId: "l2", field: "qty", message: "Jumlah minimal 1" }]));
+
+  test("tepat di batas aman lolos", () =>
+    expect(
+      validateReceipt(
+        receipt({ lines: [line({ qty: 1, unitCost: big })] }),
+        ctx,
+      ),
+    ).toEqual([]));
 });
 
 describe("tanggal kosong vs format salah", () => {

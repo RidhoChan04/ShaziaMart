@@ -185,6 +185,26 @@ function unitCostError(l: CheckLine): ReceiptError | null {
   return null;
 }
 
+/** R13: subtotal, total, atau jumlah satuan dasar di luar bilangan bulat aman (dipakai juga server). */
+export const RECEIPT_TOO_LARGE =
+  "Angka terlalu besar — periksa jumlah dan harga beli";
+
+/** Total berjalan atas baris yang jumlah & harganya sah; galat sekali di baris yang melewati batas. */
+function totalError(
+  l: CheckLine,
+  running: { total: number; over: boolean },
+): ReceiptError | null {
+  if (running.over || l.qty === null || l.unitCost === null) return null;
+  if (qtyError(l) !== null || unitCostError(l) !== null) return null;
+  const total = running.total + l.qty * l.unitCost;
+  if (Number.isSafeInteger(l.qty * l.unitCost) && Number.isSafeInteger(total)) {
+    running.total = total;
+    return null;
+  }
+  running.over = true;
+  return err(l.lineId, "unitCost", RECEIPT_TOO_LARGE);
+}
+
 function lineErrors(
   l: CheckLine,
   seen: { names: Set<string>; barcodes: Set<string> },
@@ -234,7 +254,12 @@ export function validateReceipt(
     out.push(err(null, "lines", "Belum ada barang di nota"));
   }
   const seen = { names: new Set<string>(), barcodes: new Set<string>() };
-  for (const l of r.lines) out.push(...lineErrors(l, seen));
+  const running = { total: 0, over: false };
+  for (const l of r.lines) {
+    out.push(...lineErrors(l, seen));
+    const tooLarge = totalError(l, running);
+    if (tooLarge !== null) out.push(tooLarge);
+  }
   out.push(...validatePayment(r.payment, r.notaDate, ctx.shiftOpen));
   return out;
 }

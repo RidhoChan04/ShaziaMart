@@ -1,4 +1,8 @@
-import type { ProductUnit } from "@/shared/api/gen/shaziaMartAPI.schemas";
+import type {
+  ProductUnit,
+  ReceiptInput,
+  ReceiptLineInput,
+} from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { newId } from "@/shared/lib/id";
 import { type MockSale, type MockState, mockDb } from "../db";
 import { KIND, makeId } from "../seed";
@@ -144,3 +148,56 @@ export function placedSales(
 export function placedShifts(state: Readonly<MockState> = mockDb.get()) {
   return state.closedShifts.filter((c) => !c.shiftId.startsWith(HISTORY_SHIFT));
 }
+
+/** Baris nota untuk barang seed `name` dengan satuan `unitName`. */
+function receiptLine(
+  lineId: string,
+  name: string,
+  unitName: string,
+  qty: number,
+  unitCost: number,
+  expiryDate: string | null = null,
+): ReceiptLineInput {
+  const unit = unitOf(name, unitName);
+  return {
+    lineId,
+    productId: unit.productId,
+    unitId: unit.id,
+    newProduct: null,
+    qty,
+    unitCost,
+    expiryDate,
+  };
+}
+
+/**
+ * Nota mockup `draf-1`: CV Sumber Rejeki, 2026-11-02, Indomie 2 dus × 112.000 ED 2027-04-20 (l1),
+ * Bimoli 12 pcs × 34.000 (l2), Gula 50 kg × 16.200 (l3); bayar sekarang, tunai, dari laci.
+ */
+export function receiptInput(patch: Partial<ReceiptInput> = {}): ReceiptInput {
+  return {
+    id: "draf-1",
+    supplierName: "CV Sumber Rejeki",
+    notaDate: "2026-11-02",
+    photoId: null,
+    lines: [
+      receiptLine("l1", "Indomie Goreng", "dus", 2, 112_000, "2027-04-20"),
+      receiptLine("l2", BIMOLI, "pcs", 12, 34_000),
+      receiptLine("l3", "Gula Pasir", "kg", 50, 16_200),
+    ],
+    payment: {
+      timing: "sekarang",
+      method: "tunai",
+      cashSource: "laci",
+      dueDate: null,
+    },
+    ...patch,
+  };
+}
+
+/** Byte JPEG palsu sepanjang `size` (diawali penanda SOI FF D8 FF). */
+export const jpegBytes = (size: number): Uint8Array => {
+  const bytes = new Uint8Array(size).map((_, i) => i % 251);
+  bytes.set([0xff, 0xd8, 0xff].slice(0, size));
+  return bytes;
+};

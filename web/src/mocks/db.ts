@@ -18,6 +18,7 @@ import type {
   Supplier,
   User,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
+import { mockPhotos } from "./photos";
 import { createSeedState } from "./seed-data";
 
 /** `password` hanya untuk pemilik (login aplikasi pemilik); mock saja. */
@@ -230,6 +231,7 @@ export const mockDb = {
   reset(): void {
     current = createSeedState();
     persist(current);
+    mockPhotos.reset();
   },
 };
 

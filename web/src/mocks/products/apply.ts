@@ -2,7 +2,6 @@ import type {
   FieldError,
   PriceHistoryEntry,
   PriceSource,
-  ProductCost,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import {
   type ProductDraft,
@@ -19,7 +18,7 @@ import {
   otherUnits,
   uniqueErrors,
 } from "./checks";
-import { sameCost } from "./cost-alert";
+import { noteCostChange, sameCost } from "./cost-alert";
 import { draftFromProduct } from "./drafts";
 import { soldUnitIds } from "./views";
 
@@ -97,23 +96,6 @@ export function applyDraft(
   };
 }
 
-function updateCostAlert(
-  state: MockState,
-  prev: MockProduct,
-  next: ProductCost | null,
-  { source, now }: ApplyOptions,
-): void {
-  const alert = state.costAlerts[prev.id];
-  if (next === null || (alert && sameCost(alert.fromCost, next))) {
-    delete state.costAlerts[prev.id];
-  } else if (alert) {
-    alert.changedAt = now;
-    alert.source = source;
-  } else if (prev.cost !== null) {
-    state.costAlerts[prev.id] = { fromCost: prev.cost, changedAt: now, source };
-  }
-}
-
 /** Simpan hasil `applyDraft`/`applyPriceLines`: barang, stok awal, batas, kategori baru, riwayat harga, peringatan modal. */
 export function saveApplied(
   state: MockState,
@@ -124,7 +106,9 @@ export function saveApplied(
   const index = state.products.findIndex((p) => p.id === product.id);
   const prev = state.products[index];
   if (prev) {
-    if (result.costChanged) updateCostAlert(state, prev, product.cost, opts);
+    if (result.costChanged) {
+      noteCostChange(state, prev, product.cost, opts.source, opts.now);
+    }
     state.products[index] = product;
   } else {
     state.products.push(product);

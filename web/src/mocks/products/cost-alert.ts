@@ -1,4 +1,7 @@
-import type { ProductCost } from "@/shared/api/gen/shaziaMartAPI.schemas";
+import type {
+  PriceSource,
+  ProductCost,
+} from "@/shared/api/gen/shaziaMartAPI.schemas";
 import type { MockCostAlert, MockProduct, MockState } from "../db";
 
 /** Rasio HPP sama (amount/qtyBase), bukan bentuk penulisannya. */
@@ -21,4 +24,27 @@ export function meaningfulCostAlert(
   const alert = state.costAlerts[p.id];
   if (alert === undefined || p.cost === null) return null;
   return sameCost(alert.fromCost, p.cost) ? null : alert;
+}
+
+/**
+ * Butir modal untuk HPP `prev.cost` → `next` (pemanggil memastikan rasio berubah): kembali ke
+ * `fromCost` atau HPP dihapus → butir hilang; butir lama → waktu & sumber diperbarui; belum ada
+ * → butir baru dari HPP lama (barang tanpa HPP lama tidak membuat butir).
+ */
+export function noteCostChange(
+  state: MockState,
+  prev: MockProduct,
+  next: ProductCost | null,
+  source: PriceSource,
+  now: number,
+): void {
+  const alert = state.costAlerts[prev.id];
+  if (next === null || (alert && sameCost(alert.fromCost, next))) {
+    delete state.costAlerts[prev.id];
+  } else if (alert) {
+    alert.changedAt = now;
+    alert.source = source;
+  } else if (prev.cost !== null) {
+    state.costAlerts[prev.id] = { fromCost: prev.cost, changedAt: now, source };
+  }
 }
