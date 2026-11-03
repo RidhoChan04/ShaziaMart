@@ -818,7 +818,7 @@ paths:
         - ownerCookieAuth: []
       responses:
         "200":
-          description: Nota barang masuk, terbaru dulu (createdAt)
+          description: Nota barang masuk, terbaru dulu (createdAt, lalu id menurun)
           content:
             application/json:
               schema:

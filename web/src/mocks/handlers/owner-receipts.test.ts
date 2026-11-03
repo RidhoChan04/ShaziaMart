@@ -163,6 +163,16 @@ describe("nota barang masuk di app pemilik", () => {
     expect((await cancel("tidak-ada")).status).toBe(404);
   });
 
+  test("createdAt sama → urut id menurun (urutan stabil)", async () => {
+    for (const id of ["draf-0", "draf-2"]) {
+      expect(
+        (await post("/api/staff/receipts", receiptInput({ id }))).status,
+      ).toBe(201);
+    }
+    const rows = await json<OwnerReceiptRow[]>(await get(BASE));
+    expect(rows.map((r) => r.id)).toEqual(["draf-2", "draf-1", "draf-0"]);
+  });
+
   test("sesi staf tidak berlaku di /api/owner/receipts (401)", async () => {
     await post("/api/owner/logout", {});
     expect(mockDb.get().staffSession).not.toBeNull();

@@ -410,6 +410,31 @@ describe("ubah nota: pembayaran", () => {
   });
 });
 
+describe("ubah nota: jatuh tempo nota yang sudah lunas", () => {
+  test("nota 'nanti' sudah lunas: tanggal nota digeser melewati jatuh tempo → lolos (jatuh tempo tidak berlaku lagi)", () => {
+    applyReceipt(
+      state,
+      mockupInput({
+        id: "draf-2",
+        notaDate: "2026-11-01",
+        payment: nanti("2026-11-02"),
+      }),
+      rina,
+      NOW,
+    );
+    const r = receiptOf("draf-2");
+    r.paid = {
+      at: NOW,
+      method: "transfer",
+      cashSource: null,
+      byName: "Pak Ahmad",
+    };
+    expect(
+      checkEdit(state, r, editOf(r, { notaDate: "2026-11-03" }), LATER),
+    ).toEqual([]);
+  });
+});
+
 describe("checkEdit: aturan isi", () => {
   test("lineId kurang/lebih/kembar → 422 lines 'Baris nota tidak cocok — muat ulang'", () => {
     const r = receiptOf();

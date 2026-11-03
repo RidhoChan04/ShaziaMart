@@ -75,7 +75,8 @@ function overflowErrors(
 
 /**
  * Galat ubah nota: baris tepat sama, aturan `validateReceipt`, pembayaran hanya untuk Bayar
- * nanti yang belum lunas. Pembayaran tidak berubah tidak diperiksa ulang terhadap shift (R6).
+ * nanti yang belum lunas. Pembayaran tidak berubah tidak diperiksa ulang terhadap shift (R6);
+ * jatuh tempo nota yang sudah lunas tidak diperiksa terhadap tanggal nota.
  */
 export function checkEdit(
   state: Readonly<MockState>,
@@ -114,7 +115,10 @@ export function checkEdit(
   if (changed && !editable) {
     errors.push(err(null, "payment", RECEIPT_PAYMENT_LOCKED));
   }
-  return errors.length > 0 ? errors : overflowErrors(state, r, lines);
+  // Nota yang sudah lunas: jatuh tempo tidak berlaku lagi, tanggal nota boleh melewatinya.
+  const relevant =
+    r.paid === null ? errors : errors.filter((e) => e.field !== "dueDate");
+  return relevant.length > 0 ? relevant : overflowErrors(state, r, lines);
 }
 
 function audit(
