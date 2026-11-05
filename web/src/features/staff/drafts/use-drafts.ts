@@ -22,7 +22,8 @@ import {
 import { useServerHealth } from "@/shared/hooks/use-server-health";
 import { type DraftStore, indexedDbDraftStore } from "./draft-store";
 import type { ReceiptDraft } from "./draft-types";
-import { realSyncApi, type SyncReport, syncDrafts } from "./sync";
+import { realSyncApi, syncDrafts } from "./sync";
+import type { SyncReport } from "./sync-core";
 
 const SYNC_INTERVAL_MS = 30_000;
 const NOTHING_SENT: SyncReport = { sent: [], rejected: [], stopped: null };

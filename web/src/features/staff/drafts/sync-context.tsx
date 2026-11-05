@@ -1,5 +1,5 @@
 import { createContext, type ReactNode, useContext } from "react";
-import type { SyncReport } from "./sync";
+import type { SyncReport } from "./sync-core";
 import { useDraftSync } from "./use-drafts";
 
 type StaffSync = {
