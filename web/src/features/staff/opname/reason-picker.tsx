@@ -9,7 +9,8 @@ import {
 /** Pilihan staf untuk satu barang; `receiptId` hanya berarti untuk `salah_input` (null = tidak tahu notanya). */
 export type ReasonChoice = {
   reason: (typeof CHOOSABLE_REASONS)[number];
-  receiptId: string | null;
+  /** `undefined` = nota belum dipilih (salah_input belum lengkap); null = Tidak tahu notanya. */
+  receiptId?: string | null | undefined;
 };
 
 const CHIP =
@@ -54,8 +55,7 @@ export function ReasonPicker({
 }) {
   const reasonName = `alasan-${item.productId}`;
   const receiptName = `nota-${item.productId}`;
-  const pick = (reason: ReasonChoice["reason"]) =>
-    onChange({ reason, receiptId: null });
+  const pick = (reason: ReasonChoice["reason"]) => onChange({ reason });
   return (
     <div className="grid gap-3">
       <div

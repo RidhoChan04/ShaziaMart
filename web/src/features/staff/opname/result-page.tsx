@@ -9,6 +9,7 @@ import type {
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import {
   getGetStaffOpnameSessionQueryKey,
+  getListStaffOpnameSessionsQueryKey,
   useFinishStaffOpnameSession,
   useGetStaffOpnameSession,
 } from "@/shared/api/gen/staff/staff";
@@ -39,6 +40,10 @@ function InfoRow({ title, note }: { title: string; note: string }) {
   );
 }
 
+/** Alasan sudah dipilih; `salah_input` juga butuh pilihan nota (atau Tidak tahu notanya). */
+const isComplete = (c: ReasonChoice | undefined): c is ReasonChoice =>
+  c !== undefined && (c.reason !== "salah_input" || c.receiptId !== undefined);
+
 /** Alasan terpilih per barang; `receiptId` hanya dikirim untuk `salah_input`. */
 function reasonInputs(
   awaiting: readonly StaffOpnameItem[],
@@ -46,25 +51,39 @@ function reasonInputs(
 ): OpnameReasonInput[] {
   return awaiting.flatMap((i) => {
     const c = choices[i.productId];
-    if (!c) return [];
-    const receiptId = c.reason === "salah_input" ? c.receiptId : null;
+    if (!isComplete(c)) return [];
+    const receiptId = c.reason === "salah_input" ? (c.receiptId ?? null) : null;
     return [{ productId: i.productId, reason: c.reason, receiptId }];
   });
 }
 
-/** 422 opname: pesan per barang; selain itu satu pesan umum. */
-function failureOf(error: unknown): {
-  perItem: Record<string, string>;
-  general: string | null;
-} {
+/**
+ * 422 opname: pesan untuk kartu yang tampil (`shown`) per barang; sisanya (barang tak tampil, atau
+ * tingkat sesi) jadi satu pesan umum. `stale` = ada galat barang yang tak punya kartu.
+ */
+function failureOf(
+  error: unknown,
+  shown: ReadonlySet<string>,
+): { perItem: Record<string, string>; general: string | null; stale: boolean } {
   const listed = readProblem(error, opnameProblemSchema)?.errors ?? [];
   const perItem: Record<string, string> = {};
+  const rest: string[] = [];
   for (const e of listed) {
-    if (e.productId !== null) perItem[e.productId] = e.message;
+    if (e.productId !== null && shown.has(e.productId)) {
+      perItem[e.productId] = e.message;
+    } else rest.push(e.message);
   }
-  const general = listed.find((e) => e.productId === null)?.message;
-  if (general !== undefined) return { perItem, general };
-  return { perItem, general: listed.length === 0 ? pesanError(error) : null };
+  const stale = listed.some(
+    (e) => e.productId !== null && !shown.has(e.productId),
+  );
+  if (listed.length === 0) {
+    return { perItem, general: pesanError(error), stale };
+  }
+  return {
+    perItem,
+    general: rest.length > 0 ? [...new Set(rest)].join(". ") : null,
+    stale,
+  };
 }
 
 function SaveBar({
@@ -133,9 +152,14 @@ export function OpnameResultPage() {
   const offline = !online && !checking;
   const matched = session.items.filter((i) => i.state === "cocok").length;
   const initial = session.items.filter((i) => i.state === "stok_awal").length;
-  const diffs = session.items.filter((i) => !NOT_A_DIFF.includes(i.state));
+  const diffs = session.items.filter(
+    (i) => !NOT_A_DIFF.includes(i.state) && i.state !== "diganti",
+  );
+  const replaced = session.items.filter((i) => i.state === "diganti");
   const awaiting = diffs.filter((i) => i.state === "menunggu_alasan");
-  const missing = awaiting.filter((i) => !choices[i.productId]).length;
+  const missing = awaiting.filter(
+    (i) => !isComplete(choices[i.productId]),
+  ).length;
   const done = session.status === "selesai";
   const eyebrow = done
     ? `${scopeLabel(session.scope)} · selesai ${jakartaTime(session.finishedAt ?? session.submittedAt)}`
@@ -155,11 +179,19 @@ export function OpnameResultPage() {
         data: { reasons: reasonInputs(awaiting, choices) },
       });
       client.setQueryData(getGetStaffOpnameSessionQueryKey(sessionId), saved);
+      void client.invalidateQueries({
+        queryKey: getListStaffOpnameSessionsQueryKey(),
+      });
       toast.success("Hasil opname tersimpan");
     } catch (error) {
-      const found = failureOf(error);
+      const found = failureOf(error, new Set(awaiting.map((i) => i.productId)));
       setErrors(found.perItem);
       setFailure(found.general);
+      if (found.stale) {
+        void client.invalidateQueries({
+          queryKey: getGetStaffOpnameSessionQueryKey(sessionId),
+        });
+      }
     }
   };
 
@@ -183,15 +215,15 @@ export function OpnameResultPage() {
             )}
           </Card>
         )}
-        {diffs.length > 0 && (
+        {diffs.length + replaced.length > 0 && (
           <>
             <SectionHeading>
               {done || awaiting.length === 0
                 ? `${diffs.length} selisih`
-                : `${diffs.length} selisih · wajib beri alasan`}
+                : `${awaiting.length} selisih · wajib beri alasan`}
             </SectionHeading>
             <Card>
-              {diffs.map((item) => (
+              {[...diffs, ...replaced].map((item) => (
                 <DiffCard
                   key={item.productId}
                   item={item}

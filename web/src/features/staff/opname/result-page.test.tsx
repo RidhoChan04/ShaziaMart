@@ -268,3 +268,84 @@ test("sesi selesai tampil hanya-baca dengan tanda per barang", async () => {
   expect(within(card(INDOMIE)).getByText("Rusak")).toBeVisible();
   expect(document.body.textContent).not.toContain("Rp");
 });
+
+test("Salah input sebelumnya belum lengkap sebelum nota atau Tidak tahu notanya dipilih", async () => {
+  const user = userEvent.setup();
+  await submitSession(threeDiffs);
+  open();
+  await screen.findByText("3 barang belum diberi alasan");
+  await user.click(radio(MIE_SEDAAP, "Hilang"));
+  await user.click(radio(INDOMIE_SOTO, "Rusak"));
+  await user.click(radio(INDOMIE, "Salah input sebelumnya"));
+
+  expect(screen.getByText("1 barang belum diberi alasan")).toBeVisible();
+  expect(radio(INDOMIE, "Tidak tahu notanya")).not.toBeChecked();
+  expect(save()).toBeDisabled();
+  await user.click(radio(INDOMIE, "Tidak tahu notanya"));
+  expect(screen.queryByText(/belum diberi alasan/)).toBeNull();
+  await waitFor(() => expect(save()).toBeEnabled());
+});
+
+test("422 untuk barang tanpa kartu tampil sebagai pesan umum dan sesi dimuat ulang", async () => {
+  const user = userEvent.setup();
+  await submitSession(threeDiffs);
+  let reads = 0;
+  server.use(
+    http.get("/api/staff/opname-sessions/:id", () => {
+      reads += 1;
+      return undefined;
+    }),
+    http.post("/api/staff/opname-sessions/:id/finish", () =>
+      HttpResponse.json(
+        {
+          type: "about:blank",
+          title: "Validasi gagal",
+          status: 422,
+          code: "VALIDATION",
+          errors: [
+            {
+              productId: "tidak-tampil",
+              message: "Barang ini tidak perlu alasan",
+            },
+          ],
+        },
+        {
+          status: 422,
+          headers: { "Content-Type": "application/problem+json" },
+        },
+      ),
+    ),
+  );
+  open();
+  await screen.findByText("3 barang belum diberi alasan");
+  for (const n of [INDOMIE, MIE_SEDAAP, INDOMIE_SOTO]) {
+    await user.click(radio(n, "Rusak"));
+  }
+  const before = reads;
+  await user.click(save());
+
+  expect(
+    await screen.findByText("Barang ini tidak perlu alasan"),
+  ).toBeVisible();
+  await waitFor(() => expect(reads).toBeGreaterThan(before));
+});
+
+test("barang diganti tidak dihitung dan tidak diminta alasan", async () => {
+  await submitSession(threeDiffs);
+  const newer = await post("/api/staff/opname-sessions", {
+    id: "sesi-baru",
+    scope: MI_INSTAN,
+    deviceNow: Date.now(),
+    items: [{ productId: idOf(INDOMIE), qtyBase: 120, countedAt: T("10.20") }],
+  });
+  expect(newer.status).toBe(201);
+  open();
+
+  expect(
+    await screen.findByText("2 selisih · wajib beri alasan"),
+  ).toBeVisible();
+  expect(screen.getByText("2 barang belum diberi alasan")).toBeVisible();
+  const c = card(INDOMIE);
+  expect(within(c).getByText("Diganti hitungan baru")).toBeVisible();
+  expect(within(c).queryByRole("radio")).toBeNull();
+});
