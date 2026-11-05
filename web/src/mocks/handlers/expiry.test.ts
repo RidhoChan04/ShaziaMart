@@ -437,6 +437,37 @@ describe("kedaluwarsa pemilik (K20)", () => {
     ).toMatchObject({ detail: "Jumlah minimal 1" });
   });
 
+  test("I3: barang di log dihapus (nota dibatalkan dulu) → daftar staf & pemilik tetap 200 dengan nama saat kejadian", async () => {
+    expect((await remove({ id: "rm1", ...ROTI_LOT, qtyBase: 1 })).status).toBe(
+      204,
+    );
+    vi.setSystemTime(NOW + 60_000);
+    expect((await lineExpiry(ROTI_LOT, "2026-11-01")).status).toBe(204);
+    const roti = productOf(ROTI).id;
+    expect(
+      (await post(`/api/owner/receipts/${ROTI_LOT.receiptId}/cancel`, {}))
+        .status,
+    ).toBe(200);
+    const del = await fetch(`/api/owner/products/${roti}`, {
+      method: "DELETE",
+    });
+    expect(del.status).toBe(204);
+    expect(mockDb.get().products.some((p) => p.id === roti)).toBe(false);
+
+    const staff = await staffList();
+    expect(
+      staff.recent.map((e) => [e.kind, e.productName, e.unitName]),
+    ).toEqual([
+      ["ubah_ed", ROTI, "bungkus"],
+      ["keluar", ROTI, "bungkus"],
+    ]);
+    const owner = await ownerList();
+    expect(owner.recent.map((e) => [e.productName, e.lossValue])).toEqual([
+      [ROTI, null],
+      [ROTI, 15_000],
+    ]);
+  });
+
   test("tanpa sesi pemilik → 401", async () => {
     await post("/api/owner/logout", {});
     expect((await get("/api/owner/expiry")).status).toBe(401);

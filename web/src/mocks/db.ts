@@ -158,13 +158,20 @@ export type MockOpnameSession = {
   reviewedAt: number | null;
   items: MockOpnameItem[];
 };
-/** Log kedaluwarsa; `lossValue` = nilai saat kejadian (K28), hanya untuk `keluar`. */
+/**
+ * Log kedaluwarsa; `lossValue` = nilai saat kejadian (K28), hanya untuk `keluar`. Nama & satuan
+ * disalin saat kejadian agar log tetap terbaca setelah barangnya dihapus.
+ */
 export type MockExpiryEvent = {
   id: string;
   at: number;
   actorName: string;
   kind: "keluar" | "ubah_ed";
   productId: string;
+  productName: string;
+  unitName: string;
+  unitSize: number;
+  isCurah: boolean;
   receiptId: string;
   lineId: string;
   qtyBase: number | null;

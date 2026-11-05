@@ -97,24 +97,32 @@ function recentEvents(
     .slice(0, RECENT_MAX);
 }
 
-function toEvent(state: Readonly<MockState>, e: MockExpiryEvent): ExpiryEvent {
-  const p = productById(state, e.productId);
+/** Nama & satuan dari salinan saat kejadian: barangnya boleh sudah dihapus (I3). */
+const toEvent = (e: MockExpiryEvent): ExpiryEvent => ({
+  id: e.id,
+  at: e.at,
+  actorName: e.actorName,
+  kind: e.kind,
+  receiptId: e.receiptId,
+  lineId: e.lineId,
+  productId: e.productId,
+  productName: e.productName,
+  unitName: e.unitName,
+  unitSize: e.unitSize,
+  isCurah: e.isCurah,
+  qtyBase: e.qtyBase,
+  fromDate: e.fromDate,
+  toDate: e.toDate,
+});
+
+/** Salinan nama & satuan eceran barang untuk log (I3). */
+export function productSnapshot(p: MockProduct) {
   const eceran = eceranOf(p);
   return {
-    id: e.id,
-    at: e.at,
-    actorName: e.actorName,
-    kind: e.kind,
-    receiptId: e.receiptId,
-    lineId: e.lineId,
-    productId: e.productId,
     productName: p.name,
     unitName: eceran.name,
     unitSize: eceran.unitSize,
     isCurah: p.isCurah,
-    qtyBase: e.qtyBase,
-    fromDate: e.fromDate,
-    toDate: e.toDate,
   };
 }
 
@@ -126,7 +134,7 @@ export function staffExpiryList(
   return {
     soonDays: state.stockRules.expirySoonDays,
     lots: expiryLots(state, jakartaIsoDate(now)),
-    recent: recentEvents(state, now).map((e) => toEvent(state, e)),
+    recent: recentEvents(state, now).map(toEvent),
   };
 }
 
@@ -146,7 +154,7 @@ export function ownerExpiryList(
     soonDays: state.stockRules.expirySoonDays,
     lots,
     recent: recentEvents(state, now).map((e) => ({
-      ...toEvent(state, e),
+      ...toEvent(e),
       lossValue: e.lossValue,
     })),
     expiredLossValue: lots
@@ -155,7 +163,7 @@ export function ownerExpiryList(
   };
 }
 
-/** K19: jumlah barang berbeda yang punya ≥ 1 kiriman di tiap tahap. */
+/** K19: jumlah barang berbeda yang punya â‰¥ 1 kiriman di tiap tahap. */
 export function expiryAttention(
   state: Readonly<MockState>,
   now: number,

@@ -6,7 +6,7 @@ import { invalid, problem } from "../handlers/respond";
 import { eceranOf } from "../products/views";
 import { editChanges } from "../receipts/audit";
 import { audit } from "../receipts/revise";
-import { productById, supplierNameOf } from "./expiry";
+import { productById, productSnapshot, supplierNameOf } from "./expiry";
 import { shipmentsOf } from "./fifo";
 import { diffValue } from "./opname-value";
 
@@ -112,6 +112,7 @@ export function applyRemoval(
     actorName,
     kind: "keluar",
     productId: p.id,
+    ...productSnapshot(p),
     receiptId: r.receiptId,
     lineId: r.lineId,
     qtyBase: r.qtyBase,
@@ -161,6 +162,7 @@ export function applyExpiryDate(
     actorName,
     kind: "ubah_ed",
     productId: line.productId,
+    ...productSnapshot(productById(state, line.productId)),
     receiptId,
     lineId,
     qtyBase: null,
