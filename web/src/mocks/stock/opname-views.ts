@@ -97,16 +97,22 @@ const receiptOption = (
   notaDate: r.notaDate,
 });
 
+/** Nota aktif yang memuat barang ini. */
+export const activeReceiptsOf = (
+  state: Readonly<MockState>,
+  productId: string,
+): MockReceipt[] =>
+  state.receipts.filter(
+    (r) =>
+      r.status === "aktif" && r.lines.some((l) => l.productId === productId),
+  );
+
 /** K4 (J4): maks. 5 nota aktif terakhir yang memuat barang ini (notaDate lalu createdAt terbaru). */
 export function receiptOptionsOf(
   state: Readonly<MockState>,
   productId: string,
 ): OpnameReceiptOption[] {
-  return state.receipts
-    .filter(
-      (r) =>
-        r.status === "aktif" && r.lines.some((l) => l.productId === productId),
-    )
+  return activeReceiptsOf(state, productId)
     .sort(
       (a, b) =>
         b.notaDate.localeCompare(a.notaDate) || b.createdAt - a.createdAt,

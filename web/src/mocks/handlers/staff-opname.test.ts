@@ -486,6 +486,50 @@ describe("simpan alasan", () => {
     });
   });
 
+  test("M4: nota rujukan yang tergeser dari 5 teratas (nota baru masuk) tetap diterima selama masih aktif", async () => {
+    await loginWithShift(1_500_000);
+    await staffLogin();
+    expect((await post("/api/staff/receipts", receiptInput())).status).toBe(
+      201,
+    );
+    at("10.05");
+    setStock(INDOMIE, 60);
+    await submit("sesi-1", [count(INDOMIE, 59, T("10.04"))]);
+    mockDb.update((s) => {
+      const base = s.receipts.find((r) => r.id === "draf-1");
+      if (!base) throw new Error("tanpa draf-1");
+      for (const n of [1, 2, 3, 4, 5]) {
+        s.receipts.push({
+          ...structuredClone(base),
+          id: `baru-${n}`,
+          createdAt: base.createdAt + n,
+        });
+      }
+    });
+    const res = await finish("sesi-1", [
+      reason(INDOMIE, "salah_input", "draf-1"),
+    ]);
+    expect(res.status).toBe(200);
+    const ok = await json<StaffOpnameSession>(res);
+    expect(itemOf(ok, INDOMIE).receiptRef?.receiptId).toBe("draf-1");
+  });
+
+  test("M5: productId tak dikenal → Barang tidak ditemukan; alasan ganda → Barang dihitung dua kali", async () => {
+    await submit("sesi-1", [count(INDOMIE, 55)]);
+    const before = dataOf();
+    const res = await finish("sesi-1", [
+      reason(INDOMIE, "rusak"),
+      reason(INDOMIE, "hilang"),
+      { productId: "tidak-ada", reason: "rusak", receiptId: null },
+    ]);
+    expect(res.status).toBe(422);
+    expect(await errorsOf(res)).toEqual([
+      { productId: idOf(INDOMIE), message: "Barang dihitung dua kali" },
+      { productId: "tidak-ada", message: "Barang tidak ditemukan" },
+    ]);
+    expect(dataOf()).toEqual(before);
+  });
+
   test("alasan kurang → 422 Pilih alasan; simpan dua kali → stok disesuaikan sekali", async () => {
     await submit("sesi-1", [
       count(INDOMIE, 55),

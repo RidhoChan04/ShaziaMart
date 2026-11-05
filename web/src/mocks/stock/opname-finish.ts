@@ -12,7 +12,7 @@ import { problem } from "../handlers/respond";
 import { applyDiff, opnameProblem, safeValue } from "./opname";
 import { type ReasonInput, readReasons } from "./opname-input";
 import { isHeld, sessionFlagged } from "./opname-value";
-import { receiptOptionsOf } from "./opname-views";
+import { activeReceiptsOf } from "./opname-views";
 
 type Resolution = {
   item: MockOpnameItem;
@@ -24,17 +24,16 @@ type Resolution = {
 /** Satu alasan sah untuk barang menunggu alasan; string = pesan galat; null = diabaikan (diganti). */
 function resolveReason(
   state: Readonly<MockState>,
-  item: MockOpnameItem | undefined,
+  item: MockOpnameItem,
   r: ReasonInput,
 ): Resolution | string | null {
-  if (item?.state === "diganti") return null;
-  if (item?.state !== "menunggu_alasan") return "Barang ini tidak perlu alasan";
+  if (item.state === "diganti") return null;
+  if (item.state !== "menunggu_alasan") return "Barang ini tidak perlu alasan";
+  // M4: nota aktif mana pun yang memuat barang ini; 5 pilihan di layar bisa tergeser nota baru.
   const refOk =
     r.receiptId === null ||
     (r.reason === "salah_input" &&
-      receiptOptionsOf(state, r.productId).some(
-        (o) => o.receiptId === r.receiptId,
-      ));
+      activeReceiptsOf(state, r.productId).some((x) => x.id === r.receiptId));
   if (!refOk) return "Nota rujukan tidak cocok";
   const cost = state.products.find((p) => p.id === item.productId)?.cost;
   // K3: dari HPP sekarang.
@@ -59,11 +58,12 @@ function resolveReasons(
   const errors: OpnameError[] = [];
   const given = new Set<string>();
   for (const r of reasons) {
-    const item = given.has(r.productId)
-      ? undefined
-      : session.items.find((i) => i.productId === r.productId);
+    const item = session.items.find((i) => i.productId === r.productId);
+    let result: Resolution | string | null;
+    if (given.has(r.productId)) result = "Barang dihitung dua kali";
+    else if (!item) result = "Barang tidak ditemukan";
+    else result = resolveReason(state, item, r);
     given.add(r.productId);
-    const result = resolveReason(state, item, r);
     if (typeof result === "string") {
       errors.push({ productId: r.productId, message: result });
     } else if (result !== null) resolved.push(result);
