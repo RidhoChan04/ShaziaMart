@@ -121,11 +121,12 @@ export function checkEdit(
   return relevant.length > 0 ? relevant : overflowErrors(state, r, lines);
 }
 
-function audit(
+/** Catat riwayat perubahan nota (append-only). */
+export function audit(
   state: MockState,
   r: MockReceipt,
   action: MockAuditEntry["action"],
-  actor: MockUser,
+  actorName: string,
   changes: string[],
   now: number,
 ): void {
@@ -133,7 +134,7 @@ function audit(
     id: newId(now),
     receiptId: r.id,
     at: now,
-    actorName: actor.name,
+    actorName,
     action,
     changes,
   });
@@ -204,7 +205,7 @@ export function applyEdit(
   if (changes.length === 0) return;
   r.editedByName = actor.name;
   r.editedAt = now;
-  audit(state, r, "ubah", actor, changes, now);
+  audit(state, r, "ubah", actor.name, changes, now);
 }
 
 /** Batalkan nota (idempoten): stok & HPP dibalik, uang laci dikembalikan, audit atas nama pemilik. */
@@ -240,5 +241,5 @@ export function applyCancel(
   const changes = correctCash(state, r, -laciPaid(r), now);
   r.status = "dibatalkan";
   r.cancelledAt = now;
-  audit(state, r, "batal", actor, changes, now);
+  audit(state, r, "batal", actor.name, changes, now);
 }

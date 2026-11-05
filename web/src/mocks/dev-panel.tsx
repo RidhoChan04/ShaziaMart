@@ -9,6 +9,7 @@ import {
   scenarios,
   setScenario,
 } from "./scenarios";
+import { applySampleStock } from "./stock/sample";
 
 function isScenario(value: string): value is Scenario {
   return (scenarios as readonly string[]).includes(value);
@@ -57,6 +58,11 @@ export function DevPanel() {
     void queryClient.invalidateQueries();
   }
 
+  function onSampleStock() {
+    mockDb.update((s) => applySampleStock(s, Date.now()));
+    void queryClient.invalidateQueries();
+  }
+
   return (
     <div
       className={cn(
@@ -94,6 +100,13 @@ export function DevPanel() {
             className="h-8 rounded-md border border-border bg-surface px-2 font-medium hover:bg-primary-soft"
           >
             Reset data
+          </button>
+          <button
+            type="button"
+            onClick={onSampleStock}
+            className="h-8 rounded-md border border-border bg-surface px-2 font-medium hover:bg-primary-soft"
+          >
+            Isi contoh stok
           </button>
         </aside>
       ) : null}

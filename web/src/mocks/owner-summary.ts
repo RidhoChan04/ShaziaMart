@@ -18,6 +18,7 @@ import { oldestUnpaidAt } from "./ledger";
 import { meaningfulCostAlert } from "./products/cost-alert";
 import { eceranOf, stockAlertOf } from "./products/views";
 import { debtAttention } from "./receipts/debts";
+import { expiryAttention } from "./stock/expiry";
 
 const WEEKDAYS = [
   "Minggu",
@@ -73,8 +74,8 @@ function attention(state: Readonly<MockState>, now: number): Attention {
     awaitingPriceCount: state.products.filter(
       (p) => p.status === "menunggu_harga",
     ).length,
-    // Sementara nol: server kedaluwarsa & opname belum ada.
-    expiry: { expiredCount: 0, soonCount: 0, soonDays: 30 },
+    expiry: expiryAttention(state, now),
+    // Sementara nol: server opname belum ada.
     opnameHeldCount: 0,
     opnameFlags: [],
   };

@@ -86,3 +86,16 @@ test.each([
   const lift = "bottom-[calc(5.5rem+env(safe-area-inset-bottom))]";
   expect(toggle.parentElement?.classList.contains(lift)).toBe(raised);
 });
+
+test("DevPanel: Isi contoh stok menambah barang & kiriman ber-ED contoh", async () => {
+  const user = userEvent.setup();
+  renderApp("/kasir");
+  await expandPanel(user);
+  expect(mockDb.get().receipts).toEqual([]);
+  await user.click(
+    await screen.findByRole("button", { name: "Isi contoh stok" }),
+  );
+  const state = mockDb.get();
+  expect(state.products.some((p) => p.name === "Sari Roti Tawar")).toBe(true);
+  expect(state.receipts.map((r) => r.id)).toContain("contoh-stok-1");
+});

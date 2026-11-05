@@ -9,6 +9,7 @@ import { ownerTodaySummary } from "./owner-summary";
 import { stockAlertOf, toOwnerProduct } from "./products/views";
 import { formatSaleNumber } from "./sale-number";
 import { createSeedState } from "./seed-data";
+import { applySampleStock } from "./stock/sample";
 
 /** Jumat 23 Okt 2026 14.30 WIB. */
 const NOW = Date.UTC(2026, 9, 23, 7, 30);
@@ -320,6 +321,23 @@ describe("Perlu perhatian: barang menunggu harga jual dan utang supplier", () =>
       overdueTotal: 0,
       dueSoonCount: 0,
       dueSoonTotal: 0,
+    });
+  });
+});
+
+describe("Perlu perhatian: kedaluwarsa (K19)", () => {
+  test("perhatian expiry: barang berbeda per tahap", () => {
+    const state = fresh();
+    expect(ownerTodaySummary(state, NOW).attention.expiry).toEqual({
+      expiredCount: 0,
+      soonCount: 0,
+      soonDays: 30,
+    });
+    applySampleStock(state, NOW);
+    expect(ownerTodaySummary(state, NOW).attention.expiry).toEqual({
+      expiredCount: 1,
+      soonCount: 3,
+      soonDays: 30,
     });
   });
 });

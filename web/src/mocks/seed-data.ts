@@ -18,7 +18,7 @@ type UnitSpec = {
   tiers?: WholesaleTier[];
 };
 
-type Fixture = {
+export type Fixture = {
   name: string;
   storeCode: string;
   category: string;
@@ -125,7 +125,7 @@ function shuffle<T>(items: readonly T[], rand: () => number): T[] {
   return out;
 }
 
-function buildProduct(
+export function buildProduct(
   fx: Fixture,
   index: number,
   unitSeq: { n: number },
