@@ -186,3 +186,83 @@ test("scan di Uang fisik di laci: rentetan dibuang, Enter penutupnya tidak menut
   expect(await screen.findByText("Uang seharusnya")).toBeInTheDocument();
   expect(closes.n).toBe(1);
 });
+
+/** Hasil tutup shift dari server, tanpa jendela hitung. */
+const closureFixture = (patch: Partial<ShiftClosure> = {}): ShiftClosure => ({
+  shiftId: "shift-1",
+  openingCash: 200_000,
+  cashSales: 150_000,
+  supplierPayments: 50_000,
+  creditPayments: 75_000,
+  saleRefunds: 0,
+  expectedCash: 375_000,
+  countedCash: 375_000,
+  difference: 0,
+  salesCount: 1,
+  ...patch,
+});
+
+function showClosure(closure: ShiftClosure) {
+  renderWithQuery(<ShiftClosureDialog closure={closure} onDone={() => {}} />);
+  const ui = within(screen.getByRole("dialog", { name: "Tutup shift" }));
+  return {
+    ui,
+    labels: () => ui.getAllByRole("term").map((t) => t.textContent),
+    row: (label: string) => ui.getByText(label).closest("div") as HTMLElement,
+  };
+}
+
+test("hasil: 'Pelunasan kasbon' '+Rp75.000' di atas 'Bayar supplier' dan 'Uang seharusnya'", () => {
+  const { labels, row } = showClosure(closureFixture());
+  expect(labels()).toEqual([
+    "Pelunasan kasbon",
+    "Bayar supplier",
+    "Uang seharusnya",
+    "Uang fisik",
+    "Selisih",
+  ]);
+  expect(within(row("Pelunasan kasbon")).getByText("+Rp75.000")).toBeVisible();
+  expect(within(row("Bayar supplier")).getByText("-Rp50.000")).toBeVisible();
+  expect(within(row("Uang seharusnya")).getByText("Rp375.000")).toBeVisible();
+});
+
+test("creditPayments 0 → tidak ada baris 'Pelunasan kasbon'", () => {
+  const { ui, labels } = showClosure(
+    closureFixture({ creditPayments: 0, expectedCash: 300_000 }),
+  );
+  expect(ui.queryByText("Pelunasan kasbon")).toBeNull();
+  expect(labels()).toEqual([
+    "Bayar supplier",
+    "Uang seharusnya",
+    "Uang fisik",
+    "Selisih",
+  ]);
+});
+
+test("(ruling R12, koreksi mockup M1) saleRefunds 30.000 → 'Pengembalian transaksi' '-Rp30.000' di bawah 'Bayar supplier' dan di atas 'Uang seharusnya'; 0 → tidak tampil", () => {
+  const { labels, row } = showClosure(
+    closureFixture({
+      saleRefunds: 30_000,
+      expectedCash: 345_000,
+      countedCash: 345_000,
+    }),
+  );
+  expect(labels()).toEqual([
+    "Pelunasan kasbon",
+    "Bayar supplier",
+    "Pengembalian transaksi",
+    "Uang seharusnya",
+    "Uang fisik",
+    "Selisih",
+  ]);
+  expect(
+    within(row("Pengembalian transaksi")).getByText("-Rp30.000"),
+  ).toBeVisible();
+  expect(within(row("Uang seharusnya")).getByText("Rp345.000")).toBeVisible();
+});
+
+test("saleRefunds 0 → tidak ada baris 'Pengembalian transaksi'", () => {
+  const { ui } = showClosure(closureFixture());
+  expect(ui.getByText("Uang seharusnya")).toBeVisible();
+  expect(ui.queryByText("Pengembalian transaksi")).toBeNull();
+});

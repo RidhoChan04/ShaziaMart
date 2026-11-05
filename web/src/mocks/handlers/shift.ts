@@ -5,6 +5,7 @@ import type {
   ShiftClosure,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { newId } from "@/shared/lib/id";
+import { creditPaymentsOf } from "../credit/payments";
 import { type MockShift, mockDb } from "../db";
 import { supplierPaymentsOf } from "../receipts/cash";
 import { withScenario } from "../scenarios";
@@ -17,6 +18,10 @@ const toShift = ({
   openedAt,
   openingCash,
 }: MockShift): Shift => ({ id, kasirId, kasirName, openedAt, openingCash });
+
+/** Σ `saleRefunds` shift ini (`ShiftClosure.saleRefunds`), tanpa membedakan asal pengembalian. */
+const saleRefundsOf = (shift: MockShift): number =>
+  shift.saleRefunds.reduce((sum, r) => sum + r.amount, 0);
 
 const isMoney = (v: unknown): v is number =>
   typeof v === "number" && Number.isSafeInteger(v) && v >= 0;
@@ -80,15 +85,23 @@ export const shiftHandlers = [
       }
       // Uang keluar laci ke supplier (barang masuk, koreksi nota, pelunasan) mengurangi kas seharusnya.
       const supplierPayments = supplierPaymentsOf(shift);
+      // Hanya pelunasan kasbon Tunai shift ini (bukan uang diterima) yang masuk laci.
+      const creditPayments = creditPaymentsOf(shift);
+      // (ruling R12) Tunai yang keluar laci untuk transaksi yang dibatalkan kasir di shift ini.
+      const saleRefunds = saleRefundsOf(shift);
       const expectedCash =
-        shift.openingCash + shift.cashSales - supplierPayments;
+        shift.openingCash +
+        shift.cashSales -
+        supplierPayments +
+        creditPayments -
+        saleRefunds;
       const closure: ShiftClosure = {
         shiftId: shift.id,
         openingCash: shift.openingCash,
         cashSales: shift.cashSales,
         supplierPayments,
-        creditPayments: 0,
-        saleRefunds: 0,
+        creditPayments,
+        saleRefunds,
         expectedCash,
         countedCash,
         difference: countedCash - expectedCash,

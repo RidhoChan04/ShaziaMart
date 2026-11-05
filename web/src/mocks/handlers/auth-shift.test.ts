@@ -1,12 +1,15 @@
-import { afterEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { Session } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { newId } from "@/shared/lib/id";
 import { mockDb } from "../db";
 import { setScenario } from "../scenarios";
 import {
   BIMOLI,
+  customerId,
+  json,
   login,
   loginWithShift,
+  ownerLogin,
   placedShifts,
   post,
   receiptInput,
@@ -159,22 +162,23 @@ describe("shift", () => {
   });
 });
 
+const close = (countedCash: number) =>
+  post("/api/shifts/current/close", { countedCash });
+/** Penjualan tunai pas Rp150.000: Beras Pandan Wangi 78.000 + Bimoli 2 × 36.000. */
+const cashSales150k = () =>
+  post("/api/sales", {
+    saleId: newId(),
+    items: [
+      saleItem("Beras Pandan Wangi 5 kg", { qtyBase: 1 }, 78_000),
+      saleItem(BIMOLI, { qtyBase: 2 }, 36_000),
+    ],
+    payments: [{ method: "cash", amount: 150_000 }],
+    cashReceived: 150_000,
+    print: false,
+  });
+
 describe("tutup shift dengan Bayar supplier", () => {
   const NOW = Date.UTC(2026, 10, 2, 3); // 2 Nov 2026 10.00 WIB
-  const close = (countedCash: number) =>
-    post("/api/shifts/current/close", { countedCash });
-  /** Penjualan tunai pas Rp150.000: Beras Pandan Wangi 78.000 + Bimoli 2 × 36.000. */
-  const cashSales150k = () =>
-    post("/api/sales", {
-      saleId: newId(),
-      items: [
-        saleItem("Beras Pandan Wangi 5 kg", { qtyBase: 1 }, 78_000),
-        saleItem(BIMOLI, { qtyBase: 2 }, 36_000),
-      ],
-      payments: [{ method: "cash", amount: 150_000 }],
-      cashReceived: 150_000,
-      print: false,
-    });
 
   test("tutup shift: modal 1.500.000 + tunai 150.000 − Bayar supplier 1.442.000, uang fisik 203.000 → {supplierPayments:1442000, expectedCash:208000, difference:-5000}", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
@@ -250,6 +254,157 @@ describe("tutup shift dengan Bayar supplier", () => {
     expect(placedShifts()).toEqual([
       expect.objectContaining({ openedAt: NOW, closedAt: NOW + 3 * 3_600_000 }),
     ]);
+  });
+});
+
+describe("tutup shift dengan pelunasan kasbon & pengembalian transaksi", () => {
+  const NOW = Date.UTC(2026, 10, 5, 3); // Kamis 5 Nov 2026 10.00 WIB
+  const pay = (patch: Record<string, unknown>) =>
+    post("/api/credit-payments", {
+      customerId: customerId("Bu Sari"),
+      print: false,
+      ...patch,
+    });
+  const payTunai75k = () =>
+    pay({
+      id: "pel-tunai",
+      amount: 75_000,
+      method: "tunai",
+      cashReceived: 100_000,
+    });
+  const refund = (...amounts: number[]) =>
+    mockDb.update((s) => {
+      for (const [i, amount] of amounts.entries()) {
+        s.shift?.saleRefunds.push({
+          id: `ref-${i}`,
+          at: NOW,
+          amount,
+          saleId: `sale-${i}`,
+        });
+      }
+    });
+
+  /**
+   * Modal 200.000, jual tunai 150.000, bayar supplier dari laci 50.000,
+   * pelunasan Tunai 75.000 (diterima 100.000), pelunasan QRIS 30.000.
+   */
+  async function busyShift() {
+    await loginWithShift(200_000);
+    expect((await cashSales150k()).status).toBe(201);
+    mockDb.update((s) => {
+      s.shift?.cashOuts.push({
+        id: "c1",
+        at: NOW,
+        amount: 50_000,
+        receiptId: "r1",
+        kind: "bayar",
+      });
+    });
+    expect((await payTunai75k()).status).toBe(201);
+    expect(
+      (
+        await pay({
+          id: "pel-qris",
+          amount: 30_000,
+          method: "qris",
+          cashReceived: null,
+        })
+      ).status,
+    ).toBe(201);
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(NOW);
+  });
+
+  test("uang seharusnya + pelunasan tunai saja (bukan uang diterima)", async () => {
+    await busyShift();
+    const res = await close(375_000);
+    expect(res.status).toBe(200);
+    const closure = {
+      openingCash: 200_000,
+      cashSales: 150_000,
+      supplierPayments: 50_000,
+      creditPayments: 75_000,
+      saleRefunds: 0,
+      expectedCash: 375_000,
+      countedCash: 375_000,
+      difference: 0,
+    };
+    expect(await json(res)).toMatchObject(closure);
+    expect(placedShifts()).toEqual([expect.objectContaining(closure)]);
+  });
+
+  test("dibatalkan kasir di shift yang sama → creditPayments 0", async () => {
+    await busyShift();
+    expect(
+      (
+        await post("/api/credit-payments/pel-tunai/cancel", {
+          reason: "Salah pelanggan",
+        })
+      ).status,
+    ).toBe(200);
+    expect(await json(await close(300_000))).toMatchObject({
+      creditPayments: 0,
+      expectedCash: 300_000,
+      difference: 0,
+    });
+  });
+
+  test("(pra-cek) pelunasan shift lama dibatalkan pemilik saat shift ini buka → creditPayments shift ini tetap 0; closedShifts lama tidak berubah", async () => {
+    await loginWithShift(200_000);
+    expect((await payTunai75k()).status).toBe(201);
+    expect(await json(await close(275_000))).toMatchObject({
+      creditPayments: 75_000,
+      expectedCash: 275_000,
+    });
+    const closedBefore = mockDb.get().closedShifts;
+
+    await login("654321", "Budi");
+    expect((await post("/api/shifts", { openingCash: 100_000 })).status).toBe(
+      201,
+    );
+    expect((await ownerLogin()).status).toBe(200);
+    vi.setSystemTime(NOW + 60_000);
+    expect(
+      (
+        await post("/api/owner/credit-payments/pel-tunai/cancel", {
+          reason: "Uang dikembalikan",
+        })
+      ).status,
+    ).toBe(200);
+    expect(mockDb.get().closedShifts).toEqual(closedBefore);
+
+    expect(await json(await close(100_000))).toMatchObject({
+      creditPayments: 0,
+      expectedCash: 100_000,
+      difference: 0,
+    });
+    expect(mockDb.get().closedShifts.slice(0, -1)).toEqual(closedBefore);
+  });
+
+  test("(ruling R12) saleRefunds [30.000] di shift ini → closure saleRefunds 30.000, expectedCash = 375.000 − 30.000", async () => {
+    await busyShift();
+    refund(30_000);
+    const closure = {
+      creditPayments: 75_000,
+      saleRefunds: 30_000,
+      expectedCash: 345_000,
+      difference: 0,
+    };
+    expect(await json(await close(345_000))).toMatchObject(closure);
+    expect(placedShifts()).toEqual([expect.objectContaining(closure)]);
+  });
+
+  test("(koreksi mockup M1) saleRefunds [30.000, 20.000] → closure saleRefunds 50.000, expectedCash turun 50.000", async () => {
+    await busyShift();
+    refund(30_000, 20_000);
+    expect(await json(await close(325_000))).toMatchObject({
+      saleRefunds: 50_000,
+      expectedCash: 325_000,
+      difference: 0,
+    });
   });
 });
 

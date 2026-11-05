@@ -51,15 +51,36 @@ function ClosureResult({
   result: ShiftClosure;
   onDone: () => void;
 }) {
-  const { supplierPayments, expectedCash, countedCash, difference } = result;
+  const {
+    creditPayments,
+    supplierPayments,
+    saleRefunds,
+    expectedCash,
+    countedCash,
+    difference,
+  } = result;
   return (
     <div className="grid gap-4">
       <dl className="grid gap-2 text-base">
+        {creditPayments !== 0 && (
+          // Hanya pelunasan kasbon Tunai shift ini yang menambah laci.
+          <ResultRow
+            label="Pelunasan kasbon"
+            value={signedRupiah(creditPayments)}
+          />
+        )}
         {supplierPayments !== 0 && (
           // Uang keluar ke supplier mengurangi laci; bersih masuk (koreksi) bertanda +.
           <ResultRow
             label="Bayar supplier"
             value={signedRupiah(-supplierPayments)}
+          />
+        )}
+        {saleRefunds !== 0 && (
+          // Tunai yang dikembalikan dari laci untuk transaksi yang dibatalkan.
+          <ResultRow
+            label="Pengembalian transaksi"
+            value={signedRupiah(-saleRefunds)}
           />
         )}
         <ResultRow label="Uang seharusnya" value={formatRupiah(expectedCash)} />
