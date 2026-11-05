@@ -10,12 +10,25 @@ import { priceLine } from "@/shared/lib/pricing";
 import type { CreditEntry, MockSale, MockState } from "./db";
 import { appendCredit } from "./ledger";
 import { formatSaleNumber } from "./sale-number";
-import { saleCost } from "./sale-rules";
+import { saleLineCosts, sumLineCosts } from "./sale-rules";
 import { KIND, makeId, rng } from "./seed";
 import { appendSeedRepayment } from "./seed-customers";
 
-const HISTORY_DAYS = 14;
+/** (K11) Panjang riwayat contoh; dijaga agar state tersimpan jauh di bawah kuota localStorage. */
+export const HISTORY_DAYS = 63;
 const HISTORY_SEED = 0x5eed1d;
+/**
+ * (K11) Barang buatan "lambat" untuk laporan Tidak terjual: 3 pertama tidak pernah terjual, 3
+ * sisanya hanya terjual pada hari-ke-belakang di `SLOW_SOLD_BACK` (terakhir 45–57 hari lalu).
+ * Dipilih dengan pengacak tetap, jadi sama untuk setiap tanggal bisnis.
+ */
+export const SLOW_PRODUCTS = 6;
+const SLOW_SEED = 0x510e;
+const SLOW_SOLD_BACK: readonly (readonly number[])[] = [
+  [63, 45],
+  [62, 51],
+  [61, 57],
+];
 const OPENING_CASH = 200_000;
 const SHIFT_DIFFS = [0, 0, 0, -5000, 2000];
 /** Kasbon riwayat hanya Mbak Dewi; saldonya dijaga jauh di bawah limit Rp500.000. */
@@ -47,10 +60,15 @@ function pickHour(rand: Rand): number {
 
 type Line = { productId: string; item: SaleItem };
 
-function buildItems(products: readonly Product[], rand: Rand): Line[] {
+/** 1–6 barang berbeda dari `pool`; `extra` (barang lambat) selalu ikut sebagai baris pertama. */
+function buildItems(
+  pool: readonly Product[],
+  rand: Rand,
+  extra: Product | undefined,
+): Line[] {
   const count = 1 + Math.floor(rand() ** 1.5 * 6);
-  const chosen = new Set<Product>();
-  while (chosen.size < count) chosen.add(pick(products, rand));
+  const chosen = new Set<Product>(extra ? [extra] : []);
+  while (chosen.size < count) chosen.add(pick(pool, rand));
   return [...chosen].flatMap((p): Line[] => {
     const unit = p.units.length > 1 && rand() < 0.15 ? p.units[1] : p.units[0];
     if (!unit) return [];
@@ -76,9 +94,9 @@ function buildItems(products: readonly Product[], rand: Rand): Line[] {
   });
 }
 
-/** Satu hari: waktu penjualan berurutan, nomor struk berurutan per hari. */
+/** Satu hari: 20–60 penjualan (akhir pekan ×1,3), waktu & nomor struk berurutan. */
 function timesFor(day: BusinessDay, rand: Rand): number[] {
-  const base = 40 + Math.floor(rand() * 121);
+  const base = 20 + Math.floor(rand() * 41);
   const weekend = day.weekday === 0 || day.weekday === 6;
   const count = weekend ? Math.round(base * 1.3) : base;
   return Array.from(
@@ -90,6 +108,8 @@ function timesFor(day: BusinessDay, rand: Rand): number[] {
 
 type Ctx = {
   state: MockState;
+  /** Barang yang dijual acak: semua kecuali barang lambat. */
+  pool: readonly Product[];
   rand: Rand;
   today: BusinessDay;
   dewi: MockState["customers"][number] | undefined;
@@ -132,10 +152,12 @@ function makeSale(
   at: number,
   seq: number,
   shiftIds: Readonly<Record<"Rina" | "Budi", string>>,
+  slow: Product | undefined,
 ): MockSale {
   const { state, rand } = ctx;
-  const lines = buildItems(state.products, rand);
+  const lines = buildItems(ctx.pool, rand, slow);
   const items = lines.map((l) => l.item);
+  const lineCosts = saleLineCosts(state.products, items);
   const total = items.reduce((a, it) => a + it.subtotal, 0);
   const { method, customerId } = payFor(ctx, at, total);
   const step = total < 50_000 ? 5000 : 10_000;
@@ -171,7 +193,8 @@ function makeSale(
     customerId,
     status: "selesai",
     printStatus: "tercetak",
-    costTotal: saleCost(state.products, items),
+    costTotal: sumLineCosts(lineCosts),
+    lineCosts,
     voidedAt: null,
     voidedById: null,
     voidedByName: null,
@@ -240,11 +263,50 @@ function restock(
 }
 
 /**
- * Isi penjualan selesai 14 hari sebelum hari bisnis `now` (hari ini sengaja kosong),
- * lengkap dengan shift tertutup, stok, dan kasbon Mbak Dewi yang lunas 1-7 hari kemudian.
+ * (K11) `SLOW_PRODUCTS` barang lambat dari `candidates` (barang buatan), selain yang menipis agar
+ * stoknya tetap > 0 dan tampil di laporan Tidak terjual.
+ */
+function pickSlow(
+  state: MockState,
+  candidates: readonly string[],
+  low: ReadonlySet<string>,
+): Product[] {
+  const pool = state.products.filter(
+    (p) => candidates.includes(p.id) && !low.has(p.id),
+  );
+  if (pool.length < SLOW_PRODUCTS) {
+    throw new Error("Calon barang lambat kurang");
+  }
+  const rand = rng(SLOW_SEED);
+  const chosen = new Set<Product>();
+  while (chosen.size < SLOW_PRODUCTS) chosen.add(pick(pool, rand));
+  return [...chosen];
+}
+
+/** Hari-ke-belakang → barang lambat yang ikut di penjualan ke-i hari itu. */
+function slowSalesByDay(slow: readonly Product[]): Map<number, Product[]> {
+  const byBack = new Map<number, Product[]>();
+  SLOW_SOLD_BACK.forEach((backs, i) => {
+    const product = slow[SLOW_PRODUCTS - SLOW_SOLD_BACK.length + i];
+    if (!product) return;
+    for (const back of backs) {
+      byBack.set(back, [...(byBack.get(back) ?? []), product]);
+    }
+  });
+  return byBack;
+}
+
+/**
+ * Isi penjualan selesai `HISTORY_DAYS` hari sebelum hari bisnis `now` (hari ini sengaja kosong),
+ * lengkap dengan HPP per baris, shift tertutup, stok, dan kasbon Mbak Dewi yang lunas 1-7 hari
+ * kemudian. `slowCandidates` = id barang yang boleh dijadikan barang lambat (bukan fixture).
  * Pengacak sendiri yang hanya bergantung pada tanggal bisnis.
  */
-export function generateHistory(state: MockState, now: number): void {
+export function generateHistory(
+  state: MockState,
+  now: number,
+  slowCandidates: readonly string[],
+): void {
   const today = businessDay(now);
   const baseStock = { ...state.stock };
   const low = new Set(
@@ -252,8 +314,11 @@ export function generateHistory(state: MockState, now: number): void {
       .filter((p) => (state.stock[p.id] ?? 0) < (state.minStock[p.id] ?? 0))
       .map((p) => p.id),
   );
+  const slow = pickSlow(state, slowCandidates, low);
+  const slowByBack = slowSalesByDay(slow);
   const ctx: Ctx = {
     state,
+    pool: state.products.filter((p) => !slow.includes(p)),
     rand: rng(HISTORY_SEED ^ Number(today.key)),
     today,
     dewi: state.customers.find((c) => c.name === CREDIT_CUSTOMER),
@@ -265,8 +330,9 @@ export function generateHistory(state: MockState, now: number): void {
   for (let back = HISTORY_DAYS; back >= 1; back--) {
     const day = daysBefore(today, back);
     const shiftIds = shiftIdsFor(ctx);
+    const forced = slowByBack.get(back) ?? [];
     const sales = timesFor(day, ctx.rand).map((at, i) =>
-      makeSale(ctx, day, at, i + 1, shiftIds),
+      makeSale(ctx, day, at, i + 1, shiftIds, forced[i]),
     );
     state.sales.push(...sales);
     state.saleSeq[day.key] = sales.length;

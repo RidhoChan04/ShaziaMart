@@ -27,8 +27,9 @@ import {
   priceChanges,
   priceItems,
   type Rejection,
-  saleCost,
+  saleLineCosts,
   saleTotal,
+  sumLineCosts,
 } from "../sale-rules";
 import { getScenario, withScenario } from "../scenarios";
 import { invalid, problem, readJson, requireSession } from "./respond";
@@ -109,11 +110,14 @@ function commitSale(
   const dateKey = jakartaDateKey(createdAt);
   const { saleSeq, products } = mockDb.get();
   const seq = (saleSeq[dateKey] ?? 0) + 1;
+  // (K10) HPP per baris disalin sekarang; perubahan HPP sesudahnya tidak mengubah penjualan ini.
+  const lineCosts = saleLineCosts(products, draft.items);
   const sale: MockSale = {
     ...draft,
     number: formatSaleNumber(createdAt, seq),
     createdAt,
-    costTotal: saleCost(products, draft.items),
+    costTotal: sumLineCosts(lineCosts),
+    lineCosts,
     voidedAt: null,
     voidedById: null,
     voidedByName: null,

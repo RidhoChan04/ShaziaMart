@@ -49,6 +49,7 @@ function addSale(
     status: "selesai",
     printStatus: "tercetak",
     costTotal: Math.round(total * 0.9),
+    lineCosts: [],
     voidedAt: null,
     voidedById: null,
     voidedByName: null,

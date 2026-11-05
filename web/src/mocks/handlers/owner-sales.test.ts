@@ -81,7 +81,8 @@ describe("listOwnerSales & getOwnerSale", () => {
     });
     // Riwayat seed: kemarin (4 Nov), semua shift sudah tutup, terbaru dulu.
     const yesterday = await list("?date=2026-11-04");
-    expect(yesterday.length).toBeGreaterThanOrEqual(40);
+    // (K11) volume harian minimum riwayat seed.
+    expect(yesterday.length).toBeGreaterThanOrEqual(20);
     expect(yesterday.every((r) => r.number.startsWith("20261104-"))).toBe(true);
     expect(yesterday.every((r) => !r.shiftOpen)).toBe(true);
     const ats = yesterday.map((r) => r.createdAt);

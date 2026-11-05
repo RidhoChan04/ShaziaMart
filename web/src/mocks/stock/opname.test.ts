@@ -76,6 +76,7 @@ function sell(s: MockState, at: number, qtyBase: number): void {
     status: "selesai",
     printStatus: "tercetak",
     costTotal: 0,
+    lineCosts: [0],
     voidedAt: null,
     voidedById: null,
     voidedByName: null,

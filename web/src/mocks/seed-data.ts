@@ -3,9 +3,10 @@ import type {
   ProductCost,
   WholesaleTier,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
+import { businessDay, daysBefore } from "@/shared/lib/business-day";
 import { roundHalfUp } from "@/shared/lib/quantity";
 import type { MockProduct, MockState, MockUnit, MockUser } from "./db";
-import { generateHistory } from "./history";
+import { generateHistory, HISTORY_DAYS } from "./history";
 import { KIND, makeId, rng } from "./seed";
 import { CATALOG_NAMES, TEMPLATE_CATEGORIES } from "./seed-catalog-names";
 import { seedCustomers, settleSeedBalanceAfter } from "./seed-customers";
@@ -249,7 +250,7 @@ export function createSeedState(now: number = Date.now()): MockState {
   const [rina] = users;
   if (!rina) throw new Error("Seed tanpa kasir");
   const state: MockState = {
-    version: 8,
+    version: 9,
     store: { id: makeId(KIND.store, 1), name: "ShaziaMart" },
     users,
     session: null,
@@ -293,8 +294,16 @@ export function createSeedState(now: number = Date.now()): MockState {
       batal_pelunasan: null,
       kasbon_lewat_limit: null,
     },
+    // (K11) awal hari riwayat pertama; (K18) batas laporan bawaan.
+    catalogSince: daysBefore(businessDay(now), HISTORY_DAYS).start,
+    reportRules: { thinMarginPermille: 100, unsoldDays: 30 },
   };
-  generateHistory(state, now);
+  // Barang lambat hanya dari barang buatan: fixture dipakai test & E2E.
+  generateHistory(
+    state,
+    now,
+    generated.map((p) => p.id),
+  );
   settleSeedBalanceAfter(state);
   return state;
 }

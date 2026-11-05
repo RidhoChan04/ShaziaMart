@@ -103,9 +103,16 @@ test("deterministik untuk now yang sama", () => {
   expect(createSeedState(NOW)).toEqual(createSeedState(NOW));
 });
 
+test("(K11) catalogSince = awal hari bisnis pertama riwayat 63 hari (WIB)", () => {
+  // NOW = Jumat 23 Okt 2026 10.00 WIB → hari pertama riwayat Jumat 21 Agu 2026 00.00 WIB.
+  expect(createSeedState(NOW).catalogSince).toBe(Date.UTC(2026, 7, 20, 17));
+});
+
 test("PIN seed dan state awal", () => {
   const s = createSeedState();
-  expect(s.version).toBe(8);
+  expect(s.version).toBe(9);
+  // (K18) batas laporan di state server; layar pengaturannya di F3c-2.
+  expect(s.reportRules).toEqual({ thinMarginPermille: 100, unsoldDays: 30 });
   // (ruling R9) belum ada pengecualian yang pernah ditinjau.
   expect(s.exceptionReviews).toEqual({
     batal_transaksi: null,
@@ -180,13 +187,13 @@ test("ID unik di seluruh state", () => {
   expect(new Set(ids).size).toBe(ids.length);
 });
 
-test("state versi lama di localStorage diganti default v8", () => {
+test("state versi lama di localStorage diganti default v9", () => {
   localStorage.setItem(
     "mock.db",
     JSON.stringify({ store: { id: "x", name: "y" } }),
   );
   __resetMockDbCacheForTests();
-  expect(mockDb.get().version).toBe(8);
+  expect(mockDb.get().version).toBe(9);
   expect(mockDb.get().products).toHaveLength(60);
 });
 

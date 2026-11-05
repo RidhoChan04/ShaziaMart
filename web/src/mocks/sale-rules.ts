@@ -162,17 +162,30 @@ function safeSum(values: readonly number[]): number | null {
 export const saleTotal = (items: readonly PricedItem[]): number | null =>
   safeSum(items.map((p) => p.item.subtotal));
 
-/** HPP penjualan: Σ round_half_up(HPP.amount × qtyBase ÷ HPP.qtyBase) per item; HPP kosong = 0. */
-export const saleCost = (
+/**
+ * (K10) HPP per baris, sejajar `items`: round_half_up(HPP.amount × qtyBase ÷ HPP.qtyBase); HPP
+ * kosong atau satuan tak dikenal → null. Disalin ke penjualan saat jual (`MockSale.lineCosts`).
+ */
+export const saleLineCosts = (
   products: readonly MockProduct[],
   items: readonly SaleItem[],
-): number =>
-  items.reduce((sum, i) => {
+): (number | null)[] =>
+  items.map((i) => {
     const product = products.find((p) =>
       p.units.some((u) => u.id === i.unitId),
     );
-    return sum + (unitCost(product?.cost ?? null, i.qtyBase) ?? 0);
-  }, 0);
+    return unitCost(product?.cost ?? null, i.qtyBase);
+  });
+
+/** Σ HPP per baris dengan null = 0 (`MockSale.costTotal`, angka Beranda). */
+export const sumLineCosts = (lineCosts: readonly (number | null)[]): number =>
+  lineCosts.reduce<number>((sum, c) => sum + (c ?? 0), 0);
+
+/** HPP penjualan: Σ `saleLineCosts` dengan HPP kosong = 0. */
+export const saleCost = (
+  products: readonly MockProduct[],
+  items: readonly SaleItem[],
+): number => sumLineCosts(saleLineCosts(products, items));
 
 function parsePayments(raw: unknown): PaymentInput[] | Rejection {
   if (!Array.isArray(raw) || raw.length === 0) {

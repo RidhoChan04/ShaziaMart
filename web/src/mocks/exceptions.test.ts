@@ -35,6 +35,7 @@ function sale(over: Partial<MockSale> = {}): MockSale {
     status: "selesai",
     printStatus: "tercetak",
     costTotal: 0,
+    lineCosts: [],
     voidedAt: null,
     voidedById: null,
     voidedByName: null,

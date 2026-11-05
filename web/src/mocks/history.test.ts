@@ -4,11 +4,14 @@ import {
   DAY_MS,
   daysBefore,
   HOUR_MS,
+  isoDaysBetween,
+  jakartaIsoDate,
 } from "@/shared/lib/business-day";
-import type { MockSale } from "./db";
+import type { MockSale, MockState } from "./db";
+import { HISTORY_DAYS, SLOW_PRODUCTS } from "./history";
 import { balanceOf, oldestUnpaidAt } from "./ledger";
 import { formatSaleNumber } from "./sale-number";
-import { saleCost } from "./sale-rules";
+import { saleCost, saleLineCosts } from "./sale-rules";
 import { createSeedState } from "./seed-data";
 
 /** Jumat 23 Okt 2026 14.30 WIB. */
@@ -22,11 +25,37 @@ for (const s of state.sales) {
 }
 const hourOf = (ms: number) =>
   Math.floor((ms - businessDay(ms).start) / HOUR_MS);
+/** Hari kalender WIB dari `at` sampai `now`. */
+const daysAgo = (at: number, now = NOW) =>
+  isoDaysBetween(jakartaIsoDate(at), jakartaIsoDate(now));
 
-describe("riwayat 14 hari", () => {
-  test("hanya 14 hari sebelum hari ini; hari ini kosong", () => {
+/** Barang tak pernah terjual (id) dan barang terakhir terjual ≥ 45 hari lalu (id + hari). */
+function slowOf(s: Readonly<MockState>, now = NOW) {
+  const productOf = new Map(
+    s.products.flatMap((p) => p.units.map((u) => [u.id, p.id] as const)),
+  );
+  const lastSold = new Map<string, number>();
+  for (const sale of s.sales) {
+    for (const item of sale.items) {
+      const id = productOf.get(item.unitId) ?? "";
+      lastSold.set(id, Math.max(lastSold.get(id) ?? 0, sale.createdAt));
+    }
+  }
+  const never = s.products.filter((p) => !lastSold.has(p.id)).map((p) => p.id);
+  const old = s.products.flatMap((p) => {
+    const at = lastSold.get(p.id);
+    return at !== undefined && daysAgo(at, now) >= 45
+      ? [{ id: p.id, days: daysAgo(at, now) }]
+      : [];
+  });
+  return { never, old, lastSold };
+}
+
+describe("riwayat 63 hari", () => {
+  test("riwayat 63 hari sebelum hari ini; hari ini kosong; tiap penjualan punya shiftId", () => {
+    expect(HISTORY_DAYS).toBe(63);
     const expected = Array.from(
-      { length: 14 },
+      { length: 63 },
       (_, i) => daysBefore(today, i + 1).key,
     );
     expect([...byDay.keys()].sort()).toEqual(expected.sort());
@@ -35,6 +64,14 @@ describe("riwayat 14 hari", () => {
     expect(state.closedShifts.every((c) => c.closedAt < today.start)).toBe(
       true,
     );
+    const shiftIds = new Set(state.closedShifts.map((c) => c.shiftId));
+    expect(state.sales.every((s) => shiftIds.has(s.shiftId))).toBe(true);
+    // (K11) katalog dianggap ada sejak awal hari riwayat pertama.
+    expect(state.catalogSince).toBe(daysBefore(today, 63).start);
+    expect(state.reportRules).toEqual({
+      thinMarginPermille: 100,
+      unsoldDays: 30,
+    });
   });
 
   test("deterministik untuk tanggal bisnis yang sama (tak peduli milidetik); katalog tak berubah", () => {
@@ -45,11 +82,11 @@ describe("riwayat 14 hari", () => {
     expect(createSeedState(NOW + 9 * DAY_MS).products).toEqual(state.products);
   });
 
-  test("volume harian 40-160 (akhir pekan x1,3), jam 06-21, nomor struk berurutan", () => {
+  test("volume harian 20-60 (akhir pekan 26-78), jam 06-21, nomor struk berurutan", () => {
     for (const [key, sales] of byDay) {
       const weekend = businessDay(sales[0]?.createdAt ?? 0).weekday % 6 === 0;
-      expect(sales.length).toBeGreaterThanOrEqual(weekend ? 52 : 40);
-      expect(sales.length).toBeLessThanOrEqual(weekend ? 208 : 160);
+      expect(sales.length).toBeGreaterThanOrEqual(weekend ? 26 : 20);
+      expect(sales.length).toBeLessThanOrEqual(weekend ? 78 : 60);
       expect(state.saleSeq[key]).toBe(sales.length);
       sales.forEach((s, i) => {
         expect(s.number).toBe(formatSaleNumber(s.createdAt, i + 1));
@@ -89,6 +126,49 @@ describe("riwayat 14 hari", () => {
     }
     const methods = state.sales.flatMap((s) => s.payments.map((p) => p.method));
     expect(new Set(methods)).toEqual(new Set(["cash", "qris", "credit"]));
+  });
+
+  test("(K10) lineCosts tiap penjualan riwayat sejajar items dan Σ = costTotal", () => {
+    for (const s of state.sales) {
+      expect(s.lineCosts).toHaveLength(s.items.length);
+      expect(s.lineCosts).toEqual(saleLineCosts(state.products, s.items));
+      expect(s.lineCosts.reduce<number>((a, c) => a + (c ?? 0), 0)).toBe(
+        s.costTotal,
+      );
+    }
+  });
+
+  test("(K11) 6 barang lambat: 3 tidak pernah terjual, 3 terakhir terjual 45-63 hari lalu; tidak ada FIXTURES di antaranya", () => {
+    expect(SLOW_PRODUCTS).toBe(6);
+    const { never, old } = slowOf(state);
+    expect(never).toHaveLength(3);
+    expect(old).toHaveLength(3);
+    for (const { days } of old) {
+      expect(days).toBeGreaterThanOrEqual(45);
+      expect(days).toBeLessThanOrEqual(63);
+    }
+    // FIXTURES (9 barang pertama, dipakai test & E2E) tidak pernah lambat; stok barang lambat > 0.
+    const fixtures = new Set(state.products.slice(0, 9).map((p) => p.id));
+    for (const id of [...never, ...old.map((p) => p.id)]) {
+      expect(fixtures.has(id)).toBe(false);
+      expect(state.stock[id] ?? 0).toBeGreaterThan(0);
+    }
+  });
+
+  test("(K11) barang lain terjual dalam 30 hari terakhir; barang lambat sama untuk tanggal bisnis lain", () => {
+    const { never, old, lastSold } = slowOf(state);
+    const slow = new Set([...never, ...old.map((p) => p.id)]);
+    for (const p of state.products) {
+      if (slow.has(p.id)) continue;
+      expect(daysAgo(lastSold.get(p.id) ?? 0), p.name).toBeLessThan(30);
+    }
+    const other = slowOf(createSeedState(NOW + 9 * DAY_MS), NOW + 9 * DAY_MS);
+    expect(other.never).toEqual(never);
+    expect(other.old.map((p) => p.id)).toEqual(old.map((p) => p.id));
+  });
+
+  test("(K11) ukuran state seed < 4.000.000 karakter JSON (kuota localStorage)", () => {
+    expect(JSON.stringify(createSeedState(NOW)).length).toBeLessThan(4_000_000);
   });
 
   test("(T2b) setiap penjualan riwayat punya shiftId shift tutup kasirnya yang memuat jamnya; shift tumpang 13.00–13.05 tidak dipakai menebak", () => {
@@ -161,7 +241,7 @@ describe("riwayat 14 hari", () => {
   });
 
   test("2 shift tertutup per hari (Rina, Budi) dengan selisih dari {0,-5000,+2000}", () => {
-    expect(state.closedShifts).toHaveLength(28);
+    expect(state.closedShifts).toHaveLength(2 * 63);
     for (const c of state.closedShifts) {
       expect([0, -5000, 2000]).toContain(c.difference);
       expect(c.expectedCash).toBe(c.openingCash + c.cashSales);

@@ -6,6 +6,7 @@ import {
   type PricedItem,
   priceChanges,
   saleCost,
+  saleLineCosts,
 } from "./sale-rules";
 import { createSeedState } from "./seed-data";
 
@@ -104,6 +105,33 @@ test("saleCost: Σ round_half_up(HPP × qtyBase); satuan nonaktif tetap dihitung
   ).toBe(7800 + 2600 + 208000);
   indomie.cost = { amount: 1001, qtyBase: 2 };
   expect(saleCost(products, [line(pcs.id, 1)])).toBe(501); // 500,5 → 501
+});
+
+test("(K10) saleLineCosts per baris; HPP kosong → null; Σ (null = 0) = saleCost", () => {
+  const { products } = createSeedState();
+  const unitOf = (code: string) => {
+    const p = products.find((x) => x.storeCode === code);
+    const unit = p?.units[0];
+    if (!p || !unit) throw new Error(code);
+    return { p, unit };
+  };
+  const indomie = unitOf("1001");
+  const kopi = unitOf("1004");
+  kopi.p.cost = null;
+  const line = (unitId: string, qtyBase: number) => ({
+    ...priced(unitId, 0, 0).item,
+    unitSize: 1,
+    qtyBase,
+  });
+  const items = [line(indomie.unit.id, 5), line(kopi.unit.id, 2)];
+  // 104.000 × 5 ÷ 40 = 13.000; Kopi tanpa HPP → null (bukan 0).
+  expect(saleLineCosts(products, items)).toEqual([13_000, null]);
+  expect(saleCost(products, items)).toBe(13_000);
+  // Satuan tak dikenal → null; urutan sejajar items; daftar kosong → [].
+  expect(
+    saleLineCosts(products, [line("tidak-ada", 1), line(indomie.unit.id, 1)]),
+  ).toEqual([null, 2600]);
+  expect(saleLineCosts(products, [])).toEqual([]);
 });
 
 describe("creditGate (ruling R3: limit = batas peringatan, alasan wajib)", () => {

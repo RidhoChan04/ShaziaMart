@@ -159,7 +159,7 @@ export const voidSale = (id: string, body: unknown) =>
 const HISTORY_SALE = makeId(KIND.sale, 0).slice(0, 8);
 const HISTORY_SHIFT = makeId(KIND.shift, 0).slice(0, 8);
 
-/** Penjualan yang dibuat test ini; riwayat 14 hari seed tidak ikut. */
+/** Penjualan yang dibuat test ini; riwayat seed (`HISTORY_DAYS` hari) tidak ikut. */
 export function placedSales(
   state: Readonly<MockState> = mockDb.get(),
 ): MockSale[] {

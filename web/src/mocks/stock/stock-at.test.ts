@@ -54,6 +54,7 @@ const sale = (s: SaleSpec, i: number): MockSale => ({
   status: s.voidedAt === undefined ? "selesai" : "dibatalkan",
   printStatus: "tercetak",
   costTotal: 0,
+  lineCosts: [0],
   voidedAt: s.voidedAt ?? null,
   voidedById: null,
   voidedByName: null,

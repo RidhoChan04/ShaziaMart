@@ -7,6 +7,9 @@ import {
   cashSale,
   customerBalance,
   customerId,
+  deepKeys,
+  FORBIDDEN_KASIR_KEYS,
+  get,
   json,
   loginWithShift,
   post,
@@ -15,6 +18,7 @@ import {
 } from "./test-helpers";
 
 const GULA = "Gula Pasir";
+const KOPI = "Kopi Kapal Api 165 g";
 
 describe("HPP & buku kasbon", () => {
   const keysOf = async (res: Response): Promise<string[]> => {
@@ -97,6 +101,71 @@ describe("HPP & buku kasbon", () => {
     expect(mockDb.get().sales.find((s) => s.id === sale.id)?.voidedAt).toBe(
       Date.UTC(2026, 9, 23, 4),
     );
+  });
+
+  test("(K10) penjualan baru menyimpan lineCosts sejajar items; HPP berubah setelahnya tidak mengubah lineCosts/costTotal", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(Date.UTC(2026, 9, 23, 2));
+    await loginWithShift();
+    // Kopi tanpa HPP → null; costTotal tetap Σ dengan null = 0.
+    mockDb.update((s) => {
+      const kopi = s.products.find((p) => p.name === KOPI);
+      if (kopi) kopi.cost = null;
+    });
+    const sale = await json<Sale>(
+      await post("/api/sales", {
+        saleId: newId(),
+        items: [
+          saleItem(GULA, { qtyBase: 1500 }, 18000), // 24.750
+          saleItem(KOPI, { qtyBase: 2 }, 14500), // HPP kosong
+          saleItem("Indomie Goreng", { qtyBase: 3 }, 3100, "pcs"), // 7.800
+        ],
+        payments: [{ method: "qris", amount: 27000 + 29000 + 9300 }],
+        print: false,
+      }),
+    );
+    const stored = () => mockDb.get().sales.find((s) => s.id === sale.id);
+    expect(stored()).toMatchObject({
+      lineCosts: [24750, null, 7800],
+      costTotal: 24750 + 7800,
+    });
+    // HPP diubah setelah penjualan: salinan di penjualan tidak ikut berubah.
+    mockDb.update((s) => {
+      for (const p of s.products) p.cost = { amount: 1, qtyBase: 1 };
+    });
+    expect(stored()).toMatchObject({
+      lineCosts: [24750, null, 7800],
+      costTotal: 32550,
+    });
+  });
+
+  test("(K10) respons createSale/listShiftSales/lookupSales/void tidak memuat lineCosts (kedalaman mana pun)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(Date.UTC(2026, 9, 23, 2));
+    await loginWithShift();
+    const body = cashSale();
+    const created = await post("/api/sales", body);
+    const { id } = (await created.clone().json()) as Sale;
+    expect(mockDb.get().sales.find((s) => s.id === id)?.lineCosts).toEqual([
+      expect.any(Number),
+    ]);
+    const lookup = await get("/api/sales/lookup?q=20261022");
+    const responses = [
+      created,
+      await post("/api/sales", body),
+      await fetch("/api/sales/shift"),
+      lookup,
+      await voidSale(id, reasonVoid),
+      await voidSale(id, reasonVoid),
+    ];
+    const lookupRows: unknown = await lookup.clone().json();
+    expect(Array.isArray(lookupRows) && lookupRows.length > 0).toBe(true);
+    for (const res of responses) {
+      expect(res.ok).toBe(true);
+      const keys = deepKeys(await res.json());
+      expect(keys).toContain("total");
+      for (const key of FORBIDDEN_KASIR_KEYS) expect(keys).not.toContain(key);
+    }
   });
 
   test("kasbon menambah ledger; batal menambah entri negatif; balance = Σ ledger", async () => {

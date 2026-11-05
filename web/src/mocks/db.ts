@@ -88,9 +88,12 @@ export type MockVoidRefund = {
 /**
  * HPP disalin saat penjualan; tidak pernah dikirim ke endpoint kasir, begitu juga data batal
  * (`voided*`, `voidRefund`) dan kasbon lewat limit (ruling R3/R4) — hanya untuk pemilik.
+ * (K10) `lineCosts` = HPP per baris sejajar `items` (null = HPP belum ada saat jual);
+ * `costTotal` = Σ `lineCosts` dengan null = 0.
  */
 export type MockSale = Sale & {
   costTotal: number;
+  lineCosts: (number | null)[];
   voidedAt: number | null;
   voidedById: string | null;
   voidedByName: string | null;
@@ -339,13 +342,19 @@ export type StockRules = {
   opnameSessionLimit: number;
 };
 
+/**
+ * (K17/K18) Batas laporan di server: untung tipis bila margin eceran < `thinMarginPermille` ‰,
+ * tidak terjual bila ≥ `unsoldDays` hari. Layar pengaturannya di F3c-2.
+ */
+export type ReportRules = { thinMarginPermille: number; unsoldDays: number };
+
 type LoginFailures = Record<
   string,
   { count: number; lockedUntil: number | null }
 >;
 
 export type MockState = {
-  version: 8;
+  version: 9;
   store: { id: string; name: string };
   users: MockUser[];
   session: { userId: string } | null;
@@ -387,6 +396,9 @@ export type MockState = {
   stockRules: StockRules;
   /** (ruling R9) Terakhir ditinjau per jenis pengecualian kasir; null = belum pernah. */
   exceptionReviews: Record<ExceptionKind, number | null>;
+  /** (K11/K17) Barang dianggap ada sejak jam ini bila belum punya entri stok positif. */
+  catalogSince: number;
+  reportRules: ReportRules;
 };
 
 const STORAGE_KEY = "mock.db";
@@ -396,7 +408,7 @@ const isObj = (x: unknown): x is Record<string, unknown> =>
 
 /** Pemeriksaan struktur murah (bukan validasi mendalam). */
 function isState(value: unknown): value is MockState {
-  if (!isObj(value) || value.version !== 8) return false;
+  if (!isObj(value) || value.version !== 9) return false;
   const { store } = value;
   return (
     isObj(store) &&
@@ -430,7 +442,9 @@ function isState(value: unknown): value is MockState {
       "saleSeq",
       "stockRules",
       "exceptionReviews",
+      "reportRules",
     ].every((k) => isObj(value[k])) &&
+    typeof value.catalogSince === "number" &&
     ["session", "ownerSession", "staffSession", "shift"].every(
       (k) => value[k] === null || isObj(value[k]),
     )
