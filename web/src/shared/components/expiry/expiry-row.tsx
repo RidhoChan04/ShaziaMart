@@ -10,6 +10,7 @@ export function ExpiryRow({
   expiryText,
   whenText,
   tone,
+  trailing,
   onMore,
 }: {
   name: string;
@@ -20,6 +21,8 @@ export function ExpiryRow({
   /** `Lewat 2 hari` · `Hari ini` · `13 hari lagi`. */
   whenText: string;
   tone: ExpiryTone;
+  /** Teks kanan opsional (pemilik: nilai rupiah). */
+  trailing?: string | undefined;
   onMore: (button: HTMLButtonElement) => void;
 }) {
   const Icon = tone === "bad" ? OctagonAlert : Clock;
@@ -41,6 +44,11 @@ export function ExpiryRow({
           {whenText}
         </div>
       </div>
+      {trailing && (
+        <span className="shrink-0 text-right text-[14px] font-semibold tabular-nums">
+          {trailing}
+        </span>
+      )}
       <button
         type="button"
         aria-label="Pilihan"

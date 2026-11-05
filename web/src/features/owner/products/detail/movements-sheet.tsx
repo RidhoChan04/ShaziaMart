@@ -8,14 +8,12 @@ import {
   ShoppingCart,
 } from "lucide-react";
 import { useListOwnerProductMovements } from "@/shared/api/gen/owner/owner";
-import type {
-  OpnameReason,
-  StockMovement,
-} from "@/shared/api/gen/shaziaMartAPI.schemas";
+import type { StockMovement } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { relativeDayTime } from "@/shared/lib/business-day";
 import { cn } from "@/shared/lib/cn";
 import { pesanError } from "@/shared/lib/error-messages";
 import { formatQty } from "@/shared/lib/quantity";
+import { OPNAME_REASON_LABEL } from "@/shared/lib/stock-rules";
 import { Button } from "@/shared/ui/button";
 import {
   Sheet,
@@ -51,14 +49,6 @@ const KINDS: Record<Kind, { label: string; icon: LucideIcon; by: string }> = {
   },
 };
 
-const REASONS: Record<OpnameReason, string> = {
-  rusak: "Rusak",
-  hilang: "Hilang",
-  kedaluwarsa: "Kedaluwarsa",
-  salah_input: "Salah input sebelumnya",
-  tidak_diketahui: "Tidak diketahui",
-};
-
 /** Satu mutasi stok: `Terjual 2 pcs` / `Opname · Hilang 7 pcs`, `{waktu} · {pencatat}`, jumlah bertanda. */
 export function MovementRow({
   movement,
@@ -72,7 +62,9 @@ export function MovementRow({
   const abs = Math.abs(movement.qtyBase);
   const { label, icon: Icon, by } = KINDS[movement.kind];
   const reason =
-    movement.reason === null ? "" : ` · ${REASONS[movement.reason]}`;
+    movement.reason === null
+      ? ""
+      : ` · ${OPNAME_REASON_LABEL[movement.reason]}`;
   const out = movement.qtyBase < 0;
   const sign = out ? "−" : "+";
   return (

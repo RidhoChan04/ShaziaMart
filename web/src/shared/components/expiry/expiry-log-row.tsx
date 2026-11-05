@@ -5,10 +5,13 @@ export function ExpiryLogRow({
   kind,
   text,
   detail,
+  trailing,
 }: {
   kind: "keluar" | "ubah_ed";
   text: string;
   detail: string;
+  /** Teks kanan opsional (pemilik: nilai rupiah). */
+  trailing?: string | undefined;
 }) {
   const Icon = kind === "keluar" ? PackageMinus : CalendarDays;
   return (
@@ -23,6 +26,11 @@ export function ExpiryLogRow({
         <div>{text}</div>
         <small className="block text-[13px] text-muted">{detail}</small>
       </div>
+      {trailing && (
+        <span className="shrink-0 text-[14px] font-semibold tabular-nums">
+          {trailing}
+        </span>
+      )}
     </li>
   );
 }

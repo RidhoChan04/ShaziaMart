@@ -51,6 +51,7 @@ export type AttentionLink =
         | "/owner/barang"
         | "/owner/lainnya"
         | "/owner/lainnya/utang"
+        | "/owner/lainnya/kedaluwarsa"
         | "/owner/kasbon";
     }
   | { to: "/owner/barang"; search: { menunggu: true } }
@@ -65,7 +66,15 @@ export type AttentionItem = {
   title: string;
   detail: string;
   tone: "warning" | "critical";
-  icon: "stock" | "cost" | "stockout" | "cash" | "credit" | "debt" | "price";
+  icon:
+    | "stock"
+    | "cost"
+    | "stockout"
+    | "cash"
+    | "credit"
+    | "debt"
+    | "price"
+    | "expiry";
   link: AttentionLink;
 };
 
@@ -109,7 +118,28 @@ function debtItem(
   };
 }
 
-/** Urutan: stok minus, utang lewat, perubahan modal, barang baru menunggu harga, stok menipis, utang segera, barang habis, selisih kas, kasbon > 30 hari. */
+/** Butir kedaluwarsa tahap `kind`; kosong bila tak ada barangnya. */
+function expiryItems(
+  kind: "expired" | "soon",
+  e: Attention["expiry"],
+): AttentionItem[] {
+  const expired = kind === "expired";
+  if ((expired ? e.expiredCount : e.soonCount) === 0) return [];
+  return [
+    {
+      key: `expiry-${kind}`,
+      title: expired ? "Barang sudah kedaluwarsa" : "Barang segera kedaluwarsa",
+      detail: expired
+        ? `${e.expiredCount} barang`
+        : `${e.soonCount} barang · ≤ ${e.soonDays} hari`,
+      tone: expired ? "critical" : "warning",
+      icon: "expiry",
+      link: { to: "/owner/lainnya/kedaluwarsa" },
+    },
+  ];
+}
+
+/** Urutan: stok minus, kedaluwarsa, utang lewat, perubahan modal, barang baru menunggu harga, stok menipis, segera kedaluwarsa, utang segera, barang habis, selisih kas, kasbon > 30 hari. */
 export function attentionItems(a: Attention): AttentionItem[] {
   const items: AttentionItem[] = [];
   if (a.negativeStockCount > 0) {
@@ -122,6 +152,7 @@ export function attentionItems(a: Attention): AttentionItem[] {
       link: { to: "/owner/barang" },
     });
   }
+  items.push(...expiryItems("expired", a.expiry));
   const debts = a.supplierDebts;
   if (debts.overdueCount > 0) {
     items.push(debtItem("overdue", debts.overdueCount, debts.overdueTotal));
@@ -147,6 +178,7 @@ export function attentionItems(a: Attention): AttentionItem[] {
       link: { to: "/owner/barang" },
     });
   }
+  items.push(...expiryItems("soon", a.expiry));
   if (debts.dueSoonCount > 0) {
     items.push(debtItem("soon", debts.dueSoonCount, debts.dueSoonTotal));
   }

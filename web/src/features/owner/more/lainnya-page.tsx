@@ -3,14 +3,18 @@ import { Link } from "@tanstack/react-router";
 import {
   ChevronRight,
   HandCoins,
+  Hourglass,
   LogOut,
   type LucideIcon,
   PackagePlus,
 } from "lucide-react";
 import {
+  getGetOwnerTodaySummaryQueryKey,
+  useGetOwnerTodaySummary,
   useListOwnerSupplierDebts,
   useOwnerLogout,
 } from "@/shared/api/gen/owner/owner";
+import { useBusinessDay } from "@/shared/hooks/use-business-day";
 import { jakartaIsoDate } from "@/shared/lib/business-day";
 import { pesanError } from "@/shared/lib/error-messages";
 import { formatRupiah } from "@/shared/lib/money";
@@ -34,13 +38,19 @@ function RowIcon({ icon: Icon }: { icon: LucideIcon }) {
   );
 }
 
-/** Menu Lainnya: kartu daftar ala Settings (Barang masuk, Utang supplier), lalu Keluar. */
+/** Menu Lainnya: kartu daftar ala Settings (Barang masuk, Utang supplier, Kedaluwarsa), lalu Keluar. */
 export function LainnyaPage() {
   const client = useQueryClient();
   const logout = useOwnerLogout({
     mutation: { onSuccess: () => clearOwnerSession(client) },
   });
   const debts = useListOwnerSupplierDebts();
+  const { date } = useBusinessDay();
+  // Kunci sama dengan Beranda: angka kedaluwarsa memakai ringkasan yang sudah ada, bukan daftar penuh.
+  const summary = useGetOwnerTodaySummary({
+    query: { queryKey: [...getGetOwnerTodaySummaryQueryKey(), date] },
+  });
+  const expiredCount = summary.data?.attention.expiry.expiredCount ?? 0;
   const unpaid = debts.data
     ? unpaidSummary(debts.data.debts, jakartaIsoDate(Date.now()))
     : null;
@@ -77,6 +87,24 @@ export function LainnyaPage() {
                     min={11}
                     className="text-right"
                   />
+                </span>
+              )}
+              <ChevronRight
+                aria-hidden="true"
+                className="size-4 shrink-0 text-muted"
+              />
+            </Link>
+          </li>
+          <li>
+            <Link
+              to="/owner/lainnya/kedaluwarsa"
+              className={`${rowClass} hover:bg-bg`}
+            >
+              <RowIcon icon={Hourglass} />
+              <span className="min-w-0 flex-1">Kedaluwarsa</span>
+              {expiredCount > 0 && (
+                <span className="shrink-0 font-semibold text-danger-ink tabular-nums">
+                  {`${expiredCount} lewat`}
                 </span>
               )}
               <ChevronRight

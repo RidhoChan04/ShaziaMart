@@ -114,6 +114,12 @@ const ownerUtangDetailRoute = createRoute({
   component: lazyRouteComponent(loadOwner, "DebtDetailPage"),
 });
 
+const ownerKedaluwarsaRoute = createRoute({
+  getParentRoute: () => ownerRoute,
+  path: "lainnya/kedaluwarsa",
+  component: lazyRouteComponent(loadOwner, "OwnerExpiryPage"),
+});
+
 /** Pohon rute app pemilik (`/owner`). */
 export const ownerTree = ownerRoute.addChildren([
   ownerIndexRoute,
@@ -129,4 +135,5 @@ export const ownerTree = ownerRoute.addChildren([
   ownerBarangMasukDetailRoute,
   ownerUtangRoute,
   ownerUtangDetailRoute,
+  ownerKedaluwarsaRoute,
 ]);

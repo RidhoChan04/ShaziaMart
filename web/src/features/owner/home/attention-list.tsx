@@ -3,6 +3,7 @@ import {
   ChevronRight,
   CircleCheck,
   HandCoins,
+  Hourglass,
   type LucideIcon,
   NotebookPen,
   PackageX,
@@ -23,6 +24,7 @@ const ICONS: Record<AttentionItem["icon"], LucideIcon> = {
   credit: NotebookPen,
   debt: HandCoins,
   price: Tag,
+  expiry: Hourglass,
 };
 
 export function AttentionList({ attention }: { attention: Attention }) {

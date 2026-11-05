@@ -416,3 +416,49 @@ describe("attentionItems: modal berubah dan barang habis", () => {
     ]);
   });
 });
+
+describe("attentionItems: kedaluwarsa", () => {
+  const base: Attention = {
+    lowStockCount: 2,
+    negativeStockCount: 1,
+    cashDifferences: [],
+    overdueCredit: { count: 0, total: 0 },
+    costChanges: [],
+    stockOuts: [],
+    supplierDebts: {
+      overdueCount: 1,
+      overdueTotal: 5,
+      dueSoonCount: 0,
+      dueSoonTotal: 0,
+    },
+    awaitingPriceCount: 0,
+    expiry: { expiredCount: 1, soonCount: 2, soonDays: 30 },
+    opnameHeldCount: 0,
+    opnameFlags: [],
+  };
+
+  test("kritis setelah stok minus, 'segera' setelah stok menipis (K19)", () => {
+    const items = attentionItems(base);
+    expect(items.map((i) => i.key)).toEqual([
+      "negative-stock",
+      "expiry-expired",
+      "debt-overdue",
+      "low-stock",
+      "expiry-soon",
+    ]);
+    expect(items[1]).toEqual({
+      key: "expiry-expired",
+      title: "Barang sudah kedaluwarsa",
+      detail: "1 barang",
+      tone: "critical",
+      icon: "expiry",
+      link: { to: "/owner/lainnya/kedaluwarsa" },
+    });
+    expect(items[4]).toMatchObject({
+      title: "Barang segera kedaluwarsa",
+      detail: "2 barang · ≤ 30 hari",
+      tone: "warning",
+      link: { to: "/owner/lainnya/kedaluwarsa" },
+    });
+  });
+});

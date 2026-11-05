@@ -11,7 +11,8 @@ type BackFallback =
   | "/owner/barang"
   | "/owner/lainnya"
   | "/owner/lainnya/utang"
-  | "/owner/lainnya/barang-masuk";
+  | "/owner/lainnya/barang-masuk"
+  | "/owner/lainnya/kedaluwarsa";
 
 /** Kembali ke halaman sebelumnya bila ada riwayat (menjaga filter di URL), selain itu ke `fallback`. */
 function BackControl({
