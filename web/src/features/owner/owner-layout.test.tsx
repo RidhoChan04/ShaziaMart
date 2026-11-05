@@ -216,7 +216,11 @@ test("main memberi ruang bawah untuk kapsul tab bar, termasuk jarak aman bawah",
 test("isi halaman memakai kolom max-w-6xl yang sejajar dengan header", async () => {
   renderApp("/owner/kasbon");
   const marker = await screen.findByText("Total kasbon");
-  expect(marker.closest(".max-w-6xl")).toHaveClass("mx-auto", "max-w-6xl");
+  const column = marker.closest(".max-w-6xl");
+  expect(column).toHaveClass("mx-auto", "max-w-6xl");
+  // Kolom adalah pembungkus langsung Outlet di dalam <main>, dan halaman adalah anak langsungnya.
+  expect(column?.parentElement).toBe(screen.getByRole("main"));
+  expect(column?.firstElementChild).toContainElement(marker);
 });
 
 test("kapsul tab dan kerangka menghormati jarak aman kiri-kanan (viewport-fit=cover)", async () => {

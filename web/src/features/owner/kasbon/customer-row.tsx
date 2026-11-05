@@ -22,10 +22,33 @@ export function CustomerRow({ customer }: { customer: OwnerCustomerRow }) {
         className="flex min-h-14 items-center gap-3 px-4 py-2 hover:bg-bg focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary"
       >
         <span className="grid min-w-0 flex-1 gap-0.5">
-          <span className="text-[17px] leading-snug font-semibold">
-            {customer.name}
+          <span className="flex items-baseline justify-between gap-3">
+            <span className="min-w-0 flex-1 text-[17px] leading-snug font-semibold">
+              {customer.name}
+            </span>
+            {balance !== 0 && (
+              // Lebar kolom tetap dari persentase baris: ukuran huruf tidak bergantung pada isinya sendiri.
+              <span
+                className={cn(
+                  "shrink-0 text-right font-semibold tabular-nums",
+                  overpaid ? "w-[54%]" : "w-[40%]",
+                )}
+              >
+                <FitAmount
+                  text={
+                    overpaid
+                      ? `Lebih bayar ${formatRupiah(-balance)}`
+                      : formatRupiah(balance)
+                  }
+                  max={overpaid ? 14 : 17}
+                  min={overpaid ? 11 : 12}
+                  className={cn(overpaid && "text-muted")}
+                />
+              </span>
+            )}
           </span>
-          <span className="text-[13px] text-muted">
+          {/* Satu baris: angka tidak pernah terpisah dari satuannya (lebar penuh baris di bawah nama). */}
+          <span className="text-[13px] whitespace-nowrap text-muted">
             {balance > 0 && ageDays !== null ? (
               age === OVERDUE ? (
                 <>
@@ -41,26 +64,6 @@ export function CustomerRow({ customer }: { customer: OwnerCustomerRow }) {
             )}
           </span>
         </span>
-        {balance !== 0 && (
-          // Lebar kolom tetap dari persentase baris: ukuran huruf tidak bergantung pada isinya sendiri.
-          <span
-            className={cn(
-              "shrink-0 text-right font-semibold tabular-nums",
-              overpaid ? "w-[50%]" : "w-[36%]",
-            )}
-          >
-            <FitAmount
-              text={
-                overpaid
-                  ? `Lebih bayar ${formatRupiah(-balance)}`
-                  : formatRupiah(balance)
-              }
-              max={overpaid ? 14 : 17}
-              min={12}
-              className={cn(overpaid && "text-muted")}
-            />
-          </span>
-        )}
         <ChevronRight
           aria-hidden="true"
           className="size-4 shrink-0 text-muted"
