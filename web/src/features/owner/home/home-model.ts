@@ -2,9 +2,11 @@ import type {
   Attention,
   CostChangeItem,
   HourBucket,
+  OpnameFlag,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { formatRupiah } from "@/shared/lib/money";
 import { roundHalfUp } from "@/shared/lib/quantity";
+import { scopeLabel } from "@/shared/lib/stock-rules";
 
 export function comparisonText(
   revenue: number,
@@ -52,7 +54,12 @@ export type AttentionLink =
         | "/owner/lainnya"
         | "/owner/lainnya/utang"
         | "/owner/lainnya/kedaluwarsa"
+        | "/owner/lainnya/opname"
         | "/owner/kasbon";
+    }
+  | {
+      to: "/owner/lainnya/opname/$sessionId";
+      params: { sessionId: string };
     }
   | { to: "/owner/barang"; search: { menunggu: true } }
   | {
@@ -74,7 +81,9 @@ export type AttentionItem = {
     | "credit"
     | "debt"
     | "price"
-    | "expiry";
+    | "expiry"
+    | "opname-flag"
+    | "opname-held";
   link: AttentionLink;
 };
 
@@ -139,7 +148,35 @@ function expiryItems(
   ];
 }
 
-/** Urutan: stok minus, kedaluwarsa, utang lewat, perubahan modal, barang baru menunggu harga, stok menipis, segera kedaluwarsa, utang segera, barang habis, selisih kas, kasbon > 30 hari. */
+function opnameFlagItem(f: OpnameFlag): AttentionItem {
+  return {
+    key: `opname-flag-${f.sessionId}`,
+    title: "Selisih opname besar",
+    detail: `${scopeLabel(f.scope)} · ${formatRupiah(f.totalValue)}`,
+    tone: "critical",
+    icon: "opname-flag",
+    link: {
+      to: "/owner/lainnya/opname/$sessionId",
+      params: { sessionId: f.sessionId },
+    },
+  };
+}
+
+function opnameHeldItems(count: number): AttentionItem[] {
+  if (count === 0) return [];
+  return [
+    {
+      key: "opname-held",
+      title: "Opname menunggu persetujuan",
+      detail: `${count} barang`,
+      tone: "warning",
+      icon: "opname-held",
+      link: { to: "/owner/lainnya/opname" },
+    },
+  ];
+}
+
+/** Urutan: stok minus, kedaluwarsa, selisih opname besar, utang lewat, perubahan modal, barang baru menunggu harga, opname menunggu persetujuan, stok menipis, segera kedaluwarsa, utang segera, barang habis, selisih kas, kasbon > 30 hari. */
 export function attentionItems(a: Attention): AttentionItem[] {
   const items: AttentionItem[] = [];
   if (a.negativeStockCount > 0) {
@@ -153,6 +190,7 @@ export function attentionItems(a: Attention): AttentionItem[] {
     });
   }
   items.push(...expiryItems("expired", a.expiry));
+  items.push(...a.opnameFlags.map(opnameFlagItem));
   const debts = a.supplierDebts;
   if (debts.overdueCount > 0) {
     items.push(debtItem("overdue", debts.overdueCount, debts.overdueTotal));
@@ -168,6 +206,7 @@ export function attentionItems(a: Attention): AttentionItem[] {
       link: { to: "/owner/barang", search: { menunggu: true } },
     });
   }
+  items.push(...opnameHeldItems(a.opnameHeldCount));
   if (a.lowStockCount > 0) {
     items.push({
       key: "low-stock",

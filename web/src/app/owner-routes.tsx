@@ -120,6 +120,18 @@ const ownerKedaluwarsaRoute = createRoute({
   component: lazyRouteComponent(loadOwner, "OwnerExpiryPage"),
 });
 
+const ownerOpnameRoute = createRoute({
+  getParentRoute: () => ownerRoute,
+  path: "lainnya/opname",
+  component: lazyRouteComponent(loadOwner, "OpnameListPage"),
+});
+
+const ownerOpnameDetailRoute = createRoute({
+  getParentRoute: () => ownerRoute,
+  path: "lainnya/opname/$sessionId",
+  component: lazyRouteComponent(loadOwner, "OpnameDetailPage"),
+});
+
 /** Pohon rute app pemilik (`/owner`). */
 export const ownerTree = ownerRoute.addChildren([
   ownerIndexRoute,
@@ -136,4 +148,6 @@ export const ownerTree = ownerRoute.addChildren([
   ownerUtangRoute,
   ownerUtangDetailRoute,
   ownerKedaluwarsaRoute,
+  ownerOpnameRoute,
+  ownerOpnameDetailRoute,
 ]);

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { ownerLogin } from "@/mocks/handlers/test-helpers";
 import { renderApp } from "@/test/render-app";
 import { DEBT_NOW, seedDebts } from "@/test/seed-debts";
+import { seedOpname, T } from "@/test/seed-opname";
 
 beforeEach(async () => {
   vi.useFakeTimers({ toFake: ["Date"] });
@@ -50,4 +51,20 @@ test("tanpa utang belum lunas: baris 'Utang supplier' tanpa total", async () => 
   renderApp("/owner/lainnya");
   const link = await screen.findByRole("link", { name: /Utang supplier/ });
   expect(link).not.toHaveTextContent("Rp");
+});
+
+test("baris 'Hasil opname' menaut ke daftar; '2 menunggu' dari ringkasan perhatian", async () => {
+  await seedOpname();
+  await ownerLogin();
+  vi.setSystemTime(T("14.05"));
+  renderApp("/owner/lainnya");
+  const link = await screen.findByRole("link", { name: /Hasil opname/ });
+  expect(link).toHaveAttribute("href", "/owner/lainnya/opname");
+  expect(await within(link).findByText("2 menunggu")).toBeVisible();
+});
+
+test("tanpa barang ditahan: 'Hasil opname' tanpa angka", async () => {
+  renderApp("/owner/lainnya");
+  const link = await screen.findByRole("link", { name: /Hasil opname/ });
+  expect(link).not.toHaveTextContent("menunggu");
 });

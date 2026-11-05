@@ -2,6 +2,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import {
   ChevronRight,
+  ClipboardList,
   HandCoins,
   Hourglass,
   LogOut,
@@ -51,6 +52,7 @@ export function LainnyaPage() {
     query: { queryKey: [...getGetOwnerTodaySummaryQueryKey(), date] },
   });
   const expiredCount = summary.data?.attention.expiry.expiredCount ?? 0;
+  const held = summary.data?.attention.opnameHeldCount ?? 0;
   const unpaid = debts.data
     ? unpaidSummary(debts.data.debts, jakartaIsoDate(Date.now()))
     : null;
@@ -88,6 +90,22 @@ export function LainnyaPage() {
                     className="text-right"
                   />
                 </span>
+              )}
+              <ChevronRight
+                aria-hidden="true"
+                className="size-4 shrink-0 text-muted"
+              />
+            </Link>
+          </li>
+          <li>
+            <Link
+              to="/owner/lainnya/opname"
+              className={`${rowClass} hover:bg-bg`}
+            >
+              <RowIcon icon={ClipboardList} />
+              <span className="min-w-0 flex-1">Hasil opname</span>
+              {held > 0 && (
+                <span className="shrink-0 text-muted tabular-nums">{`${held} menunggu`}</span>
               )}
               <ChevronRight
                 aria-hidden="true"

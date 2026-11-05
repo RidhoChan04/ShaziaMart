@@ -462,3 +462,117 @@ describe("attentionItems: kedaluwarsa", () => {
     });
   });
 });
+
+describe("attentionItems: opname", () => {
+  const base: Attention = {
+    lowStockCount: 2,
+    negativeStockCount: 1,
+    cashDifferences: [],
+    overdueCredit: { count: 0, total: 0 },
+    costChanges: [],
+    stockOuts: [],
+    supplierDebts: {
+      overdueCount: 1,
+      overdueTotal: 500000,
+      dueSoonCount: 0,
+      dueSoonTotal: 0,
+    },
+    awaitingPriceCount: 0,
+    expiry: { expiredCount: 0, soonCount: 0, soonDays: 30 },
+    opnameHeldCount: 2,
+    opnameFlags: [
+      {
+        sessionId: "A",
+        scope: { kind: "kategori", category: "Mi Instan" },
+        finishedAt: 1,
+        totalValue: 260000,
+      },
+      {
+        sessionId: "B",
+        scope: { kind: "semua", category: null },
+        finishedAt: 2,
+        totalValue: 300000,
+      },
+    ],
+  };
+
+  test("selisih besar (kritis, tautan detail) tepat sesudah stok minus; menunggu persetujuan (peringatan) sebelum stok menipis", () => {
+    const items = attentionItems(base);
+    expect(items.map((i) => i.key)).toEqual([
+      "negative-stock",
+      "opname-flag-A",
+      "opname-flag-B",
+      "debt-overdue",
+      "opname-held",
+      "low-stock",
+    ]);
+    expect(items[1]).toEqual({
+      key: "opname-flag-A",
+      title: "Selisih opname besar",
+      detail: "Mi Instan · Rp260.000",
+      tone: "critical",
+      icon: "opname-flag",
+      link: {
+        to: "/owner/lainnya/opname/$sessionId",
+        params: { sessionId: "A" },
+      },
+    });
+    expect(items[2]?.detail).toBe("Semua barang · Rp300.000");
+    expect(items[4]).toEqual({
+      key: "opname-held",
+      title: "Opname menunggu persetujuan",
+      detail: "2 barang",
+      tone: "warning",
+      icon: "opname-held",
+      link: { to: "/owner/lainnya/opname" },
+    });
+  });
+
+  test("tanpa tahan / tanda: tidak ada butir opname", () => {
+    const items = attentionItems({
+      ...base,
+      opnameHeldCount: 0,
+      opnameFlags: [],
+    });
+    expect(items.some((i) => i.key.startsWith("opname"))).toBe(false);
+  });
+});
+
+describe("attentionItems: urutan K19 lengkap (kedaluwarsa + opname)", () => {
+  test("stok minus, kedaluwarsa, selisih opname besar, utang lewat, opname menunggu, stok menipis, segera kedaluwarsa", () => {
+    const items = attentionItems({
+      lowStockCount: 2,
+      negativeStockCount: 1,
+      cashDifferences: [],
+      overdueCredit: { count: 0, total: 0 },
+      costChanges: [],
+      stockOuts: [],
+      supplierDebts: {
+        overdueCount: 1,
+        overdueTotal: 500000,
+        dueSoonCount: 0,
+        dueSoonTotal: 0,
+      },
+      awaitingPriceCount: 0,
+      expiry: { expiredCount: 1, soonCount: 2, soonDays: 30 },
+      opnameHeldCount: 2,
+      opnameFlags: [
+        {
+          sessionId: "A",
+          scope: { kind: "kategori", category: "Mi Instan" },
+          finishedAt: 1,
+          totalValue: 260000,
+        },
+      ],
+    });
+    expect(items.map((i) => i.key)).toEqual([
+      "negative-stock",
+      "expiry-expired",
+      "opname-flag-A",
+      "debt-overdue",
+      "opname-held",
+      "low-stock",
+      "expiry-soon",
+    ]);
+  });
+});
