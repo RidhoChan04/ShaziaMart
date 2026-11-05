@@ -1120,7 +1120,7 @@ export const GetOwnerOpnameSessionResponse = zod.object({
   "resolvedByName": zod.string().nullable().describe('Pemilik yang menyetujui atau menghitung ulang.'),
   "resolvedAt": zod.int().nullable(),
   "replacedBySessionId": zod.string().nullable().describe('Sesi yang hitungannya menggantikan barang ini (state diganti).'),
-  "replacedByName": zod.string().nullable().describe('Nama pembuat sesi pengganti, hanya bila barang ini berstate ditahan saat diganti\n(selisih tertahan tetap terlihat pemilik, I2); null untuk barang lain, termasuk\nyang diganti saat masih menunggu_alasan.\n'),
+  "replacedByName": zod.string().nullable().describe('Nama pembuat sesi pengganti, hanya bila barang ini menunggu pemilik saat diganti:\nberstate ditahan, atau pengganti hitungan tertahan yang alasannya belum disimpan\n(selisih tertahan tetap terlihat pemilik, I2); null untuk barang lain, termasuk\nhitungan biasa yang diganti saat masih menunggu_alasan.\n'),
   "recount": zod.union([zod.object({
   "countedQtyBase": zod.int(),
   "countedAt": zod.int(),
@@ -1200,7 +1200,7 @@ export const ApproveOpnameItemResponse = zod.object({
   "resolvedByName": zod.string().nullable().describe('Pemilik yang menyetujui atau menghitung ulang.'),
   "resolvedAt": zod.int().nullable(),
   "replacedBySessionId": zod.string().nullable().describe('Sesi yang hitungannya menggantikan barang ini (state diganti).'),
-  "replacedByName": zod.string().nullable().describe('Nama pembuat sesi pengganti, hanya bila barang ini berstate ditahan saat diganti\n(selisih tertahan tetap terlihat pemilik, I2); null untuk barang lain, termasuk\nyang diganti saat masih menunggu_alasan.\n'),
+  "replacedByName": zod.string().nullable().describe('Nama pembuat sesi pengganti, hanya bila barang ini menunggu pemilik saat diganti:\nberstate ditahan, atau pengganti hitungan tertahan yang alasannya belum disimpan\n(selisih tertahan tetap terlihat pemilik, I2); null untuk barang lain, termasuk\nhitungan biasa yang diganti saat masih menunggu_alasan.\n'),
   "recount": zod.union([zod.object({
   "countedQtyBase": zod.int(),
   "countedAt": zod.int(),
@@ -1288,7 +1288,7 @@ export const RecountOpnameItemResponse = zod.object({
   "resolvedByName": zod.string().nullable().describe('Pemilik yang menyetujui atau menghitung ulang.'),
   "resolvedAt": zod.int().nullable(),
   "replacedBySessionId": zod.string().nullable().describe('Sesi yang hitungannya menggantikan barang ini (state diganti).'),
-  "replacedByName": zod.string().nullable().describe('Nama pembuat sesi pengganti, hanya bila barang ini berstate ditahan saat diganti\n(selisih tertahan tetap terlihat pemilik, I2); null untuk barang lain, termasuk\nyang diganti saat masih menunggu_alasan.\n'),
+  "replacedByName": zod.string().nullable().describe('Nama pembuat sesi pengganti, hanya bila barang ini menunggu pemilik saat diganti:\nberstate ditahan, atau pengganti hitungan tertahan yang alasannya belum disimpan\n(selisih tertahan tetap terlihat pemilik, I2); null untuk barang lain, termasuk\nhitungan biasa yang diganti saat masih menunggu_alasan.\n'),
   "recount": zod.union([zod.object({
   "countedQtyBase": zod.int(),
   "countedAt": zod.int(),
@@ -1369,7 +1369,7 @@ export const ReviewOpnameSessionResponse = zod.object({
   "resolvedByName": zod.string().nullable().describe('Pemilik yang menyetujui atau menghitung ulang.'),
   "resolvedAt": zod.int().nullable(),
   "replacedBySessionId": zod.string().nullable().describe('Sesi yang hitungannya menggantikan barang ini (state diganti).'),
-  "replacedByName": zod.string().nullable().describe('Nama pembuat sesi pengganti, hanya bila barang ini berstate ditahan saat diganti\n(selisih tertahan tetap terlihat pemilik, I2); null untuk barang lain, termasuk\nyang diganti saat masih menunggu_alasan.\n'),
+  "replacedByName": zod.string().nullable().describe('Nama pembuat sesi pengganti, hanya bila barang ini menunggu pemilik saat diganti:\nberstate ditahan, atau pengganti hitungan tertahan yang alasannya belum disimpan\n(selisih tertahan tetap terlihat pemilik, I2); null untuk barang lain, termasuk\nhitungan biasa yang diganti saat masih menunggu_alasan.\n'),
   "recount": zod.union([zod.object({
   "countedQtyBase": zod.int(),
   "countedAt": zod.int(),

@@ -645,6 +645,63 @@ describe("I2: selisih tertahan yang diganti hitungan baru", () => {
   });
 });
 
+describe("I2: rantai hitungan oleh orang yang sama", () => {
+  test("A ditahan → Rina B (menunggu alasan) → Rina C sebelum B disimpan: C tetap ditahan, stok tetap, A & B terlihat pemilik", async () => {
+    await heldIndomie();
+    at("10.30");
+    await submit("B", [count(INDOMIE, 55, "10.30")]);
+    at("10.40");
+    await submit("C", [count(INDOMIE, 57, "10.40")]);
+    expect(itemOf(await detail("B"), INDOMIE)).toMatchObject({
+      state: "diganti",
+      replacedBySessionId: "C",
+      replacedByName: "Rina",
+    });
+    at("10.45");
+    await finish("C", [[INDOMIE, "rusak"]]);
+    expect(itemOf(await detail("C"), INDOMIE)).toMatchObject({
+      state: "ditahan",
+      diffQtyBase: -3,
+      value: 7800,
+    });
+    expect(stockOf(INDOMIE)).toBe(60);
+    expect(opnameEntries()).toEqual([]);
+    expect(await attention()).toEqual({
+      opnameHeldCount: 1,
+      opnameFlags: [],
+      opnameReplacedHeld: 2,
+    });
+
+    // Hitungan cocok di ujung rantai juga langsung ditahan.
+    at("10.50");
+    await submit("D", [count(INDOMIE, 60, "10.50")]);
+    expect(itemOf(await detail("D"), INDOMIE).state).toBe("ditahan");
+    expect(stockOf(INDOMIE)).toBe(60);
+  });
+
+  test("rantai yang sama, C oleh orang lain → J5 (disesuaikan); B tetap terlihat 'oleh Budi'", async () => {
+    await heldIndomie();
+    at("10.30");
+    await submit("B", [count(INDOMIE, 55, "10.30")]);
+    await switchStaff("Budi", "654321");
+    at("10.40");
+    await submit("C", [count(INDOMIE, 57, "10.40")]);
+    at("10.45");
+    await finish("C", [[INDOMIE, "rusak"]]);
+    expect(itemOf(await detail("C"), INDOMIE).state).toBe("disesuaikan");
+    expect(stockOf(INDOMIE)).toBe(57);
+    expect(itemOf(await detail("B"), INDOMIE)).toMatchObject({
+      state: "diganti",
+      replacedByName: "Budi",
+    });
+    expect(await attention()).toEqual({
+      opnameHeldCount: 0,
+      opnameFlags: [],
+      opnameReplacedHeld: 2,
+    });
+  });
+});
+
 describe("batas sesi", () => {
   test("M3: sessionLimit dari stockRules", async () => {
     await heldIndomie();

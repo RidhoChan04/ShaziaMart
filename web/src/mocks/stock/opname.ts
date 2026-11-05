@@ -170,7 +170,11 @@ function settle(s: MockOpnameSession, now: number): void {
   s.finishedAt = now;
 }
 
-/** K5: hitungan lama barang ini yang belum diterapkan menjadi diganti; yang ditahan tetap terlihat pemilik (I2). */
+/** Hitungan yang harus menunggu pemilik: sudah ditahan, atau pengganti hitungan tertahan yang belum disimpan (I2). */
+const awaitsOwner = (i: MockOpnameItem): boolean =>
+  i.state === "ditahan" || (i.mustHold && i.state !== "diganti");
+
+/** K5: hitungan lama barang ini yang belum diterapkan menjadi diganti; yang menunggu pemilik tetap terlihat (I2). */
 function replaceOlder(
   state: MockState,
   productId: string,
@@ -184,7 +188,7 @@ function replaceOlder(
         (i.state === "menunggu_alasan" || i.state === "ditahan"),
     );
     for (const i of old) {
-      i.replacedByName = i.state === "ditahan" ? session.createdByName : null;
+      i.replacedByName = awaitsOwner(i) ? session.createdByName : null;
       i.state = "diganti";
       i.replacedBySessionId = session.id;
     }
@@ -194,7 +198,8 @@ function replaceOlder(
 
 /**
  * I2 (pengaman 1 & 2): pengganti hitungan tertahan milik pembuat yang sama tetap menunggu pemilik
- * apa pun angkanya; selisih 0 langsung ditahan, selisih lain ditahan saat alasan disimpan.
+ * apa pun angkanya; selisih 0 langsung ditahan, selisih lain ditahan saat alasan disimpan. Berlaku
+ * juga sepanjang rantai: pengganti hitungan `mustHold` yang belum disimpan ikut `mustHold`.
  */
 function holdIfOwnHeld(
   state: Readonly<MockState>,
@@ -205,9 +210,7 @@ function holdIfOwnHeld(
   const ownHeld = state.opnameSessions.some(
     (s) =>
       s.createdById === userId &&
-      s.items.some(
-        (i) => i.productId === item.productId && i.state === "ditahan",
-      ),
+      s.items.some((i) => i.productId === item.productId && awaitsOwner(i)),
   );
   if (!ownHeld) return;
   item.mustHold = true;

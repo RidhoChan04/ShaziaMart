@@ -1702,8 +1702,9 @@ export const getCreateStaffOpnameSessionUrl = () => {
  * berlaku. Barang di sesi ini menjadi diganti bila sesi lain punya hitungan barang itu dengan
  * countedAt lebih baru yang belum diganti; selain itu hitungan lama barang itu yang masih
  * menunggu_alasan atau ditahan menjadi diganti (replacedBySessionId).
- * Pengaman selisih tertahan (I2): bila hitungan yang diganti berstate ditahan dan sesinya
- * dibuat pengguna yang sama, hitungan baru tetap menunggu pemilik apa pun angkanya —
+ * Pengaman selisih tertahan (I2): bila hitungan yang diganti berstate ditahan, atau sendiri
+ * pengganti hitungan tertahan yang alasannya belum disimpan (rantai), dan sesinya dibuat
+ * pengguna yang sama, hitungan baru tetap menunggu pemilik apa pun angkanya —
  * selisih 0 langsung ditahan (tanpa alasan), selisih lain menunggu_alasan lalu ditahan saat
  * alasan disimpan walau ≤ Rp100.000. Pengganti oleh pengguna lain mengikuti aturan biasa.
  * Hitungan tertahan yang diganti tetap terlihat pemilik (replacedByName).

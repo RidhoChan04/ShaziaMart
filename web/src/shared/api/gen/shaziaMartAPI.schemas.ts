@@ -1745,9 +1745,10 @@ export type OwnerOpnameItem = StaffOpnameItem & ({
      */
   replacedBySessionId: string | null;
   /**
-     * Nama pembuat sesi pengganti, hanya bila barang ini berstate ditahan saat diganti
+     * Nama pembuat sesi pengganti, hanya bila barang ini menunggu pemilik saat diganti:
+     * berstate ditahan, atau pengganti hitungan tertahan yang alasannya belum disimpan
      * (selisih tertahan tetap terlihat pemilik, I2); null untuk barang lain, termasuk
-     * yang diganti saat masih menunggu_alasan.
+     * hitungan biasa yang diganti saat masih menunggu_alasan.
      * @nullable
      */
   replacedByName: string | null;
