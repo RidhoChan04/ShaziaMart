@@ -535,6 +535,27 @@ describe("attentionItems: opname", () => {
     });
   });
 
+  test("I2: tertahan diganti hitungan baru (kritis, ClipboardX) tepat sesudah selisih besar", () => {
+    const items = attentionItems({ ...base, opnameReplacedHeld: 3 });
+    expect(items.map((i) => i.key)).toEqual([
+      "negative-stock",
+      "opname-flag-A",
+      "opname-flag-B",
+      "opname-replaced",
+      "debt-overdue",
+      "opname-held",
+      "low-stock",
+    ]);
+    expect(items[3]).toEqual({
+      key: "opname-replaced",
+      title: "Opname tertahan diganti hitungan baru",
+      detail: "3 barang",
+      tone: "critical",
+      icon: "opname-flag",
+      link: { to: "/owner/lainnya/opname" },
+    });
+  });
+
   test("tanpa tahan / tanda: tidak ada butir opname", () => {
     const items = attentionItems({
       ...base,
@@ -547,7 +568,7 @@ describe("attentionItems: opname", () => {
 });
 
 describe("attentionItems: urutan K19 lengkap (kedaluwarsa + opname)", () => {
-  test("stok minus, kedaluwarsa, selisih opname besar, utang lewat, opname menunggu, stok menipis, segera kedaluwarsa", () => {
+  test("stok minus, kedaluwarsa, selisih opname besar, tertahan diganti, utang lewat, opname menunggu, stok menipis, segera kedaluwarsa", () => {
     const items = attentionItems({
       lowStockCount: 2,
       negativeStockCount: 1,
@@ -572,12 +593,13 @@ describe("attentionItems: urutan K19 lengkap (kedaluwarsa + opname)", () => {
           totalValue: 260000,
         },
       ],
-      opnameReplacedHeld: 0,
+      opnameReplacedHeld: 1,
     });
     expect(items.map((i) => i.key)).toEqual([
       "negative-stock",
       "expiry-expired",
       "opname-flag-A",
+      "opname-replaced",
       "debt-overdue",
       "opname-held",
       "low-stock",

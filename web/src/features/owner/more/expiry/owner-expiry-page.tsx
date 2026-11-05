@@ -22,7 +22,6 @@ import { useServerHealth } from "@/shared/hooks/use-server-health";
 import {
   formatIsoDate,
   formatIsoDayMonth,
-  jakartaIsoDate,
   relativeDayTime,
 } from "@/shared/lib/business-day";
 import { pesanError } from "@/shared/lib/error-messages";
@@ -139,7 +138,8 @@ export function OwnerExpiryPage() {
     needsFocus.current = false;
     if (!opener.current?.isConnected) container.current?.focus();
   }, [list.dataUpdatedAt, mode]);
-  const today = jakartaIsoDate(Date.now());
+  // M1: hari ini menurut server, sama dengan dasar tahapnya (jam HP bisa melenceng).
+  const today = data?.today ?? "";
   const lots = data?.lots ?? [];
   const expired = lots.filter((l) => l.stage === "lewat");
   const soon = lots.filter((l) => l.stage === "segera");

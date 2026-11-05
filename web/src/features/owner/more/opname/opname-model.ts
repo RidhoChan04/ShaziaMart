@@ -4,9 +4,6 @@ import type {
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { formatQty } from "@/shared/lib/quantity";
 
-/** Batas total selisih per sesi (J8: nilai tetap di server, belum ada endpoint pengaturan; layar pengaturan di F3c). */
-export const OPNAME_SESSION_LIMIT = 250_000;
-
 export type OpnameGroup = {
   title: "Menunggu persetujuan" | "Selisih" | "Stok awal" | "Cocok";
   items: OwnerOpnameItem[];

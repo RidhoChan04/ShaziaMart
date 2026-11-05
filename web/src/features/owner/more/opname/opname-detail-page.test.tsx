@@ -299,19 +299,140 @@ test("galat server saat Setujui: dialog tetap terbuka dengan pesan", async () =>
   expect(screen.getByRole("alertdialog")).toBeVisible();
 });
 
-test("barang 'diganti': hanya status, tanpa nilai Rp", async () => {
+test("I2: hitungan tertahan yang diganti tetap terlihat (Rp, oleh siapa, tautan ke hitungan baru)", async () => {
   vi.setSystemTime(T("11.00"));
   await submitCount("C", { kind: "kategori", category: "Mi Instan" }, [
     countOf(INDOMIE, 59, "11.00"),
   ]);
+  vi.setSystemTime(T("14.05"));
   renderApp("/owner/lainnya/opname/A");
   await screen.findByRole("heading", { level: 1, name: "Mi Instan" });
   const li = await vi.waitFor(() => {
     const row = rowOf(INDOMIE);
+    expect(row).toHaveTextContent(
+      "Diganti hitungan baru · Rp104.000 · oleh Rina",
+    );
+    return row;
+  });
+  expect(li).not.toHaveTextContent("Kurang");
+  expect(within(li).queryByRole("button")).toBeNull();
+  expect(
+    within(li).getByRole("link", { name: "Lihat hitungan baru" }),
+  ).toHaveAttribute("href", "/owner/lainnya/opname/C");
+});
+
+test("barang diganti saat masih menunggu alasan: hanya status, tanpa Rp dan tautan", async () => {
+  vi.setSystemTime(T("11.00"));
+  await submitCount("B", { kind: "kategori", category: "Beras" }, [
+    countOf(BERAS5, 8, "11.00"),
+  ]);
+  vi.setSystemTime(T("11.05"));
+  await submitCount("C", { kind: "kategori", category: "Beras" }, [
+    countOf(BERAS5, 9, "11.05"),
+  ]);
+  vi.setSystemTime(T("14.05"));
+  renderApp("/owner/lainnya/opname/B");
+  await screen.findByRole("heading", { level: 1, name: "Beras" });
+  const li = await vi.waitFor(() => {
+    const row = rowOf(BERAS5);
     expect(row).toHaveTextContent("Diganti hitungan baru");
     return row;
   });
   expect(li).not.toHaveTextContent("Rp");
-  expect(li).not.toHaveTextContent("Kurang");
-  expect(within(li).queryByRole("button")).toBeNull();
+  expect(within(li).queryByRole("link")).toBeNull();
+  expect(
+    screen.queryByRole("button", { name: "Tandai sudah ditinjau" }),
+  ).toBeNull();
+});
+
+test("I2: sesi tidak bertanda dengan barang tertahan yang diganti → 'Tandai sudah ditinjau'", async () => {
+  const user = userEvent.setup();
+  setCost(BERAS5, null);
+  vi.setSystemTime(T("11.00"));
+  await submitCount("B", { kind: "kategori", category: "Beras" }, [
+    countOf(BERAS5, 8, "11.00"),
+  ]);
+  await post("/api/staff/opname-sessions/B/finish", {
+    reasons: [{ productId: idOf(BERAS5), reason: "hilang", receiptId: null }],
+  });
+  vi.setSystemTime(T("11.30"));
+  await submitCount("C", { kind: "kategori", category: "Beras" }, [
+    countOf(BERAS5, 10, "11.30"),
+  ]);
+  vi.setSystemTime(T("14.05"));
+  renderApp("/owner/lainnya/opname/B");
+  await screen.findByRole("heading", { level: 1, name: "Beras" });
+  expect(rowOf(BERAS5)).toHaveTextContent(
+    "Diganti hitungan baru · HPP belum ada · oleh Rina",
+  );
+  expect(screen.queryByText(/melewati batas/)).toBeNull();
+  expect(
+    screen.getByText("Opname tertahan diganti hitungan baru"),
+  ).toBeVisible();
+  await user.click(
+    screen.getByRole("button", { name: "Tandai sudah ditinjau" }),
+  );
+  expect(
+    await screen.findByText("Ditinjau Pak Ahmad · Hari ini 14.05"),
+  ).toBeVisible();
+  expect(
+    mockDb.get().opnameSessions.find((x) => x.id === "B")?.reviewedAt,
+  ).toBe(T("14.05"));
+});
+
+test("M3: batas di banner dari server (sessionLimit)", async () => {
+  mockDb.update((s) => {
+    s.stockRules.opnameSessionLimit = 200_000;
+  });
+  renderApp("/owner/lainnya/opname/A");
+  expect(
+    await screen.findByText("Total selisih Rp260.000 melewati batas Rp200.000"),
+  ).toBeVisible();
+});
+
+test("M2: baris cocok tanpa baris tanda/status kosong", async () => {
+  renderApp("/owner/lainnya/opname/A");
+  const cocok = await screen.findByRole("region", { name: "Cocok" });
+  const li = within(cocok).getByText(BERAS5).closest("li");
+  expect(li?.querySelectorAll("div:empty")).toHaveLength(0);
+});
+
+test("I1: 'Kembali' / Esc di dialog Setujui → fokus kembali ke tombol Setujui", async () => {
+  const user = userEvent.setup();
+  renderApp("/owner/lainnya/opname/A");
+  const held = await screen.findByRole("region", {
+    name: "Menunggu persetujuan",
+  });
+  const opener = within(held).getByRole("button", { name: `Setujui ${KOPI}` });
+  await user.click(opener);
+  const dialog = await screen.findByRole("alertdialog");
+  await user.click(within(dialog).getByRole("button", { name: "Kembali" }));
+  await vi.waitFor(() => expect(opener).toHaveFocus());
+
+  await user.click(opener);
+  await screen.findByRole("alertdialog");
+  await user.keyboard("{Escape}");
+  await vi.waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+  await vi.waitFor(() => expect(opener).toHaveFocus());
+});
+
+test("I1: 'Batal' / Esc di lembar Hitung ulang → fokus kembali ke tombol Hitung ulang", async () => {
+  const user = userEvent.setup();
+  renderApp("/owner/lainnya/opname/A");
+  const held = await screen.findByRole("region", {
+    name: "Menunggu persetujuan",
+  });
+  const opener = within(held).getByRole("button", {
+    name: `Hitung ulang ${INDOMIE}`,
+  });
+  await user.click(opener);
+  const sheet = await screen.findByRole("dialog", { name: "Hitung ulang" });
+  await user.click(within(sheet).getByRole("button", { name: "Batal" }));
+  await vi.waitFor(() => expect(opener).toHaveFocus());
+
+  await user.click(opener);
+  await screen.findByRole("dialog", { name: "Hitung ulang" });
+  await user.keyboard("{Escape}");
+  await vi.waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  await vi.waitFor(() => expect(opener).toHaveFocus());
 });

@@ -1,6 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
-import { OctagonAlert } from "lucide-react";
 import { useRef, useState } from "react";
 import { ApiError } from "@/shared/api/fetcher";
 import {
@@ -16,11 +15,7 @@ import type {
   OwnerOpnameItem,
   OwnerOpnameSession,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
-import {
-  formatDateLong,
-  jakartaTime,
-  relativeDayTime,
-} from "@/shared/lib/business-day";
+import { formatDateLong, jakartaTime } from "@/shared/lib/business-day";
 import { pesanError } from "@/shared/lib/error-messages";
 import { formatRupiah } from "@/shared/lib/money";
 import { scopeLabel } from "@/shared/lib/stock-rules";
@@ -29,12 +24,9 @@ import { SubPageHeader } from "../../common/sub-page-header";
 import { RowList, Section } from "../../products/detail/section";
 import { ApproveDialog } from "./approve-dialog";
 import { OpnameItemRow } from "./opname-item-row";
-import {
-  effectiveCount,
-  groupItems,
-  OPNAME_SESSION_LIMIT,
-} from "./opname-model";
+import { effectiveCount, groupItems } from "./opname-model";
 import { RecountSheet } from "./recount-sheet";
+import { hasReplacedHeld, ReviewBanner } from "./review-banner";
 
 function Summary({ session }: { session: OwnerOpnameSession }) {
   const counted = session.items.filter((i) => i.state !== "diganti");
@@ -67,42 +59,6 @@ function Summary({ session }: { session: OwnerOpnameSession }) {
   );
 }
 
-function FlagBanner({
-  session,
-  pending,
-  onReview,
-}: {
-  session: OwnerOpnameSession;
-  pending: boolean;
-  onReview: () => void;
-}) {
-  return (
-    <section
-      aria-label="Selisih besar"
-      className="grid gap-3 rounded-lg bg-danger-soft p-4 text-danger-ink"
-    >
-      <p className="flex items-start gap-2 font-semibold">
-        <OctagonAlert aria-hidden="true" className="mt-0.5 size-5 shrink-0" />
-        {`Total selisih ${formatRupiah(session.totalValue)} melewati batas ${formatRupiah(OPNAME_SESSION_LIMIT)}`}
-      </p>
-      {session.reviewedAt !== null ? (
-        <p className="text-[15px] font-semibold">
-          {`Ditinjau ${session.reviewedByName ?? "pemilik"} · ${relativeDayTime(session.reviewedAt, Date.now())}`}
-        </p>
-      ) : (
-        <Button
-          variant="outline"
-          className="justify-self-start"
-          disabled={pending}
-          onClick={onReview}
-        >
-          Tandai sudah ditinjau
-        </Button>
-      )}
-    </section>
-  );
-}
-
 /** Detail sesi opname (9b): ringkasan nilai, tanda selisih besar, lalu barang per bagian; selisih yang ditahan bisa disetujui atau dihitung ulang. */
 export function OpnameDetailPage() {
   const { sessionId } = useParams({ from: "/owner/lainnya/opname/$sessionId" });
@@ -122,7 +78,9 @@ export function OpnameDetailPage() {
       client.invalidateQueries({ queryKey: getGetOwnerTodaySummaryQueryKey() }),
     ]);
   // Tombol pemicu hilang setelah sukses (baris pindah bagian): fokus ke judul halaman, bukan body.
+  // Dibatalkan (Kembali/Batal/Esc): fokus kembali ke tombol pembukanya (dialog tanpa Trigger Radix).
   const focusTitleOnClose = useRef(false);
+  const opener = useRef<HTMLButtonElement | null>(null);
   const focusTitle = () =>
     document.querySelector<HTMLElement>("main h1")?.focus();
   const closeSheets = () => {
@@ -131,10 +89,11 @@ export function OpnameDetailPage() {
     setRecounting(null);
   };
   const keepFocus = (e: Event) => {
-    if (!focusTitleOnClose.current) return;
-    focusTitleOnClose.current = false;
     e.preventDefault();
-    focusTitle();
+    if (focusTitleOnClose.current || !opener.current?.isConnected) {
+      focusTitleOnClose.current = false;
+      focusTitle();
+    } else opener.current.focus();
   };
   const mutationOptions = {
     onSuccess: async (session: OwnerOpnameSession) => {
@@ -211,8 +170,8 @@ export function OpnameDetailPage() {
       {header}
       <div className="grid gap-5 lg:max-w-2xl">
         <Summary session={session} />
-        {session.flagged && (
-          <FlagBanner
+        {(session.flagged || hasReplacedHeld(session)) && (
+          <ReviewBanner
             session={session}
             pending={busy}
             onReview={() => {
@@ -235,11 +194,13 @@ export function OpnameDetailPage() {
                   item={item}
                   now={now}
                   busy={busy}
-                  onApprove={(i) => {
+                  onApprove={(i, button) => {
+                    opener.current = button;
                     setDialogError(null);
                     setApproving(i);
                   }}
-                  onRecount={(i) => {
+                  onRecount={(i, button) => {
+                    opener.current = button;
                     setDialogError(null);
                     setRecounting(i);
                   }}

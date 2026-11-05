@@ -162,6 +162,21 @@ function opnameFlagItem(f: OpnameFlag): AttentionItem {
   };
 }
 
+/** I2: hitungan tertahan yang diganti hitungan baru, sampai sesinya ditinjau. */
+function opnameReplacedItems(count: number): AttentionItem[] {
+  if (count === 0) return [];
+  return [
+    {
+      key: "opname-replaced",
+      title: "Opname tertahan diganti hitungan baru",
+      detail: `${count} barang`,
+      tone: "critical",
+      icon: "opname-flag",
+      link: { to: "/owner/lainnya/opname" },
+    },
+  ];
+}
+
 function opnameHeldItems(count: number): AttentionItem[] {
   if (count === 0) return [];
   return [
@@ -176,7 +191,7 @@ function opnameHeldItems(count: number): AttentionItem[] {
   ];
 }
 
-/** Urutan: stok minus, kedaluwarsa, selisih opname besar, utang lewat, perubahan modal, barang baru menunggu harga, opname menunggu persetujuan, stok menipis, segera kedaluwarsa, utang segera, barang habis, selisih kas, kasbon > 30 hari. */
+/** Urutan: stok minus, kedaluwarsa, selisih opname besar, opname tertahan diganti, utang lewat, perubahan modal, barang baru menunggu harga, opname menunggu persetujuan, stok menipis, segera kedaluwarsa, utang segera, barang habis, selisih kas, kasbon > 30 hari. */
 export function attentionItems(a: Attention): AttentionItem[] {
   const items: AttentionItem[] = [];
   if (a.negativeStockCount > 0) {
@@ -191,6 +206,7 @@ export function attentionItems(a: Attention): AttentionItem[] {
   }
   items.push(...expiryItems("expired", a.expiry));
   items.push(...a.opnameFlags.map(opnameFlagItem));
+  items.push(...opnameReplacedItems(a.opnameReplacedHeld));
   const debts = a.supplierDebts;
   if (debts.overdueCount > 0) {
     items.push(debtItem("overdue", debts.overdueCount, debts.overdueTotal));

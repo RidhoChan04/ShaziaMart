@@ -1,8 +1,11 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { HttpResponse, http } from "msw";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { mockDb } from "@/mocks/db";
 import { ownerLogin } from "@/mocks/handlers/test-helpers";
+import { server } from "@/mocks/node";
+import { ownerExpiryList } from "@/mocks/stock/expiry";
 import { applySampleStock } from "@/mocks/stock/sample";
 import { getGetOwnerTodaySummaryQueryKey } from "@/shared/api/gen/owner/owner";
 import { renderApp } from "@/test/render-app";
@@ -38,6 +41,25 @@ test("kartu 'Perkiraan kerugian' = Σ grup lewat; kanan tiap baris Rp; kembali k
   const links = screen.getAllByRole("link", { name: /Lainnya/ });
   expect(links.length).toBeGreaterThanOrEqual(2);
   for (const l of links) expect(l).toHaveAttribute("href", "/owner/lainnya");
+});
+
+test("M1: teks hari memakai 'today' dari server, bukan tanggal HP", async () => {
+  server.use(
+    http.get("/api/owner/expiry", () =>
+      HttpResponse.json({
+        ...ownerExpiryList(mockDb.get(), Date.now()),
+        today: "2026-11-03",
+      }),
+    ),
+  );
+  renderApp("/owner/lainnya/kedaluwarsa");
+  await screen.findByText("Sari Roti Tawar");
+  expect(
+    within(rowOf("Sari Roti Tawar")).getByText("Lewat 3 hari"),
+  ).toBeVisible();
+  expect(
+    within(rowOf("Sari Roti Sobek Coklat")).getByText("1 hari lagi"),
+  ).toBeVisible();
 });
 
 test("tanpa HPP: baris menulis 'HPP belum ada'", async () => {

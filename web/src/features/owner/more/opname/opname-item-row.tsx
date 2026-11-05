@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { Minus, Plus } from "lucide-react";
 import type { OwnerOpnameItem } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import {
@@ -33,7 +34,10 @@ function DiffBadge({
   );
 }
 
-/** `Disetujui {nama} · Hari ini 14.05` · `Dihitung ulang: 48 pcs · ...` · `Diganti hitungan baru`. */
+/**
+ * `Disetujui {nama} · Hari ini 14.05` · `Dihitung ulang: 48 pcs · ...` · `Diganti hitungan baru`;
+ * hitungan tertahan yang diganti tetap memperlihatkan nilai dan penggantinya (I2).
+ */
 function statusText(item: OwnerOpnameItem, now: number): string | null {
   const when =
     item.resolvedAt === null
@@ -47,7 +51,9 @@ function statusText(item: OwnerOpnameItem, now: number): string | null {
         ? `Dihitung ulang: ${formatQty(item.recount.countedQtyBase, item.unitSize, item.unitName)}${when}`
         : null;
     case "diganti":
-      return "Diganti hitungan baru";
+      return item.replacedByName === null
+        ? "Diganti hitungan baru"
+        : `Diganti hitungan baru · ${item.value === null ? "HPP belum ada" : formatRupiah(item.value)} · oleh ${item.replacedByName}`;
     default:
       return null;
   }
@@ -81,13 +87,15 @@ export function OpnameItemRow({
   item: OwnerOpnameItem;
   now: number;
   busy: boolean;
-  onApprove: (item: OwnerOpnameItem) => void;
-  onRecount: (item: OwnerOpnameItem) => void;
+  onApprove: (item: OwnerOpnameItem, opener: HTMLButtonElement) => void;
+  onRecount: (item: OwnerOpnameItem, opener: HTMLButtonElement) => void;
 }) {
   const c = effectiveCount(item);
   const status = statusText(item, now);
   // Barang yang diganti tidak masuk total (K26): hanya statusnya yang tampil.
   const hasDiff = c.diffQtyBase !== 0 && item.state !== "diganti";
+  const replacedBy =
+    item.replacedByName !== null ? item.replacedBySessionId : null;
   return (
     <li className="grid gap-2 px-4 py-3">
       <div className="flex items-start justify-between gap-3">
@@ -109,14 +117,25 @@ export function OpnameItemRow({
           </span>
         )}
       </div>
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <DiffBadge diffQtyBase={hasDiff ? c.diffQtyBase : 0} item={item} />
-        {status && (
-          <span className="text-[13px] font-semibold text-primary">
-            {status}
-          </span>
-        )}
-      </div>
+      {(hasDiff || status) && (
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <DiffBadge diffQtyBase={hasDiff ? c.diffQtyBase : 0} item={item} />
+          {status && (
+            <span className="text-[13px] font-semibold text-primary">
+              {status}
+            </span>
+          )}
+        </div>
+      )}
+      {replacedBy && (
+        <Link
+          to="/owner/lainnya/opname/$sessionId"
+          params={{ sessionId: replacedBy }}
+          className="inline-flex min-h-11 items-center justify-self-start text-[15px] font-semibold text-primary underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+        >
+          Lihat hitungan baru
+        </Link>
+      )}
       {hasDiff && <p className="text-[13px] text-muted">{detailText(item)}</p>}
       {!hasDiff && item.state !== "diganti" && (
         <p className="text-[13px] text-muted">{`dihitung ${jakartaTime(item.countedAt)}`}</p>
@@ -127,7 +146,7 @@ export function OpnameItemRow({
             className="flex-1"
             disabled={busy}
             aria-label={`Setujui ${item.productName}`}
-            onClick={() => onApprove(item)}
+            onClick={(e) => onApprove(item, e.currentTarget)}
           >
             Setujui
           </Button>
@@ -136,7 +155,7 @@ export function OpnameItemRow({
             className="flex-1"
             disabled={busy}
             aria-label={`Hitung ulang ${item.productName}`}
-            onClick={() => onRecount(item)}
+            onClick={(e) => onRecount(item, e.currentTarget)}
           >
             Hitung ulang
           </Button>
