@@ -181,6 +181,8 @@ function closeShifts(ctx: Ctx, day: BusinessDay, sales: readonly MockSale[]) {
       openingCash: OPENING_CASH,
       cashSales,
       supplierPayments: 0,
+      creditPayments: 0,
+      saleRefunds: 0,
       expectedCash,
       countedCash: expectedCash + difference,
       difference,

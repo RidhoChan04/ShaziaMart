@@ -5,7 +5,7 @@
  * Kontrak API kasir sembako. Sumber kebenaran tunggal untuk frontend dan backend.
  * Semua uang dan jumlah berupa integer (rupiah utuh; qtyBase dalam satuan dasar pcs/gram/ml).
  * Semua waktu berupa integer epoch milidetik UTC. Error memakai application/problem+json.
- * Autentikasi memakai cookie sesi kasir_session. Endpoint shift, sales, dan session
+ * Autentikasi memakai cookie sesi kasir_session. Endpoint shift, sales, credit-payments, dan session
  * memerlukan sesi; health, users, pin-login, settings, catalog, dan customers publik
  * (satu PC di localhost).
  *
@@ -1472,4 +1472,266 @@ export const PutOwnerLineExpiryBody = zod.object({
 })
 
 export const PutOwnerLineExpiryResponse = zod.void()
+
+/**
+ * Semua pelanggan, urut saldo terbesar lalu nama (saldo < 0 "Lebih bayar" di akhir); UI
+ * menyembunyikan saldo = 0 kecuali saat mencari. totalBalance, debtorCount, ages, dan
+ * overdueCount hanya menjumlah pelanggan bersaldo > 0. ages selalu tepat 3 entri berurutan
+ * hari_0_7, hari_8_30, lebih_30_hari, agar UI tidak menjumlah uang sendiri. overdueCount =
+ * jumlah pelanggan kelompok lebih_30_hari (sama dengan Attention.overdueCredit.count).
+ * @summary Kasbon semua pelanggan
+ */
+export const listOwnerCustomersResponseAgesMin = 3;
+export const listOwnerCustomersResponseAgesMax = 3;
+
+
+
+export const ListOwnerCustomersResponse = zod.object({
+  "customers": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "phone": zod.string(),
+  "balance": zod.int().describe('Saldo kasbon = Σ buku kasbon; < 0 = Lebih bayar (tidak dihitung sebagai utang).'),
+  "creditLimit": zod.int(),
+  "oldestUnpaidAt": zod.int().nullable().describe('Waktu kasbon belum lunas tertua menurut FIFO (pelunasan melunasi kasbon tertua dulu;\npembalik batal pelunasan dikenali); null iff balance ≤ 0.\n'),
+  "ageDays": zod.int().nullable().describe('ageDays = ceil((now − oldestUnpaidAt) / 86.400.000), pembulatan ke atas ke hari penuh; null\niff balance ≤ 0. Setara dengan aturan Beranda (now − oldestUnpaidAt > 30 hari ⇔ ageDays >\n30), sehingga angka hari, kelompok, dan butir Kasbon > 30 hari selalu sepakat.\n'),
+  "age": zod.union([zod.enum(['hari_0_7', 'hari_8_30', 'lebih_30_hari']).describe('Kelompok umur kasbon belum lunas tertua — 0–7 hari, 8–30 hari, lebih dari 30 hari.'),zod.null()]).describe('Dari ageDays: > 30 → lebih_30_hari, ≥ 8 → hari_8_30, selain itu hari_0_7; null iff\nbalance ≤ 0.\n')
+})).describe('Semua pelanggan, urut saldo terbesar lalu nama.'),
+  "totalBalance": zod.int().describe('Σ saldo > 0 (Lebih bayar tidak mengurangi).'),
+  "debtorCount": zod.int().describe('Jumlah pelanggan bersaldo > 0.'),
+  "ages": zod.array(zod.object({
+  "age": zod.enum(['hari_0_7', 'hari_8_30', 'lebih_30_hari']).describe('Kelompok umur kasbon belum lunas tertua — 0–7 hari, 8–30 hari, lebih dari 30 hari.'),
+  "count": zod.int().describe('Jumlah pelanggan bersaldo > 0 di kelompok ini.'),
+  "total": zod.int().describe('Σ saldo pelanggan tersebut (rupiah).')
+})).min(listOwnerCustomersResponseAgesMin).max(listOwnerCustomersResponseAgesMax).describe('Tepat 3 entri, urut hari_0_7, hari_8_30, lebih_30_hari; hanya saldo > 0.'),
+  "overdueCount": zod.int().describe('Jumlah pelanggan kelompok lebih_30_hari.')
+})
+
+/**
+ * @summary Detail kasbon pelanggan beserta riwayat
+ */
+export const GetOwnerCustomerParams = zod.object({
+  "customerId": zod.string()
+})
+
+
+
+
+export const GetOwnerCustomerResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "phone": zod.string(),
+  "balance": zod.int().describe('Saldo kasbon = Σ buku kasbon; < 0 = Lebih bayar (tidak dihitung sebagai utang).'),
+  "creditLimit": zod.int(),
+  "oldestUnpaidAt": zod.int().nullable().describe('Waktu kasbon belum lunas tertua menurut FIFO (pelunasan melunasi kasbon tertua dulu;\npembalik batal pelunasan dikenali); null iff balance ≤ 0.\n'),
+  "ageDays": zod.int().nullable().describe('ageDays = ceil((now − oldestUnpaidAt) / 86.400.000), pembulatan ke atas ke hari penuh; null\niff balance ≤ 0. Setara dengan aturan Beranda (now − oldestUnpaidAt > 30 hari ⇔ ageDays >\n30), sehingga angka hari, kelompok, dan butir Kasbon > 30 hari selalu sepakat.\n'),
+  "age": zod.union([zod.enum(['hari_0_7', 'hari_8_30', 'lebih_30_hari']).describe('Kelompok umur kasbon belum lunas tertua — 0–7 hari, 8–30 hari, lebih dari 30 hari.'),zod.null()]).describe('Dari ageDays: > 30 → lebih_30_hari, ≥ 8 → hari_8_30, selain itu hari_0_7; null iff\nbalance ≤ 0.\n')
+}).and(zod.object({
+  "history": zod.array(zod.object({
+  "id": zod.string(),
+  "at": zod.int(),
+  "kind": zod.enum(['kasbon', 'pelunasan']),
+  "amount": zod.int().min(1),
+  "saleId": zod.string().nullable(),
+  "saleNumber": zod.string().nullable(),
+  "kasirName": zod.string().nullable(),
+  "payment": zod.union([zod.object({
+  "id": zod.string().describe('paymentId (dipakai cancelOwnerCreditPayment).'),
+  "channel": zod.enum(['kasir', 'pemilik']).describe('kasir = dicatat di kasir (hanya tunai masuk laci); pemilik = langsung ke pemilik (tidak pernah masuk laci).'),
+  "method": zod.enum(['tunai', 'qris', 'transfer', 'titip']).describe('tunai dan qris hanya jalur kasir; transfer dan titip (tunai ke pemilik) hanya jalur pemilik.'),
+  "byName": zod.string().describe('Nama pencatat (kasir atau pemilik).'),
+  "cashReceived": zod.int().describe('Jalur kasir tunai; selain itu 0.'),
+  "change": zod.int().describe('Jalur kasir tunai; selain itu 0.'),
+  "inOpenShift": zod.boolean().describe('Jalur kasir dari shift yang sedang buka → pemilik tidak bisa membatalkan (batalkan dari kasir).')
+}),zod.null()]),
+  "cancelled": zod.union([zod.object({
+  "at": zod.int().describe('Jam server saat dibatalkan (epoch ms UTC).'),
+  "byName": zod.string().describe('Nama pembatal (boleh beda dari pencatat).'),
+  "reason": zod.string(),
+  "channel": zod.enum(['kasir', 'pemilik']).describe('kasir = dicatat di kasir (hanya tunai masuk laci); pemilik = langsung ke pemilik (tidak pernah masuk laci).')
+}),zod.null()])
+}).describe('Satu baris riwayat pelanggan; pembalik dilipat ke barisnya (cancelled). Kasbon: saleId,\nsaleNumber, dan kasirName dari penjualan (null untuk kasbon seed tanpa struk), payment null;\nbatal kasbon karena batal transaksi memakai data pembatalan penjualannya. Pelunasan: payment\nterisi, saleId/saleNumber/kasirName null.\n')).describe('Terbaru dulu.')
+})).describe('Detail kasbon pelanggan untuk pemilik.')
+
+/**
+ * Limit = batas peringatan, bilangan bulat ≥ 0; boleh di bawah saldo sekarang (kasbon baru di
+ * kasir yang melewati limit tetap boleh dengan alasan wajib).
+ * @summary Atur limit kasbon pelanggan
+ */
+export const SetOwnerCustomerCreditLimitParams = zod.object({
+  "customerId": zod.string()
+})
+
+export const setOwnerCustomerCreditLimitBodyCreditLimitMin = 0;
+
+
+
+export const SetOwnerCustomerCreditLimitBody = zod.object({
+  "creditLimit": zod.int().min(setOwnerCustomerCreditLimitBodyCreditLimitMin).describe('Batas peringatan kasbon (rupiah); boleh di bawah saldo sekarang.')
+})
+
+
+
+
+export const SetOwnerCustomerCreditLimitResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "phone": zod.string(),
+  "balance": zod.int().describe('Saldo kasbon = Σ buku kasbon; < 0 = Lebih bayar (tidak dihitung sebagai utang).'),
+  "creditLimit": zod.int(),
+  "oldestUnpaidAt": zod.int().nullable().describe('Waktu kasbon belum lunas tertua menurut FIFO (pelunasan melunasi kasbon tertua dulu;\npembalik batal pelunasan dikenali); null iff balance ≤ 0.\n'),
+  "ageDays": zod.int().nullable().describe('ageDays = ceil((now − oldestUnpaidAt) / 86.400.000), pembulatan ke atas ke hari penuh; null\niff balance ≤ 0. Setara dengan aturan Beranda (now − oldestUnpaidAt > 30 hari ⇔ ageDays >\n30), sehingga angka hari, kelompok, dan butir Kasbon > 30 hari selalu sepakat.\n'),
+  "age": zod.union([zod.enum(['hari_0_7', 'hari_8_30', 'lebih_30_hari']).describe('Kelompok umur kasbon belum lunas tertua — 0–7 hari, 8–30 hari, lebih dari 30 hari.'),zod.null()]).describe('Dari ageDays: > 30 → lebih_30_hari, ≥ 8 → hari_8_30, selain itu hari_0_7; null iff\nbalance ≤ 0.\n')
+}).and(zod.object({
+  "history": zod.array(zod.object({
+  "id": zod.string(),
+  "at": zod.int(),
+  "kind": zod.enum(['kasbon', 'pelunasan']),
+  "amount": zod.int().min(1),
+  "saleId": zod.string().nullable(),
+  "saleNumber": zod.string().nullable(),
+  "kasirName": zod.string().nullable(),
+  "payment": zod.union([zod.object({
+  "id": zod.string().describe('paymentId (dipakai cancelOwnerCreditPayment).'),
+  "channel": zod.enum(['kasir', 'pemilik']).describe('kasir = dicatat di kasir (hanya tunai masuk laci); pemilik = langsung ke pemilik (tidak pernah masuk laci).'),
+  "method": zod.enum(['tunai', 'qris', 'transfer', 'titip']).describe('tunai dan qris hanya jalur kasir; transfer dan titip (tunai ke pemilik) hanya jalur pemilik.'),
+  "byName": zod.string().describe('Nama pencatat (kasir atau pemilik).'),
+  "cashReceived": zod.int().describe('Jalur kasir tunai; selain itu 0.'),
+  "change": zod.int().describe('Jalur kasir tunai; selain itu 0.'),
+  "inOpenShift": zod.boolean().describe('Jalur kasir dari shift yang sedang buka → pemilik tidak bisa membatalkan (batalkan dari kasir).')
+}),zod.null()]),
+  "cancelled": zod.union([zod.object({
+  "at": zod.int().describe('Jam server saat dibatalkan (epoch ms UTC).'),
+  "byName": zod.string().describe('Nama pembatal (boleh beda dari pencatat).'),
+  "reason": zod.string(),
+  "channel": zod.enum(['kasir', 'pemilik']).describe('kasir = dicatat di kasir (hanya tunai masuk laci); pemilik = langsung ke pemilik (tidak pernah masuk laci).')
+}),zod.null()])
+}).describe('Satu baris riwayat pelanggan; pembalik dilipat ke barisnya (cancelled). Kasbon: saleId,\nsaleNumber, dan kasirName dari penjualan (null untuk kasbon seed tanpa struk), payment null;\nbatal kasbon karena batal transaksi memakai data pembatalan penjualannya. Pelunasan: payment\nterisi, saleId/saleNumber/kasirName null.\n')).describe('Terbaru dulu.')
+})).describe('Detail kasbon pelanggan untuk pemilik.')
+
+/**
+ * Jalur pemilik (channel pemilik): method hanya transfer atau titip (tunai ke pemilik). Uang
+ * pemilik tidak pernah masuk laci kasir: tanpa shift (shiftId null), tanpa baris laci, tanpa
+ * struk. Jumlah: bilangan bulat 1 ≤ amount ≤ saldo kasbon (boleh sebagian, maksimal sisa
+ * kasbon; lebih → 422 VALIDATION). Cicilan FIFO: melunasi kasbon belum lunas tertua dulu.
+ * Waktu dari jam server.
+ * Idempoten menurut (pembuat, id); id global lintas jalur kasir dan pemilik. id yang sama milik
+ * pengguna ini → 200 pelanggan sekarang tanpa entri buku kedua; id sudah dipakai pengguna lain
+ * → 409 ID_TAKEN.
+ * @summary Catat pelunasan kasbon langsung ke pemilik
+ */
+export const CreateOwnerCreditPaymentParams = zod.object({
+  "customerId": zod.string()
+})
+
+export const createOwnerCreditPaymentBodyIdMax = 64;
+
+
+
+
+export const CreateOwnerCreditPaymentBody = zod.object({
+  "id": zod.string().min(1).max(createOwnerCreditPaymentBodyIdMax).describe('ID dari klien (idempotensi per pembuat).'),
+  "amount": zod.int().min(1).describe('1 ≤ amount ≤ saldo kasbon pelanggan (boleh sebagian).'),
+  "method": zod.enum(['transfer', 'titip'])
+})
+
+
+
+
+export const CreateOwnerCreditPaymentResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "phone": zod.string(),
+  "balance": zod.int().describe('Saldo kasbon = Σ buku kasbon; < 0 = Lebih bayar (tidak dihitung sebagai utang).'),
+  "creditLimit": zod.int(),
+  "oldestUnpaidAt": zod.int().nullable().describe('Waktu kasbon belum lunas tertua menurut FIFO (pelunasan melunasi kasbon tertua dulu;\npembalik batal pelunasan dikenali); null iff balance ≤ 0.\n'),
+  "ageDays": zod.int().nullable().describe('ageDays = ceil((now − oldestUnpaidAt) / 86.400.000), pembulatan ke atas ke hari penuh; null\niff balance ≤ 0. Setara dengan aturan Beranda (now − oldestUnpaidAt > 30 hari ⇔ ageDays >\n30), sehingga angka hari, kelompok, dan butir Kasbon > 30 hari selalu sepakat.\n'),
+  "age": zod.union([zod.enum(['hari_0_7', 'hari_8_30', 'lebih_30_hari']).describe('Kelompok umur kasbon belum lunas tertua — 0–7 hari, 8–30 hari, lebih dari 30 hari.'),zod.null()]).describe('Dari ageDays: > 30 → lebih_30_hari, ≥ 8 → hari_8_30, selain itu hari_0_7; null iff\nbalance ≤ 0.\n')
+}).and(zod.object({
+  "history": zod.array(zod.object({
+  "id": zod.string(),
+  "at": zod.int(),
+  "kind": zod.enum(['kasbon', 'pelunasan']),
+  "amount": zod.int().min(1),
+  "saleId": zod.string().nullable(),
+  "saleNumber": zod.string().nullable(),
+  "kasirName": zod.string().nullable(),
+  "payment": zod.union([zod.object({
+  "id": zod.string().describe('paymentId (dipakai cancelOwnerCreditPayment).'),
+  "channel": zod.enum(['kasir', 'pemilik']).describe('kasir = dicatat di kasir (hanya tunai masuk laci); pemilik = langsung ke pemilik (tidak pernah masuk laci).'),
+  "method": zod.enum(['tunai', 'qris', 'transfer', 'titip']).describe('tunai dan qris hanya jalur kasir; transfer dan titip (tunai ke pemilik) hanya jalur pemilik.'),
+  "byName": zod.string().describe('Nama pencatat (kasir atau pemilik).'),
+  "cashReceived": zod.int().describe('Jalur kasir tunai; selain itu 0.'),
+  "change": zod.int().describe('Jalur kasir tunai; selain itu 0.'),
+  "inOpenShift": zod.boolean().describe('Jalur kasir dari shift yang sedang buka → pemilik tidak bisa membatalkan (batalkan dari kasir).')
+}),zod.null()]),
+  "cancelled": zod.union([zod.object({
+  "at": zod.int().describe('Jam server saat dibatalkan (epoch ms UTC).'),
+  "byName": zod.string().describe('Nama pembatal (boleh beda dari pencatat).'),
+  "reason": zod.string(),
+  "channel": zod.enum(['kasir', 'pemilik']).describe('kasir = dicatat di kasir (hanya tunai masuk laci); pemilik = langsung ke pemilik (tidak pernah masuk laci).')
+}),zod.null()])
+}).describe('Satu baris riwayat pelanggan; pembalik dilipat ke barisnya (cancelled). Kasbon: saleId,\nsaleNumber, dan kasirName dari penjualan (null untuk kasbon seed tanpa struk), payment null;\nbatal kasbon karena batal transaksi memakai data pembatalan penjualannya. Pelunasan: payment\nterisi, saleId/saleNumber/kasirName null.\n')).describe('Terbaru dulu.')
+})).describe('Detail kasbon pelanggan untuk pemilik.')
+
+/**
+ * Pembatalan dari app pemilik tidak pernah mengoreksi laci: buku kasbon bertambah lagi sebesar
+ * amount (entri pembalik dengan paymentId sama), laci tidak dikoreksi, termasuk untuk
+ * pelunasan tunai jalur kasir (uang dikembalikan pemilik). Urutan pemeriksaan: id tidak dikenal
+ * → 404; sudah dibatalkan → 200 pelanggan apa adanya tanpa perubahan; reason kosong (setelah
+ * trim) atau > 200 karakter → 422 VALIDATION; pelunasan jalur kasir dari shift yang sedang buka
+ * → 409 IN_OPEN_SHIFT (batalkan dari kasir). Tercatat cancelledAt (jam server), pembatal,
+ * channel pemilik, dan alasan. Respons = pelanggan pemilik pelunasan itu.
+ * @summary Batalkan pelunasan dari app pemilik (alasan wajib)
+ */
+export const CancelOwnerCreditPaymentParams = zod.object({
+  "paymentId": zod.string()
+})
+
+export const cancelOwnerCreditPaymentBodyReasonMax = 200;
+
+
+
+export const CancelOwnerCreditPaymentBody = zod.object({
+  "reason": zod.string().min(1).max(cancelOwnerCreditPaymentBodyReasonMax).describe('Alasan pembatalan, wajib (1..200 karakter setelah trim); tanpa PIN pemilik.')
+})
+
+
+
+
+export const CancelOwnerCreditPaymentResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "phone": zod.string(),
+  "balance": zod.int().describe('Saldo kasbon = Σ buku kasbon; < 0 = Lebih bayar (tidak dihitung sebagai utang).'),
+  "creditLimit": zod.int(),
+  "oldestUnpaidAt": zod.int().nullable().describe('Waktu kasbon belum lunas tertua menurut FIFO (pelunasan melunasi kasbon tertua dulu;\npembalik batal pelunasan dikenali); null iff balance ≤ 0.\n'),
+  "ageDays": zod.int().nullable().describe('ageDays = ceil((now − oldestUnpaidAt) / 86.400.000), pembulatan ke atas ke hari penuh; null\niff balance ≤ 0. Setara dengan aturan Beranda (now − oldestUnpaidAt > 30 hari ⇔ ageDays >\n30), sehingga angka hari, kelompok, dan butir Kasbon > 30 hari selalu sepakat.\n'),
+  "age": zod.union([zod.enum(['hari_0_7', 'hari_8_30', 'lebih_30_hari']).describe('Kelompok umur kasbon belum lunas tertua — 0–7 hari, 8–30 hari, lebih dari 30 hari.'),zod.null()]).describe('Dari ageDays: > 30 → lebih_30_hari, ≥ 8 → hari_8_30, selain itu hari_0_7; null iff\nbalance ≤ 0.\n')
+}).and(zod.object({
+  "history": zod.array(zod.object({
+  "id": zod.string(),
+  "at": zod.int(),
+  "kind": zod.enum(['kasbon', 'pelunasan']),
+  "amount": zod.int().min(1),
+  "saleId": zod.string().nullable(),
+  "saleNumber": zod.string().nullable(),
+  "kasirName": zod.string().nullable(),
+  "payment": zod.union([zod.object({
+  "id": zod.string().describe('paymentId (dipakai cancelOwnerCreditPayment).'),
+  "channel": zod.enum(['kasir', 'pemilik']).describe('kasir = dicatat di kasir (hanya tunai masuk laci); pemilik = langsung ke pemilik (tidak pernah masuk laci).'),
+  "method": zod.enum(['tunai', 'qris', 'transfer', 'titip']).describe('tunai dan qris hanya jalur kasir; transfer dan titip (tunai ke pemilik) hanya jalur pemilik.'),
+  "byName": zod.string().describe('Nama pencatat (kasir atau pemilik).'),
+  "cashReceived": zod.int().describe('Jalur kasir tunai; selain itu 0.'),
+  "change": zod.int().describe('Jalur kasir tunai; selain itu 0.'),
+  "inOpenShift": zod.boolean().describe('Jalur kasir dari shift yang sedang buka → pemilik tidak bisa membatalkan (batalkan dari kasir).')
+}),zod.null()]),
+  "cancelled": zod.union([zod.object({
+  "at": zod.int().describe('Jam server saat dibatalkan (epoch ms UTC).'),
+  "byName": zod.string().describe('Nama pembatal (boleh beda dari pencatat).'),
+  "reason": zod.string(),
+  "channel": zod.enum(['kasir', 'pemilik']).describe('kasir = dicatat di kasir (hanya tunai masuk laci); pemilik = langsung ke pemilik (tidak pernah masuk laci).')
+}),zod.null()])
+}).describe('Satu baris riwayat pelanggan; pembalik dilipat ke barisnya (cancelled). Kasbon: saleId,\nsaleNumber, dan kasirName dari penjualan (null untuk kasbon seed tanpa struk), payment null;\nbatal kasbon karena batal transaksi memakai data pembatalan penjualannya. Pelunasan: payment\nterisi, saleId/saleNumber/kasirName null.\n')).describe('Terbaru dulu.')
+})).describe('Detail kasbon pelanggan untuk pemilik.')
 

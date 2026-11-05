@@ -1,5 +1,6 @@
 import { expect, expectTypeOf, test } from "vitest";
 import type { z } from "zod";
+import * as creditApi from "./gen/credit/credit";
 import * as ownerApi from "./gen/owner/owner";
 import type {
   Attention,
@@ -7,6 +8,7 @@ import type {
   CreditLimitProblem,
   ExpiryAttention,
   ImportRowResult,
+  KasirCreditPayment,
   OpnameFlag,
   OpnameReason,
   OwnerExpiryList,
@@ -19,6 +21,7 @@ import type {
   PriceChangedProblem,
   Product,
   ProductInput,
+  SearchCustomersParams,
   ShiftClosure,
   StockMovement,
   StockOutItem,
@@ -32,11 +35,18 @@ import {
 import * as staffApi from "./gen/staff/staff";
 import { LookupCatalogResponse } from "./gen/zod/catalog/catalog";
 import {
+  CancelCreditPaymentBody,
+  CreateCreditPaymentBody,
+  SearchCustomersQueryParams,
+} from "./gen/zod/credit/credit";
+import {
   CheckOwnerProductImportBody,
+  CreateOwnerCreditPaymentBody,
   CreateOwnerProductBody,
   GetOwnerTodaySummaryResponse,
   OwnerLoginBody,
   RecountOpnameItemBody,
+  SetOwnerCustomerCreditLimitBody,
   UpdateOwnerProductPricesBody,
 } from "./gen/zod/owner/owner";
 import { CreateSaleBody, VoidSaleBody } from "./gen/zod/sales/sales";
@@ -103,8 +113,8 @@ test("creditLimitProblemSchema cocok dengan tipe hasil generate", () => {
   expect(ok.success).toBe(true);
 });
 
-test("ErrorCode 22 nilai termasuk OPNAME_NOT_HELD", () => {
-  expect(Object.values(ErrorCode)).toHaveLength(22);
+test("ErrorCode 24 nilai termasuk OPNAME_NOT_HELD, OUTSIDE_SHIFT, IN_OPEN_SHIFT", () => {
+  expect(Object.values(ErrorCode)).toHaveLength(24);
   expect(Object.values(ErrorCode)).toEqual(
     expect.arrayContaining([
       "PRODUCT_INACTIVE",
@@ -115,6 +125,8 @@ test("ErrorCode 22 nilai termasuk OPNAME_NOT_HELD", () => {
       "DEBT_ALREADY_PAID",
       "ID_TAKEN",
       "OPNAME_NOT_HELD",
+      "OUTSIDE_SHIFT",
+      "IN_OPEN_SHIFT",
     ]),
   );
   expect(ErrorCode.LOGIN_INVALID).toBe("LOGIN_INVALID");
@@ -600,4 +612,115 @@ test("ProductUnit.unitSize minimal 1", () => {
   });
   expect(LookupCatalogResponse.safeParse(match(1000)).success).toBe(true);
   expect(LookupCatalogResponse.safeParse(match(0)).success).toBe(false);
+});
+
+/** Operasi F3c-1 kasbon & pelunasan (K1, jawaban pemilik J0). */
+const CREDIT_OPS = {
+  credit: [
+    "createCreditPayment",
+    "listShiftCreditPayments",
+    "printCreditPayment",
+    "cancelCreditPayment",
+  ],
+  owner: [
+    "listOwnerCustomers",
+    "getOwnerCustomer",
+    "setOwnerCustomerCreditLimit",
+    "createOwnerCreditPayment",
+    "cancelOwnerCreditPayment",
+  ],
+} as const;
+
+test("operasi kasbon dan pelunasan ada di klien hasil generate", () => {
+  const modules: Record<string, Record<string, unknown>> = {
+    credit: creditApi,
+    owner: ownerApi,
+  };
+  for (const [tag, ids] of Object.entries(CREDIT_OPS)) {
+    for (const id of ids) {
+      expect({ id, type: typeof modules[tag]?.[id] }).toEqual({
+        id,
+        type: "function",
+      });
+    }
+  }
+});
+
+test("KasirCreditPaymentInput: id 1..64, amount >= 1, hanya tunai/qris; QRIS cashReceived null", () => {
+  const tunai = {
+    id: "p1",
+    customerId: "c1",
+    amount: 50_000,
+    method: "tunai",
+    cashReceived: 100_000,
+    print: true,
+  };
+  const parse = (b: unknown) => CreateCreditPaymentBody.safeParse(b);
+  expect(parse(tunai).success).toBe(true);
+  expect(parse({ ...tunai, method: "qris", cashReceived: null }).success).toBe(
+    true,
+  );
+  expect(parse({ ...tunai, cashReceived: null }).success).toBe(true);
+  expect(parse({ ...tunai, amount: 0 }).success).toBe(false);
+  expect(parse({ ...tunai, id: "" }).success).toBe(false);
+  expect(parse({ ...tunai, id: "x".repeat(65) }).success).toBe(false);
+  expect(parse({ ...tunai, method: "transfer" }).success).toBe(false);
+});
+
+test("OwnerCreditPaymentInput hanya transfer/titip; CreditLimitInput >= 0", () => {
+  const body = { id: "p1", amount: 50_000, method: "transfer" };
+  const parse = (b: unknown) => CreateOwnerCreditPaymentBody.safeParse(b);
+  expect(parse(body).success).toBe(true);
+  expect(parse({ ...body, method: "titip" }).success).toBe(true);
+  expect(parse({ ...body, method: "tunai" }).success).toBe(false);
+  expect(parse({ ...body, method: "qris" }).success).toBe(false);
+  expect(parse({ ...body, amount: 0 }).success).toBe(false);
+  expect(
+    SetOwnerCustomerCreditLimitBody.safeParse({ creditLimit: 0 }).success,
+  ).toBe(true);
+  expect(
+    SetOwnerCustomerCreditLimitBody.safeParse({ creditLimit: -1 }).success,
+  ).toBe(false);
+});
+
+test("CancelCreditPaymentInput: alasan wajib, tanpa ownerPin (ruling R2)", () => {
+  expect(
+    CancelCreditPaymentBody.safeParse({ reason: "salah catat" }).success,
+  ).toBe(true);
+  expect(CancelCreditPaymentBody.safeParse({ reason: "" }).success).toBe(false);
+  expect(Object.keys(CancelCreditPaymentBody.shape)).toEqual(["reason"]);
+});
+
+test("searchCustomers menerima owing", () => {
+  expectTypeOf<{ owing: true }>().toMatchTypeOf<SearchCustomersParams>();
+  expect(SearchCustomersQueryParams.safeParse({ owing: true }).success).toBe(
+    true,
+  );
+  expect(Object.keys(SearchCustomersQueryParams.shape)).toEqual(["q", "owing"]);
+});
+
+test("KasirCreditPayment hanya key allowlist; ShiftClosure memuat pelunasan & pengembalian", () => {
+  expectTypeOf<keyof KasirCreditPayment>().toEqualTypeOf<
+    | "id"
+    | "customerId"
+    | "customerName"
+    | "amount"
+    | "method"
+    | "cashReceived"
+    | "change"
+    | "balanceAfter"
+    | "createdAt"
+    | "kasirName"
+    | "shiftId"
+    | "status"
+    | "printStatus"
+  >();
+  expectTypeOf<
+    Required<KasirCreditPayment>
+  >().toEqualTypeOf<KasirCreditPayment>();
+  expectTypeOf<KasirCreditPayment["method"]>().toEqualTypeOf<
+    "tunai" | "qris"
+  >();
+  expectTypeOf<ShiftClosure["creditPayments"]>().toEqualTypeOf<number>();
+  expectTypeOf<ShiftClosure["saleRefunds"]>().toEqualTypeOf<number>();
 });

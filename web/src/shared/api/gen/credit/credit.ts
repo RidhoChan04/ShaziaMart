@@ -5,7 +5,7 @@
  * Kontrak API kasir sembako. Sumber kebenaran tunggal untuk frontend dan backend.
  * Semua uang dan jumlah berupa integer (rupiah utuh; qtyBase dalam satuan dasar pcs/gram/ml).
  * Semua waktu berupa integer epoch milidetik UTC. Error memakai application/problem+json.
- * Autentikasi memakai cookie sesi kasir_session. Endpoint shift, sales, dan session
+ * Autentikasi memakai cookie sesi kasir_session. Endpoint shift, sales, credit-payments, dan session
  * memerlukan sesi; health, users, pin-login, settings, catalog, dan customers publik
  * (satu PC di localhost).
  *
@@ -48,9 +48,16 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  CancelCreditPaymentInput,
   Customer,
+  KasirCreditPayment,
+  KasirCreditPaymentInput,
   NewCustomer,
+  NotFoundResponse,
+  PrintResult,
+  Problem,
   SearchCustomersParams,
+  UnauthorizedResponse,
   ValidationFailedResponse
 } from '../shaziaMartAPI.schemas';
 
@@ -93,6 +100,7 @@ export const getSearchCustomersUrl = (params?: SearchCustomersParams,) => {
 }
 
 /**
+ * Paling banyak 20 hasil. HPP dan laba tidak pernah ada di respons kasir.
  * @summary Cari pelanggan
  */
 export const searchCustomers = async (params?: SearchCustomersParams, options?: Parameters<typeof customFetch>[1]): Promise<Customer[]> => {
@@ -270,4 +278,383 @@ export const useCreateCustomer = <TError = ErrorType<ValidationFailedResponse>,
         TContext
       > => {
       return useMutation(getCreateCustomerMutationOptions(options), queryClient);
+    }
+    export const getCreateCreditPaymentUrl = () => {
+
+
+
+
+  return `/api/credit-payments`
+}
+
+/**
+ * Satu skema pelunasan, dua jalur. Jalur kasir (channel kasir, endpoint ini): method hanya
+ * tunai atau qris; perlu sesi kasir dan shift yang sedang buka (tanpa shift → 409
+ * SHIFT_CLOSED); rekaman menyimpan shiftId shift itu. Hanya pelunasan tunai jalur kasir yang
+ * masuk laci (ShiftClosure.creditPayments); QRIS tidak masuk laci. Uang pemilik (transfer/tunai
+ * ke pemilik, jalur createOwnerCreditPayment) tidak pernah masuk laci.
+ * Jumlah: bilangan bulat 1 ≤ amount ≤ saldo kasbon pelanggan (boleh sebagian, maksimal sisa
+ * kasbon; lebih → 422 VALIDATION). Tunai: cashReceived wajib ≥ amount, change = cashReceived −
+ * amount. QRIS: cashReceived null, disimpan cashReceived 0 dan change 0. balanceAfter = saldo
+ * setelah pelunasan ini, disalin saat dicatat. Cicilan FIFO: pelunasan melunasi kasbon belum
+ * lunas tertua dulu. createdAt = jam server (bukan dari body).
+ * Idempoten menurut (pembuat, id); id global lintas jalur kasir dan pemilik. id yang sama milik
+ * pengguna ini → 200 rekaman tersimpan apa adanya, tanpa entri buku kasbon atau laci kedua; id
+ * sudah dipakai pengguna lain → 409 ID_TAKEN tanpa isi rekaman.
+ * print = true → server mencetak struk pelunasan (bawaan klien = autoPrint toko): nama toko,
+ * alamat, PELUNASAN KASBON, tanggal jam · Kasir, Pelanggan, Sisa sebelum, Dibayar (metode),
+ * Sisa kasbon, (Tunai) Uang diterima dan Kembalian, lalu footer struk toko. Jalur pemilik tanpa
+ * struk. Pelanggan tidak dikenal → 404.
+ * HPP dan laba tidak pernah ada di respons kasir.
+ * @summary Catat pelunasan kasbon di kasir
+ */
+export const createCreditPayment = async (kasirCreditPaymentInput: KasirCreditPaymentInput, options?: Parameters<typeof customFetch>[1]): Promise<KasirCreditPayment> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<KasirCreditPayment>(getCreateCreditPaymentUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(kasirCreditPaymentInput)
+  }
+);}
+
+
+
+
+
+export const getCreateCreditPaymentMutationKey = () => ['createCreditPayment'] as const;
+
+export const getCreateCreditPaymentMutationOptions = <TError = ErrorType<UnauthorizedResponse | NotFoundResponse | Problem | ValidationFailedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCreditPayment>>, TError,CreateCreditPaymentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createCreditPayment>>, TError,CreateCreditPaymentMutationVariables, TContext> => {
+
+const mutationKey = getCreateCreditPaymentMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createCreditPayment>>, CreateCreditPaymentMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  createCreditPayment(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateCreditPaymentMutationResult = NonNullable<Awaited<ReturnType<typeof createCreditPayment>>>
+    export type CreateCreditPaymentMutationBody = KasirCreditPaymentInput
+    export type CreateCreditPaymentMutationError = ErrorType<UnauthorizedResponse | NotFoundResponse | Problem | ValidationFailedResponse>
+    export type CreateCreditPaymentMutationVariables = {data: KasirCreditPaymentInput}
+
+    /**
+ * @summary Catat pelunasan kasbon di kasir
+ */
+export const useCreateCreditPayment = <TError = ErrorType<UnauthorizedResponse | NotFoundResponse | Problem | ValidationFailedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCreditPayment>>, TError,CreateCreditPaymentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof createCreditPayment>>,
+        TError,
+        CreateCreditPaymentMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateCreditPaymentMutationOptions(options), queryClient);
+    }
+    export const getListShiftCreditPaymentsUrl = () => {
+
+
+
+
+  return `/api/credit-payments/shift`
+}
+
+/**
+ * Shift yang sedang buka, bukan hari ini (shift bisa lewat tengah malam); termasuk yang
+ * dibatalkan. Tanpa shift buka → []. HPP dan laba tidak pernah ada di respons kasir.
+ * @summary Pelunasan jalur kasir di shift yang sedang buka, terbaru dulu
+ */
+export const listShiftCreditPayments = async ( options?: Parameters<typeof customFetch>[1]): Promise<KasirCreditPayment[]> => {
+
+  return customFetch<KasirCreditPayment[]>(getListShiftCreditPaymentsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListShiftCreditPaymentsQueryKey = () => {
+    return [
+    `/api/credit-payments/shift`
+    ] as const;
+    }
+
+
+export const getListShiftCreditPaymentsQueryOptions = <TData = Awaited<ReturnType<typeof listShiftCreditPayments>>, TError = ErrorType<UnauthorizedResponse>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listShiftCreditPayments>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListShiftCreditPaymentsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listShiftCreditPayments>>> = ({ signal }) => listShiftCreditPayments({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listShiftCreditPayments>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListShiftCreditPaymentsQueryResult = NonNullable<Awaited<ReturnType<typeof listShiftCreditPayments>>>
+export type ListShiftCreditPaymentsQueryError = ErrorType<UnauthorizedResponse>
+
+
+export function useListShiftCreditPayments<TData = Awaited<ReturnType<typeof listShiftCreditPayments>>, TError = ErrorType<UnauthorizedResponse>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listShiftCreditPayments>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listShiftCreditPayments>>,
+          TError,
+          Awaited<ReturnType<typeof listShiftCreditPayments>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListShiftCreditPayments<TData = Awaited<ReturnType<typeof listShiftCreditPayments>>, TError = ErrorType<UnauthorizedResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listShiftCreditPayments>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listShiftCreditPayments>>,
+          TError,
+          Awaited<ReturnType<typeof listShiftCreditPayments>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListShiftCreditPayments<TData = Awaited<ReturnType<typeof listShiftCreditPayments>>, TError = ErrorType<UnauthorizedResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listShiftCreditPayments>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Pelunasan jalur kasir di shift yang sedang buka, terbaru dulu
+ */
+
+export function useListShiftCreditPayments<TData = Awaited<ReturnType<typeof listShiftCreditPayments>>, TError = ErrorType<UnauthorizedResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listShiftCreditPayments>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListShiftCreditPaymentsQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+export const getPrintCreditPaymentUrl = (paymentId: string,) => {
+
+
+
+
+  return `/api/credit-payments/${paymentId}/print`
+}
+
+/**
+ * Isi struk sama dengan createCreditPayment. Hanya pelunasan jalur kasir; id tidak dikenal atau
+ * pelunasan jalur pemilik → 404. Klien menonaktifkan cetak ulang untuk pelunasan yang dibatalkan.
+ * @summary Cetak ulang struk pelunasan
+ */
+export const printCreditPayment = async (paymentId: string, options?: Parameters<typeof customFetch>[1]): Promise<PrintResult> => {
+
+  return customFetch<PrintResult>(getPrintCreditPaymentUrl(paymentId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getPrintCreditPaymentMutationKey = () => ['printCreditPayment'] as const;
+
+export const getPrintCreditPaymentMutationOptions = <TError = ErrorType<UnauthorizedResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof printCreditPayment>>, TError,PrintCreditPaymentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof printCreditPayment>>, TError,PrintCreditPaymentMutationVariables, TContext> => {
+
+const mutationKey = getPrintCreditPaymentMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof printCreditPayment>>, PrintCreditPaymentMutationVariables> = (props) => {
+          const {paymentId} = props ?? {};
+
+          return  printCreditPayment(paymentId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PrintCreditPaymentMutationResult = NonNullable<Awaited<ReturnType<typeof printCreditPayment>>>
+
+    export type PrintCreditPaymentMutationError = ErrorType<UnauthorizedResponse | NotFoundResponse>
+    export type PrintCreditPaymentMutationVariables = {paymentId: string}
+
+    /**
+ * @summary Cetak ulang struk pelunasan
+ */
+export const usePrintCreditPayment = <TError = ErrorType<UnauthorizedResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof printCreditPayment>>, TError,PrintCreditPaymentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof printCreditPayment>>,
+        TError,
+        PrintCreditPaymentMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPrintCreditPaymentMutationOptions(options), queryClient);
+    }
+    export const getCancelCreditPaymentUrl = (paymentId: string,) => {
+
+
+
+
+  return `/api/credit-payments/${paymentId}/cancel`
+}
+
+/**
+ * Kasir hanya boleh membatalkan pelunasan jalur kasir dari shift yang sedang buka; setelah shift
+ * tutup, batal hanya dari app pemilik. Tanpa PIN pemilik; alasan wajib. Urutan pemeriksaan:
+ * id tidak dikenal atau pelunasan jalur pemilik → 404; sudah dibatalkan → 200 rekaman apa
+ * adanya tanpa perubahan; reason kosong (setelah trim) atau > 200 karakter → 422 VALIDATION;
+ * tanpa shift buka → 409 SHIFT_CLOSED; shiftId pelunasan bukan shift yang sedang buka → 409
+ * OUTSIDE_SHIFT. Berhasil: buku kasbon bertambah lagi sebesar amount (entri pembalik dengan
+ * paymentId sama) dan, bila tunai, uang laci shift yang sedang buka berkurang sebesar amount
+ * (ShiftClosure.creditPayments turun). Tercatat cancelledAt (jam server), pembatal (id + nama,
+ * boleh beda dari pencatat), channel kasir, dan alasan; muncul di Perlu perhatian pemilik.
+ * @summary Batalkan pelunasan di kasir (alasan wajib)
+ */
+export const cancelCreditPayment = async (paymentId: string,
+    cancelCreditPaymentInput: CancelCreditPaymentInput, options?: Parameters<typeof customFetch>[1]): Promise<KasirCreditPayment> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<KasirCreditPayment>(getCancelCreditPaymentUrl(paymentId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(cancelCreditPaymentInput)
+  }
+);}
+
+
+
+
+
+export const getCancelCreditPaymentMutationKey = () => ['cancelCreditPayment'] as const;
+
+export const getCancelCreditPaymentMutationOptions = <TError = ErrorType<UnauthorizedResponse | NotFoundResponse | Problem | ValidationFailedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelCreditPayment>>, TError,CancelCreditPaymentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof cancelCreditPayment>>, TError,CancelCreditPaymentMutationVariables, TContext> => {
+
+const mutationKey = getCancelCreditPaymentMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cancelCreditPayment>>, CancelCreditPaymentMutationVariables> = (props) => {
+          const {paymentId,data} = props ?? {};
+
+          return  cancelCreditPayment(paymentId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CancelCreditPaymentMutationResult = NonNullable<Awaited<ReturnType<typeof cancelCreditPayment>>>
+    export type CancelCreditPaymentMutationBody = CancelCreditPaymentInput
+    export type CancelCreditPaymentMutationError = ErrorType<UnauthorizedResponse | NotFoundResponse | Problem | ValidationFailedResponse>
+    export type CancelCreditPaymentMutationVariables = {paymentId: string;data: CancelCreditPaymentInput}
+
+    /**
+ * @summary Batalkan pelunasan di kasir (alasan wajib)
+ */
+export const useCancelCreditPayment = <TError = ErrorType<UnauthorizedResponse | NotFoundResponse | Problem | ValidationFailedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelCreditPayment>>, TError,CancelCreditPaymentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof cancelCreditPayment>>,
+        TError,
+        CancelCreditPaymentMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCancelCreditPaymentMutationOptions(options), queryClient);
     }

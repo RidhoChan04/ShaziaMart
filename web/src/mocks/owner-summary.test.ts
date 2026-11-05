@@ -149,6 +149,8 @@ describe("ownerTodaySummary", () => {
       openingCash: 0,
       cashSales: 0,
       supplierPayments: 0,
+      creditPayments: 0,
+      saleRefunds: 0,
       expectedCash: 0,
       countedCash: 0,
       salesCount: 0,

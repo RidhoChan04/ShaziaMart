@@ -5,7 +5,7 @@
  * Kontrak API kasir sembako. Sumber kebenaran tunggal untuk frontend dan backend.
  * Semua uang dan jumlah berupa integer (rupiah utuh; qtyBase dalam satuan dasar pcs/gram/ml).
  * Semua waktu berupa integer epoch milidetik UTC. Error memakai application/problem+json.
- * Autentikasi memakai cookie sesi kasir_session. Endpoint shift, sales, dan session
+ * Autentikasi memakai cookie sesi kasir_session. Endpoint shift, sales, credit-payments, dan session
  * memerlukan sesi; health, users, pin-login, settings, catalog, dan customers publik
  * (satu PC di localhost).
  *
@@ -48,8 +48,11 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  CancelCreditPaymentInput,
+  CreditLimitInput,
   ExpiryDateInput,
   ExpiryRemovalInput,
+  IdTakenResponse,
   ImportCheck,
   ImportRequest,
   ImportResult,
@@ -58,6 +61,9 @@ import type {
   NotFoundResponse,
   OpnameNotHeldResponse,
   OpnameRecountInput,
+  OwnerCreditPaymentInput,
+  OwnerCustomer,
+  OwnerCustomerList,
   OwnerExpiryList,
   OwnerLogin,
   OwnerOpnameRow,
@@ -2867,4 +2873,490 @@ export const usePutOwnerLineExpiry = <TError = ErrorType<UnauthorizedResponse | 
         TContext
       > => {
       return useMutation(getPutOwnerLineExpiryMutationOptions(options), queryClient);
+    }
+    export const getListOwnerCustomersUrl = () => {
+
+
+
+
+  return `/api/owner/customers`
+}
+
+/**
+ * Semua pelanggan, urut saldo terbesar lalu nama (saldo < 0 "Lebih bayar" di akhir); UI
+ * menyembunyikan saldo = 0 kecuali saat mencari. totalBalance, debtorCount, ages, dan
+ * overdueCount hanya menjumlah pelanggan bersaldo > 0. ages selalu tepat 3 entri berurutan
+ * hari_0_7, hari_8_30, lebih_30_hari, agar UI tidak menjumlah uang sendiri. overdueCount =
+ * jumlah pelanggan kelompok lebih_30_hari (sama dengan Attention.overdueCredit.count).
+ * @summary Kasbon semua pelanggan
+ */
+export const listOwnerCustomers = async ( options?: Parameters<typeof customFetch>[1]): Promise<OwnerCustomerList> => {
+
+  return customFetch<OwnerCustomerList>(getListOwnerCustomersUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListOwnerCustomersQueryKey = () => {
+    return [
+    `/api/owner/customers`
+    ] as const;
+    }
+
+
+export const getListOwnerCustomersQueryOptions = <TData = Awaited<ReturnType<typeof listOwnerCustomers>>, TError = ErrorType<UnauthorizedResponse>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOwnerCustomers>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListOwnerCustomersQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listOwnerCustomers>>> = ({ signal }) => listOwnerCustomers({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listOwnerCustomers>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListOwnerCustomersQueryResult = NonNullable<Awaited<ReturnType<typeof listOwnerCustomers>>>
+export type ListOwnerCustomersQueryError = ErrorType<UnauthorizedResponse>
+
+
+export function useListOwnerCustomers<TData = Awaited<ReturnType<typeof listOwnerCustomers>>, TError = ErrorType<UnauthorizedResponse>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOwnerCustomers>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listOwnerCustomers>>,
+          TError,
+          Awaited<ReturnType<typeof listOwnerCustomers>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListOwnerCustomers<TData = Awaited<ReturnType<typeof listOwnerCustomers>>, TError = ErrorType<UnauthorizedResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOwnerCustomers>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listOwnerCustomers>>,
+          TError,
+          Awaited<ReturnType<typeof listOwnerCustomers>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListOwnerCustomers<TData = Awaited<ReturnType<typeof listOwnerCustomers>>, TError = ErrorType<UnauthorizedResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOwnerCustomers>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Kasbon semua pelanggan
+ */
+
+export function useListOwnerCustomers<TData = Awaited<ReturnType<typeof listOwnerCustomers>>, TError = ErrorType<UnauthorizedResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOwnerCustomers>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListOwnerCustomersQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+export const getGetOwnerCustomerUrl = (customerId: string,) => {
+
+
+
+
+  return `/api/owner/customers/${customerId}`
+}
+
+/**
+ * @summary Detail kasbon pelanggan beserta riwayat
+ */
+export const getOwnerCustomer = async (customerId: string, options?: Parameters<typeof customFetch>[1]): Promise<OwnerCustomer> => {
+
+  return customFetch<OwnerCustomer>(getGetOwnerCustomerUrl(customerId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetOwnerCustomerQueryKey = (customerId: string,) => {
+    return [
+    `/api/owner/customers/${customerId}`
+    ] as const;
+    }
+
+
+export const getGetOwnerCustomerQueryOptions = <TData = Awaited<ReturnType<typeof getOwnerCustomer>>, TError = ErrorType<UnauthorizedResponse | NotFoundResponse>>(customerId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerCustomer>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetOwnerCustomerQueryKey(customerId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOwnerCustomer>>> = ({ signal }) => getOwnerCustomer(customerId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: customerId !== null && customerId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getOwnerCustomer>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetOwnerCustomerQueryResult = NonNullable<Awaited<ReturnType<typeof getOwnerCustomer>>>
+export type GetOwnerCustomerQueryError = ErrorType<UnauthorizedResponse | NotFoundResponse>
+
+
+export function useGetOwnerCustomer<TData = Awaited<ReturnType<typeof getOwnerCustomer>>, TError = ErrorType<UnauthorizedResponse | NotFoundResponse>>(
+ customerId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerCustomer>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getOwnerCustomer>>,
+          TError,
+          Awaited<ReturnType<typeof getOwnerCustomer>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetOwnerCustomer<TData = Awaited<ReturnType<typeof getOwnerCustomer>>, TError = ErrorType<UnauthorizedResponse | NotFoundResponse>>(
+ customerId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerCustomer>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getOwnerCustomer>>,
+          TError,
+          Awaited<ReturnType<typeof getOwnerCustomer>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetOwnerCustomer<TData = Awaited<ReturnType<typeof getOwnerCustomer>>, TError = ErrorType<UnauthorizedResponse | NotFoundResponse>>(
+ customerId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerCustomer>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Detail kasbon pelanggan beserta riwayat
+ */
+
+export function useGetOwnerCustomer<TData = Awaited<ReturnType<typeof getOwnerCustomer>>, TError = ErrorType<UnauthorizedResponse | NotFoundResponse>>(
+ customerId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerCustomer>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetOwnerCustomerQueryOptions(customerId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+export const getSetOwnerCustomerCreditLimitUrl = (customerId: string,) => {
+
+
+
+
+  return `/api/owner/customers/${customerId}/credit-limit`
+}
+
+/**
+ * Limit = batas peringatan, bilangan bulat ≥ 0; boleh di bawah saldo sekarang (kasbon baru di
+ * kasir yang melewati limit tetap boleh dengan alasan wajib).
+ * @summary Atur limit kasbon pelanggan
+ */
+export const setOwnerCustomerCreditLimit = async (customerId: string,
+    creditLimitInput: CreditLimitInput, options?: Parameters<typeof customFetch>[1]): Promise<OwnerCustomer> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<OwnerCustomer>(getSetOwnerCustomerCreditLimitUrl(customerId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(creditLimitInput)
+  }
+);}
+
+
+
+
+
+export const getSetOwnerCustomerCreditLimitMutationKey = () => ['setOwnerCustomerCreditLimit'] as const;
+
+export const getSetOwnerCustomerCreditLimitMutationOptions = <TError = ErrorType<UnauthorizedResponse | NotFoundResponse | ValidationFailedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setOwnerCustomerCreditLimit>>, TError,SetOwnerCustomerCreditLimitMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setOwnerCustomerCreditLimit>>, TError,SetOwnerCustomerCreditLimitMutationVariables, TContext> => {
+
+const mutationKey = getSetOwnerCustomerCreditLimitMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setOwnerCustomerCreditLimit>>, SetOwnerCustomerCreditLimitMutationVariables> = (props) => {
+          const {customerId,data} = props ?? {};
+
+          return  setOwnerCustomerCreditLimit(customerId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetOwnerCustomerCreditLimitMutationResult = NonNullable<Awaited<ReturnType<typeof setOwnerCustomerCreditLimit>>>
+    export type SetOwnerCustomerCreditLimitMutationBody = CreditLimitInput
+    export type SetOwnerCustomerCreditLimitMutationError = ErrorType<UnauthorizedResponse | NotFoundResponse | ValidationFailedResponse>
+    export type SetOwnerCustomerCreditLimitMutationVariables = {customerId: string;data: CreditLimitInput}
+
+    /**
+ * @summary Atur limit kasbon pelanggan
+ */
+export const useSetOwnerCustomerCreditLimit = <TError = ErrorType<UnauthorizedResponse | NotFoundResponse | ValidationFailedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setOwnerCustomerCreditLimit>>, TError,SetOwnerCustomerCreditLimitMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof setOwnerCustomerCreditLimit>>,
+        TError,
+        SetOwnerCustomerCreditLimitMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSetOwnerCustomerCreditLimitMutationOptions(options), queryClient);
+    }
+    export const getCreateOwnerCreditPaymentUrl = (customerId: string,) => {
+
+
+
+
+  return `/api/owner/customers/${customerId}/payments`
+}
+
+/**
+ * Jalur pemilik (channel pemilik): method hanya transfer atau titip (tunai ke pemilik). Uang
+ * pemilik tidak pernah masuk laci kasir: tanpa shift (shiftId null), tanpa baris laci, tanpa
+ * struk. Jumlah: bilangan bulat 1 ≤ amount ≤ saldo kasbon (boleh sebagian, maksimal sisa
+ * kasbon; lebih → 422 VALIDATION). Cicilan FIFO: melunasi kasbon belum lunas tertua dulu.
+ * Waktu dari jam server.
+ * Idempoten menurut (pembuat, id); id global lintas jalur kasir dan pemilik. id yang sama milik
+ * pengguna ini → 200 pelanggan sekarang tanpa entri buku kedua; id sudah dipakai pengguna lain
+ * → 409 ID_TAKEN.
+ * @summary Catat pelunasan kasbon langsung ke pemilik
+ */
+export const createOwnerCreditPayment = async (customerId: string,
+    ownerCreditPaymentInput: OwnerCreditPaymentInput, options?: Parameters<typeof customFetch>[1]): Promise<OwnerCustomer> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<OwnerCustomer>(getCreateOwnerCreditPaymentUrl(customerId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(ownerCreditPaymentInput)
+  }
+);}
+
+
+
+
+
+export const getCreateOwnerCreditPaymentMutationKey = () => ['createOwnerCreditPayment'] as const;
+
+export const getCreateOwnerCreditPaymentMutationOptions = <TError = ErrorType<UnauthorizedResponse | NotFoundResponse | IdTakenResponse | ValidationFailedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createOwnerCreditPayment>>, TError,CreateOwnerCreditPaymentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createOwnerCreditPayment>>, TError,CreateOwnerCreditPaymentMutationVariables, TContext> => {
+
+const mutationKey = getCreateOwnerCreditPaymentMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createOwnerCreditPayment>>, CreateOwnerCreditPaymentMutationVariables> = (props) => {
+          const {customerId,data} = props ?? {};
+
+          return  createOwnerCreditPayment(customerId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateOwnerCreditPaymentMutationResult = NonNullable<Awaited<ReturnType<typeof createOwnerCreditPayment>>>
+    export type CreateOwnerCreditPaymentMutationBody = OwnerCreditPaymentInput
+    export type CreateOwnerCreditPaymentMutationError = ErrorType<UnauthorizedResponse | NotFoundResponse | IdTakenResponse | ValidationFailedResponse>
+    export type CreateOwnerCreditPaymentMutationVariables = {customerId: string;data: OwnerCreditPaymentInput}
+
+    /**
+ * @summary Catat pelunasan kasbon langsung ke pemilik
+ */
+export const useCreateOwnerCreditPayment = <TError = ErrorType<UnauthorizedResponse | NotFoundResponse | IdTakenResponse | ValidationFailedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createOwnerCreditPayment>>, TError,CreateOwnerCreditPaymentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof createOwnerCreditPayment>>,
+        TError,
+        CreateOwnerCreditPaymentMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateOwnerCreditPaymentMutationOptions(options), queryClient);
+    }
+    export const getCancelOwnerCreditPaymentUrl = (paymentId: string,) => {
+
+
+
+
+  return `/api/owner/credit-payments/${paymentId}/cancel`
+}
+
+/**
+ * Pembatalan dari app pemilik tidak pernah mengoreksi laci: buku kasbon bertambah lagi sebesar
+ * amount (entri pembalik dengan paymentId sama), laci tidak dikoreksi, termasuk untuk
+ * pelunasan tunai jalur kasir (uang dikembalikan pemilik). Urutan pemeriksaan: id tidak dikenal
+ * → 404; sudah dibatalkan → 200 pelanggan apa adanya tanpa perubahan; reason kosong (setelah
+ * trim) atau > 200 karakter → 422 VALIDATION; pelunasan jalur kasir dari shift yang sedang buka
+ * → 409 IN_OPEN_SHIFT (batalkan dari kasir). Tercatat cancelledAt (jam server), pembatal,
+ * channel pemilik, dan alasan. Respons = pelanggan pemilik pelunasan itu.
+ * @summary Batalkan pelunasan dari app pemilik (alasan wajib)
+ */
+export const cancelOwnerCreditPayment = async (paymentId: string,
+    cancelCreditPaymentInput: CancelCreditPaymentInput, options?: Parameters<typeof customFetch>[1]): Promise<OwnerCustomer> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<OwnerCustomer>(getCancelOwnerCreditPaymentUrl(paymentId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(cancelCreditPaymentInput)
+  }
+);}
+
+
+
+
+
+export const getCancelOwnerCreditPaymentMutationKey = () => ['cancelOwnerCreditPayment'] as const;
+
+export const getCancelOwnerCreditPaymentMutationOptions = <TError = ErrorType<UnauthorizedResponse | NotFoundResponse | Problem | ValidationFailedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelOwnerCreditPayment>>, TError,CancelOwnerCreditPaymentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof cancelOwnerCreditPayment>>, TError,CancelOwnerCreditPaymentMutationVariables, TContext> => {
+
+const mutationKey = getCancelOwnerCreditPaymentMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cancelOwnerCreditPayment>>, CancelOwnerCreditPaymentMutationVariables> = (props) => {
+          const {paymentId,data} = props ?? {};
+
+          return  cancelOwnerCreditPayment(paymentId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CancelOwnerCreditPaymentMutationResult = NonNullable<Awaited<ReturnType<typeof cancelOwnerCreditPayment>>>
+    export type CancelOwnerCreditPaymentMutationBody = CancelCreditPaymentInput
+    export type CancelOwnerCreditPaymentMutationError = ErrorType<UnauthorizedResponse | NotFoundResponse | Problem | ValidationFailedResponse>
+    export type CancelOwnerCreditPaymentMutationVariables = {paymentId: string;data: CancelCreditPaymentInput}
+
+    /**
+ * @summary Batalkan pelunasan dari app pemilik (alasan wajib)
+ */
+export const useCancelOwnerCreditPayment = <TError = ErrorType<UnauthorizedResponse | NotFoundResponse | Problem | ValidationFailedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelOwnerCreditPayment>>, TError,CancelOwnerCreditPaymentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof cancelOwnerCreditPayment>>,
+        TError,
+        CancelOwnerCreditPaymentMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCancelOwnerCreditPaymentMutationOptions(options), queryClient);
     }

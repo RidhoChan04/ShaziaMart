@@ -18,6 +18,8 @@ const op = (path: string, method: string) =>
   block(block(LINES, path, 2), method, 4).join("\n");
 const schema = (name: string) =>
   block(block(LINES, "schemas", 2), name, 4).join("\n");
+const field = (name: string, prop: string) =>
+  block(block(block(LINES, "schemas", 2), name, 4), prop, 8).join("\n");
 // Teks deskripsi dilipat ke satu baris agar kalimat yang terpotong baris tetap cocok.
 const prose = (text: string) => text.replace(/\s+/g, " ");
 
@@ -178,6 +180,35 @@ test("teks kontrak untuk Go: StockMovement.at, tinjau sesi, pengaman selisih ter
 test("menipis staf tanpa angka stok (J7)", () => {
   expect(prose(op("/api/staff/low-stock", "get"))).toContain(
     "Tanpa angka sisa stok.",
+  );
+});
+
+test("K2/K3/K4: pelunasan kasir — laci, jumlah, idempoten", () => {
+  const create = prose(op("/api/credit-payments", "post"));
+  expect(create).toContain("tidak pernah masuk laci");
+  expect(create).toContain("maksimal sisa kasbon");
+  expect(create).toContain("id yang sama");
+});
+
+test("K5 (ruling R2): batal pelunasan kasir vs pemilik", () => {
+  expect(
+    prose(op("/api/credit-payments/{paymentId}/cancel", "post")),
+  ).toContain("shift yang sedang buka");
+  expect(
+    prose(op("/api/owner/credit-payments/{paymentId}/cancel", "post")),
+  ).toContain("laci tidak dikoreksi");
+});
+
+test("ShiftClosure.saleRefunds memuat rumus uang seharusnya lengkap (ruling R12)", () => {
+  const formula =
+    "expectedCash = openingCash + cashSales − supplierPayments + creditPayments − saleRefunds";
+  expect(prose(field("ShiftClosure", "saleRefunds"))).toContain(formula);
+  expect(prose(field("ShiftClosure", "supplierPayments"))).toContain(formula);
+});
+
+test("K6: umur kasbon dibulatkan ke atas", () => {
+  expect(prose(field("OwnerCustomerRow", "ageDays"))).toContain(
+    "pembulatan ke atas",
   );
 });
 

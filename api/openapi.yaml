@@ -6,7 +6,7 @@ info:
     Kontrak API kasir sembako. Sumber kebenaran tunggal untuk frontend dan backend.
     Semua uang dan jumlah berupa integer (rupiah utuh; qtyBase dalam satuan dasar pcs/gram/ml).
     Semua waktu berupa integer epoch milidetik UTC. Error memakai application/problem+json.
-    Autentikasi memakai cookie sesi kasir_session. Endpoint shift, sales, dan session
+    Autentikasi memakai cookie sesi kasir_session. Endpoint shift, sales, credit-payments, dan session
     memerlukan sesi; health, users, pin-login, settings, catalog, dan customers publik
     (satu PC di localhost).
 
@@ -407,6 +407,8 @@ paths:
       tags: [credit]
       operationId: searchCustomers
       summary: Cari pelanggan
+      description: |
+        Paling banyak 20 hasil. HPP dan laba tidak pernah ada di respons kasir.
       parameters:
         - name: q
           in: query
@@ -414,6 +416,12 @@ paths:
           description: Nama atau telepon
           schema:
             type: string
+        - name: owing
+          in: query
+          required: false
+          description: true = hanya pelanggan bersaldo kasbon > 0 (lembar Pelunasan kasbon); disaring sebelum batas 20 hasil, sehingga pelanggan berutang tidak tersembunyi oleh pelanggan lunas.
+          schema:
+            type: boolean
       responses:
         "200":
           description: Pelanggan
@@ -440,6 +448,151 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Customer"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+  /api/credit-payments:
+    post:
+      tags: [credit]
+      operationId: createCreditPayment
+      summary: Catat pelunasan kasbon di kasir
+      description: |
+        Satu skema pelunasan, dua jalur. Jalur kasir (channel kasir, endpoint ini): method hanya
+        tunai atau qris; perlu sesi kasir dan shift yang sedang buka (tanpa shift → 409
+        SHIFT_CLOSED); rekaman menyimpan shiftId shift itu. Hanya pelunasan tunai jalur kasir yang
+        masuk laci (ShiftClosure.creditPayments); QRIS tidak masuk laci. Uang pemilik (transfer/tunai
+        ke pemilik, jalur createOwnerCreditPayment) tidak pernah masuk laci.
+        Jumlah: bilangan bulat 1 ≤ amount ≤ saldo kasbon pelanggan (boleh sebagian, maksimal sisa
+        kasbon; lebih → 422 VALIDATION). Tunai: cashReceived wajib ≥ amount, change = cashReceived −
+        amount. QRIS: cashReceived null, disimpan cashReceived 0 dan change 0. balanceAfter = saldo
+        setelah pelunasan ini, disalin saat dicatat. Cicilan FIFO: pelunasan melunasi kasbon belum
+        lunas tertua dulu. createdAt = jam server (bukan dari body).
+        Idempoten menurut (pembuat, id); id global lintas jalur kasir dan pemilik. id yang sama milik
+        pengguna ini → 200 rekaman tersimpan apa adanya, tanpa entri buku kasbon atau laci kedua; id
+        sudah dipakai pengguna lain → 409 ID_TAKEN tanpa isi rekaman.
+        print = true → server mencetak struk pelunasan (bawaan klien = autoPrint toko): nama toko,
+        alamat, PELUNASAN KASBON, tanggal jam · Kasir, Pelanggan, Sisa sebelum, Dibayar (metode),
+        Sisa kasbon, (Tunai) Uang diterima dan Kembalian, lalu footer struk toko. Jalur pemilik tanpa
+        struk. Pelanggan tidak dikenal → 404.
+        HPP dan laba tidak pernah ada di respons kasir.
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/KasirCreditPaymentInput"
+      responses:
+        "200":
+          description: id sudah pernah disimpan pengguna ini; rekaman lama dikembalikan (replay)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KasirCreditPayment"
+        "201":
+          description: Pelunasan dicatat
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KasirCreditPayment"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: SHIFT_CLOSED (tanpa shift buka) atau ID_TAKEN (id milik pengguna lain)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+  /api/credit-payments/shift:
+    get:
+      tags: [credit]
+      operationId: listShiftCreditPayments
+      summary: Pelunasan jalur kasir di shift yang sedang buka, terbaru dulu
+      description: |
+        Shift yang sedang buka, bukan hari ini (shift bisa lewat tengah malam); termasuk yang
+        dibatalkan. Tanpa shift buka → []. HPP dan laba tidak pernah ada di respons kasir.
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Pelunasan shift ini
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/KasirCreditPayment"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/credit-payments/{paymentId}/print:
+    post:
+      tags: [credit]
+      operationId: printCreditPayment
+      summary: Cetak ulang struk pelunasan
+      description: |
+        Isi struk sama dengan createCreditPayment. Hanya pelunasan jalur kasir; id tidak dikenal atau
+        pelunasan jalur pemilik → 404. Klien menonaktifkan cetak ulang untuk pelunasan yang dibatalkan.
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PaymentId"
+      responses:
+        "200":
+          description: Hasil cetak
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PrintResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /api/credit-payments/{paymentId}/cancel:
+    post:
+      tags: [credit]
+      operationId: cancelCreditPayment
+      summary: Batalkan pelunasan di kasir (alasan wajib)
+      description: |
+        Kasir hanya boleh membatalkan pelunasan jalur kasir dari shift yang sedang buka; setelah shift
+        tutup, batal hanya dari app pemilik. Tanpa PIN pemilik; alasan wajib. Urutan pemeriksaan:
+        id tidak dikenal atau pelunasan jalur pemilik → 404; sudah dibatalkan → 200 rekaman apa
+        adanya tanpa perubahan; reason kosong (setelah trim) atau > 200 karakter → 422 VALIDATION;
+        tanpa shift buka → 409 SHIFT_CLOSED; shiftId pelunasan bukan shift yang sedang buka → 409
+        OUTSIDE_SHIFT. Berhasil: buku kasbon bertambah lagi sebesar amount (entri pembalik dengan
+        paymentId sama) dan, bila tunai, uang laci shift yang sedang buka berkurang sebesar amount
+        (ShiftClosure.creditPayments turun). Tercatat cancelledAt (jam server), pembatal (id + nama,
+        boleh beda dari pencatat), channel kasir, dan alasan; muncul di Perlu perhatian pemilik.
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PaymentId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CancelCreditPaymentInput"
+      responses:
+        "200":
+          description: Pelunasan dibatalkan (atau sudah dibatalkan sebelumnya)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KasirCreditPayment"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: SHIFT_CLOSED (tanpa shift buka) atau OUTSIDE_SHIFT (pelunasan dari shift lain)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
         "422":
           $ref: "#/components/responses/ValidationFailed"
   /api/owner/login:
@@ -1148,6 +1301,166 @@ paths:
           $ref: "#/components/responses/NotFound"
         "422":
           $ref: "#/components/responses/ValidationFailed"
+  /api/owner/customers:
+    get:
+      tags: [owner]
+      operationId: listOwnerCustomers
+      summary: Kasbon semua pelanggan
+      description: |
+        Semua pelanggan, urut saldo terbesar lalu nama (saldo < 0 "Lebih bayar" di akhir); UI
+        menyembunyikan saldo = 0 kecuali saat mencari. totalBalance, debtorCount, ages, dan
+        overdueCount hanya menjumlah pelanggan bersaldo > 0. ages selalu tepat 3 entri berurutan
+        hari_0_7, hari_8_30, lebih_30_hari, agar UI tidak menjumlah uang sendiri. overdueCount =
+        jumlah pelanggan kelompok lebih_30_hari (sama dengan Attention.overdueCredit.count).
+      security:
+        - ownerCookieAuth: []
+      responses:
+        "200":
+          description: Daftar kasbon
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnerCustomerList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/owner/customers/{customerId}:
+    get:
+      tags: [owner]
+      operationId: getOwnerCustomer
+      summary: Detail kasbon pelanggan beserta riwayat
+      security:
+        - ownerCookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CustomerId"
+      responses:
+        "200":
+          description: Detail pelanggan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnerCustomer"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /api/owner/customers/{customerId}/credit-limit:
+    put:
+      tags: [owner]
+      operationId: setOwnerCustomerCreditLimit
+      summary: Atur limit kasbon pelanggan
+      description: |
+        Limit = batas peringatan, bilangan bulat ≥ 0; boleh di bawah saldo sekarang (kasbon baru di
+        kasir yang melewati limit tetap boleh dengan alasan wajib).
+      security:
+        - ownerCookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CustomerId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreditLimitInput"
+      responses:
+        "200":
+          description: Limit disimpan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnerCustomer"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+  /api/owner/customers/{customerId}/payments:
+    post:
+      tags: [owner]
+      operationId: createOwnerCreditPayment
+      summary: Catat pelunasan kasbon langsung ke pemilik
+      description: |
+        Jalur pemilik (channel pemilik): method hanya transfer atau titip (tunai ke pemilik). Uang
+        pemilik tidak pernah masuk laci kasir: tanpa shift (shiftId null), tanpa baris laci, tanpa
+        struk. Jumlah: bilangan bulat 1 ≤ amount ≤ saldo kasbon (boleh sebagian, maksimal sisa
+        kasbon; lebih → 422 VALIDATION). Cicilan FIFO: melunasi kasbon belum lunas tertua dulu.
+        Waktu dari jam server.
+        Idempoten menurut (pembuat, id); id global lintas jalur kasir dan pemilik. id yang sama milik
+        pengguna ini → 200 pelanggan sekarang tanpa entri buku kedua; id sudah dipakai pengguna lain
+        → 409 ID_TAKEN.
+      security:
+        - ownerCookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CustomerId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OwnerCreditPaymentInput"
+      responses:
+        "200":
+          description: id sudah pernah disimpan pengguna ini (replay); pelanggan dikembalikan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnerCustomer"
+        "201":
+          description: Pelunasan dicatat
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnerCustomer"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/IdTaken"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+  /api/owner/credit-payments/{paymentId}/cancel:
+    post:
+      tags: [owner]
+      operationId: cancelOwnerCreditPayment
+      summary: Batalkan pelunasan dari app pemilik (alasan wajib)
+      description: |
+        Pembatalan dari app pemilik tidak pernah mengoreksi laci: buku kasbon bertambah lagi sebesar
+        amount (entri pembalik dengan paymentId sama), laci tidak dikoreksi, termasuk untuk
+        pelunasan tunai jalur kasir (uang dikembalikan pemilik). Urutan pemeriksaan: id tidak dikenal
+        → 404; sudah dibatalkan → 200 pelanggan apa adanya tanpa perubahan; reason kosong (setelah
+        trim) atau > 200 karakter → 422 VALIDATION; pelunasan jalur kasir dari shift yang sedang buka
+        → 409 IN_OPEN_SHIFT (batalkan dari kasir). Tercatat cancelledAt (jam server), pembatal,
+        channel pemilik, dan alasan. Respons = pelanggan pemilik pelunasan itu.
+      security:
+        - ownerCookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PaymentId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CancelCreditPaymentInput"
+      responses:
+        "200":
+          description: Pelunasan dibatalkan (atau sudah dibatalkan sebelumnya)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnerCustomer"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: IN_OPEN_SHIFT — pelunasan kasir di shift yang masih buka
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
   /api/staff/users:
     get:
       tags: [staff]
@@ -1830,6 +2143,18 @@ components:
       required: true
       schema:
         type: string
+    CustomerId:
+      name: customerId
+      in: path
+      required: true
+      schema:
+        type: string
+    PaymentId:
+      name: paymentId
+      in: path
+      required: true
+      schema:
+        type: string
   securitySchemes:
     cookieAuth:
       type: apiKey
@@ -1992,6 +2317,8 @@ components:
         - DEBT_ALREADY_PAID
         - ID_TAKEN
         - OPNAME_NOT_HELD
+        - OUTSIDE_SHIFT
+        - IN_OPEN_SHIFT
     Problem:
       type: object
       required: [type, title, status, code]
@@ -2328,7 +2655,7 @@ components:
           minimum: 0
     ShiftClosure:
       type: object
-      required: [shiftId, openingCash, cashSales, supplierPayments, expectedCash, countedCash, difference, salesCount]
+      required: [shiftId, openingCash, cashSales, supplierPayments, creditPayments, saleRefunds, expectedCash, countedCash, difference, salesCount]
       properties:
         shiftId:
           type: string
@@ -2338,7 +2665,19 @@ components:
           type: integer
         supplierPayments:
           type: integer
-          description: Σ uang keluar ke supplier di shift ini, bertanda; expectedCash = openingCash + cashSales − supplierPayments
+          description: Σ uang keluar ke supplier di shift ini, bertanda; expectedCash = openingCash + cashSales − supplierPayments + creditPayments − saleRefunds
+        creditPayments:
+          type: integer
+          description: |
+            Σ pelunasan kasbon tunai jalur kasir di shift ini, dikurangi pelunasan tunai shift ini yang
+            dibatalkan kasir; tidak pernah negatif. QRIS dan uang pemilik (transfer/tunai ke pemilik)
+            tidak masuk laci.
+        saleRefunds:
+          type: integer
+          description: |
+            Σ bagian tunai transaksi dari shift yang sudah tutup yang dibatalkan kasir di shift ini
+            (uang keluar dari laci shift ini; shift lama tidak diubah). expectedCash = openingCash +
+            cashSales − supplierPayments + creditPayments − saleRefunds
         expectedCash:
           type: integer
         countedCash:
@@ -3085,6 +3424,274 @@ components:
         phone:
           type: string
           pattern: '^\d{8,15}$'
+    CreditPaymentMethod:
+      type: string
+      description: tunai dan qris hanya jalur kasir; transfer dan titip (tunai ke pemilik) hanya jalur pemilik.
+      enum: [tunai, qris, transfer, titip]
+    CreditPaymentChannel:
+      type: string
+      description: kasir = dicatat di kasir (hanya tunai masuk laci); pemilik = langsung ke pemilik (tidak pernah masuk laci).
+      enum: [kasir, pemilik]
+    CreditAge:
+      type: string
+      description: Kelompok umur kasbon belum lunas tertua — 0–7 hari, 8–30 hari, lebih dari 30 hari.
+      enum: [hari_0_7, hari_8_30, lebih_30_hari]
+    KasirCreditPaymentInput:
+      type: object
+      required: [id, customerId, amount, method, cashReceived, print]
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: ID dari klien (idempotensi per pembuat); id yang sama mengembalikan rekaman lama dengan 200.
+        customerId:
+          type: string
+        amount:
+          type: integer
+          minimum: 1
+          description: 1 ≤ amount ≤ saldo kasbon pelanggan (boleh sebagian).
+        method:
+          type: string
+          enum: [tunai, qris]
+        cashReceived:
+          type: integer
+          nullable: true
+          description: Tunai wajib ≥ amount; QRIS null.
+        print:
+          type: boolean
+          description: Cetak struk pelunasan; bawaan klien = autoPrint toko.
+    KasirCreditPayment:
+      type: object
+      description: Pelunasan jalur kasir; hanya key ini (tanpa HPP, laba, atau data pembatalan).
+      required: [id, customerId, customerName, amount, method, cashReceived, change, balanceAfter, createdAt, kasirName, shiftId, status, printStatus]
+      properties:
+        id:
+          type: string
+        customerId:
+          type: string
+        customerName:
+          type: string
+        amount:
+          type: integer
+        method:
+          type: string
+          enum: [tunai, qris]
+        cashReceived:
+          type: integer
+          description: Uang tunai diterima; 0 untuk QRIS.
+        change:
+          type: integer
+          description: Kembalian = cashReceived − amount; 0 untuk QRIS.
+        balanceAfter:
+          type: integer
+          description: Sisa kasbon setelah pelunasan ini, disalin saat dicatat (tidak berubah bila dibatalkan).
+        createdAt:
+          type: integer
+          format: int64
+          description: Jam server saat dicatat (epoch ms UTC).
+        kasirName:
+          type: string
+        shiftId:
+          type: string
+        status:
+          type: string
+          enum: [aktif, dibatalkan]
+        printStatus:
+          $ref: "#/components/schemas/PrintStatus"
+    CancelCreditPaymentInput:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: Alasan pembatalan, wajib (1..200 karakter setelah trim); tanpa PIN pemilik.
+    OwnerCreditPaymentInput:
+      type: object
+      required: [id, amount, method]
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: ID dari klien (idempotensi per pembuat).
+        amount:
+          type: integer
+          minimum: 1
+          description: 1 ≤ amount ≤ saldo kasbon pelanggan (boleh sebagian).
+        method:
+          type: string
+          enum: [transfer, titip]
+    CreditLimitInput:
+      type: object
+      required: [creditLimit]
+      properties:
+        creditLimit:
+          type: integer
+          minimum: 0
+          description: Batas peringatan kasbon (rupiah); boleh di bawah saldo sekarang.
+    OwnerCustomerRow:
+      type: object
+      required: [id, name, phone, balance, creditLimit, oldestUnpaidAt, ageDays, age]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        phone:
+          type: string
+        balance:
+          type: integer
+          description: Saldo kasbon = Σ buku kasbon; < 0 = Lebih bayar (tidak dihitung sebagai utang).
+        creditLimit:
+          type: integer
+        oldestUnpaidAt:
+          type: integer
+          format: int64
+          nullable: true
+          description: |
+            Waktu kasbon belum lunas tertua menurut FIFO (pelunasan melunasi kasbon tertua dulu;
+            pembalik batal pelunasan dikenali); null iff balance ≤ 0.
+        ageDays:
+          type: integer
+          nullable: true
+          description: |
+            ageDays = ceil((now − oldestUnpaidAt) / 86.400.000), pembulatan ke atas ke hari penuh; null
+            iff balance ≤ 0. Setara dengan aturan Beranda (now − oldestUnpaidAt > 30 hari ⇔ ageDays >
+            30), sehingga angka hari, kelompok, dan butir Kasbon > 30 hari selalu sepakat.
+        age:
+          nullable: true
+          description: |
+            Dari ageDays: > 30 → lebih_30_hari, ≥ 8 → hari_8_30, selain itu hari_0_7; null iff
+            balance ≤ 0.
+          allOf:
+            - $ref: "#/components/schemas/CreditAge"
+    CreditAgeSummary:
+      type: object
+      required: [age, count, total]
+      properties:
+        age:
+          $ref: "#/components/schemas/CreditAge"
+        count:
+          type: integer
+          description: Jumlah pelanggan bersaldo > 0 di kelompok ini.
+        total:
+          type: integer
+          description: Σ saldo pelanggan tersebut (rupiah).
+    OwnerCustomerList:
+      type: object
+      required: [customers, totalBalance, debtorCount, ages, overdueCount]
+      properties:
+        customers:
+          type: array
+          description: Semua pelanggan, urut saldo terbesar lalu nama.
+          items:
+            $ref: "#/components/schemas/OwnerCustomerRow"
+        totalBalance:
+          type: integer
+          description: Σ saldo > 0 (Lebih bayar tidak mengurangi).
+        debtorCount:
+          type: integer
+          description: Jumlah pelanggan bersaldo > 0.
+        ages:
+          type: array
+          description: Tepat 3 entri, urut hari_0_7, hari_8_30, lebih_30_hari; hanya saldo > 0.
+          minItems: 3
+          maxItems: 3
+          items:
+            $ref: "#/components/schemas/CreditAgeSummary"
+        overdueCount:
+          type: integer
+          description: Jumlah pelanggan kelompok lebih_30_hari.
+    CreditPaymentInfo:
+      type: object
+      required: [id, channel, method, byName, cashReceived, change, inOpenShift]
+      properties:
+        id:
+          type: string
+          description: paymentId (dipakai cancelOwnerCreditPayment).
+        channel:
+          $ref: "#/components/schemas/CreditPaymentChannel"
+        method:
+          $ref: "#/components/schemas/CreditPaymentMethod"
+        byName:
+          type: string
+          description: Nama pencatat (kasir atau pemilik).
+        cashReceived:
+          type: integer
+          description: Jalur kasir tunai; selain itu 0.
+        change:
+          type: integer
+          description: Jalur kasir tunai; selain itu 0.
+        inOpenShift:
+          type: boolean
+          description: Jalur kasir dari shift yang sedang buka → pemilik tidak bisa membatalkan (batalkan dari kasir).
+    CreditCancel:
+      type: object
+      required: [at, byName, reason, channel]
+      properties:
+        at:
+          type: integer
+          format: int64
+          description: Jam server saat dibatalkan (epoch ms UTC).
+        byName:
+          type: string
+          description: Nama pembatal (boleh beda dari pencatat).
+        reason:
+          type: string
+        channel:
+          $ref: "#/components/schemas/CreditPaymentChannel"
+    CreditHistoryEntry:
+      type: object
+      description: |
+        Satu baris riwayat pelanggan; pembalik dilipat ke barisnya (cancelled). Kasbon: saleId,
+        saleNumber, dan kasirName dari penjualan (null untuk kasbon seed tanpa struk), payment null;
+        batal kasbon karena batal transaksi memakai data pembatalan penjualannya. Pelunasan: payment
+        terisi, saleId/saleNumber/kasirName null.
+      required: [id, at, kind, amount, saleId, saleNumber, kasirName, payment, cancelled]
+      properties:
+        id:
+          type: string
+        at:
+          type: integer
+          format: int64
+        kind:
+          type: string
+          enum: [kasbon, pelunasan]
+        amount:
+          type: integer
+          minimum: 1
+        saleId:
+          type: string
+          nullable: true
+        saleNumber:
+          type: string
+          nullable: true
+        kasirName:
+          type: string
+          nullable: true
+        payment:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/CreditPaymentInfo"
+        cancelled:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/CreditCancel"
+    OwnerCustomer:
+      description: Detail kasbon pelanggan untuk pemilik.
+      allOf:
+        - $ref: "#/components/schemas/OwnerCustomerRow"
+        - type: object
+          required: [history]
+          properties:
+            history:
+              type: array
+              description: Terbaru dulu.
+              items:
+                $ref: "#/components/schemas/CreditHistoryEntry"
     StaffUnit:
       type: object
       description: Satuan barang untuk orang toko; tanpa harga jual, modal, dan stok.

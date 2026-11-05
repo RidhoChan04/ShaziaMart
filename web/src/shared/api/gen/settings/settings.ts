@@ -5,7 +5,7 @@
  * Kontrak API kasir sembako. Sumber kebenaran tunggal untuk frontend dan backend.
  * Semua uang dan jumlah berupa integer (rupiah utuh; qtyBase dalam satuan dasar pcs/gram/ml).
  * Semua waktu berupa integer epoch milidetik UTC. Error memakai application/problem+json.
- * Autentikasi memakai cookie sesi kasir_session. Endpoint shift, sales, dan session
+ * Autentikasi memakai cookie sesi kasir_session. Endpoint shift, sales, credit-payments, dan session
  * memerlukan sesi; health, users, pin-login, settings, catalog, dan customers publik
  * (satu PC di localhost).
  *

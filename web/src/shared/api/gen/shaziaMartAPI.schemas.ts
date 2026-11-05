@@ -5,7 +5,7 @@
  * Kontrak API kasir sembako. Sumber kebenaran tunggal untuk frontend dan backend.
  * Semua uang dan jumlah berupa integer (rupiah utuh; qtyBase dalam satuan dasar pcs/gram/ml).
  * Semua waktu berupa integer epoch milidetik UTC. Error memakai application/problem+json.
- * Autentikasi memakai cookie sesi kasir_session. Endpoint shift, sales, dan session
+ * Autentikasi memakai cookie sesi kasir_session. Endpoint shift, sales, credit-payments, dan session
  * memerlukan sesi; health, users, pin-login, settings, catalog, dan customers publik
  * (satu PC di localhost).
  *
@@ -76,6 +76,8 @@ export const ErrorCode = {
   DEBT_ALREADY_PAID: 'DEBT_ALREADY_PAID',
   ID_TAKEN: 'ID_TAKEN',
   OPNAME_NOT_HELD: 'OPNAME_NOT_HELD',
+  OUTSIDE_SHIFT: 'OUTSIDE_SHIFT',
+  IN_OPEN_SHIFT: 'IN_OPEN_SHIFT',
 } as const;
 
 export interface Problem {
@@ -395,8 +397,20 @@ export interface ShiftClosure {
   shiftId: string;
   openingCash: number;
   cashSales: number;
-  /** Σ uang keluar ke supplier di shift ini, bertanda; expectedCash = openingCash + cashSales − supplierPayments */
+  /** Σ uang keluar ke supplier di shift ini, bertanda; expectedCash = openingCash + cashSales − supplierPayments + creditPayments − saleRefunds */
   supplierPayments: number;
+  /**
+     * Σ pelunasan kasbon tunai jalur kasir di shift ini, dikurangi pelunasan tunai shift ini yang
+     * dibatalkan kasir; tidak pernah negatif. QRIS dan uang pemilik (transfer/tunai ke pemilik)
+     * tidak masuk laci.
+     */
+  creditPayments: number;
+  /**
+     * Σ bagian tunai transaksi dari shift yang sudah tutup yang dibatalkan kasir di shift ini
+     * (uang keluar dari laci shift ini; shift lama tidak diubah). expectedCash = openingCash +
+     * cashSales − supplierPayments + creditPayments − saleRefunds
+     */
+  saleRefunds: number;
   expectedCash: number;
   countedCash: number;
   difference: number;
@@ -1055,6 +1069,266 @@ export interface NewCustomer {
   /** @pattern ^\d{8,15}$ */
   phone: string;
 }
+
+/**
+ * tunai dan qris hanya jalur kasir; transfer dan titip (tunai ke pemilik) hanya jalur pemilik.
+ */
+export type CreditPaymentMethod = typeof CreditPaymentMethod[keyof typeof CreditPaymentMethod];
+
+
+export const CreditPaymentMethod = {
+  tunai: 'tunai',
+  qris: 'qris',
+  transfer: 'transfer',
+  titip: 'titip',
+} as const;
+
+/**
+ * kasir = dicatat di kasir (hanya tunai masuk laci); pemilik = langsung ke pemilik (tidak pernah masuk laci).
+ */
+export type CreditPaymentChannel = typeof CreditPaymentChannel[keyof typeof CreditPaymentChannel];
+
+
+export const CreditPaymentChannel = {
+  kasir: 'kasir',
+  pemilik: 'pemilik',
+} as const;
+
+/**
+ * Kelompok umur kasbon belum lunas tertua — 0–7 hari, 8–30 hari, lebih dari 30 hari.
+ */
+export type CreditAge = typeof CreditAge[keyof typeof CreditAge];
+
+
+export const CreditAge = {
+  hari_0_7: 'hari_0_7',
+  hari_8_30: 'hari_8_30',
+  lebih_30_hari: 'lebih_30_hari',
+} as const;
+
+export type KasirCreditPaymentInputMethod = typeof KasirCreditPaymentInputMethod[keyof typeof KasirCreditPaymentInputMethod];
+
+
+export const KasirCreditPaymentInputMethod = {
+  tunai: 'tunai',
+  qris: 'qris',
+} as const;
+
+export interface KasirCreditPaymentInput {
+  /**
+     * ID dari klien (idempotensi per pembuat); id yang sama mengembalikan rekaman lama dengan 200.
+     * @minLength 1
+     * @maxLength 64
+     */
+  id: string;
+  customerId: string;
+  /**
+     * 1 ≤ amount ≤ saldo kasbon pelanggan (boleh sebagian).
+     * @minimum 1
+     */
+  amount: number;
+  method: KasirCreditPaymentInputMethod;
+  /**
+     * Tunai wajib ≥ amount; QRIS null.
+     * @nullable
+     */
+  cashReceived: number | null;
+  /** Cetak struk pelunasan; bawaan klien = autoPrint toko. */
+  print: boolean;
+}
+
+export type KasirCreditPaymentMethod = typeof KasirCreditPaymentMethod[keyof typeof KasirCreditPaymentMethod];
+
+
+export const KasirCreditPaymentMethod = {
+  tunai: 'tunai',
+  qris: 'qris',
+} as const;
+
+export type KasirCreditPaymentStatus = typeof KasirCreditPaymentStatus[keyof typeof KasirCreditPaymentStatus];
+
+
+export const KasirCreditPaymentStatus = {
+  aktif: 'aktif',
+  dibatalkan: 'dibatalkan',
+} as const;
+
+/**
+ * Pelunasan jalur kasir; hanya key ini (tanpa HPP, laba, atau data pembatalan).
+ */
+export interface KasirCreditPayment {
+  id: string;
+  customerId: string;
+  customerName: string;
+  amount: number;
+  method: KasirCreditPaymentMethod;
+  /** Uang tunai diterima; 0 untuk QRIS. */
+  cashReceived: number;
+  /** Kembalian = cashReceived − amount; 0 untuk QRIS. */
+  change: number;
+  /** Sisa kasbon setelah pelunasan ini, disalin saat dicatat (tidak berubah bila dibatalkan). */
+  balanceAfter: number;
+  /** Jam server saat dicatat (epoch ms UTC). */
+  createdAt: number;
+  kasirName: string;
+  shiftId: string;
+  status: KasirCreditPaymentStatus;
+  printStatus: PrintStatus;
+}
+
+export interface CancelCreditPaymentInput {
+  /**
+     * Alasan pembatalan, wajib (1..200 karakter setelah trim); tanpa PIN pemilik.
+     * @minLength 1
+     * @maxLength 200
+     */
+  reason: string;
+}
+
+export type OwnerCreditPaymentInputMethod = typeof OwnerCreditPaymentInputMethod[keyof typeof OwnerCreditPaymentInputMethod];
+
+
+export const OwnerCreditPaymentInputMethod = {
+  transfer: 'transfer',
+  titip: 'titip',
+} as const;
+
+export interface OwnerCreditPaymentInput {
+  /**
+     * ID dari klien (idempotensi per pembuat).
+     * @minLength 1
+     * @maxLength 64
+     */
+  id: string;
+  /**
+     * 1 ≤ amount ≤ saldo kasbon pelanggan (boleh sebagian).
+     * @minimum 1
+     */
+  amount: number;
+  method: OwnerCreditPaymentInputMethod;
+}
+
+export interface CreditLimitInput {
+  /**
+     * Batas peringatan kasbon (rupiah); boleh di bawah saldo sekarang.
+     * @minimum 0
+     */
+  creditLimit: number;
+}
+
+export interface OwnerCustomerRow {
+  id: string;
+  name: string;
+  phone: string;
+  /** Saldo kasbon = Σ buku kasbon; < 0 = Lebih bayar (tidak dihitung sebagai utang). */
+  balance: number;
+  creditLimit: number;
+  /**
+     * Waktu kasbon belum lunas tertua menurut FIFO (pelunasan melunasi kasbon tertua dulu;
+     * pembalik batal pelunasan dikenali); null iff balance ≤ 0.
+     * @nullable
+     */
+  oldestUnpaidAt: number | null;
+  /**
+     * ageDays = ceil((now − oldestUnpaidAt) / 86.400.000), pembulatan ke atas ke hari penuh; null
+     * iff balance ≤ 0. Setara dengan aturan Beranda (now − oldestUnpaidAt > 30 hari ⇔ ageDays >
+     * 30), sehingga angka hari, kelompok, dan butir Kasbon > 30 hari selalu sepakat.
+     * @nullable
+     */
+  ageDays: number | null;
+  /**
+     * Dari ageDays: > 30 → lebih_30_hari, ≥ 8 → hari_8_30, selain itu hari_0_7; null iff
+     * balance ≤ 0.
+     */
+  age: CreditAge | null;
+}
+
+export interface CreditAgeSummary {
+  age: CreditAge;
+  /** Jumlah pelanggan bersaldo > 0 di kelompok ini. */
+  count: number;
+  /** Σ saldo pelanggan tersebut (rupiah). */
+  total: number;
+}
+
+export interface OwnerCustomerList {
+  /** Semua pelanggan, urut saldo terbesar lalu nama. */
+  customers: OwnerCustomerRow[];
+  /** Σ saldo > 0 (Lebih bayar tidak mengurangi). */
+  totalBalance: number;
+  /** Jumlah pelanggan bersaldo > 0. */
+  debtorCount: number;
+  /**
+     * Tepat 3 entri, urut hari_0_7, hari_8_30, lebih_30_hari; hanya saldo > 0.
+     * @minItems 3
+     * @maxItems 3
+     */
+  ages: CreditAgeSummary[];
+  /** Jumlah pelanggan kelompok lebih_30_hari. */
+  overdueCount: number;
+}
+
+export interface CreditPaymentInfo {
+  /** paymentId (dipakai cancelOwnerCreditPayment). */
+  id: string;
+  channel: CreditPaymentChannel;
+  method: CreditPaymentMethod;
+  /** Nama pencatat (kasir atau pemilik). */
+  byName: string;
+  /** Jalur kasir tunai; selain itu 0. */
+  cashReceived: number;
+  /** Jalur kasir tunai; selain itu 0. */
+  change: number;
+  /** Jalur kasir dari shift yang sedang buka → pemilik tidak bisa membatalkan (batalkan dari kasir). */
+  inOpenShift: boolean;
+}
+
+export interface CreditCancel {
+  /** Jam server saat dibatalkan (epoch ms UTC). */
+  at: number;
+  /** Nama pembatal (boleh beda dari pencatat). */
+  byName: string;
+  reason: string;
+  channel: CreditPaymentChannel;
+}
+
+export type CreditHistoryEntryKind = typeof CreditHistoryEntryKind[keyof typeof CreditHistoryEntryKind];
+
+
+export const CreditHistoryEntryKind = {
+  kasbon: 'kasbon',
+  pelunasan: 'pelunasan',
+} as const;
+
+/**
+ * Satu baris riwayat pelanggan; pembalik dilipat ke barisnya (cancelled). Kasbon: saleId,
+ * saleNumber, dan kasirName dari penjualan (null untuk kasbon seed tanpa struk), payment null;
+ * batal kasbon karena batal transaksi memakai data pembatalan penjualannya. Pelunasan: payment
+ * terisi, saleId/saleNumber/kasirName null.
+ */
+export interface CreditHistoryEntry {
+  id: string;
+  at: number;
+  kind: CreditHistoryEntryKind;
+  /** @minimum 1 */
+  amount: number;
+  /** @nullable */
+  saleId: string | null;
+  /** @nullable */
+  saleNumber: string | null;
+  /** @nullable */
+  kasirName: string | null;
+  payment: CreditPaymentInfo | null;
+  cancelled: CreditCancel | null;
+}
+
+/**
+ * Detail kasbon pelanggan untuk pemilik.
+ */
+export type OwnerCustomer = OwnerCustomerRow & {
+  /** Terbaru dulu. */
+  history: CreditHistoryEntry[];
+};
 
 /**
  * Satuan barang untuk orang toko; tanpa harga jual, modal, dan stok.
@@ -2083,6 +2357,10 @@ export type SearchCustomersParams = {
  * Nama atau telepon
  */
 q?: string;
+/**
+ * true = hanya pelanggan bersaldo kasbon > 0 (lembar Pelunasan kasbon); disaring sebelum batas 20 hasil, sehingga pelanggan berutang tidak tersembunyi oleh pelanggan lunas.
+ */
+owing?: boolean;
 };
 
 export type SearchStaffProductsParams = {

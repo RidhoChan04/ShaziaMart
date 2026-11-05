@@ -5,7 +5,7 @@
  * Kontrak API kasir sembako. Sumber kebenaran tunggal untuk frontend dan backend.
  * Semua uang dan jumlah berupa integer (rupiah utuh; qtyBase dalam satuan dasar pcs/gram/ml).
  * Semua waktu berupa integer epoch milidetik UTC. Error memakai application/problem+json.
- * Autentikasi memakai cookie sesi kasir_session. Endpoint shift, sales, dan session
+ * Autentikasi memakai cookie sesi kasir_session. Endpoint shift, sales, credit-payments, dan session
  * memerlukan sesi; health, users, pin-login, settings, catalog, dan customers publik
  * (satu PC di localhost).
  *
@@ -32,10 +32,12 @@ import * as zod from 'zod';
 
 
 /**
+ * Paling banyak 20 hasil. HPP dan laba tidak pernah ada di respons kasir.
  * @summary Cari pelanggan
  */
 export const SearchCustomersQueryParams = zod.object({
-  "q": zod.string().optional().describe('Nama atau telepon')
+  "q": zod.string().optional().describe('Nama atau telepon'),
+  "owing": zod.boolean().optional().describe('true = hanya pelanggan bersaldo kasbon > 0 (lembar Pelunasan kasbon); disaring sebelum batas 20 hasil, sehingga pelanggan berutang tidak tersembunyi oleh pelanggan lunas.')
 })
 
 export const SearchCustomersResponseItem = zod.object({
@@ -67,4 +69,130 @@ export const CreateCustomerResponse = zod.object({
   "balance": zod.int(),
   "creditLimit": zod.int()
 })
+
+/**
+ * Satu skema pelunasan, dua jalur. Jalur kasir (channel kasir, endpoint ini): method hanya
+ * tunai atau qris; perlu sesi kasir dan shift yang sedang buka (tanpa shift → 409
+ * SHIFT_CLOSED); rekaman menyimpan shiftId shift itu. Hanya pelunasan tunai jalur kasir yang
+ * masuk laci (ShiftClosure.creditPayments); QRIS tidak masuk laci. Uang pemilik (transfer/tunai
+ * ke pemilik, jalur createOwnerCreditPayment) tidak pernah masuk laci.
+ * Jumlah: bilangan bulat 1 ≤ amount ≤ saldo kasbon pelanggan (boleh sebagian, maksimal sisa
+ * kasbon; lebih → 422 VALIDATION). Tunai: cashReceived wajib ≥ amount, change = cashReceived −
+ * amount. QRIS: cashReceived null, disimpan cashReceived 0 dan change 0. balanceAfter = saldo
+ * setelah pelunasan ini, disalin saat dicatat. Cicilan FIFO: pelunasan melunasi kasbon belum
+ * lunas tertua dulu. createdAt = jam server (bukan dari body).
+ * Idempoten menurut (pembuat, id); id global lintas jalur kasir dan pemilik. id yang sama milik
+ * pengguna ini → 200 rekaman tersimpan apa adanya, tanpa entri buku kasbon atau laci kedua; id
+ * sudah dipakai pengguna lain → 409 ID_TAKEN tanpa isi rekaman.
+ * print = true → server mencetak struk pelunasan (bawaan klien = autoPrint toko): nama toko,
+ * alamat, PELUNASAN KASBON, tanggal jam · Kasir, Pelanggan, Sisa sebelum, Dibayar (metode),
+ * Sisa kasbon, (Tunai) Uang diterima dan Kembalian, lalu footer struk toko. Jalur pemilik tanpa
+ * struk. Pelanggan tidak dikenal → 404.
+ * HPP dan laba tidak pernah ada di respons kasir.
+ * @summary Catat pelunasan kasbon di kasir
+ */
+export const createCreditPaymentBodyIdMax = 64;
+
+
+
+
+export const CreateCreditPaymentBody = zod.object({
+  "id": zod.string().min(1).max(createCreditPaymentBodyIdMax).describe('ID dari klien (idempotensi per pembuat); id yang sama mengembalikan rekaman lama dengan 200.'),
+  "customerId": zod.string(),
+  "amount": zod.int().min(1).describe('1 ≤ amount ≤ saldo kasbon pelanggan (boleh sebagian).'),
+  "method": zod.enum(['tunai', 'qris']),
+  "cashReceived": zod.int().nullable().describe('Tunai wajib ≥ amount; QRIS null.'),
+  "print": zod.boolean().describe('Cetak struk pelunasan; bawaan klien = autoPrint toko.')
+})
+
+export const CreateCreditPaymentResponse = zod.object({
+  "id": zod.string(),
+  "customerId": zod.string(),
+  "customerName": zod.string(),
+  "amount": zod.int(),
+  "method": zod.enum(['tunai', 'qris']),
+  "cashReceived": zod.int().describe('Uang tunai diterima; 0 untuk QRIS.'),
+  "change": zod.int().describe('Kembalian = cashReceived − amount; 0 untuk QRIS.'),
+  "balanceAfter": zod.int().describe('Sisa kasbon setelah pelunasan ini, disalin saat dicatat (tidak berubah bila dibatalkan).'),
+  "createdAt": zod.int().describe('Jam server saat dicatat (epoch ms UTC).'),
+  "kasirName": zod.string(),
+  "shiftId": zod.string(),
+  "status": zod.enum(['aktif', 'dibatalkan']),
+  "printStatus": zod.enum(['tercetak', 'tidak_dicetak', 'gagal'])
+}).describe('Pelunasan jalur kasir; hanya key ini (tanpa HPP, laba, atau data pembatalan).')
+
+/**
+ * Shift yang sedang buka, bukan hari ini (shift bisa lewat tengah malam); termasuk yang
+ * dibatalkan. Tanpa shift buka → []. HPP dan laba tidak pernah ada di respons kasir.
+ * @summary Pelunasan jalur kasir di shift yang sedang buka, terbaru dulu
+ */
+export const ListShiftCreditPaymentsResponseItem = zod.object({
+  "id": zod.string(),
+  "customerId": zod.string(),
+  "customerName": zod.string(),
+  "amount": zod.int(),
+  "method": zod.enum(['tunai', 'qris']),
+  "cashReceived": zod.int().describe('Uang tunai diterima; 0 untuk QRIS.'),
+  "change": zod.int().describe('Kembalian = cashReceived − amount; 0 untuk QRIS.'),
+  "balanceAfter": zod.int().describe('Sisa kasbon setelah pelunasan ini, disalin saat dicatat (tidak berubah bila dibatalkan).'),
+  "createdAt": zod.int().describe('Jam server saat dicatat (epoch ms UTC).'),
+  "kasirName": zod.string(),
+  "shiftId": zod.string(),
+  "status": zod.enum(['aktif', 'dibatalkan']),
+  "printStatus": zod.enum(['tercetak', 'tidak_dicetak', 'gagal'])
+}).describe('Pelunasan jalur kasir; hanya key ini (tanpa HPP, laba, atau data pembatalan).')
+export const ListShiftCreditPaymentsResponse = zod.array(ListShiftCreditPaymentsResponseItem)
+
+/**
+ * Isi struk sama dengan createCreditPayment. Hanya pelunasan jalur kasir; id tidak dikenal atau
+ * pelunasan jalur pemilik → 404. Klien menonaktifkan cetak ulang untuk pelunasan yang dibatalkan.
+ * @summary Cetak ulang struk pelunasan
+ */
+export const PrintCreditPaymentParams = zod.object({
+  "paymentId": zod.string()
+})
+
+export const PrintCreditPaymentResponse = zod.object({
+  "printStatus": zod.enum(['tercetak', 'tidak_dicetak', 'gagal'])
+})
+
+/**
+ * Kasir hanya boleh membatalkan pelunasan jalur kasir dari shift yang sedang buka; setelah shift
+ * tutup, batal hanya dari app pemilik. Tanpa PIN pemilik; alasan wajib. Urutan pemeriksaan:
+ * id tidak dikenal atau pelunasan jalur pemilik → 404; sudah dibatalkan → 200 rekaman apa
+ * adanya tanpa perubahan; reason kosong (setelah trim) atau > 200 karakter → 422 VALIDATION;
+ * tanpa shift buka → 409 SHIFT_CLOSED; shiftId pelunasan bukan shift yang sedang buka → 409
+ * OUTSIDE_SHIFT. Berhasil: buku kasbon bertambah lagi sebesar amount (entri pembalik dengan
+ * paymentId sama) dan, bila tunai, uang laci shift yang sedang buka berkurang sebesar amount
+ * (ShiftClosure.creditPayments turun). Tercatat cancelledAt (jam server), pembatal (id + nama,
+ * boleh beda dari pencatat), channel kasir, dan alasan; muncul di Perlu perhatian pemilik.
+ * @summary Batalkan pelunasan di kasir (alasan wajib)
+ */
+export const CancelCreditPaymentParams = zod.object({
+  "paymentId": zod.string()
+})
+
+export const cancelCreditPaymentBodyReasonMax = 200;
+
+
+
+export const CancelCreditPaymentBody = zod.object({
+  "reason": zod.string().min(1).max(cancelCreditPaymentBodyReasonMax).describe('Alasan pembatalan, wajib (1..200 karakter setelah trim); tanpa PIN pemilik.')
+})
+
+export const CancelCreditPaymentResponse = zod.object({
+  "id": zod.string(),
+  "customerId": zod.string(),
+  "customerName": zod.string(),
+  "amount": zod.int(),
+  "method": zod.enum(['tunai', 'qris']),
+  "cashReceived": zod.int().describe('Uang tunai diterima; 0 untuk QRIS.'),
+  "change": zod.int().describe('Kembalian = cashReceived − amount; 0 untuk QRIS.'),
+  "balanceAfter": zod.int().describe('Sisa kasbon setelah pelunasan ini, disalin saat dicatat (tidak berubah bila dibatalkan).'),
+  "createdAt": zod.int().describe('Jam server saat dicatat (epoch ms UTC).'),
+  "kasirName": zod.string(),
+  "shiftId": zod.string(),
+  "status": zod.enum(['aktif', 'dibatalkan']),
+  "printStatus": zod.enum(['tercetak', 'tidak_dicetak', 'gagal'])
+}).describe('Pelunasan jalur kasir; hanya key ini (tanpa HPP, laba, atau data pembatalan).')
 

@@ -5,7 +5,7 @@
  * Kontrak API kasir sembako. Sumber kebenaran tunggal untuk frontend dan backend.
  * Semua uang dan jumlah berupa integer (rupiah utuh; qtyBase dalam satuan dasar pcs/gram/ml).
  * Semua waktu berupa integer epoch milidetik UTC. Error memakai application/problem+json.
- * Autentikasi memakai cookie sesi kasir_session. Endpoint shift, sales, dan session
+ * Autentikasi memakai cookie sesi kasir_session. Endpoint shift, sales, credit-payments, dan session
  * memerlukan sesi; health, users, pin-login, settings, catalog, dan customers publik
  * (satu PC di localhost).
  *
@@ -79,7 +79,9 @@ export const CloseShiftResponse = zod.object({
   "shiftId": zod.string(),
   "openingCash": zod.int(),
   "cashSales": zod.int(),
-  "supplierPayments": zod.int().describe('Σ uang keluar ke supplier di shift ini, bertanda; expectedCash = openingCash + cashSales − supplierPayments'),
+  "supplierPayments": zod.int().describe('Σ uang keluar ke supplier di shift ini, bertanda; expectedCash = openingCash + cashSales − supplierPayments + creditPayments − saleRefunds'),
+  "creditPayments": zod.int().describe('Σ pelunasan kasbon tunai jalur kasir di shift ini, dikurangi pelunasan tunai shift ini yang\ndibatalkan kasir; tidak pernah negatif. QRIS dan uang pemilik (transfer/tunai ke pemilik)\ntidak masuk laci.\n'),
+  "saleRefunds": zod.int().describe('Σ bagian tunai transaksi dari shift yang sudah tutup yang dibatalkan kasir di shift ini\n(uang keluar dari laci shift ini; shift lama tidak diubah). expectedCash = openingCash +\ncashSales − supplierPayments + creditPayments − saleRefunds\n'),
   "expectedCash": zod.int(),
   "countedCash": zod.int(),
   "difference": zod.int(),

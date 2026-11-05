@@ -85,6 +85,8 @@ export const shiftHandlers = [
         openingCash: shift.openingCash,
         cashSales: shift.cashSales,
         supplierPayments,
+        creditPayments: 0,
+        saleRefunds: 0,
         expectedCash,
         countedCash,
         difference: countedCash - expectedCash,
