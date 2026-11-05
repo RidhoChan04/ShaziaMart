@@ -76,20 +76,21 @@ describe("buildSaleRequest", () => {
     expect(body.payments).toEqual([{ method: "qris", amount: 20000 }]);
     expect(body).not.toHaveProperty("cashReceived");
     expect(body).not.toHaveProperty("customerId");
-    expect(body).not.toHaveProperty("ownerPin");
+    expect(body).not.toHaveProperty("creditLimitReason");
   });
 
-  test("kasbon dengan PIN pemilik", () => {
+  test("kasbon lewat limit dengan alasan (ruling R3)", () => {
     fillSpecCart();
     const body = buildSaleRequest(
       useCart.getState(),
       { kind: "kasbon", customerId: "c1" },
       false,
-      "999999",
+      "hajatan",
     );
     expect(body.payments).toEqual([{ method: "credit", amount: 361500 }]);
     expect(body.customerId).toBe("c1");
-    expect(body.ownerPin).toBe("999999");
+    expect(body.creditLimitReason).toBe("hajatan");
+    expect(body).not.toHaveProperty("ownerPin");
     expect(body).not.toHaveProperty("cashReceived");
   });
 

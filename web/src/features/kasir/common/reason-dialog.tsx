@@ -1,0 +1,135 @@
+import { type ReactNode, type RefObject, useId, useRef, useState } from "react";
+import { useScanGuard } from "@/shared/hooks/use-scan-guard";
+import { Button } from "@/shared/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/shared/ui/dialog";
+import { Input } from "@/shared/ui/input";
+import { ScannedAlert } from "./scanned-alert";
+
+const REASON_MAX = 200;
+
+type Props = {
+  open: boolean;
+  title: string;
+  description: string;
+  confirmLabel: string;
+  pending: boolean;
+  error?: string | undefined;
+  onSubmit: (reason: string) => void;
+  onCancel: () => void;
+  /** (koreksi mockup M2) primary = hijau (kasbon lewat limit); danger = merah (batal). */
+  confirmTone: "primary" | "danger";
+  /** Isi tambahan di antara keterangan dan isian Alasan, mis. pilihan pengembalian QRIS. */
+  children?: ReactNode;
+};
+
+function ReasonForm({
+  confirmLabel,
+  confirmTone,
+  pending,
+  error,
+  onSubmit,
+  onCancel,
+  children,
+  inputRef,
+}: Omit<Props, "open" | "title" | "description"> & {
+  inputRef: RefObject<HTMLInputElement | null>;
+}) {
+  const id = useId();
+  const [reason, setReason] = useState("");
+  // Rentetan scanner + Enter di isian yang terfokus tidak boleh menjadi alasan (lalu terkirim).
+  const guard = useScanGuard(setReason);
+  const trimmed = reason.trim();
+  const ready = trimmed !== "" && !pending;
+
+  return (
+    <form
+      className="grid gap-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (ready) onSubmit(trimmed);
+      }}
+    >
+      {children}
+      <label htmlFor={id} className="text-sm font-medium">
+        Alasan
+      </label>
+      <Input
+        ref={inputRef}
+        id={id}
+        autoComplete="off"
+        maxLength={REASON_MAX}
+        value={reason}
+        onKeyDown={guard.onKeyDown}
+        onChange={(e) => {
+          setReason(e.target.value);
+          guard.reset();
+        }}
+      />
+      <ScannedAlert show={guard.scanned} />
+      {error && !guard.scanned && (
+        <p role="alert" className="text-sm font-medium text-danger">
+          {error}
+        </p>
+      )}
+      <DialogFooter>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onCancel}
+          disabled={pending}
+        >
+          Kembali
+        </Button>
+        <Button
+          type="submit"
+          variant={confirmTone}
+          disabled={!ready}
+          aria-busy={pending}
+        >
+          {confirmLabel}
+        </Button>
+      </DialogFooter>
+    </form>
+  );
+}
+
+/**
+ * Dialog alasan wajib (ruling R1/R5) menggantikan PIN pemilik: batal transaksi, batal pelunasan,
+ * kasbon lewat limit. Fokus ke isian Alasan; Esc/Kembali menutup kecuali saat menyimpan.
+ */
+export function ReasonDialog({ open, title, description, ...form }: Props) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next && !form.pending) form.onCancel();
+      }}
+    >
+      <DialogContent
+        className="sm:max-w-[400px]"
+        showCloseButton={!form.pending}
+        onOpenAutoFocus={(e) => {
+          // Isian Alasan, bukan pilihan pertama di `children`.
+          e.preventDefault();
+          inputRef.current?.focus();
+        }}
+      >
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription className="text-text tabular-nums">
+            {description}
+          </DialogDescription>
+        </DialogHeader>
+        {open && <ReasonForm {...form} inputRef={inputRef} />}
+      </DialogContent>
+    </Dialog>
+  );
+}

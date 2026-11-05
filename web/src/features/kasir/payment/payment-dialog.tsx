@@ -230,6 +230,7 @@ function PaymentSession({ onClose, onPaid }: Props) {
       </Dialog>
       <SalePrompts
         sale={sale}
+        customerName={fields.customer?.name ?? ""}
         rechoose={() =>
           paymentState(
             cartSummary(useCart.getState().lines).total,

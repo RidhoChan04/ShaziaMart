@@ -62,7 +62,7 @@ test("tanpa shift → Buka shift: Rina → PIN 123456 → modal 200.000 → laya
 
   await user.click(header().getByRole("button", { name: "Riwayat" }));
   expect(
-    await screen.findByText("Belum ada transaksi hari ini"),
+    await screen.findByText("Belum ada transaksi di shift ini"),
   ).toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "Tutup" }));
   await waitFor(async () => expect(await scanBox()).toHaveFocus());

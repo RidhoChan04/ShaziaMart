@@ -1,3 +1,4 @@
+import { TriangleAlert } from "lucide-react";
 import type { Customer } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { formatRupiah } from "@/shared/lib/money";
 import { CustomerPicker } from "./customer-picker";
@@ -20,8 +21,9 @@ export function KasbonFields({
         <p className="text-sm tabular-nums">
           {`Saldo setelah kasbon ${formatRupiah(after)}`}
           {after > customer.creditLimit && (
-            <span className="block font-medium text-warning">
-              Melebihi limit — perlu PIN pemilik
+            <span className="flex items-center gap-1.5 font-medium text-warning">
+              <TriangleAlert aria-hidden="true" className="size-4 shrink-0" />
+              Melebihi limit — perlu alasan
             </span>
           )}
         </p>

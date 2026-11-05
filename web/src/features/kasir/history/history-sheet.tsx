@@ -2,14 +2,15 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 import {
-  getListTodaySalesQueryKey,
-  useListTodaySales,
+  getListShiftSalesQueryKey,
+  useListShiftSales,
   usePrintSale,
   useVoidSale,
 } from "@/shared/api/gen/sales/sales";
 import type { Sale } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { pesanError } from "@/shared/lib/error-messages";
 import { formatRupiah } from "@/shared/lib/money";
+import { saleMethodLabel } from "@/shared/lib/payment-labels";
 import { Button } from "@/shared/ui/button";
 import {
   Sheet,
@@ -18,8 +19,8 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/shared/ui/sheet";
-import { OwnerPinDialog } from "../common/owner-pin-dialog";
 import { focusScanBox } from "../scan/scan-box";
+import { VoidSaleDialog } from "./void-sale-dialog";
 
 const timeFormat = new Intl.DateTimeFormat("id-ID", {
   hour: "2-digit",
@@ -28,26 +29,21 @@ const timeFormat = new Intl.DateTimeFormat("id-ID", {
   timeZone: "Asia/Jakarta",
 });
 
-const METHOD_LABEL = { cash: "Tunai", qris: "QRIS", credit: "Kasbon" } as const;
-
-function methodLabel(sale: Sale): string {
-  const [first] = sale.payments;
-  if (!first || sale.payments.length > 1) return "Campuran";
-  return METHOD_LABEL[first.method];
-}
-
 const badge =
   "rounded-full bg-danger/10 px-2 py-0.5 text-xs font-medium text-danger";
 
 type Props = { open: boolean; onClose: () => void };
 
-/** Penjualan hari ini (terbaru dulu): cetak ulang struk dan batalkan dengan PIN pemilik. */
+/**
+ * Penjualan shift yang sedang buka (jawaban pemilik J0), terbaru dulu: cetak ulang struk dan
+ * batalkan dengan alasan wajib (ruling R4, tanpa PIN pemilik).
+ */
 export function HistorySheet({ open, onClose }: Props) {
   const client = useQueryClient();
-  const sales = useListTodaySales({ query: { enabled: open } });
+  const sales = useListShiftSales({ query: { enabled: open } });
   const [voiding, setVoiding] = useState<Sale | null>(null);
   const refresh = () =>
-    client.invalidateQueries({ queryKey: getListTodaySalesQueryKey() });
+    client.invalidateQueries({ queryKey: getListShiftSalesQueryKey() });
 
   const print = usePrintSale({
     mutation: {
@@ -87,7 +83,7 @@ export function HistorySheet({ open, onClose }: Props) {
           }}
         >
           <SheetHeader>
-            <SheetTitle>Riwayat hari ini</SheetTitle>
+            <SheetTitle>Riwayat shift ini</SheetTitle>
             <SheetDescription>
               Cetak ulang struk atau batalkan transaksi.
             </SheetDescription>
@@ -99,7 +95,7 @@ export function HistorySheet({ open, onClose }: Props) {
               </p>
             )}
             {sales.data?.length === 0 && (
-              <p className="text-muted">Belum ada transaksi hari ini</p>
+              <p className="text-muted">Belum ada transaksi di shift ini</p>
             )}
             <ul className="flex flex-col gap-2">
               {sales.data?.map((sale) => (
@@ -115,18 +111,17 @@ export function HistorySheet({ open, onClose }: Props) {
           </div>
         </SheetContent>
       </Sheet>
-      <OwnerPinDialog
-        open={voiding !== null}
-        title="PIN pemilik"
-        requireReason
+      <VoidSaleDialog
+        sale={voiding}
+        fromClosedShift={false}
         pending={voidSale.isPending}
         error={voidSale.isError ? pesanError(voidSale.error) : undefined}
         onCancel={cancelVoid}
-        onSubmit={(ownerPin, reason) => {
-          if (voiding && reason !== undefined) {
+        onSubmit={(reason, qrisRefundSource) => {
+          if (voiding) {
             voidSale.mutate({
               saleId: voiding.id,
-              data: { ownerPin, reason },
+              data: { reason, qrisRefundSource },
             });
           }
         }}
@@ -157,7 +152,7 @@ function SaleRow({
           </span>
         </p>
         <p className="flex flex-wrap items-center gap-2 text-sm">
-          <span className="text-muted">{methodLabel(sale)}</span>
+          <span className="text-muted">{saleMethodLabel(sale.payments)}</span>
           <span className={voided ? "num line-through" : "num"}>
             {formatRupiah(sale.total)}
           </span>

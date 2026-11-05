@@ -164,7 +164,7 @@ export function buildSaleRequest(
   cart: Pick<CartState, "saleId" | "lines">,
   choice: PaymentChoice,
   print: boolean,
-  ownerPin?: string,
+  creditLimitReason?: string,
 ): SaleRequest {
   const items = cart.lines.map((line, i): SaleItemInput => {
     const { unitPrice } = cartLineView(line, i);
@@ -186,7 +186,7 @@ export function buildSaleRequest(
     items,
     ...paymentsFor(choice, total),
     print,
-    ...(ownerPin === undefined ? {} : { ownerPin }),
+    ...(creditLimitReason === undefined ? {} : { creditLimitReason }),
   };
 }
 

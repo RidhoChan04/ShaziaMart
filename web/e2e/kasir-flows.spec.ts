@@ -53,7 +53,7 @@ test("jual tunai contoh spec dengan kembalian Rp38.500", async ({ page }) => {
 
   await page.getByRole("button", { name: "Riwayat" }).click();
   const sheet = page.getByRole("dialog");
-  await expect(sheet.getByText("Riwayat hari ini")).toBeVisible();
+  await expect(sheet.getByText("Riwayat shift ini")).toBeVisible();
   await expect(sheet.getByRole("button", { name: "Cetak ulang" })).toHaveCount(
     1,
   );
@@ -73,7 +73,7 @@ test("beras Rp20.000 per nominal", async ({ page }) => {
   await expect(total).toContainText("Rp20.000");
 });
 
-test("kasbon melebihi limit butuh PIN pemilik", async ({ page }) => {
+test("kasbon melebihi limit butuh alasan", async ({ page }) => {
   await openShift(page, RINA);
   await scan(page, BERAS); // 78.000 > sisa limit Pak Joko (10.000)
   await page.getByRole("button", { name: "Bayar" }).click();
@@ -81,14 +81,23 @@ test("kasbon melebihi limit butuh PIN pemilik", async ({ page }) => {
   await dialog.getByRole("tab", { name: "Kasbon" }).click();
   await dialog.getByPlaceholder("Nama atau no. HP").fill("Joko");
   await dialog.getByRole("button", { name: /Pak Joko/ }).click();
+  await expect(dialog.getByText("Melebihi limit — perlu alasan")).toBeVisible();
   await dialog.getByRole("button", { name: "Selesai" }).click();
 
-  const pinDialog = page.getByRole("dialog", { name: "PIN pemilik" });
-  await expect(pinDialog).toBeVisible();
-  await pinDialog.getByLabel("PIN").fill("999999");
-  await pinDialog.getByRole("button", { name: "Konfirmasi" }).click();
+  const reasonDialog = page.getByRole("dialog", {
+    name: "Kasbon melewati limit",
+  });
+  await expect(reasonDialog).toBeVisible();
+  await expect(reasonDialog).toContainText(
+    "Pak Joko: sisa Rp290.000 + kasbon ini Rp78.000 melewati limit Rp300.000 sebesar Rp68.000.",
+  );
+  await expectNoA11yViolations(page);
+  await reasonDialog.getByLabel("Alasan").fill("Beli beras untuk hajatan");
+  await reasonDialog
+    .getByRole("button", { name: "Simpan dengan alasan" })
+    .click();
 
-  await expect(pinDialog).toBeHidden();
+  await expect(reasonDialog).toBeHidden();
   await expect(
     page.getByRole("complementary", { name: "Total" }),
   ).toContainText("0 BARANG");

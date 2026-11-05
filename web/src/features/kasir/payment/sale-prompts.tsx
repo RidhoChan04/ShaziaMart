@@ -1,19 +1,33 @@
-import { OwnerPinDialog } from "../common/owner-pin-dialog";
+import { formatRupiah } from "@/shared/lib/money";
+import { ReasonDialog } from "../common/reason-dialog";
 import type { PaymentChoice } from "./payment-model";
 import { PriceChangedDialog } from "./price-changed-dialog";
 import { ReplayedSaleDialog } from "./replayed-sale-dialog";
 import type { SaleSubmission } from "./use-submit-sale";
 
-/** Jendela lanjutan saat menyimpan: harga berubah, PIN pemilik, transaksi sudah tersimpan. */
+/** `{nama}: sisa … + kasbon ini … melewati limit … sebesar ….` (kelebihan tampilan saja; server menghitung sendiri). */
+function overLimitText(
+  name: string,
+  p: { balance: number; attempted: number; creditLimit: number },
+): string {
+  const over = p.balance + p.attempted - p.creditLimit;
+  return `${name}: sisa ${formatRupiah(p.balance)} + kasbon ini ${formatRupiah(p.attempted)} melewati limit ${formatRupiah(p.creditLimit)} sebesar ${formatRupiah(over)}.`;
+}
+
+/** Jendela lanjutan saat menyimpan: harga berubah, kasbon lewat limit (alasan), transaksi sudah tersimpan. */
 export function SalePrompts({
   sale,
+  customerName,
   rechoose,
 }: {
   sale: SaleSubmission;
+  /** Pelanggan kasbon yang dipilih di jendela bayar. */
+  customerName: string;
   /** Pilihan pembayaran dinilai ulang terhadap total keranjang terkini. */
   rechoose: () => PaymentChoice | null;
 }) {
   const { prompt } = sale;
+  const reason = prompt.kind === "creditReason" ? prompt : null;
   return (
     <>
       <PriceChangedDialog
@@ -22,15 +36,15 @@ export function SalePrompts({
         onConfirm={() => sale.confirmPrices(rechoose)}
         onCancel={sale.dismissPrompt}
       />
-      <OwnerPinDialog
-        open={prompt.kind === "ownerPin"}
-        title="PIN pemilik"
-        requireReason={false}
-        onSubmit={sale.confirmPin}
+      <ReasonDialog
+        open={reason !== null}
+        title="Kasbon melewati limit"
+        description={reason ? overLimitText(customerName, reason.problem) : ""}
+        confirmLabel="Simpan dengan alasan"
+        confirmTone="primary"
+        onSubmit={sale.confirmReason}
         onCancel={sale.dismissPrompt}
-        error={
-          prompt.kind === "ownerPin" ? (prompt.error ?? undefined) : undefined
-        }
+        error={reason?.error ?? undefined}
         pending={sale.pending}
       />
       <ReplayedSaleDialog

@@ -11,7 +11,7 @@ import { mockDb } from "@/mocks/db";
 import { loginWithShift, placedSales } from "@/mocks/handlers/test-helpers";
 import { server } from "@/mocks/node";
 import { setScenario } from "@/mocks/scenarios";
-import { getListTodaySalesQueryKey } from "@/shared/api/gen/sales/sales";
+import { getListShiftSalesQueryKey } from "@/shared/api/gen/sales/sales";
 import { openPay, panelChange, payDialog, trackSales } from "@/test/payment";
 import { fillSpecCart } from "@/test/spec-cart";
 import { useCart } from "../cart/cart-store";
@@ -130,7 +130,7 @@ test("server-mati saat Selesai → pesan, keranjang tetap; coba lagi memakai sal
   expect(panelChange()).toHaveTextContent("Rp14.000");
 });
 
-test("kasbon Pak Joko 36.000 → CREDIT_LIMIT → PIN pemilik 999999 → tersimpan", async () => {
+test("(ruling R3) kasbon Pak Joko 36.000 → CREDIT_LIMIT → dialog 'Kasbon melewati limit' + angka → alasan → tersimpan dengan saleId sama, body creditLimitReason; galat setelah alasan tampil di dialog", async () => {
   const bodies = trackSales();
   const { user, ui, selesai } = await openPay();
   await user.click(ui.getByRole("tab", { name: "Kasbon" }));
@@ -143,36 +143,80 @@ test("kasbon Pak Joko 36.000 → CREDIT_LIMIT → PIN pemilik 999999 → tersimp
     await ui.findByRole("button", { name: /Pak Joko · 081234500002/ }),
   );
   expect(ui.getByText("Saldo Rp290.000 · Limit Rp300.000")).toBeInTheDocument();
+  // (koreksi mockup M5) teks peringatan disertai ikon.
+  const warning = ui.getByText("Melebihi limit — perlu alasan");
+  expect(warning.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
   await user.click(selesai());
 
-  const pin = await screen.findByRole("dialog", { name: "PIN pemilik" });
-  const pinInput = within(pin).getByLabelText("PIN");
-  expect(pinInput).toHaveAttribute("type", "password");
-  expect(pinInput).toHaveAttribute("inputmode", "numeric");
-  const confirm = within(pin).getByRole("button", { name: "Konfirmasi" });
-  await user.type(pinInput, "11111");
-  expect(confirm).toBeDisabled();
-  await user.type(pinInput, "1");
-  await user.click(confirm);
-  expect(await within(pin).findByRole("alert")).toHaveTextContent("PIN salah");
+  const dialog = await screen.findByRole("dialog", {
+    name: "Kasbon melewati limit",
+  });
+  const prompt = within(dialog);
+  expect(
+    prompt.getByText(
+      "Pak Joko: sisa Rp290.000 + kasbon ini Rp36.000 melewati limit Rp300.000 sebesar Rp26.000.",
+    ),
+  ).toBeVisible();
+  const reason = prompt.getByRole("textbox", { name: "Alasan" });
+  expect(reason).toHaveFocus();
+  const save = prompt.getByRole("button", { name: "Simpan dengan alasan" });
+  expect(save).toHaveAttribute("data-variant", "primary");
+  expect(save).toBeDisabled();
+  await user.type(reason, "Beli beras untuk hajatan");
 
-  await user.clear(pinInput);
-  await user.type(pinInput, "999999{Enter}");
+  setScenario("server-mati");
+  await user.click(save);
+  expect(await prompt.findByRole("alert")).toHaveTextContent(
+    "Server tidak tersambung — coba lagi",
+  );
+  setScenario("normal");
+  await user.click(save);
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
 
   const joko = mockDb.get().customers.find((c) => c.name === "Pak Joko");
   expect(joko?.balance).toBe(326000);
-  expect(bodies.map((b) => b.ownerPin)).toEqual([
+  expect(bodies.map((b) => b.creditLimitReason)).toEqual([
     undefined,
-    "111111",
-    "999999",
+    "Beli beras untuk hajatan",
+    "Beli beras untuk hajatan",
   ]);
+  expect(bodies.every((b) => !("ownerPin" in b))).toBe(true);
   expect(bodies[2]).toMatchObject({
     customerId: joko?.id,
     payments: [{ method: "credit", amount: 36000 }],
   });
   expect(new Set(bodies.map((b) => b.saleId)).size).toBe(1);
+  expect(placedSales()[0]?.creditOverLimit).toEqual({
+    excess: 26000,
+    reason: "Beli beras untuk hajatan",
+  });
   expect(useCart.getState().lines).toHaveLength(0);
+});
+
+test("(ruling R3) dialog lewat limit: Kembali menutup dialog, jendela bayar tetap dan keranjang utuh", async () => {
+  const bodies = trackSales();
+  const { user, ui, selesai } = await openPay();
+  await user.click(ui.getByRole("tab", { name: "Kasbon" }));
+  await user.type(
+    ui.getByRole("searchbox", { name: "Cari pelanggan" }),
+    "Joko",
+  );
+  await user.click(
+    await ui.findByRole("button", { name: /Pak Joko · 081234500002/ }),
+  );
+  await user.click(selesai());
+  const dialog = await screen.findByRole("dialog", {
+    name: "Kasbon melewati limit",
+  });
+  await user.click(within(dialog).getByRole("button", { name: "Kembali" }));
+  await waitFor(() =>
+    expect(
+      screen.queryByRole("dialog", { name: "Kasbon melewati limit" }),
+    ).toBeNull(),
+  );
+  expect(payDialog()).not.toBeNull();
+  expect(bodies).toHaveLength(1);
+  expect(useCart.getState().lines).toHaveLength(1);
 });
 
 test("QRIS: Sudah masuk menyimpan dengan method qris", async () => {
@@ -232,9 +276,9 @@ test("campuran tunai 200.000 + sisa kasbon Bu Sari", async () => {
   expect(panelChange()).toHaveTextContent("Rp50.000");
 });
 
-test("penjualan berhasil → riwayat hari ini ditandai basi", async () => {
+test("penjualan berhasil → riwayat shift ini ditandai basi", async () => {
   const { user, ui, selesai, queryClient } = await openPay();
-  const key = getListTodaySalesQueryKey();
+  const key = getListShiftSalesQueryKey();
   queryClient.setQueryData(key, []);
   expect(queryClient.getQueryState(key)?.isInvalidated).toBe(false);
   await user.click(ui.getByRole("button", { name: "Uang pas" }));

@@ -2,10 +2,13 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import {
-  getListTodaySalesQueryKey,
+  getListShiftSalesQueryKey,
   useCreateSale,
 } from "@/shared/api/gen/sales/sales";
-import type { Sale } from "@/shared/api/gen/shaziaMartAPI.schemas";
+import type {
+  CreditLimitProblem,
+  Sale,
+} from "@/shared/api/gen/shaziaMartAPI.schemas";
 import {
   creditLimitProblemSchema,
   priceChangedProblemSchema,
@@ -29,12 +32,21 @@ export type SubmitPrompt =
       oldTotal: number;
       newTotal: number;
     }
-  | { kind: "ownerPin"; error: string | null }
+  | {
+      kind: "creditReason";
+      /** Angka 409 CREDIT_LIMIT untuk kalimat dialog. */
+      problem: CreditLimitProblem;
+      error: string | null;
+    }
   | { kind: "replayed"; sale: Sale };
 
 export type SaleSubmission = ReturnType<typeof useSubmitSale>;
 
-type Attempt = { choice: PaymentChoice; print: boolean; ownerPin?: string };
+type Attempt = {
+  choice: PaymentChoice;
+  print: boolean;
+  creditLimitReason?: string;
+};
 
 const NONE: SubmitPrompt = { kind: "none" };
 const TOTAL_CHANGED = "Total berubah — periksa pembayaran";
@@ -43,7 +55,8 @@ const TOTAL_CHANGED = "Total berubah — periksa pembayaran";
  * Kirim penjualan dari keranjang. Satu request sekaligus; `saleId` keranjang dipakai
  * ulang pada setiap percobaan sehingga retry tidak pernah membuat dua penjualan.
  * 409 PRICE_CHANGED langsung menerapkan harga baru ke keranjang lalu meminta konfirmasi;
- * 409 CREDIT_LIMIT membuka prompt PIN; error lain jadi pesan di jendela bayar.
+ * 409 CREDIT_LIMIT membuka dialog alasan (ruling R3, tanpa PIN pemilik); error lain jadi pesan
+ * di jendela bayar.
  */
 export function useSubmitSale(onPaid: (sale: Sale) => void) {
   const client = useQueryClient();
@@ -70,13 +83,16 @@ export function useSubmitSale(onPaid: (sale: Sale) => void) {
       });
       return;
     }
-    if (readProblem(err, creditLimitProblemSchema)) {
-      setPrompt({ kind: "ownerPin", error: null });
+    const creditLimit = readProblem(err, creditLimitProblemSchema);
+    if (creditLimit) {
+      setPrompt({ kind: "creditReason", problem: creditLimit, error: null });
       return;
     }
-    if (attempt.ownerPin !== undefined) {
-      // Gagal setelah PIN dimasukkan: pesan tampil di dialog PIN yang masih terbuka.
-      setPrompt({ kind: "ownerPin", error: pesanError(err) });
+    if (attempt.creditLimitReason !== undefined) {
+      // Gagal setelah alasan diisi: pesan tampil di dialog alasan yang masih terbuka.
+      setPrompt((p) =>
+        p.kind === "creditReason" ? { ...p, error: pesanError(err) } : p,
+      );
       return;
     }
     setPrompt(NONE);
@@ -86,7 +102,7 @@ export function useSubmitSale(onPaid: (sale: Sale) => void) {
   /** Penjualan tersimpan: keranjang selesai dengan kembalian dari server. */
   function finish(sale: Sale) {
     setPrompt(NONE);
-    void client.invalidateQueries({ queryKey: getListTodaySalesQueryKey() });
+    void client.invalidateQueries({ queryKey: getListShiftSalesQueryKey() });
     useCart.getState().completeSale(sale.change);
     if (sale.printStatus === "gagal") {
       toast.error("Struk gagal dicetak — cetak ulang dari Riwayat");
@@ -100,14 +116,15 @@ export function useSubmitSale(onPaid: (sale: Sale) => void) {
     last.current = attempt;
     setError(null);
     setNotice(null);
-    if (attempt.ownerPin !== undefined)
-      setPrompt({ kind: "ownerPin", error: null });
+    if (attempt.creditLimitReason !== undefined) {
+      setPrompt((p) => (p.kind === "creditReason" ? { ...p, error: null } : p));
+    }
     try {
       const body = buildSaleRequest(
         useCart.getState(),
         attempt.choice,
         attempt.print,
-        attempt.ownerPin,
+        attempt.creditLimitReason,
       );
       mutate(
         { data: body },
@@ -151,8 +168,9 @@ export function useSubmitSale(onPaid: (sale: Sale) => void) {
       setPrompt(NONE);
       setNotice(TOTAL_CHANGED);
     },
-    confirmPin(pin: string) {
-      if (last.current) send({ ...last.current, ownerPin: pin });
+    /** Kirim ulang dengan saleId sama dan alasan kasbon lewat limit (ruling R3). */
+    confirmReason(reason: string) {
+      if (last.current) send({ ...last.current, creditLimitReason: reason });
     },
     /** Penjualan lama (replay saleId) diakui kasir: selesaikan keranjang dengan data server. */
     acceptReplayed() {
