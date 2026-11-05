@@ -46,7 +46,16 @@ const staffMasukDetailRoute = createRoute({
 const staffOpnameRoute = createRoute({
   getParentRoute: () => staffRoute,
   path: "opname",
-  component: lazyRouteComponent(loadStaff, "StaffPlaceholderPage"),
+  component: lazyRouteComponent(loadStaff, "OpnamePage"),
+});
+
+const staffOpnameHitungRoute = createRoute({
+  getParentRoute: () => staffRoute,
+  path: "opname/hitung",
+  validateSearch: (search: Record<string, unknown>): { draf: string } => ({
+    draf: typeof search.draf === "string" ? search.draf : "",
+  }),
+  component: lazyRouteComponent(loadStaff, "CountPage"),
 });
 
 const staffOpnameHasilRoute = createRoute({
@@ -74,6 +83,7 @@ export const staffTree = staffRoute.addChildren([
   staffMasukBaruRoute,
   staffMasukDetailRoute,
   staffOpnameRoute,
+  staffOpnameHitungRoute,
   staffOpnameHasilRoute,
   staffKedaluwarsaRoute,
   staffLainnyaRoute,

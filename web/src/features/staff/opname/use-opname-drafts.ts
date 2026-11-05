@@ -44,6 +44,8 @@ export function useOpnameDrafts(userId: string): {
   save: (d: OpnameDraft) => Promise<void>;
   remove: (id: string) => Promise<void>;
   refresh: () => void;
+  /** Daftar sudah dibaca (berhasil atau gagal); sebelum itu `drafts` kosong karena belum dimuat. */
+  loaded: boolean;
   storageError: boolean;
 } {
   const store = useOpnameStore();
@@ -72,6 +74,7 @@ export function useOpnameDrafts(userId: string): {
     save: (d) => write(() => store.put(d)),
     remove: (id) => write(() => store.remove(id)),
     refresh,
+    loaded: !query.isPending,
     storageError: query.isError || writeFailed,
   };
 }

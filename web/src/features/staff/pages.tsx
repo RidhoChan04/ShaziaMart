@@ -5,11 +5,6 @@ import { pesanError } from "@/shared/lib/error-messages";
 import { Button } from "@/shared/ui/button";
 import { clearStaffSession, useStaffSession } from "./auth/staff-session";
 
-/** Isi sementara tab/halaman orang toko yang belum dibuat. */
-export function StaffPlaceholderPage() {
-  return <p className="text-muted">Segera hadir</p>;
-}
-
 export function StaffLainnyaPage() {
   const client = useQueryClient();
   const name = useStaffSession().data?.user.name ?? "";
