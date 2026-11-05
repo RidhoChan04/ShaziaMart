@@ -371,6 +371,8 @@ describe("Perlu perhatian: opname (K19)", () => {
     resolvedByName: null,
     resolvedAt: null,
     replacedBySessionId: null,
+    replacedByName: null,
+    mustHold: false,
     recount: null,
   });
   const session = (

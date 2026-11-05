@@ -145,7 +145,8 @@ export const GetOwnerTodaySummaryResponse = zod.object({
 }).describe('Lingkup opname. kategori = barang berkategori category; tanpa_kategori = barang berkategori\nnull (mis. barang baru dari nota); semua = semua barang. category wajib iff kind = kategori\n(selain itu null).\n'),
   "finishedAt": zod.int(),
   "totalValue": zod.int()
-}).describe('Sesi opname bertanda selisih besar yang belum ditinjau.')).describe('Sesi opname flagged yang belum ditinjau (reviewOpnameSession); terbaru dulu (finishedAt).')
+}).describe('Sesi opname bertanda selisih besar yang belum ditinjau.')).describe('Sesi opname flagged yang belum ditinjau (reviewOpnameSession); terbaru dulu (finishedAt).'),
+  "opnameReplacedHeld": zod.int().describe('Jumlah barang opname yang dulu ditahan lalu diganti hitungan baru (replacedByName ≠ null),\ndi sesi yang belum ditinjau (reviewedAt null; reviewOpnameSession menghapusnya).\n')
 })
 }).describe('Semua uang integer rupiah. revenue, grossProfit, newCredit, dan avgTicket hanya menghitung\npenjualan berstatus selesai (semua field bertipe omzet hanya menghitung penjualan selesai). avgTicket = round_half_up(revenue / salesCount), 0 bila tidak ada penjualan.\n')
 
@@ -273,7 +274,7 @@ export const CreateOwnerProductResponse = zod.object({
 }).describe('fromCost = HPP saat peringatan dibuat; changedAt dan source = perubahan modal terakhir.'),zod.null()]).describe('Peringatan modal berubah yang belum ditindaklanjuti.'),
   "recentMovements": zod.array(zod.object({
   "id": zod.string(),
-  "at": zod.int().describe('Waktu dicatat (epoch ms UTC), juga untuk opname yang berlaku pada jam hitung.'),
+  "at": zod.int().describe('Waktu dicatat di server (epoch ms UTC), untuk semua jenis termasuk opname dan stok_awal.\nJam hitung yang berlaku untuk koreksi opname (waktu efektif, K7) hanya dipakai server\nuntuk stok pada jam tertentu dan tidak diekspos.\n'),
   "kind": zod.enum(['jual', 'batal', 'masuk', 'koreksi_masuk', 'batal_masuk', 'opname', 'stok_awal', 'keluar_kedaluwarsa']).describe('jual / batal = penjualan dan pembatalannya; masuk = barang masuk; koreksi_masuk = nota\nbarang masuk diubah; batal_masuk = nota barang masuk dibatalkan; opname = koreksi stok\ndari selisih opname; stok_awal = hitungan opname pertama menjadi stok;\nkeluar_kedaluwarsa = dikeluarkan dari stok karena kedaluwarsa.\n'),
   "qtyBase": zod.int().describe('Bertanda; jual negatif, batal positif, masuk positif, koreksi_masuk bertanda, batal_masuk\nnegatif, opname bertanda, stok_awal bertanda, keluar_kedaluwarsa negatif.\n'),
   "kasirName": zod.string().describe('nama orang yang mencatat'),
@@ -357,7 +358,7 @@ export const GetOwnerProductResponse = zod.object({
 }).describe('fromCost = HPP saat peringatan dibuat; changedAt dan source = perubahan modal terakhir.'),zod.null()]).describe('Peringatan modal berubah yang belum ditindaklanjuti.'),
   "recentMovements": zod.array(zod.object({
   "id": zod.string(),
-  "at": zod.int().describe('Waktu dicatat (epoch ms UTC), juga untuk opname yang berlaku pada jam hitung.'),
+  "at": zod.int().describe('Waktu dicatat di server (epoch ms UTC), untuk semua jenis termasuk opname dan stok_awal.\nJam hitung yang berlaku untuk koreksi opname (waktu efektif, K7) hanya dipakai server\nuntuk stok pada jam tertentu dan tidak diekspos.\n'),
   "kind": zod.enum(['jual', 'batal', 'masuk', 'koreksi_masuk', 'batal_masuk', 'opname', 'stok_awal', 'keluar_kedaluwarsa']).describe('jual / batal = penjualan dan pembatalannya; masuk = barang masuk; koreksi_masuk = nota\nbarang masuk diubah; batal_masuk = nota barang masuk dibatalkan; opname = koreksi stok\ndari selisih opname; stok_awal = hitungan opname pertama menjadi stok;\nkeluar_kedaluwarsa = dikeluarkan dari stok karena kedaluwarsa.\n'),
   "qtyBase": zod.int().describe('Bertanda; jual negatif, batal positif, masuk positif, koreksi_masuk bertanda, batal_masuk\nnegatif, opname bertanda, stok_awal bertanda, keluar_kedaluwarsa negatif.\n'),
   "kasirName": zod.string().describe('nama orang yang mencatat'),
@@ -482,7 +483,7 @@ export const UpdateOwnerProductResponse = zod.object({
 }).describe('fromCost = HPP saat peringatan dibuat; changedAt dan source = perubahan modal terakhir.'),zod.null()]).describe('Peringatan modal berubah yang belum ditindaklanjuti.'),
   "recentMovements": zod.array(zod.object({
   "id": zod.string(),
-  "at": zod.int().describe('Waktu dicatat (epoch ms UTC), juga untuk opname yang berlaku pada jam hitung.'),
+  "at": zod.int().describe('Waktu dicatat di server (epoch ms UTC), untuk semua jenis termasuk opname dan stok_awal.\nJam hitung yang berlaku untuk koreksi opname (waktu efektif, K7) hanya dipakai server\nuntuk stok pada jam tertentu dan tidak diekspos.\n'),
   "kind": zod.enum(['jual', 'batal', 'masuk', 'koreksi_masuk', 'batal_masuk', 'opname', 'stok_awal', 'keluar_kedaluwarsa']).describe('jual / batal = penjualan dan pembatalannya; masuk = barang masuk; koreksi_masuk = nota\nbarang masuk diubah; batal_masuk = nota barang masuk dibatalkan; opname = koreksi stok\ndari selisih opname; stok_awal = hitungan opname pertama menjadi stok;\nkeluar_kedaluwarsa = dikeluarkan dari stok karena kedaluwarsa.\n'),
   "qtyBase": zod.int().describe('Bertanda; jual negatif, batal positif, masuk positif, koreksi_masuk bertanda, batal_masuk\nnegatif, opname bertanda, stok_awal bertanda, keluar_kedaluwarsa negatif.\n'),
   "kasirName": zod.string().describe('nama orang yang mencatat'),
@@ -587,7 +588,7 @@ export const SetOwnerProductStatusResponse = zod.object({
 }).describe('fromCost = HPP saat peringatan dibuat; changedAt dan source = perubahan modal terakhir.'),zod.null()]).describe('Peringatan modal berubah yang belum ditindaklanjuti.'),
   "recentMovements": zod.array(zod.object({
   "id": zod.string(),
-  "at": zod.int().describe('Waktu dicatat (epoch ms UTC), juga untuk opname yang berlaku pada jam hitung.'),
+  "at": zod.int().describe('Waktu dicatat di server (epoch ms UTC), untuk semua jenis termasuk opname dan stok_awal.\nJam hitung yang berlaku untuk koreksi opname (waktu efektif, K7) hanya dipakai server\nuntuk stok pada jam tertentu dan tidak diekspos.\n'),
   "kind": zod.enum(['jual', 'batal', 'masuk', 'koreksi_masuk', 'batal_masuk', 'opname', 'stok_awal', 'keluar_kedaluwarsa']).describe('jual / batal = penjualan dan pembatalannya; masuk = barang masuk; koreksi_masuk = nota\nbarang masuk diubah; batal_masuk = nota barang masuk dibatalkan; opname = koreksi stok\ndari selisih opname; stok_awal = hitungan opname pertama menjadi stok;\nkeluar_kedaluwarsa = dikeluarkan dari stok karena kedaluwarsa.\n'),
   "qtyBase": zod.int().describe('Bertanda; jual negatif, batal positif, masuk positif, koreksi_masuk bertanda, batal_masuk\nnegatif, opname bertanda, stok_awal bertanda, keluar_kedaluwarsa negatif.\n'),
   "kasirName": zod.string().describe('nama orang yang mencatat'),
@@ -685,7 +686,7 @@ export const UpdateOwnerProductPricesResponse = zod.object({
 }).describe('fromCost = HPP saat peringatan dibuat; changedAt dan source = perubahan modal terakhir.'),zod.null()]).describe('Peringatan modal berubah yang belum ditindaklanjuti.'),
   "recentMovements": zod.array(zod.object({
   "id": zod.string(),
-  "at": zod.int().describe('Waktu dicatat (epoch ms UTC), juga untuk opname yang berlaku pada jam hitung.'),
+  "at": zod.int().describe('Waktu dicatat di server (epoch ms UTC), untuk semua jenis termasuk opname dan stok_awal.\nJam hitung yang berlaku untuk koreksi opname (waktu efektif, K7) hanya dipakai server\nuntuk stok pada jam tertentu dan tidak diekspos.\n'),
   "kind": zod.enum(['jual', 'batal', 'masuk', 'koreksi_masuk', 'batal_masuk', 'opname', 'stok_awal', 'keluar_kedaluwarsa']).describe('jual / batal = penjualan dan pembatalannya; masuk = barang masuk; koreksi_masuk = nota\nbarang masuk diubah; batal_masuk = nota barang masuk dibatalkan; opname = koreksi stok\ndari selisih opname; stok_awal = hitungan opname pertama menjadi stok;\nkeluar_kedaluwarsa = dikeluarkan dari stok karena kedaluwarsa.\n'),
   "qtyBase": zod.int().describe('Bertanda; jual negatif, batal positif, masuk positif, koreksi_masuk bertanda, batal_masuk\nnegatif, opname bertanda, stok_awal bertanda, keluar_kedaluwarsa negatif.\n'),
   "kasirName": zod.string().describe('nama orang yang mencatat'),
@@ -724,7 +725,7 @@ export const ListOwnerProductMovementsParams = zod.object({
 
 export const ListOwnerProductMovementsResponseItem = zod.object({
   "id": zod.string(),
-  "at": zod.int().describe('Waktu dicatat (epoch ms UTC), juga untuk opname yang berlaku pada jam hitung.'),
+  "at": zod.int().describe('Waktu dicatat di server (epoch ms UTC), untuk semua jenis termasuk opname dan stok_awal.\nJam hitung yang berlaku untuk koreksi opname (waktu efektif, K7) hanya dipakai server\nuntuk stok pada jam tertentu dan tidak diekspos.\n'),
   "kind": zod.enum(['jual', 'batal', 'masuk', 'koreksi_masuk', 'batal_masuk', 'opname', 'stok_awal', 'keluar_kedaluwarsa']).describe('jual / batal = penjualan dan pembatalannya; masuk = barang masuk; koreksi_masuk = nota\nbarang masuk diubah; batal_masuk = nota barang masuk dibatalkan; opname = koreksi stok\ndari selisih opname; stok_awal = hitungan opname pertama menjadi stok;\nkeluar_kedaluwarsa = dikeluarkan dari stok karena kedaluwarsa.\n'),
   "qtyBase": zod.int().describe('Bertanda; jual negatif, batal positif, masuk positif, koreksi_masuk bertanda, batal_masuk\nnegatif, opname bertanda, stok_awal bertanda, keluar_kedaluwarsa negatif.\n'),
   "kasirName": zod.string().describe('nama orang yang mencatat'),
@@ -1109,7 +1110,7 @@ export const GetOwnerOpnameSessionResponse = zod.object({
   "notaDate": zod.iso.date()
 }).describe('Nota barang masuk aktif yang memuat barang itu (rujukan salah input sebelumnya).')).max(getOwnerOpnameSessionResponseItemsItemOneReceiptOptionsMax).describe('Barang selisih: paling banyak 5 nota aktif terakhir yang memuat barang itu (notaDate lalu\ncreatedAt terbaru dulu); kosong untuk barang lain.\n')
 }).describe('Satu barang yang dihitung. systemQtyBase baru dikirim setelah hitungan diterima server\n(hitung buta, K8): stok pada jam hitung (countedAt server), diffQtyBase = countedQtyBase −\nsystemQtyBase. Tanpa nilai rupiah.\n').and(zod.object({
-  "value": zod.int().nullable().describe('round_half_up(|diffQtyBase| × cost.amount ÷ cost.qtyBase) dari HPP saat dinilai (K3);\nnull bila HPP belum ada (selisih ≠ 0 selalu ditahan, J3).\n'),
+  "value": zod.int().nullable().describe('round_half_up(|diffQtyBase| × cost.amount ÷ cost.qtyBase) dari HPP saat dinilai (K3);\nnull bila HPP belum ada (selisih ≠ 0 selalu ditahan, J3). Barang yang ditahan lalu\ndiganti menyimpan nilai saat ditahan.\n'),
   "units": zod.array(zod.object({
   "id": zod.string(),
   "name": zod.string(),
@@ -1119,6 +1120,7 @@ export const GetOwnerOpnameSessionResponse = zod.object({
   "resolvedByName": zod.string().nullable().describe('Pemilik yang menyetujui atau menghitung ulang.'),
   "resolvedAt": zod.int().nullable(),
   "replacedBySessionId": zod.string().nullable().describe('Sesi yang hitungannya menggantikan barang ini (state diganti).'),
+  "replacedByName": zod.string().nullable().describe('Nama pembuat sesi pengganti, hanya bila barang ini berstate ditahan saat diganti\n(selisih tertahan tetap terlihat pemilik, I2); null untuk barang lain, termasuk\nyang diganti saat masih menunggu_alasan.\n'),
   "recount": zod.union([zod.object({
   "countedQtyBase": zod.int(),
   "countedAt": zod.int(),
@@ -1131,9 +1133,10 @@ export const GetOwnerOpnameSessionResponse = zod.object({
   "gainValue": zod.int(),
   "totalValue": zod.int(),
   "flagged": zod.boolean(),
+  "sessionLimit": zod.int().describe('Batas total selisih per sesi (rupiah) dari pengaturan server sekarang (J8; Rp250.000).'),
   "reviewedByName": zod.string().nullable(),
   "reviewedAt": zod.int().nullable()
-}).describe('lossValue / gainValue (K26) = Σ value barang menunggu_alasan, disesuaikan, ditahan,\ndisetujui, dan recount.value barang dihitung_ulang (kurang → loss, lebih → gain); cocok,\nstok_awal, dan diganti tidak dihitung. totalValue = lossValue + gainValue. flagged\nditetapkan saat alasan disimpan (Σ > Rp250.000) dan tidak berubah.\n')
+}).describe('lossValue / gainValue (K26) = Σ value barang menunggu_alasan, disesuaikan, ditahan,\ndisetujui, dan recount.value barang dihitung_ulang (kurang → loss, lebih → gain); cocok,\nstok_awal, dan diganti tidak dihitung. totalValue = lossValue + gainValue. flagged\nditetapkan saat alasan disimpan (Σ > sessionLimit) dan tidak berubah.\n')
 
 /**
  * Hanya barang berstate ditahan: stok disesuaikan sebesar diffQtyBase (entri ledger opname
@@ -1187,7 +1190,7 @@ export const ApproveOpnameItemResponse = zod.object({
   "notaDate": zod.iso.date()
 }).describe('Nota barang masuk aktif yang memuat barang itu (rujukan salah input sebelumnya).')).max(approveOpnameItemResponseItemsItemOneReceiptOptionsMax).describe('Barang selisih: paling banyak 5 nota aktif terakhir yang memuat barang itu (notaDate lalu\ncreatedAt terbaru dulu); kosong untuk barang lain.\n')
 }).describe('Satu barang yang dihitung. systemQtyBase baru dikirim setelah hitungan diterima server\n(hitung buta, K8): stok pada jam hitung (countedAt server), diffQtyBase = countedQtyBase −\nsystemQtyBase. Tanpa nilai rupiah.\n').and(zod.object({
-  "value": zod.int().nullable().describe('round_half_up(|diffQtyBase| × cost.amount ÷ cost.qtyBase) dari HPP saat dinilai (K3);\nnull bila HPP belum ada (selisih ≠ 0 selalu ditahan, J3).\n'),
+  "value": zod.int().nullable().describe('round_half_up(|diffQtyBase| × cost.amount ÷ cost.qtyBase) dari HPP saat dinilai (K3);\nnull bila HPP belum ada (selisih ≠ 0 selalu ditahan, J3). Barang yang ditahan lalu\ndiganti menyimpan nilai saat ditahan.\n'),
   "units": zod.array(zod.object({
   "id": zod.string(),
   "name": zod.string(),
@@ -1197,6 +1200,7 @@ export const ApproveOpnameItemResponse = zod.object({
   "resolvedByName": zod.string().nullable().describe('Pemilik yang menyetujui atau menghitung ulang.'),
   "resolvedAt": zod.int().nullable(),
   "replacedBySessionId": zod.string().nullable().describe('Sesi yang hitungannya menggantikan barang ini (state diganti).'),
+  "replacedByName": zod.string().nullable().describe('Nama pembuat sesi pengganti, hanya bila barang ini berstate ditahan saat diganti\n(selisih tertahan tetap terlihat pemilik, I2); null untuk barang lain, termasuk\nyang diganti saat masih menunggu_alasan.\n'),
   "recount": zod.union([zod.object({
   "countedQtyBase": zod.int(),
   "countedAt": zod.int(),
@@ -1209,9 +1213,10 @@ export const ApproveOpnameItemResponse = zod.object({
   "gainValue": zod.int(),
   "totalValue": zod.int(),
   "flagged": zod.boolean(),
+  "sessionLimit": zod.int().describe('Batas total selisih per sesi (rupiah) dari pengaturan server sekarang (J8; Rp250.000).'),
   "reviewedByName": zod.string().nullable(),
   "reviewedAt": zod.int().nullable()
-}).describe('lossValue / gainValue (K26) = Σ value barang menunggu_alasan, disesuaikan, ditahan,\ndisetujui, dan recount.value barang dihitung_ulang (kurang → loss, lebih → gain); cocok,\nstok_awal, dan diganti tidak dihitung. totalValue = lossValue + gainValue. flagged\nditetapkan saat alasan disimpan (Σ > Rp250.000) dan tidak berubah.\n')
+}).describe('lossValue / gainValue (K26) = Σ value barang menunggu_alasan, disesuaikan, ditahan,\ndisetujui, dan recount.value barang dihitung_ulang (kurang → loss, lebih → gain); cocok,\nstok_awal, dan diganti tidak dihitung. totalValue = lossValue + gainValue. flagged\nditetapkan saat alasan disimpan (Σ > sessionLimit) dan tidak berubah.\n')
 
 /**
  * Hanya barang berstate ditahan (selain itu 409 OPNAME_NOT_HELD tanpa perubahan). Hitungan
@@ -1273,7 +1278,7 @@ export const RecountOpnameItemResponse = zod.object({
   "notaDate": zod.iso.date()
 }).describe('Nota barang masuk aktif yang memuat barang itu (rujukan salah input sebelumnya).')).max(recountOpnameItemResponseItemsItemOneReceiptOptionsMax).describe('Barang selisih: paling banyak 5 nota aktif terakhir yang memuat barang itu (notaDate lalu\ncreatedAt terbaru dulu); kosong untuk barang lain.\n')
 }).describe('Satu barang yang dihitung. systemQtyBase baru dikirim setelah hitungan diterima server\n(hitung buta, K8): stok pada jam hitung (countedAt server), diffQtyBase = countedQtyBase −\nsystemQtyBase. Tanpa nilai rupiah.\n').and(zod.object({
-  "value": zod.int().nullable().describe('round_half_up(|diffQtyBase| × cost.amount ÷ cost.qtyBase) dari HPP saat dinilai (K3);\nnull bila HPP belum ada (selisih ≠ 0 selalu ditahan, J3).\n'),
+  "value": zod.int().nullable().describe('round_half_up(|diffQtyBase| × cost.amount ÷ cost.qtyBase) dari HPP saat dinilai (K3);\nnull bila HPP belum ada (selisih ≠ 0 selalu ditahan, J3). Barang yang ditahan lalu\ndiganti menyimpan nilai saat ditahan.\n'),
   "units": zod.array(zod.object({
   "id": zod.string(),
   "name": zod.string(),
@@ -1283,6 +1288,7 @@ export const RecountOpnameItemResponse = zod.object({
   "resolvedByName": zod.string().nullable().describe('Pemilik yang menyetujui atau menghitung ulang.'),
   "resolvedAt": zod.int().nullable(),
   "replacedBySessionId": zod.string().nullable().describe('Sesi yang hitungannya menggantikan barang ini (state diganti).'),
+  "replacedByName": zod.string().nullable().describe('Nama pembuat sesi pengganti, hanya bila barang ini berstate ditahan saat diganti\n(selisih tertahan tetap terlihat pemilik, I2); null untuk barang lain, termasuk\nyang diganti saat masih menunggu_alasan.\n'),
   "recount": zod.union([zod.object({
   "countedQtyBase": zod.int(),
   "countedAt": zod.int(),
@@ -1295,14 +1301,19 @@ export const RecountOpnameItemResponse = zod.object({
   "gainValue": zod.int(),
   "totalValue": zod.int(),
   "flagged": zod.boolean(),
+  "sessionLimit": zod.int().describe('Batas total selisih per sesi (rupiah) dari pengaturan server sekarang (J8; Rp250.000).'),
   "reviewedByName": zod.string().nullable(),
   "reviewedAt": zod.int().nullable()
-}).describe('lossValue / gainValue (K26) = Σ value barang menunggu_alasan, disesuaikan, ditahan,\ndisetujui, dan recount.value barang dihitung_ulang (kurang → loss, lebih → gain); cocok,\nstok_awal, dan diganti tidak dihitung. totalValue = lossValue + gainValue. flagged\nditetapkan saat alasan disimpan (Σ > Rp250.000) dan tidak berubah.\n')
+}).describe('lossValue / gainValue (K26) = Σ value barang menunggu_alasan, disesuaikan, ditahan,\ndisetujui, dan recount.value barang dihitung_ulang (kurang → loss, lebih → gain); cocok,\nstok_awal, dan diganti tidak dihitung. totalValue = lossValue + gainValue. flagged\nditetapkan saat alasan disimpan (Σ > sessionLimit) dan tidak berubah.\n')
 
 /**
- * Mengisi reviewedByName dan reviewedAt; sesi hilang dari Attention.opnameFlags. Idempoten:
- * sesi yang sudah ditinjau dikembalikan apa adanya. flagged tidak berubah.
- * @summary Tandai sesi bertanda selisih besar sudah ditinjau
+ * Boleh untuk sesi apa pun (bertanda atau tidak, selesai atau belum): mengisi reviewedByName
+ * dan reviewedAt. Idempoten: sesi yang sudah ditinjau dikembalikan apa adanya, tanpa
+ * mengubah reviewed*. flagged tidak berubah dan barang tidak diubah. Sesudahnya sesi tidak
+ * lagi ada di Attention.opnameFlags, dan barangnya yang ditahan lalu diganti
+ * (replacedByName ≠ null) tidak lagi dihitung di Attention.opnameReplacedHeld. App pemilik
+ * menawarkannya untuk sesi flagged atau sesi yang punya barang tertahan yang diganti.
+ * @summary Tandai sesi opname sudah ditinjau
  */
 export const ReviewOpnameSessionParams = zod.object({
   "sessionId": zod.string()
@@ -1348,7 +1359,7 @@ export const ReviewOpnameSessionResponse = zod.object({
   "notaDate": zod.iso.date()
 }).describe('Nota barang masuk aktif yang memuat barang itu (rujukan salah input sebelumnya).')).max(reviewOpnameSessionResponseItemsItemOneReceiptOptionsMax).describe('Barang selisih: paling banyak 5 nota aktif terakhir yang memuat barang itu (notaDate lalu\ncreatedAt terbaru dulu); kosong untuk barang lain.\n')
 }).describe('Satu barang yang dihitung. systemQtyBase baru dikirim setelah hitungan diterima server\n(hitung buta, K8): stok pada jam hitung (countedAt server), diffQtyBase = countedQtyBase −\nsystemQtyBase. Tanpa nilai rupiah.\n').and(zod.object({
-  "value": zod.int().nullable().describe('round_half_up(|diffQtyBase| × cost.amount ÷ cost.qtyBase) dari HPP saat dinilai (K3);\nnull bila HPP belum ada (selisih ≠ 0 selalu ditahan, J3).\n'),
+  "value": zod.int().nullable().describe('round_half_up(|diffQtyBase| × cost.amount ÷ cost.qtyBase) dari HPP saat dinilai (K3);\nnull bila HPP belum ada (selisih ≠ 0 selalu ditahan, J3). Barang yang ditahan lalu\ndiganti menyimpan nilai saat ditahan.\n'),
   "units": zod.array(zod.object({
   "id": zod.string(),
   "name": zod.string(),
@@ -1358,6 +1369,7 @@ export const ReviewOpnameSessionResponse = zod.object({
   "resolvedByName": zod.string().nullable().describe('Pemilik yang menyetujui atau menghitung ulang.'),
   "resolvedAt": zod.int().nullable(),
   "replacedBySessionId": zod.string().nullable().describe('Sesi yang hitungannya menggantikan barang ini (state diganti).'),
+  "replacedByName": zod.string().nullable().describe('Nama pembuat sesi pengganti, hanya bila barang ini berstate ditahan saat diganti\n(selisih tertahan tetap terlihat pemilik, I2); null untuk barang lain, termasuk\nyang diganti saat masih menunggu_alasan.\n'),
   "recount": zod.union([zod.object({
   "countedQtyBase": zod.int(),
   "countedAt": zod.int(),
@@ -1370,9 +1382,10 @@ export const ReviewOpnameSessionResponse = zod.object({
   "gainValue": zod.int(),
   "totalValue": zod.int(),
   "flagged": zod.boolean(),
+  "sessionLimit": zod.int().describe('Batas total selisih per sesi (rupiah) dari pengaturan server sekarang (J8; Rp250.000).'),
   "reviewedByName": zod.string().nullable(),
   "reviewedAt": zod.int().nullable()
-}).describe('lossValue / gainValue (K26) = Σ value barang menunggu_alasan, disesuaikan, ditahan,\ndisetujui, dan recount.value barang dihitung_ulang (kurang → loss, lebih → gain); cocok,\nstok_awal, dan diganti tidak dihitung. totalValue = lossValue + gainValue. flagged\nditetapkan saat alasan disimpan (Σ > Rp250.000) dan tidak berubah.\n')
+}).describe('lossValue / gainValue (K26) = Σ value barang menunggu_alasan, disesuaikan, ditahan,\ndisetujui, dan recount.value barang dihitung_ulang (kurang → loss, lebih → gain); cocok,\nstok_awal, dan diganti tidak dihitung. totalValue = lossValue + gainValue. flagged\nditetapkan saat alasan disimpan (Σ > sessionLimit) dan tidak berubah.\n')
 
 /**
  * Sama dengan getStaffExpiry ditambah nilai rupiah dari HPP sekarang (lossValue per kiriman
@@ -1386,6 +1399,7 @@ export const getOwnerExpiryResponseRecentMax = 20;
 
 
 export const GetOwnerExpiryResponse = zod.object({
+  "today": zod.iso.date().describe('Hari ini menurut server (Asia/Jakarta); lihat StaffExpiryList.today.'),
   "soonDays": zod.int(),
   "lots": zod.array(zod.object({
   "lineId": zod.string(),
@@ -1426,7 +1440,8 @@ export const GetOwnerExpiryResponse = zod.object({
 })
 
 /**
- * Aturan sama dengan createStaffExpiryRemoval; tercatat atas nama pemilik.
+ * Aturan sama dengan createStaffExpiryRemoval, termasuk idempoten menurut id saja (id yang
+ * sudah dicatat siapa pun → 204 tanpa mencatat ulang); tercatat atas nama pemilik.
  * @summary Keluarkan barang kedaluwarsa dari stok (pemilik)
  */
 export const createOwnerExpiryRemovalBodyIdMax = 64;

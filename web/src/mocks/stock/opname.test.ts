@@ -336,9 +336,16 @@ describe("K5: hitungan terbaru yang berlaku", () => {
     });
     expect(d.status).toBe("selesai");
     expect(itemOf(s, "B", INDOMIE).state).toBe("menunggu_alasan");
-    // finish mengabaikan barang diganti; stok hanya dikoreksi oleh B.
+    // finish mengabaikan barang diganti; stok hanya dikoreksi oleh B. Indomie B menggantikan
+    // hitungan tertahan milik Rina sendiri → tetap ditahan walau kecil (I2); Bimoli disesuaikan.
     finish(s, "B", [hilang(INDOMIE), hilang(BIMOLI)], T("10.45"));
-    expect(s.stock[INDOMIE]).toBe(58);
+    expect(itemOf(s, "B", INDOMIE)).toMatchObject({
+      state: "ditahan",
+      value: 5200,
+    });
+    expect(itemOf(s, "A", INDOMIE).replacedByName).toBe("Rina");
+    expect(itemOf(s, "C", BIMOLI).replacedByName).toBeNull();
+    expect(s.stock[INDOMIE]).toBe(60);
     expect(s.stock[BIMOLI]).toBe(9);
   });
   test("K5: hitungan staf sebelum hitung ulang pemilik kalah (jam hitung ulang yang berlaku)", () => {

@@ -9,6 +9,9 @@ import type {
   ImportRowResult,
   OpnameFlag,
   OpnameReason,
+  OwnerExpiryList,
+  OwnerOpnameItem,
+  OwnerOpnameSession,
   OwnerProduct,
   OwnerProductRow,
   OwnerProductUnit,
@@ -261,6 +264,12 @@ test("Attention memuat kedaluwarsa dan opname (K19)", () => {
   expectTypeOf<Attention["expiry"]>().toEqualTypeOf<ExpiryAttention>();
   expectTypeOf<Attention["opnameHeldCount"]>().toEqualTypeOf<number>();
   expectTypeOf<Attention["opnameFlags"]>().toEqualTypeOf<OpnameFlag[]>();
+  expectTypeOf<Attention["opnameReplacedHeld"]>().toEqualTypeOf<number>();
+  expectTypeOf<OwnerOpnameItem["replacedByName"]>().toEqualTypeOf<
+    string | null
+  >();
+  expectTypeOf<OwnerOpnameSession["sessionLimit"]>().toEqualTypeOf<number>();
+  expectTypeOf<OwnerExpiryList["today"]>().toEqualTypeOf<string>();
   expectTypeOf<keyof ExpiryAttention>().toEqualTypeOf<
     "expiredCount" | "soonCount" | "soonDays"
   >();
@@ -517,6 +526,7 @@ test("fixture OwnerTodaySummary valid terhadap skema respons dan tipe", () => {
           totalValue: 262000,
         },
       ],
+      opnameReplacedHeld: 0,
     },
   } satisfies OwnerTodaySummary;
   expect(GetOwnerTodaySummaryResponse.safeParse(summary).success).toBe(true);

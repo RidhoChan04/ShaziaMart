@@ -30,6 +30,7 @@ function item(
     resolvedByName: null,
     resolvedAt: null,
     replacedBySessionId: null,
+    replacedByName: null,
     recount: null,
     ...patch,
   };

@@ -133,9 +133,10 @@ const dataOf = () => {
 async function attention() {
   const res = await get("/api/owner/summary/today");
   expect(res.status).toBe(200);
-  const { opnameHeldCount, opnameFlags } = (await json<OwnerTodaySummary>(res))
-    .attention;
-  return { opnameHeldCount, opnameFlags };
+  const { opnameHeldCount, opnameFlags, opnameReplacedHeld } = (
+    await json<OwnerTodaySummary>(res)
+  ).attention;
+  return { opnameHeldCount, opnameFlags, opnameReplacedHeld };
 }
 /** Indomie dihitung 20 dari 60 pukul 10.00 → −40 (Rp104.000) ditahan di sesi `id`. */
 async function heldIndomie(id = "A"): Promise<void> {
@@ -475,7 +476,11 @@ describe("perhatian & tinjau", () => {
   test("perhatian: opnameHeldCount = barang ditahan; opnameFlags hanya sesi flagged yang belum ditinjau; tinjau → hilang", async () => {
     setCost(KOPI, 1000);
     setStock(KOPI, 300);
-    expect(await attention()).toEqual({ opnameHeldCount: 0, opnameFlags: [] });
+    expect(await attention()).toEqual({
+      opnameHeldCount: 0,
+      opnameFlags: [],
+      opnameReplacedHeld: 0,
+    });
     await submit("A", [count(INDOMIE, 20), count(KOPI, 100)]);
     at("10.05");
     await finish("A", [
@@ -496,6 +501,7 @@ describe("perhatian & tinjau", () => {
           totalValue: 304_000,
         },
       ],
+      opnameReplacedHeld: 0,
     });
 
     at("11.00");
@@ -511,13 +517,142 @@ describe("perhatian & tinjau", () => {
       reviewedByName: "Pak Ahmad",
       reviewedAt: T("11.10"),
     });
-    expect(await attention()).toEqual({ opnameHeldCount: 1, opnameFlags: [] });
+    expect(await attention()).toEqual({
+      opnameHeldCount: 1,
+      opnameFlags: [],
+      opnameReplacedHeld: 0,
+    });
     expect((await rows()).find((r) => r.id === "A")?.reviewed).toBe(true);
 
     at("11.20");
     const again = await review("A");
     expect(again.status).toBe(200);
     expect(await json<OwnerOpnameSession>(again)).toEqual(reviewed);
+  });
+});
+
+describe("I2: selisih tertahan yang diganti hitungan baru", () => {
+  test("aturan 1: Rina mengganti hitungan tertahannya sendiri (cocok) → hitungan baru ditahan, lama diganti tetap terlihat; stok tetap; tinjau → perhatian hilang", async () => {
+    await heldIndomie();
+    at("10.30");
+    const res = await post(STAFF, {
+      id: "B",
+      scope: MI_INSTAN,
+      deviceNow: Date.now(),
+      items: [count(INDOMIE, 60, "10.30")],
+    });
+    expect(res.status).toBe(201);
+    const b = await json<StaffOpnameSession>(res);
+    expect(b.items[0]).toMatchObject({
+      systemQtyBase: 60,
+      diffQtyBase: 0,
+      state: "ditahan",
+    });
+    expect(b.status).toBe("selesai");
+    expect(stockOf(INDOMIE)).toBe(60);
+    expect(opnameEntries()).toEqual([]);
+
+    const a = await detail("A");
+    expect(itemOf(a, INDOMIE)).toMatchObject({
+      state: "diganti",
+      replacedBySessionId: "B",
+      replacedByName: "Rina",
+      value: 104_000,
+    });
+    // K26: diganti tidak dihitung di total sesi.
+    expect(a).toMatchObject({ lossValue: 0, totalValue: 0 });
+    expect(itemOf(await detail("B"), INDOMIE)).toMatchObject({
+      state: "ditahan",
+      value: 0,
+      replacedByName: null,
+    });
+    expect(await attention()).toEqual({
+      opnameHeldCount: 1,
+      opnameFlags: [],
+      opnameReplacedHeld: 1,
+    });
+
+    // Setujui selisih 0 → tanpa entri ledger.
+    at("11.00");
+    expect((await approve("B", INDOMIE)).status).toBe(200);
+    expect(opnameEntries()).toEqual([]);
+    expect(stockOf(INDOMIE)).toBe(60);
+    expect((await attention()).opnameReplacedHeld).toBe(1);
+
+    at("11.10");
+    expect((await review("A")).status).toBe(200);
+    expect(await attention()).toEqual({
+      opnameHeldCount: 0,
+      opnameFlags: [],
+      opnameReplacedHeld: 0,
+    });
+  });
+
+  test("aturan 1: selisih kecil oleh orang yang sama → menunggu alasan, lalu ditahan (≤ Rp100.000); setujui menerapkan selisih baru", async () => {
+    await heldIndomie();
+    at("10.30");
+    await submit("B", [count(INDOMIE, 55, "10.30")]);
+    expect(itemOf(await detail("B"), INDOMIE).state).toBe("menunggu_alasan");
+    at("10.35");
+    await finish("B", [[INDOMIE, "rusak"]]);
+    expect(itemOf(await detail("B"), INDOMIE)).toMatchObject({
+      state: "ditahan",
+      diffQtyBase: -5,
+      value: 13_000,
+      reason: "rusak",
+    });
+    expect(stockOf(INDOMIE)).toBe(60);
+    expect(await attention()).toMatchObject({
+      opnameHeldCount: 1,
+      opnameReplacedHeld: 1,
+    });
+    at("11.00");
+    expect((await approve("B", INDOMIE)).status).toBe(200);
+    expect(stockOf(INDOMIE)).toBe(55);
+    expect(opnameEntries()).toEqual([
+      expect.objectContaining({
+        qtyBase: -5,
+        effectiveAt: T("10.30"),
+        opnameId: "B",
+        reason: "rusak",
+      }),
+    ]);
+  });
+
+  test("J5: orang lain mengganti → aturan biasa (cocok); hitungan lama tetap terlihat 'oleh Budi'; diganti saat menunggu alasan tidak dihitung", async () => {
+    await heldIndomie();
+    at("10.10");
+    await submit("C", [count(KOPI, 9, "10.10")]);
+    await switchStaff("Budi", "654321");
+    at("10.30");
+    await submit("B", [count(INDOMIE, 60, "10.30"), count(KOPI, 9, "10.30")]);
+    expect(itemOf(await detail("B"), INDOMIE).state).toBe("cocok");
+    expect(itemOf(await detail("A"), INDOMIE)).toMatchObject({
+      state: "diganti",
+      replacedByName: "Budi",
+    });
+    expect(itemOf(await detail("C"), KOPI)).toMatchObject({
+      state: "diganti",
+      replacedByName: null,
+    });
+    expect(await attention()).toEqual({
+      opnameHeldCount: 0,
+      opnameFlags: [],
+      opnameReplacedHeld: 1,
+    });
+    expect((await review("A")).status).toBe(200);
+    expect((await attention()).opnameReplacedHeld).toBe(0);
+  });
+});
+
+describe("batas sesi", () => {
+  test("M3: sessionLimit dari stockRules", async () => {
+    await heldIndomie();
+    expect((await detail("A")).sessionLimit).toBe(250_000);
+    mockDb.update((s) => {
+      s.stockRules.opnameSessionLimit = 300_000;
+    });
+    expect((await detail("A")).sessionLimit).toBe(300_000);
   });
 });
 

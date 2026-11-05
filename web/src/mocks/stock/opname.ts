@@ -132,6 +132,8 @@ function planItem(
     resolvedByName: null,
     resolvedAt: null,
     replacedBySessionId: winner?.id ?? null,
+    replacedByName: null,
+    mustHold: false,
     recount: null,
   };
 }
@@ -168,11 +170,11 @@ function settle(s: MockOpnameSession, now: number): void {
   s.finishedAt = now;
 }
 
-/** K5: hitungan lama barang ini yang belum diterapkan menjadi diganti. */
+/** K5: hitungan lama barang ini yang belum diterapkan menjadi diganti; yang ditahan tetap terlihat pemilik (I2). */
 function replaceOlder(
   state: MockState,
   productId: string,
-  sessionId: string,
+  session: MockOpnameSession,
   now: number,
 ): void {
   for (const s of state.opnameSessions) {
@@ -182,11 +184,34 @@ function replaceOlder(
         (i.state === "menunggu_alasan" || i.state === "ditahan"),
     );
     for (const i of old) {
+      i.replacedByName = i.state === "ditahan" ? session.createdByName : null;
       i.state = "diganti";
-      i.replacedBySessionId = sessionId;
+      i.replacedBySessionId = session.id;
     }
     if (old.length > 0) settle(s, now);
   }
+}
+
+/**
+ * I2 (pengaman 1 & 2): pengganti hitungan tertahan milik pembuat yang sama tetap menunggu pemilik
+ * apa pun angkanya; selisih 0 langsung ditahan, selisih lain ditahan saat alasan disimpan.
+ */
+function holdIfOwnHeld(
+  state: Readonly<MockState>,
+  item: MockOpnameItem,
+  userId: string,
+): void {
+  if (item.state !== "cocok" && item.state !== "menunggu_alasan") return;
+  const ownHeld = state.opnameSessions.some(
+    (s) =>
+      s.createdById === userId &&
+      s.items.some(
+        (i) => i.productId === item.productId && i.state === "ditahan",
+      ),
+  );
+  if (!ownHeld) return;
+  item.mustHold = true;
+  if (item.state === "cocok") item.state = "ditahan";
 }
 
 /**
@@ -226,7 +251,8 @@ export function submitSession(
   };
   for (const item of items) {
     if (item.state === "diganti") continue;
-    replaceOlder(state, item.productId, session.id, now);
+    holdIfOwnHeld(state, item, user.id);
+    replaceOlder(state, item.productId, session, now);
     if (item.state !== "stok_awal") continue;
     applyDiff(
       state,

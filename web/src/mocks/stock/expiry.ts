@@ -131,9 +131,11 @@ export function staffExpiryList(
   state: Readonly<MockState>,
   now: number,
 ): StaffExpiryList {
+  const today = jakartaIsoDate(now);
   return {
+    today,
     soonDays: state.stockRules.expirySoonDays,
-    lots: expiryLots(state, jakartaIsoDate(now)),
+    lots: expiryLots(state, today),
     recent: recentEvents(state, now).map(toEvent),
   };
 }
@@ -143,7 +145,8 @@ export function ownerExpiryList(
   state: Readonly<MockState>,
   now: number,
 ): OwnerExpiryList {
-  const lots = expiryLots(state, jakartaIsoDate(now)).map((l) => ({
+  const today = jakartaIsoDate(now);
+  const lots = expiryLots(state, today).map((l) => ({
     ...l,
     lossValue: diffValue(
       l.estimateQtyBase,
@@ -151,6 +154,7 @@ export function ownerExpiryList(
     ),
   }));
   return {
+    today,
     soonDays: state.stockRules.expirySoonDays,
     lots,
     recent: recentEvents(state, now).map((e) => ({

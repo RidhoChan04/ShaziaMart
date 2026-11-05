@@ -1702,6 +1702,11 @@ export const getCreateStaffOpnameSessionUrl = () => {
  * berlaku. Barang di sesi ini menjadi diganti bila sesi lain punya hitungan barang itu dengan
  * countedAt lebih baru yang belum diganti; selain itu hitungan lama barang itu yang masih
  * menunggu_alasan atau ditahan menjadi diganti (replacedBySessionId).
+ * Pengaman selisih tertahan (I2): bila hitungan yang diganti berstate ditahan dan sesinya
+ * dibuat pengguna yang sama, hitungan baru tetap menunggu pemilik apa pun angkanya —
+ * selisih 0 langsung ditahan (tanpa alasan), selisih lain menunggu_alasan lalu ditahan saat
+ * alasan disimpan walau ≤ Rp100.000. Pengganti oleh pengguna lain mengikuti aturan biasa.
+ * Hitungan tertahan yang diganti tetap terlihat pemilik (replacedByName).
  * Atomik: 422 OpnameProblem dengan galat per barang (barang tidak ditemukan, nonaktif,
  * dihitung dua kali, jumlah atau jam tidak valid), tanpa perubahan sebagian.
  * Batas min/max di skema adalah panduan klien; server selalu memvalidasi isi mentah.
@@ -1895,15 +1900,20 @@ export const getFinishStaffOpnameSessionUrl = (sessionId: string,) => {
 /**
  * Langkah 2 dari 2 (K2); hanya pembuat sesi (sesi orang lain 404). Satu alasan untuk tepat
  * setiap barang menunggu_alasan; barang diganti diabaikan. Alasan untuk barang yang tidak
- * perlu alasan, barang tanpa alasan, atau receiptId di luar receiptOptions → 422
- * OpnameProblem, tanpa perubahan sebagian.
- * salah_input (J4): receiptId dari receiptOptions disimpan sebagai rujukan (nota tidak
- * diubah, stok dikoreksi oleh opname); receiptId null → tercatat tidak_diketahui.
+ * perlu alasan ("Barang ini tidak perlu alasan"), barang yang tidak ada di sesi ("Barang
+ * tidak ditemukan"), alasan ganda ("Barang dihitung dua kali"), barang tanpa alasan ("Pilih
+ * alasan"), atau receiptId yang bukan nota aktif berisi barang itu ("Nota rujukan tidak
+ * cocok") → 422 OpnameProblem, tanpa perubahan sebagian.
+ * salah_input (J4): receiptId disimpan sebagai rujukan (nota tidak diubah, stok dikoreksi
+ * oleh opname). receiptOptions hanya 5 nota terbaru yang ditawarkan; server menerima nota
+ * aktif mana pun yang memuat barang itu, agar nota baru yang masuk sesudah halaman dimuat
+ * tidak membuat pilihan lama ditolak. receiptId null → tercatat tidak_diketahui.
  * Nilai (K3): value = round_half_up(|diffQtyBase| × cost.amount ÷ cost.qtyBase) dari HPP
  * sekarang; null bila HPP belum ada. Barang ditahan bila value null (J3) atau > Rp100.000
  * (J2, nilai mutlak, kurang maupun lebih); selain itu langsung disesuaikan (entri ledger
- * opname dengan alasan, waktu efektif = countedAt). Sesi flagged bila Σ value yang diketahui
- * pada barang selisih > Rp250.000; ditetapkan sekali di sini.
+ * opname dengan alasan, waktu efektif = countedAt). Pengecualian (I2): barang yang
+ * menggantikan hitungan tertahan milik pengguna yang sama selalu ditahan. Sesi flagged bila
+ * Σ value yang diketahui pada barang selisih > Rp250.000; ditetapkan sekali di sini.
  * Replay pada sesi selesai → 200 sesi apa adanya, tanpa menerapkan ulang.
  * @summary Simpan alasan selisih (online)
  */
@@ -2105,7 +2115,9 @@ export const getCreateStaffExpiryRemovalUrl = () => {
  * berkurang: entri ledger keluar_kedaluwarsa (qtyBase negatif) atas nama pengguna ini.
  * 1 ≤ qtyBase ≤ capacityQtyBase kiriman itu, selain itu 422 VALIDATION (detail = pesan);
  * stok boleh menjadi minus. Nota tidak ada, dibatalkan, atau tanpa baris itu → 404.
- * Idempoten menurut (pembuat, id): id yang sama tetap 204 tanpa mencatat ulang. Online saja.
+ * Idempoten menurut id saja, bukan per pembuat: id yang sudah pernah dicatat (oleh siapa
+ * pun, lewat app staf maupun pemilik) → 204 tanpa mencatat ulang dan tanpa memeriksa isinya
+ * lagi; isi yang pertama yang berlaku. Online saja.
  * @summary Keluarkan barang kedaluwarsa dari stok
  */
 export const createStaffExpiryRemoval = async (expiryRemovalInput: ExpiryRemovalInput, options?: Parameters<typeof customFetch>[1]): Promise<void> => {

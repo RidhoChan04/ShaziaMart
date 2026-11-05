@@ -87,6 +87,8 @@ describe("daftar kedaluwarsa orang toko", () => {
     // contoh K13: Roti tawar 3 (ED −2), Susu Bendera A 24 (ED +18), B 12 (ED +48); stok susu 14
     const body = await staffList();
     expect(body.soonDays).toBe(30);
+    // M1: hari ini menurut server (WIB), bukan jam HP.
+    expect(body.today).toBe("2026-11-02");
     expect(body.lots[0]).toMatchObject({
       productName: ROTI,
       stage: "lewat",
@@ -130,6 +132,11 @@ describe("daftar kedaluwarsa orang toko", () => {
       notaDate: "2026-10-03",
     });
     expect(body.recent).toEqual([]);
+  });
+
+  test("M1: today = tanggal WIB server (00.30 WIB = 17.30 UTC hari sebelumnya)", async () => {
+    vi.setSystemTime(Date.UTC(2026, 10, 2, 17, 30));
+    expect((await staffList()).today).toBe("2026-11-03");
   });
 
   test("tanpa sesi orang toko → 401", async () => {
@@ -367,6 +374,7 @@ describe("kedaluwarsa pemilik (K20)", () => {
   test("pemilik: lossValue = perkiraan × HPP; expiredLossValue = Σ lewat; log keluar membawa lossValue saat kejadian", async () => {
     const before = await ownerList();
     expect(before.soonDays).toBe(30);
+    expect(before.today).toBe("2026-11-02");
     expect(before.lots.map((l) => [l.productName, l.lossValue])).toEqual([
       [ROTI, 45_000], // 3 × 15.000
       [SOBEK, 62_500], // 5 × 12.500

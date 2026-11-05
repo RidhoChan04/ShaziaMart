@@ -104,6 +104,7 @@ describe("attentionItems", () => {
     expiry: { expiredCount: 0, soonCount: 0, soonDays: 30 },
     opnameHeldCount: 0,
     opnameFlags: [],
+    opnameReplacedHeld: 0,
   };
 
   test("semua nol -> kosong", () => expect(attentionItems(none)).toEqual([]));
@@ -124,6 +125,7 @@ describe("attentionItems", () => {
       expiry: { expiredCount: 0, soonCount: 0, soonDays: 30 },
       opnameHeldCount: 0,
       opnameFlags: [],
+      opnameReplacedHeld: 0,
     };
     expect(attentionItems(a)).toEqual([
       {
@@ -211,6 +213,7 @@ describe("attentionItems: modal berubah dan barang habis", () => {
     expiry: { expiredCount: 0, soonCount: 0, soonDays: 30 },
     opnameHeldCount: 0,
     opnameFlags: [],
+    opnameReplacedHeld: 0,
   };
   const change = (
     over: Partial<Attention["costChanges"][number]> = {},
@@ -368,6 +371,7 @@ describe("attentionItems: modal berubah dan barang habis", () => {
       expiry: { expiredCount: 0, soonCount: 0, soonDays: 30 },
       opnameHeldCount: 0,
       opnameFlags: [],
+      opnameReplacedHeld: 0,
     });
     expect(items.map((i) => i.key)).toEqual([
       "negative-stock",
@@ -397,6 +401,7 @@ describe("attentionItems: modal berubah dan barang habis", () => {
       expiry: { expiredCount: 0, soonCount: 0, soonDays: 30 },
       opnameHeldCount: 0,
       opnameFlags: [],
+      opnameReplacedHeld: 0,
     });
     expect(items.map((i) => i.key)).toEqual([
       "negative-stock",
@@ -435,6 +440,7 @@ describe("attentionItems: kedaluwarsa", () => {
     expiry: { expiredCount: 1, soonCount: 2, soonDays: 30 },
     opnameHeldCount: 0,
     opnameFlags: [],
+    opnameReplacedHeld: 0,
   };
 
   test("kritis setelah stok minus, 'segera' setelah stok menipis (K19)", () => {
@@ -494,6 +500,7 @@ describe("attentionItems: opname", () => {
         totalValue: 300000,
       },
     ],
+    opnameReplacedHeld: 0,
   };
 
   test("selisih besar (kritis, tautan detail) tepat sesudah stok minus; menunggu persetujuan (peringatan) sebelum stok menipis", () => {
@@ -533,6 +540,7 @@ describe("attentionItems: opname", () => {
       ...base,
       opnameHeldCount: 0,
       opnameFlags: [],
+      opnameReplacedHeld: 0,
     });
     expect(items.some((i) => i.key.startsWith("opname"))).toBe(false);
   });
@@ -564,6 +572,7 @@ describe("attentionItems: urutan K19 lengkap (kedaluwarsa + opname)", () => {
           totalValue: 260000,
         },
       ],
+      opnameReplacedHeld: 0,
     });
     expect(items.map((i) => i.key)).toEqual([
       "negative-stock",

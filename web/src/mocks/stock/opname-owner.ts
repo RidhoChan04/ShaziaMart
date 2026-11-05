@@ -65,6 +65,7 @@ export function toOwnerOpnameSession(
       resolvedByName: i?.resolvedByName ?? null,
       resolvedAt: i?.resolvedAt ?? null,
       replacedBySessionId: i?.replacedBySessionId ?? null,
+      replacedByName: i?.replacedByName ?? null,
       recount: i?.recount ?? null,
     };
   });
@@ -73,6 +74,7 @@ export function toOwnerOpnameSession(
     items,
     ...sessionValues(s),
     flagged: s.flagged,
+    sessionLimit: state.stockRules.opnameSessionLimit,
     reviewedByName: s.reviewedByName,
     reviewedAt: s.reviewedAt,
   };
@@ -193,7 +195,7 @@ export function recountItem(
   return session;
 }
 
-/** Tandai ditinjau; idempoten, `flagged` tidak berubah. */
+/** Tandai ditinjau (sesi apa pun); idempoten, `flagged` dan barang tidak berubah. */
 export function reviewSession(
   state: MockState,
   sessionId: string,
@@ -208,10 +210,14 @@ export function reviewSession(
   return session;
 }
 
-/** K19: barang ditahan, dan sesi bertanda selisih besar yang belum ditinjau (terbaru dulu). */
+/**
+ * K19: barang ditahan, sesi bertanda selisih besar yang belum ditinjau (terbaru dulu), dan barang
+ * tertahan yang diganti hitungan baru di sesi yang belum ditinjau (I2).
+ */
 export function opnameAttention(state: Readonly<MockState>): {
   opnameHeldCount: number;
   opnameFlags: OpnameFlag[];
+  opnameReplacedHeld: number;
 } {
   const opnameHeldCount = state.opnameSessions
     .flatMap((s) => s.items)
@@ -227,5 +233,9 @@ export function opnameAttention(state: Readonly<MockState>): {
       }),
     )
     .sort((a, b) => b.finishedAt - a.finishedAt);
-  return { opnameHeldCount, opnameFlags };
+  const opnameReplacedHeld = state.opnameSessions
+    .filter((s) => s.reviewedAt === null)
+    .flatMap((s) => s.items)
+    .filter((i) => i.state === "diganti" && i.replacedByName != null).length;
+  return { opnameHeldCount, opnameFlags, opnameReplacedHeld };
 }

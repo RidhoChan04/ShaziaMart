@@ -144,7 +144,35 @@ test("J6/K9: kedaluwarsa FIFO per kiriman, urutan lots, log 14 hari", () => {
   const removal = prose(op("/api/staff/expiry-removals", "post"));
   expect(removal).toContain("dicatat pada kiriman (baris nota) yang dipilih");
   expect(removal).toContain("1 ≤ qtyBase ≤ capacityQtyBase");
-  expect(removal).toContain("Idempoten menurut (pembuat, id)");
+  expect(removal).toContain("Idempoten menurut id saja, bukan per pembuat");
+  expect(removal).not.toContain("dicatat pengguna ini");
+  const ownerRemoval = prose(op("/api/owner/expiry-removals", "post"));
+  expect(ownerRemoval).toContain("idempoten menurut id saja");
+  expect(ownerRemoval).not.toContain("dicatat pengguna ini");
+});
+
+test("teks kontrak untuk Go: StockMovement.at, tinjau sesi, pengaman selisih tertahan (I2)", () => {
+  expect(prose(schema("StockMovement"))).toContain(
+    "Waktu dicatat di server (epoch ms UTC), untuk semua jenis termasuk opname dan stok_awal.",
+  );
+  expect(prose(schema("StockMovement"))).toContain("tidak diekspos");
+  const review = prose(
+    op("/api/owner/opname-sessions/{sessionId}/review", "post"),
+  );
+  expect(review).toContain("Boleh untuk sesi apa pun");
+  expect(review).toContain("Idempoten");
+  expect(review).toContain("Attention.opnameReplacedHeld");
+  const create = prose(op("/api/staff/opname-sessions", "post"));
+  expect(create).toContain(
+    "hitungan baru tetap menunggu pemilik apa pun angkanya",
+  );
+  const finish = prose(
+    op("/api/staff/opname-sessions/{sessionId}/finish", "post"),
+  );
+  expect(finish).toContain(
+    "server menerima nota aktif mana pun yang memuat barang itu",
+  );
+  expect(finish).toContain('("Barang dihitung dua kali")');
 });
 
 test("menipis staf tanpa angka stok (J7)", () => {

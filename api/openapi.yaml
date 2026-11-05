@@ -1055,10 +1055,14 @@ paths:
     post:
       tags: [owner]
       operationId: reviewOpnameSession
-      summary: Tandai sesi bertanda selisih besar sudah ditinjau
+      summary: Tandai sesi opname sudah ditinjau
       description: |
-        Mengisi reviewedByName dan reviewedAt; sesi hilang dari Attention.opnameFlags. Idempoten:
-        sesi yang sudah ditinjau dikembalikan apa adanya. flagged tidak berubah.
+        Boleh untuk sesi apa pun (bertanda atau tidak, selesai atau belum): mengisi reviewedByName
+        dan reviewedAt. Idempoten: sesi yang sudah ditinjau dikembalikan apa adanya, tanpa
+        mengubah reviewed*. flagged tidak berubah dan barang tidak diubah. Sesudahnya sesi tidak
+        lagi ada di Attention.opnameFlags, dan barangnya yang ditahan lalu diganti
+        (replacedByName ≠ null) tidak lagi dihitung di Attention.opnameReplacedHeld. App pemilik
+        menawarkannya untuk sesi flagged atau sesi yang punya barang tertahan yang diganti.
       security:
         - ownerCookieAuth: []
       parameters:
@@ -1098,7 +1102,9 @@ paths:
       tags: [owner]
       operationId: createOwnerExpiryRemoval
       summary: Keluarkan barang kedaluwarsa dari stok (pemilik)
-      description: Aturan sama dengan createStaffExpiryRemoval; tercatat atas nama pemilik.
+      description: |
+        Aturan sama dengan createStaffExpiryRemoval, termasuk idempoten menurut id saja (id yang
+        sudah dicatat siapa pun → 204 tanpa mencatat ulang); tercatat atas nama pemilik.
       security:
         - ownerCookieAuth: []
       requestBody:
@@ -1109,7 +1115,7 @@ paths:
               $ref: "#/components/schemas/ExpiryRemovalInput"
       responses:
         "204":
-          description: Dikeluarkan (atau id sudah pernah dicatat pengguna ini)
+          description: Dikeluarkan (atau id ini sudah pernah dicatat)
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
@@ -1570,6 +1576,11 @@ paths:
         berlaku. Barang di sesi ini menjadi diganti bila sesi lain punya hitungan barang itu dengan
         countedAt lebih baru yang belum diganti; selain itu hitungan lama barang itu yang masih
         menunggu_alasan atau ditahan menjadi diganti (replacedBySessionId).
+        Pengaman selisih tertahan (I2): bila hitungan yang diganti berstate ditahan dan sesinya
+        dibuat pengguna yang sama, hitungan baru tetap menunggu pemilik apa pun angkanya —
+        selisih 0 langsung ditahan (tanpa alasan), selisih lain menunggu_alasan lalu ditahan saat
+        alasan disimpan walau ≤ Rp100.000. Pengganti oleh pengguna lain mengikuti aturan biasa.
+        Hitungan tertahan yang diganti tetap terlihat pemilik (replacedByName).
         Atomik: 422 OpnameProblem dengan galat per barang (barang tidak ditemukan, nonaktif,
         dihitung dua kali, jumlah atau jam tidak valid), tanpa perubahan sebagian.
         Batas min/max di skema adalah panduan klien; server selalu memvalidasi isi mentah.
@@ -1633,15 +1644,20 @@ paths:
       description: |
         Langkah 2 dari 2 (K2); hanya pembuat sesi (sesi orang lain 404). Satu alasan untuk tepat
         setiap barang menunggu_alasan; barang diganti diabaikan. Alasan untuk barang yang tidak
-        perlu alasan, barang tanpa alasan, atau receiptId di luar receiptOptions → 422
-        OpnameProblem, tanpa perubahan sebagian.
-        salah_input (J4): receiptId dari receiptOptions disimpan sebagai rujukan (nota tidak
-        diubah, stok dikoreksi oleh opname); receiptId null → tercatat tidak_diketahui.
+        perlu alasan ("Barang ini tidak perlu alasan"), barang yang tidak ada di sesi ("Barang
+        tidak ditemukan"), alasan ganda ("Barang dihitung dua kali"), barang tanpa alasan ("Pilih
+        alasan"), atau receiptId yang bukan nota aktif berisi barang itu ("Nota rujukan tidak
+        cocok") → 422 OpnameProblem, tanpa perubahan sebagian.
+        salah_input (J4): receiptId disimpan sebagai rujukan (nota tidak diubah, stok dikoreksi
+        oleh opname). receiptOptions hanya 5 nota terbaru yang ditawarkan; server menerima nota
+        aktif mana pun yang memuat barang itu, agar nota baru yang masuk sesudah halaman dimuat
+        tidak membuat pilihan lama ditolak. receiptId null → tercatat tidak_diketahui.
         Nilai (K3): value = round_half_up(|diffQtyBase| × cost.amount ÷ cost.qtyBase) dari HPP
         sekarang; null bila HPP belum ada. Barang ditahan bila value null (J3) atau > Rp100.000
         (J2, nilai mutlak, kurang maupun lebih); selain itu langsung disesuaikan (entri ledger
-        opname dengan alasan, waktu efektif = countedAt). Sesi flagged bila Σ value yang diketahui
-        pada barang selisih > Rp250.000; ditetapkan sekali di sini.
+        opname dengan alasan, waktu efektif = countedAt). Pengecualian (I2): barang yang
+        menggantikan hitungan tertahan milik pengguna yang sama selalu ditahan. Sesi flagged bila
+        Σ value yang diketahui pada barang selisih > Rp250.000; ditetapkan sekali di sini.
         Replay pada sesi selesai → 200 sesi apa adanya, tanpa menerapkan ulang.
       security:
         - staffCookieAuth: []
@@ -1705,7 +1721,9 @@ paths:
         berkurang: entri ledger keluar_kedaluwarsa (qtyBase negatif) atas nama pengguna ini.
         1 ≤ qtyBase ≤ capacityQtyBase kiriman itu, selain itu 422 VALIDATION (detail = pesan);
         stok boleh menjadi minus. Nota tidak ada, dibatalkan, atau tanpa baris itu → 404.
-        Idempoten menurut (pembuat, id): id yang sama tetap 204 tanpa mencatat ulang. Online saja.
+        Idempoten menurut id saja, bukan per pembuat: id yang sudah pernah dicatat (oleh siapa
+        pun, lewat app staf maupun pemilik) → 204 tanpa mencatat ulang dan tanpa memeriksa isinya
+        lagi; isi yang pertama yang berlaku. Online saja.
       security:
         - staffCookieAuth: []
       requestBody:
@@ -1716,7 +1734,7 @@ paths:
               $ref: "#/components/schemas/ExpiryRemovalInput"
       responses:
         "204":
-          description: Dikeluarkan (atau id sudah pernah dicatat pengguna ini)
+          description: Dikeluarkan (atau id ini sudah pernah dicatat)
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -2116,7 +2134,7 @@ components:
           description: Jumlah saldo kasbon seluruh pelanggan tersebut (rupiah).
     Attention:
       type: object
-      required: [lowStockCount, negativeStockCount, cashDifferences, overdueCredit, costChanges, stockOuts, supplierDebts, awaitingPriceCount, expiry, opnameHeldCount, opnameFlags]
+      required: [lowStockCount, negativeStockCount, cashDifferences, overdueCredit, costChanges, stockOuts, supplierDebts, awaitingPriceCount, expiry, opnameHeldCount, opnameFlags, opnameReplacedHeld]
       properties:
         lowStockCount:
           type: integer
@@ -2161,6 +2179,11 @@ components:
           description: Sesi opname flagged yang belum ditinjau (reviewOpnameSession); terbaru dulu (finishedAt).
           items:
             $ref: "#/components/schemas/OpnameFlag"
+        opnameReplacedHeld:
+          type: integer
+          description: |
+            Jumlah barang opname yang dulu ditahan lalu diganti hitungan baru (replacedByName ≠ null),
+            di sesi yang belum ditinjau (reviewedAt null; reviewOpnameSession menghapusnya).
     SupplierDebtAttention:
       type: object
       description: |
@@ -2585,7 +2608,10 @@ components:
         at:
           type: integer
           format: int64
-          description: Waktu dicatat (epoch ms UTC), juga untuk opname yang berlaku pada jam hitung.
+          description: |
+            Waktu dicatat di server (epoch ms UTC), untuk semua jenis termasuk opname dan stok_awal.
+            Jam hitung yang berlaku untuk koreksi opname (waktu efektif, K7) hanya dipakai server
+            untuk stok pada jam tertentu dan tidak diekspos.
         kind:
           type: string
           description: |
@@ -3815,14 +3841,15 @@ components:
       allOf:
         - $ref: "#/components/schemas/StaffOpnameItem"
         - type: object
-          required: [value, units, resolvedByName, resolvedAt, replacedBySessionId, recount]
+          required: [value, units, resolvedByName, resolvedAt, replacedBySessionId, replacedByName, recount]
           properties:
             value:
               type: integer
               nullable: true
               description: |
                 round_half_up(|diffQtyBase| × cost.amount ÷ cost.qtyBase) dari HPP saat dinilai (K3);
-                null bila HPP belum ada (selisih ≠ 0 selalu ditahan, J3).
+                null bila HPP belum ada (selisih ≠ 0 selalu ditahan, J3). Barang yang ditahan lalu
+                diganti menyimpan nilai saat ditahan.
             units:
               type: array
               description: Satuan aktif barang sekarang (untuk penghitung hitung ulang); units[0] = eceran.
@@ -3840,6 +3867,13 @@ components:
               type: string
               nullable: true
               description: Sesi yang hitungannya menggantikan barang ini (state diganti).
+            replacedByName:
+              type: string
+              nullable: true
+              description: |
+                Nama pembuat sesi pengganti, hanya bila barang ini berstate ditahan saat diganti
+                (selisih tertahan tetap terlihat pemilik, I2); null untuk barang lain, termasuk
+                yang diganti saat masih menunggu_alasan.
             recount:
               nullable: true
               allOf:
@@ -3850,8 +3884,8 @@ components:
         lossValue / gainValue (K26) = Σ value barang menunggu_alasan, disesuaikan, ditahan,
         disetujui, dan recount.value barang dihitung_ulang (kurang → loss, lebih → gain); cocok,
         stok_awal, dan diganti tidak dihitung. totalValue = lossValue + gainValue. flagged
-        ditetapkan saat alasan disimpan (Σ > Rp250.000) dan tidak berubah.
-      required: [id, scope, status, createdByName, submittedAt, finishedAt, items, lossValue, gainValue, totalValue, flagged, reviewedByName, reviewedAt]
+        ditetapkan saat alasan disimpan (Σ > sessionLimit) dan tidak berubah.
+      required: [id, scope, status, createdByName, submittedAt, finishedAt, items, lossValue, gainValue, totalValue, flagged, sessionLimit, reviewedByName, reviewedAt]
       properties:
         id:
           type: string
@@ -3880,6 +3914,9 @@ components:
           type: integer
         flagged:
           type: boolean
+        sessionLimit:
+          type: integer
+          description: Batas total selisih per sesi (rupiah) dari pengaturan server sekarang (J8; Rp250.000).
         reviewedByName:
           type: string
           nullable: true
@@ -4033,8 +4070,14 @@ components:
           nullable: true
     StaffExpiryList:
       type: object
-      required: [soonDays, lots, recent]
+      required: [today, soonDays, lots, recent]
       properties:
+        today:
+          type: string
+          format: date
+          description: |
+            Hari ini menurut server (Asia/Jakarta), dasar tahap tiap kiriman; app memakainya untuk
+            teks "Lewat {n} hari" / "Hari ini" / "{n} hari lagi", bukan tanggal HP.
         soonDays:
           type: integer
           description: Batas tahap segera (hari), dari pengaturan server.
@@ -4071,8 +4114,12 @@ components:
               description: Nilai yang dikeluarkan dari HPP saat kejadian (K28, tidak dihitung ulang); null untuk ubah_ed atau tanpa HPP.
     OwnerExpiryList:
       type: object
-      required: [soonDays, lots, recent, expiredLossValue]
+      required: [today, soonDays, lots, recent, expiredLossValue]
       properties:
+        today:
+          type: string
+          format: date
+          description: Hari ini menurut server (Asia/Jakarta); lihat StaffExpiryList.today.
         soonDays:
           type: integer
         lots:

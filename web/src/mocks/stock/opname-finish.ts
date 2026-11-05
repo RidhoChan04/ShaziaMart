@@ -103,7 +103,10 @@ export function finishSession(
     item.reason = reason;
     item.receiptRefId = receiptRefId;
     item.value = value;
-    item.state = isHeld(value, opnameItemLimit) ? "ditahan" : "disesuaikan";
+    item.state =
+      item.mustHold || isHeld(value, opnameItemLimit)
+        ? "ditahan"
+        : "disesuaikan";
     if (item.state === "ditahan") continue;
     applyDiff(
       state,

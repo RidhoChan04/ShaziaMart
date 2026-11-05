@@ -137,6 +137,10 @@ export type MockOpnameItem = {
   resolvedByName: string | null;
   resolvedAt: number | null;
   replacedBySessionId: string | null;
+  /** Pembuat sesi pengganti; hanya bila barang ini ditahan saat diganti (tetap terlihat pemilik, I2). */
+  replacedByName: string | null;
+  /** I2: hitungan ini menggantikan hitungan tertahan milik pembuat yang sama → selalu ditahan. */
+  mustHold: boolean;
   recount: {
     countedQtyBase: number;
     countedAt: number;

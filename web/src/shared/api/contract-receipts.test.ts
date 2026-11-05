@@ -428,6 +428,7 @@ const STAFF_RESPONSE_KEYS: Record<string, readonly string[]> = {
   GetStaffOpnameSessionResponse: OPNAME_SESSION,
   FinishStaffOpnameSessionResponse: OPNAME_SESSION,
   GetStaffExpiryResponse: [
+    "today",
     "soonDays",
     "lots",
     "lineId",
@@ -578,7 +579,7 @@ test("hitung buta: barang opname = StaffProduct tanpa stok; respons staf memakai
   >();
   expectTypeOf<Required<ExpiryEvent>>().toEqualTypeOf<ExpiryEvent>();
   expectTypeOf<keyof StaffExpiryList>().toEqualTypeOf<
-    "soonDays" | "lots" | "recent"
+    "today" | "soonDays" | "lots" | "recent"
   >();
   expectTypeOf<keyof StaffLowStockItem>().toEqualTypeOf<
     | "productId"
@@ -627,6 +628,7 @@ test("respons staf opname & kedaluwarsa contoh mockup valid", () => {
     staffZod.GetStaffOpnameSessionResponse.safeParse(session).success,
   ).toBe(true);
   const expiry = {
+    today: "2026-11-02",
     soonDays: 30,
     lots: [
       {

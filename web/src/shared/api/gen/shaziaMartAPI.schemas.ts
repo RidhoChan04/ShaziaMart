@@ -324,6 +324,11 @@ export interface Attention {
   opnameHeldCount: number;
   /** Sesi opname flagged yang belum ditinjau (reviewOpnameSession); terbaru dulu (finishedAt). */
   opnameFlags: OpnameFlag[];
+  /**
+     * Jumlah barang opname yang dulu ditahan lalu diganti hitungan baru (replacedByName ≠ null),
+     * di sesi yang belum ditinjau (reviewedAt null; reviewOpnameSession menghapusnya).
+     */
+  opnameReplacedHeld: number;
 }
 
 /**
@@ -589,7 +594,11 @@ export const OpnameReason = {
 
 export interface StockMovement {
   id: string;
-  /** Waktu dicatat (epoch ms UTC), juga untuk opname yang berlaku pada jam hitung. */
+  /**
+     * Waktu dicatat di server (epoch ms UTC), untuk semua jenis termasuk opname dan stok_awal.
+     * Jam hitung yang berlaku untuk koreksi opname (waktu efektif, K7) hanya dipakai server
+     * untuk stok pada jam tertentu dan tidak diekspos.
+     */
   at: number;
   /**
      * jual / batal = penjualan dan pembatalannya; masuk = barang masuk; koreksi_masuk = nota
@@ -1716,7 +1725,8 @@ export interface OpnameRecount {
 export type OwnerOpnameItem = StaffOpnameItem & ({
   /**
      * round_half_up(|diffQtyBase| × cost.amount ÷ cost.qtyBase) dari HPP saat dinilai (K3);
-     * null bila HPP belum ada (selisih ≠ 0 selalu ditahan, J3).
+     * null bila HPP belum ada (selisih ≠ 0 selalu ditahan, J3). Barang yang ditahan lalu
+     * diganti menyimpan nilai saat ditahan.
      * @nullable
      */
   value: number | null;
@@ -1734,6 +1744,13 @@ export type OwnerOpnameItem = StaffOpnameItem & ({
      * @nullable
      */
   replacedBySessionId: string | null;
+  /**
+     * Nama pembuat sesi pengganti, hanya bila barang ini berstate ditahan saat diganti
+     * (selisih tertahan tetap terlihat pemilik, I2); null untuk barang lain, termasuk
+     * yang diganti saat masih menunggu_alasan.
+     * @nullable
+     */
+  replacedByName: string | null;
   recount: OpnameRecount | null;
 });
 
@@ -1741,7 +1758,7 @@ export type OwnerOpnameItem = StaffOpnameItem & ({
  * lossValue / gainValue (K26) = Σ value barang menunggu_alasan, disesuaikan, ditahan,
  * disetujui, dan recount.value barang dihitung_ulang (kurang → loss, lebih → gain); cocok,
  * stok_awal, dan diganti tidak dihitung. totalValue = lossValue + gainValue. flagged
- * ditetapkan saat alasan disimpan (Σ > Rp250.000) dan tidak berubah.
+ * ditetapkan saat alasan disimpan (Σ > sessionLimit) dan tidak berubah.
  */
 export interface OwnerOpnameSession {
   id: string;
@@ -1756,6 +1773,8 @@ export interface OwnerOpnameSession {
   gainValue: number;
   totalValue: number;
   flagged: boolean;
+  /** Batas total selisih per sesi (rupiah) dari pengaturan server sekarang (J8; Rp250.000). */
+  sessionLimit: number;
   /** @nullable */
   reviewedByName: string | null;
   /** @nullable */
@@ -1873,6 +1892,11 @@ export interface ExpiryEvent {
 }
 
 export interface StaffExpiryList {
+  /**
+     * Hari ini menurut server (Asia/Jakarta), dasar tahap tiap kiriman; app memakainya untuk
+     * teks "Lewat {n} hari" / "Hari ini" / "{n} hari lagi", bukan tanggal HP.
+     */
+  today: string;
   /** Batas tahap segera (hari), dari pengaturan server. */
   soonDays: number;
   lots: StaffExpiryLot[];
@@ -1903,6 +1927,8 @@ export type OwnerExpiryEvent = ExpiryEvent & ({
 });
 
 export interface OwnerExpiryList {
+  /** Hari ini menurut server (Asia/Jakarta); lihat StaffExpiryList.today. */
+  today: string;
   soonDays: number;
   lots: OwnerExpiryLot[];
   /** @maxItems 20 */

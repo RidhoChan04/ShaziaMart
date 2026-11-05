@@ -2516,9 +2516,13 @@ export const useRecountOpnameItem = <TError = ErrorType<UnauthorizedResponse | N
 }
 
 /**
- * Mengisi reviewedByName dan reviewedAt; sesi hilang dari Attention.opnameFlags. Idempoten:
- * sesi yang sudah ditinjau dikembalikan apa adanya. flagged tidak berubah.
- * @summary Tandai sesi bertanda selisih besar sudah ditinjau
+ * Boleh untuk sesi apa pun (bertanda atau tidak, selesai atau belum): mengisi reviewedByName
+ * dan reviewedAt. Idempoten: sesi yang sudah ditinjau dikembalikan apa adanya, tanpa
+ * mengubah reviewed*. flagged tidak berubah dan barang tidak diubah. Sesudahnya sesi tidak
+ * lagi ada di Attention.opnameFlags, dan barangnya yang ditahan lalu diganti
+ * (replacedByName ≠ null) tidak lagi dihitung di Attention.opnameReplacedHeld. App pemilik
+ * menawarkannya untuk sesi flagged atau sesi yang punya barang tertahan yang diganti.
+ * @summary Tandai sesi opname sudah ditinjau
  */
 export const reviewOpnameSession = async (sessionId: string, options?: Parameters<typeof customFetch>[1]): Promise<OwnerOpnameSession> => {
 
@@ -2570,7 +2574,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type ReviewOpnameSessionMutationVariables = {sessionId: string}
 
     /**
- * @summary Tandai sesi bertanda selisih besar sudah ditinjau
+ * @summary Tandai sesi opname sudah ditinjau
  */
 export const useReviewOpnameSession = <TError = ErrorType<UnauthorizedResponse | NotFoundResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reviewOpnameSession>>, TError,ReviewOpnameSessionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
@@ -2693,7 +2697,8 @@ export const getCreateOwnerExpiryRemovalUrl = () => {
 }
 
 /**
- * Aturan sama dengan createStaffExpiryRemoval; tercatat atas nama pemilik.
+ * Aturan sama dengan createStaffExpiryRemoval, termasuk idempoten menurut id saja (id yang
+ * sudah dicatat siapa pun → 204 tanpa mencatat ulang); tercatat atas nama pemilik.
  * @summary Keluarkan barang kedaluwarsa dari stok (pemilik)
  */
 export const createOwnerExpiryRemoval = async (expiryRemovalInput: ExpiryRemovalInput, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
