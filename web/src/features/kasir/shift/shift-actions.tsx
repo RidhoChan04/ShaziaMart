@@ -9,6 +9,7 @@ import type {
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { Button } from "@/shared/ui/button";
 import { useCart } from "../cart/cart-store";
+import { RepaymentDialog } from "../credit/repayment-dialog";
 import { HistorySheet } from "../history/history-sheet";
 import { focusScanBox } from "../scan/scan-box";
 import { CloseShiftDialog } from "./close-shift-dialog";
@@ -47,6 +48,7 @@ export function ShiftActions({
   const hasLines = useCart((s) => s.lines.length > 0);
   const [closing, setClosing] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [repaying, setRepaying] = useState(false);
   // Kunci tetap berlaku di layar walau server tidak menjawab.
   const logout = useLogout({
     mutation: {
@@ -63,6 +65,17 @@ export function ShiftActions({
 
   return (
     <>
+      {/* Boleh dipakai saat keranjang berisi: keranjang tidak disentuh (ruling R7). */}
+      <Button variant="outline" onClick={() => setRepaying(true)}>
+        Pelunasan kasbon
+      </Button>
+      <RepaymentDialog
+        open={repaying}
+        onClose={() => {
+          setRepaying(false);
+          focusScanBox();
+        }}
+      />
       <Button variant="outline" onClick={() => setHistoryOpen(true)}>
         Riwayat
       </Button>

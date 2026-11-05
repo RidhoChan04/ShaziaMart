@@ -13,12 +13,31 @@ import { Input } from "@/shared/ui/input";
 
 const DEBOUNCE_MS = 150;
 
-function CustomerInfo({ customer }: { customer: Customer }) {
+type PickerMode = "kasbon" | "pelunasan";
+
+function balanceText(customer: Customer, mode: PickerMode) {
+  const limit = `Limit ${formatRupiah(customer.creditLimit)}`;
+  if (mode === "pelunasan") {
+    return `Sisa kasbon ${formatRupiah(customer.balance)} · ${limit}`;
+  }
+  // Pembatalan kasbon lama yang sudah dicicil bisa membuat saldo minus (lebih bayar).
+  return customer.balance < 0
+    ? `Lebih bayar ${formatRupiah(-customer.balance)} · ${limit}`
+    : `Saldo ${formatRupiah(customer.balance)} · ${limit}`;
+}
+
+function CustomerInfo({
+  customer,
+  mode,
+}: {
+  customer: Customer;
+  mode: PickerMode;
+}) {
   return (
     <>
       <span className="block font-medium">{`${customer.name} · ${customer.phone}`}</span>
       <span className="block text-sm text-muted tabular-nums">
-        {`Saldo ${formatRupiah(customer.balance)} · Limit ${formatRupiah(customer.creditLimit)}`}
+        {balanceText(customer, mode)}
       </span>
     </>
   );
@@ -101,14 +120,20 @@ function NewCustomerForm({ onCreated }: { onCreated: (c: Customer) => void }) {
   );
 }
 
-/** Pilih pelanggan kasbon: cari nama/no. HP atau tambah baru. */
+/**
+ * Pilih pelanggan: cari nama/no. HP atau (mode `kasbon`, bawaan) tambah baru.
+ * Mode `pelunasan` hanya menampilkan pelanggan yang masih punya kasbon.
+ */
 export function CustomerPicker({
   value,
   onChange,
+  mode = "kasbon",
 }: {
   value: Customer | null;
   onChange: (customer: Customer | null) => void;
+  mode?: PickerMode;
 }) {
+  const repayment = mode === "pelunasan";
   const searchId = useId();
   const searchRef = useRef<HTMLInputElement>(null);
   const [text, setText] = useState("");
@@ -125,7 +150,7 @@ export function CustomerPicker({
   }, [refocus, value]);
 
   const search = useSearchCustomers(
-    { q },
+    repayment ? { q, owing: true } : { q },
     // Daftar lama tetap tampil selama pencarian baru dimuat (tanpa kedip).
     { query: { enabled: value === null, placeholderData: keepPreviousData } },
   );
@@ -134,7 +159,7 @@ export function CustomerPicker({
     return (
       <div className="flex items-center justify-between gap-2 rounded-md border border-primary bg-primary-soft p-2">
         <div>
-          <CustomerInfo customer={value} />
+          <CustomerInfo customer={value} mode={mode} />
         </div>
         <Button
           type="button"
@@ -180,12 +205,15 @@ export function CustomerPicker({
               className="w-full rounded-md border border-border px-3 py-1.5 text-left hover:bg-primary-soft focus-visible:outline-2 focus-visible:outline-primary"
               onClick={() => onChange(c)}
             >
-              <CustomerInfo customer={c} />
+              <CustomerInfo customer={c} mode={mode} />
             </button>
           </li>
         ))}
       </ul>
-      {adding ? (
+      {repayment && search.data?.length === 0 && (
+        <p className="text-sm text-muted">Tidak ada pelanggan dengan kasbon</p>
+      )}
+      {repayment ? null : adding ? (
         <NewCustomerForm onCreated={onChange} />
       ) : (
         <Button type="button" variant="ghost" onClick={() => setAdding(true)}>

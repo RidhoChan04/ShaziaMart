@@ -58,3 +58,38 @@ test("Tambah pelanggan: validasi nama & telepon, lalu tersimpan dan terpilih", a
   expect(screen.getByText("Saldo Rp0 · Limit Rp500.000")).toBeInTheDocument();
   expect(mockDb.get().customers.map((c) => c.name)).toContain("Bu Ani");
 });
+
+function ModeHarness({ mode }: { mode: "kasbon" | "pelunasan" }) {
+  const [value, setValue] = useState<Customer | null>(null);
+  return <CustomerPicker value={value} onChange={setValue} mode={mode} />;
+}
+
+test("(jawaban pemilik Q8) tab Kasbon: pelanggan saldo −40.000 → 'Lebih bayar Rp40.000 · Limit Rp500.000'", async () => {
+  mockDb.update((s) => {
+    const c = s.customers.find((x) => x.name === "Bu Sari");
+    if (c) c.balance = -40_000;
+  });
+  const user = userEvent.setup();
+  renderWithQuery(<ModeHarness mode="kasbon" />);
+  await user.type(search(), "Sari");
+  const option = await screen.findByRole("button", { name: /Bu Sari/ });
+  expect(option).toHaveTextContent("Lebih bayar Rp40.000 · Limit Rp500.000");
+  expect(option).not.toHaveTextContent("Saldo");
+  await user.click(option);
+  expect(
+    screen.getByText("Lebih bayar Rp40.000 · Limit Rp500.000"),
+  ).toBeInTheDocument();
+});
+
+test("mode pelunasan: hanya pelanggan bersisa, tanpa Tambah pelanggan, info 'Sisa kasbon'; kosong → keterangan", async () => {
+  const user = userEvent.setup();
+  renderWithQuery(<ModeHarness mode="pelunasan" />);
+  const sari = await screen.findByRole("button", { name: /Bu Sari/ });
+  expect(sari).toHaveTextContent("Sisa kasbon Rp120.000 · Limit Rp500.000");
+  expect(screen.queryByRole("button", { name: /Mbak Dewi/ })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Tambah pelanggan" })).toBeNull();
+  await user.type(search(), "zzzz");
+  expect(
+    await screen.findByText("Tidak ada pelanggan dengan kasbon"),
+  ).toBeInTheDocument();
+});
