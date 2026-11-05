@@ -49,6 +49,12 @@ const staffOpnameRoute = createRoute({
   component: lazyRouteComponent(loadStaff, "StaffPlaceholderPage"),
 });
 
+const staffOpnameHasilRoute = createRoute({
+  getParentRoute: () => staffRoute,
+  path: "opname/$sessionId",
+  component: lazyRouteComponent(loadStaff, "OpnameResultPage"),
+});
+
 const staffKedaluwarsaRoute = createRoute({
   getParentRoute: () => staffRoute,
   path: "kedaluwarsa",
@@ -68,6 +74,7 @@ export const staffTree = staffRoute.addChildren([
   staffMasukBaruRoute,
   staffMasukDetailRoute,
   staffOpnameRoute,
+  staffOpnameHasilRoute,
   staffKedaluwarsaRoute,
   staffLainnyaRoute,
 ]);
