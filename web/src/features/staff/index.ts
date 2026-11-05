@@ -2,6 +2,7 @@
 
 export { ExpiryPage } from "./expiry/expiry-page";
 export { StaffBerandaPage } from "./home/beranda-page";
+export { LowStockPage } from "./home/low-stock-page";
 export { CountPage } from "./opname/count-page";
 export { OpnamePage } from "./opname/opname-page";
 export { OpnameResultPage } from "./opname/result-page";

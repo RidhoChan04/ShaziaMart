@@ -70,6 +70,12 @@ const staffKedaluwarsaRoute = createRoute({
   component: lazyRouteComponent(loadStaff, "ExpiryPage"),
 });
 
+const staffMenipisRoute = createRoute({
+  getParentRoute: () => staffRoute,
+  path: "menipis",
+  component: lazyRouteComponent(loadStaff, "LowStockPage"),
+});
+
 const staffLainnyaRoute = createRoute({
   getParentRoute: () => staffRoute,
   path: "lainnya",
@@ -86,5 +92,6 @@ export const staffTree = staffRoute.addChildren([
   staffOpnameHitungRoute,
   staffOpnameHasilRoute,
   staffKedaluwarsaRoute,
+  staffMenipisRoute,
   staffLainnyaRoute,
 ]);
