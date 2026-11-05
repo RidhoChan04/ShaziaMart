@@ -10,7 +10,9 @@ import { useStaffSync } from "../drafts/sync-context";
 import { CountCard } from "./count-card";
 import { CountList } from "./count-list";
 import {
+  autoOpenProduct,
   type Current,
+  changeQty,
   findByBarcode,
   nextUncounted,
   openProduct,
@@ -73,14 +75,20 @@ function CountScreen({ draftId }: { draftId: string }) {
     ? draft.products.find((p) => p.id === current.productId)
     : undefined;
 
-  const persist = (next: OpnameDraft) => {
+  // Gagal menulis ke HP: peringatan penyimpanan tampil (storageError); pemanggil yang perlu kepastian membaca hasilnya.
+  const persist = async (next: OpnameDraft): Promise<boolean> => {
     setEdited(next);
-    save(next).catch(() => undefined);
+    try {
+      await save(next);
+      return true;
+    } catch {
+      return false;
+    }
   };
   // Jumlah di kartu yang sudah diubah tidak hilang saat pindah barang, jeda, atau selesai.
   const flushed = (): OpnameDraft => {
     const next = withTouched(draft, current, Date.now());
-    if (next !== draft) persist(next);
+    if (next !== draft) void persist(next);
     return next;
   };
 
@@ -101,22 +109,29 @@ function CountScreen({ draftId }: { draftId: string }) {
   const saveCurrent = () => {
     if (!current) return;
     const next = setCount(draft, current, Date.now());
-    persist(next);
+    void persist(next);
     const following = nextUncounted(next, current.productId);
-    setCurrent(
-      following ? openProduct(next, following, "buka", Date.now()) : null,
-    );
+    setCurrent(following ? autoOpenProduct(next, following) : null);
     focusScan();
   };
 
   const removeCount = (productId: string) => {
     const { [productId]: _gone, ...counts } = draft.counts;
-    persist({
+    void persist({
       ...draft,
       updatedAt: Date.now(),
       counts,
       errors: draft.errors.filter((e) => e.productId !== productId),
     });
+  };
+
+  // Jeda/Kembali: pindah hanya bila hitungan benar-benar tersimpan di HP.
+  const leave = async () => {
+    const next = withTouched(draft, current, Date.now());
+    if (!readOnly && (next !== draft || storageError)) {
+      if (!(await persist(next))) return;
+    }
+    toTab();
   };
 
   const finish = async () => {
@@ -164,10 +179,7 @@ function CountScreen({ draftId }: { draftId: string }) {
         counted={Object.keys(draft.counts).length}
         total={total}
         readOnly={readOnly}
-        onLeave={() => {
-          flushed();
-          toTab();
-        }}
+        onLeave={() => void leave()}
       />
       <CountNotices
         storageError={storageError || sync.storageError}
@@ -196,7 +208,7 @@ function CountScreen({ draftId }: { draftId: string }) {
             product={currentProduct}
             current={current}
             onChange={(qtyBase) =>
-              setCurrent({ ...current, qtyBase, touched: true })
+              setCurrent(changeQty(current, qtyBase, Date.now()))
             }
             onSave={saveCurrent}
           />

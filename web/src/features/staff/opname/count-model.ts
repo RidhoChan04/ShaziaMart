@@ -6,10 +6,15 @@ import type { OpnameDraft } from "./opname-draft-types";
 export type Current = {
   productId: string;
   qtyBase: number;
-  /** Jam HP saat barang dibuka (K6) → `countedAt` bila disimpan. */
-  openedAt: number;
+  /**
+   * Jam HP saat barang dibuka untuk dihitung (K6) → `countedAt` bila disimpan. null = kartu
+   * dibuka otomatis setelah `Simpan, lanjut…` dan belum disentuh; jamnya dicap saat interaksi pertama.
+   */
+  openedAt: number | null;
+  /** Jumlah saat kartu dibuka; `touched` hanya bila jumlah sekarang berbeda dari ini. */
+  initialQty: number;
   source: "scan" | "buka";
-  /** Jumlah sudah diubah pengguna (dipertahankan saat pindah barang / jeda / selesai). */
+  /** Jumlah benar-benar berbeda dari saat dibuka (dipertahankan saat pindah barang / jeda / selesai). */
   touched: boolean;
 };
 
@@ -37,7 +42,9 @@ export function findByBarcode(
   products: readonly StaffProduct[],
   code: string,
 ): StaffProduct | undefined {
+  // Nol di depan diabaikan (UPC-A vs EAN-13); kode semua-nol tidak boleh cocok dengan barcode kosong/nol.
   const wanted = digits(code);
+  if (wanted === "") return undefined;
   return products.find((p) =>
     p.units.some((u) => u.barcodes.some((b) => digits(b) === wanted)),
   );
@@ -63,12 +70,36 @@ export function openProduct(
   source: Current["source"],
   now: number,
 ): Current {
+  const qty = draft.counts[product.id]?.qtyBase ?? 0;
   return {
     productId: product.id,
-    qtyBase: draft.counts[product.id]?.qtyBase ?? 0,
+    qtyBase: qty,
     openedAt: now,
+    initialQty: qty,
     source,
     touched: false,
+  };
+}
+
+/** Kartu yang dibuka otomatis setelah simpan: jam belum dicap sampai pengguna menyentuhnya. */
+export function autoOpenProduct(
+  draft: OpnameDraft,
+  product: StaffProduct,
+): Current {
+  return { ...openProduct(draft, product, "buka", 0), openedAt: null };
+}
+
+/** Ubah jumlah di kartu; interaksi pertama pada kartu otomatis mencap jam hitung. */
+export function changeQty(
+  current: Current,
+  qtyBase: number,
+  now: number,
+): Current {
+  return {
+    ...current,
+    qtyBase,
+    openedAt: current.openedAt ?? now,
+    touched: qtyBase !== current.initialQty,
   };
 }
 
@@ -108,7 +139,7 @@ export function setCount(
       ...draft.counts,
       [current.productId]: {
         qtyBase: current.qtyBase,
-        countedAt: current.openedAt,
+        countedAt: current.openedAt ?? now,
       },
     },
   };

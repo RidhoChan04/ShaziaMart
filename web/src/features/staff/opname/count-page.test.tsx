@@ -472,3 +472,92 @@ test("Jeda menyimpan jumlah yang sudah diubah tetapi belum disimpan", async () =
     countedAt: T("10.20"),
   });
 });
+
+test("kartu yang dibuka otomatis setelah simpan: jam dicap saat interaksi pertama, bukan saat dibuka", async () => {
+  const user = userEvent.setup();
+  const { store } = await open();
+  vi.setSystemTime(T("10.20"));
+  await user.click(within(todo()).getByRole("button", { name: INDOMIE }));
+  await user.click(screen.getByRole("button", { name: "Tambah Pcs" }));
+  vi.setSystemTime(T("10.30"));
+  await press(user, "Simpan, lanjut barang berikutnya");
+  const at = names().indexOf(INDOMIE);
+  const next = names()[(at + 1) % names().length] ?? "";
+  await waitFor(() =>
+    expect(within(card()).getByRole("heading", { name: next })).toBeVisible(),
+  );
+  expect(within(card()).queryByText(/^Dibuka/)).toBeNull();
+  vi.setSystemTime(T("10.40"));
+  await user.click(screen.getByRole("button", { name: "Tambah Pcs" }));
+  expect(within(card()).getByText("Dibuka 10.40")).toBeVisible();
+  vi.setSystemTime(T("10.50"));
+  await press(user, "Simpan, lanjut barang berikutnya");
+  await waitFor(async () =>
+    expect((await stored(store)).counts[idOf(next)]).toEqual({
+      qtyBase: 1,
+      countedAt: T("10.40"),
+    }),
+  );
+});
+
+test("diubah lalu dikembalikan (+ lalu −) tidak tersimpan otomatis sebagai 0; Simpan eksplisit tetap menyimpan", async () => {
+  const user = userEvent.setup();
+  const { store, router } = await open();
+  await user.click(within(todo()).getByRole("button", { name: INDOMIE }));
+  await user.click(screen.getByRole("button", { name: "Tambah Pcs" }));
+  await user.click(screen.getByRole("button", { name: "Kurangi Pcs" }));
+  await press(user, "Jeda");
+  await waitFor(() =>
+    expect(router.state.location.pathname).toBe("/staff/opname"),
+  );
+  expect((await stored(store)).counts[idOf(INDOMIE)]).toBeUndefined();
+});
+
+test("Simpan eksplisit pada kartu yang tidak diubah menyimpan 0", async () => {
+  const user = userEvent.setup();
+  const { store } = await open();
+  await user.click(within(todo()).getByRole("button", { name: INDOMIE }));
+  await user.click(screen.getByRole("button", { name: "Tambah Pcs" }));
+  await user.click(screen.getByRole("button", { name: "Kurangi Pcs" }));
+  await press(user, "Simpan, lanjut barang berikutnya");
+  await waitFor(async () =>
+    expect((await stored(store)).counts[idOf(INDOMIE)]?.qtyBase).toBe(0),
+  );
+});
+
+test("gagal menulis ke HP: peringatan tampil dan Jeda tidak pindah halaman", async () => {
+  const user = userEvent.setup();
+  const { store, router } = await open();
+  await user.click(within(todo()).getByRole("button", { name: INDOMIE }));
+  await user.click(screen.getByRole("button", { name: "Tambah Pcs" }));
+  vi.spyOn(store, "put").mockRejectedValue(new Error("penuh"));
+  await press(user, "Jeda");
+  expect(
+    await screen.findByText(/Hitungan tidak bisa disimpan di HP/),
+  ).toBeVisible();
+  expect(router.state.location.pathname).toBe("/staff/opname/hitung");
+});
+
+test("barang curah: isian kg → gram di draf dan 'Jumlah fisik = 1,5 kg'", async () => {
+  const user = userEvent.setup();
+  const gula: StaffProduct = {
+    id: "p-gula-uji",
+    name: "Gula Curah Uji",
+    category: "Mi Instan",
+    isCurah: true,
+    baseUnit: "gram",
+    status: "aktif",
+    units: [{ id: "u-kg", name: "kg", unitSize: 1000, barcodes: [] }],
+  };
+  const { store } = await open({ products: [gula, ...products] });
+  await user.click(
+    within(todo()).getByRole("button", { name: "Gula Curah Uji" }),
+  );
+  await user.type(screen.getByLabelText("Berat (kg)"), "1,5");
+  expect(screen.getByText("= 1,5 kg")).toBeVisible();
+  await press(user, "Simpan, lanjut barang berikutnya");
+  await waitFor(async () =>
+    expect((await stored(store)).counts["p-gula-uji"]?.qtyBase).toBe(1500),
+  );
+  expect(within(done()).getByText("1,5 kg")).toBeVisible();
+});

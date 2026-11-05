@@ -22,9 +22,9 @@ export function CountCard({
   onSave: () => void;
 }) {
   const badge =
-    current.source === "scan"
-      ? `Ter-scan ${jakartaTime(current.openedAt)}`
-      : `Dibuka ${jakartaTime(current.openedAt)}`;
+    current.openedAt === null
+      ? null
+      : `${current.source === "scan" ? "Ter-scan" : "Dibuka"} ${jakartaTime(current.openedAt)}`;
   return (
     <>
       <section
@@ -35,15 +35,17 @@ export function CountCard({
           <span className="text-[13px] font-semibold tracking-wide text-muted uppercase">
             Sedang dihitung
           </span>
-          <span className="inline-flex items-center gap-1 rounded-full bg-primary-soft px-2 py-0.5 text-[12px] font-semibold text-primary tabular-nums">
-            <Check aria-hidden="true" className="size-3" />
-            {badge}
-          </span>
+          {badge && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-primary-soft px-2 py-0.5 text-[12px] font-semibold text-primary tabular-nums">
+              <Check aria-hidden="true" className="size-3" />
+              {badge}
+            </span>
+          )}
         </div>
         <h2 className="text-[20px] leading-tight font-bold">{product.name}</h2>
         {/* key: penghitung mulai dari jumlah barang ini, bukan sisa barang sebelumnya */}
         <UnitCounter
-          key={`${current.productId}:${current.openedAt}`}
+          key={current.productId}
           units={unitsLargestFirst(product)}
           baseUnitName={counterBaseName(product)}
           isCurah={product.isCurah}
