@@ -84,6 +84,12 @@ const ownerKasbonRoute = createRoute({
   component: lazyRouteComponent(loadOwner, "KasbonPage"),
 });
 
+const ownerKasbonDetailRoute = createRoute({
+  getParentRoute: () => ownerRoute,
+  path: "kasbon/$customerId",
+  component: lazyRouteComponent(loadOwner, "CustomerPage"),
+});
+
 const ownerLainnyaRoute = createRoute({
   getParentRoute: () => ownerRoute,
   path: "lainnya",
@@ -142,6 +148,7 @@ export const ownerTree = ownerRoute.addChildren([
   ownerBarangUbahRoute,
   ownerLaporanRoute,
   ownerKasbonRoute,
+  ownerKasbonDetailRoute,
   ownerLainnyaRoute,
   ownerBarangMasukRoute,
   ownerBarangMasukDetailRoute,

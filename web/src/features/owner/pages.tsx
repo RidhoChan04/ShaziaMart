@@ -6,7 +6,3 @@ function PlaceholderPage() {
 export function LaporanPage() {
   return <PlaceholderPage />;
 }
-
-export function KasbonPage() {
-  return <PlaceholderPage />;
-}

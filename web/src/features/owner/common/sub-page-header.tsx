@@ -9,6 +9,7 @@ export const pillClass =
 
 type BackFallback =
   | "/owner/barang"
+  | "/owner/kasbon"
   | "/owner/lainnya"
   | "/owner/lainnya/utang"
   | "/owner/lainnya/barang-masuk"

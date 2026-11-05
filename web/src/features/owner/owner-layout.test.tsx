@@ -91,14 +91,14 @@ test("judul halaman = tab aktif", async () => {
   expect(
     await header.findByRole("heading", { level: 1, name: "Kasbon" }),
   ).toBeInTheDocument();
-  await screen.findByText("Segera hadir");
+  await screen.findByText("Total kasbon");
   // Judul besar di kerangka adalah satu-satunya h1 halaman.
   expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
 });
 
-test("header tidak lagi menampilkan ShaziaMart; halaman sementara menampilkan Segera hadir", async () => {
+test("header tidak lagi menampilkan ShaziaMart", async () => {
   renderApp("/owner/kasbon");
-  expect(await screen.findByText("Segera hadir")).toBeInTheDocument();
+  expect(await screen.findByText("Total kasbon")).toBeInTheDocument();
   expect(screen.queryByText("ShaziaMart")).not.toBeInTheDocument();
 });
 
@@ -127,7 +127,7 @@ test("Beranda: h1 hanya dari kerangka (tanpa h1 sr-only di halaman)", async () =
 
 test("offline setelah data dimuat → halaman tetap + banner; pulih → banner hilang", async () => {
   const { queryClient } = renderApp("/owner/kasbon");
-  const page = await screen.findByText("Segera hadir");
+  const page = await screen.findByText("Total kasbon");
   await screen.findByText("Toko online");
   const pollHealth = () =>
     act(() => queryClient.refetchQueries({ queryKey: getGetHealthQueryKey() }));
@@ -154,7 +154,7 @@ test("offline sebelum data apa pun dimuat → layar penuh tidak bisa terhubung +
   renderApp("/owner/kasbon");
   expect(await screen.findByText(OFFLINE_TEXT)).toBeInTheDocument();
   // Halaman belum dipasang; judul besar kerangka tetap satu-satunya h1.
-  expect(screen.queryByText("Segera hadir")).not.toBeInTheDocument();
+  expect(screen.queryByText("Total kasbon")).not.toBeInTheDocument();
   expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
   // navigasi tetap tersedia saat offline
   expect(
@@ -163,7 +163,7 @@ test("offline sebelum data apa pun dimuat → layar penuh tidak bisa terhubung +
 
   setScenario("normal");
   await user.click(screen.getByRole("button", { name: "Coba lagi" }));
-  expect(await screen.findByText("Segera hadir")).toBeInTheDocument();
+  expect(await screen.findByText("Total kasbon")).toBeInTheDocument();
   expect(screen.queryByText(OFFLINE_TEXT)).not.toBeInTheDocument();
 });
 
@@ -215,8 +215,8 @@ test("main memberi ruang bawah untuk kapsul tab bar, termasuk jarak aman bawah",
 
 test("isi halaman memakai kolom max-w-6xl yang sejajar dengan header", async () => {
   renderApp("/owner/kasbon");
-  const placeholder = await screen.findByText("Segera hadir");
-  expect(placeholder.parentElement).toHaveClass("mx-auto", "max-w-6xl");
+  const marker = await screen.findByText("Total kasbon");
+  expect(marker.closest(".max-w-6xl")).toHaveClass("mx-auto", "max-w-6xl");
 });
 
 test("kapsul tab dan kerangka menghormati jarak aman kiri-kanan (viewport-fit=cover)", async () => {
