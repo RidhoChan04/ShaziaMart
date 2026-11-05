@@ -47,6 +47,7 @@ svg.k-i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stro
 /* Isi (main): px-4 pt-1, ruang bawah 7rem untuk tab bar */
 .k-main{padding:4px 16px 112px}
 .k-stack{display:grid;gap:12px}
+.k-stack>*{min-width:0}
 /* Sub-halaman (SubPageHeader) */
 .k-subheader{padding:12px 0 12px}
 .k-back{display:inline-flex;height:44px;align-items:center;gap:2px;border-radius:99px;background:var(--surface);padding:0 16px 0 10px;font-size:15px;font-weight:600;color:var(--primary);box-shadow:0 1px 2px rgba(0,0,0,.06)}
@@ -94,8 +95,8 @@ svg.k-i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stro
 .k-rowl.sm{font-size:16px}
 .k-rowl .t{flex:1;min-width:0}
 .k-rowl .t small{display:block;font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.k-rowl .r{flex:none;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
-.k-rowl .v{flex:none;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.k-rowl .r{flex:none;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap;font-size:15px}
+.k-rowl .v{flex:none;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;font-size:15px}
 .k-rowl .chev{width:16px;height:16px;color:var(--muted)}
 .k-box{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;flex:none;background:var(--primary);color:var(--primary-fg)}
 .k-box svg.k-i{width:18px;height:18px}
@@ -175,7 +176,7 @@ svg.k-i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stro
     <section>
       <div class="k-section-h"><h2>Daftar dua baris</h2><a>Lihat semua</a></div>
       <div class="k-card"><ul class="k-rows">
-        <li><span class="k-rowl sm"><span class="t">Minyak Bimoli 2 L<small>310 pcs · keterangan satu baris</small></span><span class="v">Rp11.904.000</span></span></li>
+        <li><span class="k-rowl sm"><span class="t">Minyak Bimoli 2 L<small>310 pcs</small></span><span class="v">Rp11.904.000</span></span></li>
         <li><span class="k-rowl sm"><span class="t">Beras Premium 5 kg<small>142 karung</small></span><span class="v">Rp9.656.000</span></span></li>
         <li><span class="k-rowl sm"><span class="t">Susu Bendera 200 ml<small>status merah</small></span><span class="k-badge bad"><svg class="k-i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/></svg>Stok minus</span></span></li>
       </ul></div>
