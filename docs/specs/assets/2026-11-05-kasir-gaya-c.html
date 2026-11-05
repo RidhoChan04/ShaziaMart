@@ -1,0 +1,296 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mockup kasir gaya C</title><style>body{margin:0;padding:24px;background:#e9e9ee;font-family:Inter,system-ui,sans-serif}h2{margin:0 0 4px;font-size:18px}.subtitle{margin:0 0 16px;color:#636366}</style></head><body><style>
+  @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+
+  /* ---------- page / picking ---------- */
+  .km-list { display: flex; flex-direction: column; gap: 48px; }
+  .km-pick { width: 956px; max-width: 100%; }
+  .km-ref { width: 700px; max-width: 100%; margin-top: 64px; padding-top: 32px; border-top: 1px solid var(--border); }
+  .km-stage { width: 956px; height: 538px; overflow: hidden; border-radius: 12px; background: #fff;
+    box-shadow: 0 0 0 1px rgba(0,0,0,.14), 0 10px 30px rgba(0,0,0,.12); transition: box-shadow .15s ease; }
+  .km-stage--sheet { width: 700px; }
+  .km-pick.selected .km-stage { outline: 3px solid #0a84ff; outline-offset: 5px; }
+  .km-pick h3, .km-ref h3 { margin-top: 18px; }
+  .km-pick > p, .km-ref > p { font-size: 14px; opacity: .8; max-width: 860px; }
+
+  /* ---------- screen canvas (1366×768 at 70%) ---------- */
+  .km-screen { position: relative; width: 1366px; height: 768px; overflow: hidden; transform: scale(.7); transform-origin: 0 0;
+    background: #fff; color: #1d1d1f; text-align: left;
+    font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 15px; line-height: 20px; letter-spacing: -.006em;
+    font-variant-numeric: tabular-nums; font-feature-settings: "tnum", "cv11"; -webkit-font-smoothing: antialiased; }
+  .km-stage--sheet .km-screen { transform: scale(.7) translateX(-183px); }
+  .km-screen * { box-sizing: border-box; }
+  .km-ic { width: 20px; height: 20px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+  .km-g { color: #1f7a4d; }
+  .km-cap { font-size: 13px; line-height: 16px; font-weight: 600; color: #636366; }
+
+  /* buttons & controls */
+  .km-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 44px; padding: 0 16px;
+    border-radius: 10px; border: 1px solid #7c7c80; background: #fff; color: #1d1d1f; font-weight: 500; white-space: nowrap;
+    box-shadow: 0 1px 1px rgba(0,0,0,.05); }
+  .km-btn--primary { background: #1f7a4d; border-color: #1f7a4d; color: #fff; font-weight: 600;
+    box-shadow: 0 1px 2px rgba(31,122,77,.35), inset 0 1px 0 rgba(255,255,255,.14); }
+  .km-btn--plain { border-color: transparent; background: transparent; box-shadow: none; padding: 0 12px; }
+  .km-btn.km-on { background: #e6f2ea; border: 2px solid #1f7a4d; color: #17663f; }
+  .km-wide { width: 100%; }
+  .km-pay { width: 100%; height: 64px; border-radius: 12px; font-size: 20px; letter-spacing: -.01em; }
+  .km-check { width: 22px; height: 22px; flex: none; border-radius: 6px; background: #1f7a4d; color: #fff; display: grid; place-items: center; }
+  .km-check .km-ic { width: 15px; height: 15px; stroke-width: 3; }
+  .km-switch { position: relative; width: 46px; height: 28px; flex: none; border-radius: 14px; background: #1f7a4d; }
+  .km-switch::after { content: ""; position: absolute; top: 2px; right: 2px; width: 24px; height: 24px; border-radius: 50%; background: #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,.3); }
+  .km-kbd { display: inline-flex; align-items: center; justify-content: center; gap: 4px; height: 22px; min-width: 22px; padding: 0 6px; margin: 0 2px;
+    border-radius: 5px; border: 1px solid #a1a1a6; border-bottom-width: 2px; background: #fff; color: #3a3a3c; font-size: 12px; font-weight: 600; line-height: 1; }
+  .km-online { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; color: #1d1d1f; white-space: nowrap; }
+  .km-online i { width: 8px; height: 8px; border-radius: 50%; background: #1f9d55; box-shadow: 0 0 0 3px rgba(31,157,85,.2); }
+  .km-badge { min-width: 24px; height: 22px; padding: 0 7px; border-radius: 11px; background: #1f7a4d; color: #fff; font-size: 13px; font-weight: 600;
+    display: grid; place-items: center; }
+  .km-chev { width: 18px; height: 18px; color: #636366; }
+  .km-appic { width: 36px; height: 36px; flex: none; border-radius: 9px; display: grid; place-items: center; color: #fff;
+    background: linear-gradient(#2b8c5b, #1f7a4d); box-shadow: inset 0 0 0 1px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.2); }
+  .km-a-title { font-size: 15px; line-height: 18px; font-weight: 700; letter-spacing: -.01em; }
+  .km-a-sub { font-size: 13px; line-height: 16px; font-weight: 500; color: #636366; }
+
+  /* segmented control (selected = solid green for ≥3:1) */
+  .km-seg { display: flex; gap: 2px; padding: 3px; background: #f2f2f7; border: 1px solid #7c7c80; border-radius: 10px; }
+  .km-seg > span { display: flex; align-items: center; justify-content: center; gap: 8px; height: 38px; padding: 0 16px; border-radius: 7px;
+    font-weight: 500; white-space: nowrap; }
+  .km-seg > span.on { background: #1f7a4d; color: #fff; font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.22); }
+  .km-seg em { font-style: normal; font-size: 13px; font-weight: 600; min-width: 22px; height: 20px; padding: 0 6px; border-radius: 10px;
+    background: #e0e0e6; color: #3a3a3c; display: grid; place-items: center; }
+  .km-seg .on em { background: rgba(255,255,255,.24); color: #fff; }
+  .km-seg--full > span { flex: 1; }
+
+  /* scan field (always focused) */
+  .km-scan { display: flex; align-items: center; gap: 12px; height: 44px; padding: 0 14px; background: #fff; border: 2px solid #1f7a4d;
+    border-radius: 10px; box-shadow: 0 0 0 4px rgba(31,122,77,.16); }
+  .km-ph { flex: 1; min-width: 0; color: #636366; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .km-ph::before { content: ""; display: inline-block; width: 2px; height: 20px; margin-right: 2px; vertical-align: -4px; background: #1d1d1f; }
+
+  /* cart table */
+  .km-tbl { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  .km-rows { flex: 1; min-height: 0; overflow: hidden; }
+  .km-row { display: grid; grid-template-columns: var(--km-cols); align-items: center; column-gap: 12px; height: 36px; padding: 0 16px; }
+  .km-head { flex: none; font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: #636366; }
+  .km-r { text-align: right; }
+  .km-b { font-weight: 600; }
+  .km-no { color: #636366; }
+  .km-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .km-tag { display: inline-flex; align-items: center; height: 20px; padding: 0 7px; margin-left: 8px; border-radius: 5px; vertical-align: 1px;
+    font-size: 12px; font-weight: 600; letter-spacing: 0; }
+  .km-tag--curah { background: #ededf0; color: #505055; }
+  .km-tag--grosir { background: #e3f1e9; color: #17663f; }
+  .km-sel { height: 52px; }
+  .km-step { display: flex; align-items: center; gap: 8px; }
+  .km-step b { min-width: 52px; text-align: center; font-weight: 600; }
+  .km-sq { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 10px; border: 1px solid #7c7c80; background: #fff; }
+  .km-act { display: flex; justify-content: flex-end; }
+  .km-del { color: #b42318; }
+
+  /* ================= A · Jendela Mac ================= */
+  .km-a-tb { height: 64px; display: flex; align-items: center; gap: 24px; padding: 0 20px; background: #ececec; border-bottom: 1px solid #c4c4c8; }
+  .km-a-app { display: flex; align-items: center; gap: 12px; flex: none; }
+  .km-a-scan { flex: 1; min-width: 0; }
+  .km-a-tools { display: flex; align-items: center; gap: 8px; flex: none; }
+  .km-a-tools .km-online { margin-right: 8px; }
+  .km-a-body { display: flex; height: 704px; }
+  .km-a-main { flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 16px 24px 0; }
+  .km-a-strip { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; flex: none; }
+  .km-a-strip .km-cap { margin-right: 8px; }
+  .km-a-cb { padding: 0 14px; }
+  .km-a .km-tbl { flex: 1; border: 1px solid #d1d1d6; border-radius: 10px; --km-cols: 40px 1fr 160px 120px 120px 48px; }
+  .km-a .km-head { background: #f6f6f6; border-bottom: 1px solid #d1d1d6; }
+  .km-a .km-rows .km-row:nth-child(even) { background: #f4f5f5; }
+  .km-a .km-rows .km-row.km-sel { background: #1f7a4d; color: #fff; }
+  .km-a .km-sel .km-no { color: #fff; }
+  .km-a .km-sel .km-sq { background: rgba(255,255,255,.14); border-color: rgba(255,255,255,.85); color: #fff; }
+  .km-a-hint { flex: none; height: 48px; display: flex; align-items: center; gap: 2px; font-size: 13px; color: #636366; }
+  .km-dot { margin: 0 8px; }
+  .km-a-insp { width: 360px; flex: none; display: flex; flex-direction: column; padding: 24px; background: #f6f6f6; border-left: 1px solid #d1d1d6; }
+  .km-a-count { font-size: 14px; color: #636366; margin: 2px 0 4px; }
+  .km-total { font-size: 32px; line-height: 40px; font-weight: 700; letter-spacing: -.025em; }
+  .km-group { margin: 24px 0 12px; background: #fff; border: 1px solid #d1d1d6; border-radius: 10px; }
+  .km-grow { display: flex; align-items: center; justify-content: space-between; height: 48px; padding: 0 14px; }
+  .km-grow + .km-grow { border-top: 1px solid #e5e5ea; }
+  .km-grow-l { display: flex; align-items: center; gap: 10px; font-weight: 500; }
+  .km-grow-l .km-ic { color: #636366; }
+  .km-grow-r { display: flex; align-items: center; gap: 6px; }
+  .km-a-insp .km-pay { margin-top: auto; }
+
+  /* sheet (A language) */
+  .km-has-sheet .km-scan { border: 1px solid #b8b8bd; box-shadow: none; padding: 0 15px; }
+  .km-has-sheet .km-ph::before { display: none; }
+  .km-dim { position: absolute; inset: 0; background: rgba(20,20,22,.3); }
+  .km-sheet { position: absolute; top: 88px; left: 50%; width: 600px; margin-left: -300px; padding: 24px; background: #fff; border-radius: 12px;
+    box-shadow: 0 0 0 1px rgba(0,0,0,.12), 0 2px 8px rgba(0,0,0,.12), 0 24px 64px rgba(0,0,0,.28); }
+  .km-sh-head { display: flex; justify-content: space-between; align-items: flex-end; padding-bottom: 16px; margin-bottom: 16px; border-bottom: 1px solid #e5e5ea; }
+  .km-sh-title { font-size: 20px; line-height: 24px; font-weight: 700; letter-spacing: -.02em; }
+  .km-sh-sub { font-size: 14px; color: #636366; margin-top: 2px; }
+  .km-sh-tot { text-align: right; }
+  .km-sh-tot b { display: block; font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: -.02em; }
+  .km-sh-lbl { margin: 20px 0 8px; }
+  .km-sh-input { display: flex; align-items: center; height: 60px; padding: 0 16px; border: 2px solid #1f7a4d; border-radius: 10px;
+    box-shadow: 0 0 0 4px rgba(31,122,77,.16); font-size: 28px; font-weight: 700; letter-spacing: -.02em; }
+  .km-sh-rp { margin-right: 8px; font-size: 18px; font-weight: 600; color: #636366; }
+  .km-caret { width: 2px; height: 30px; margin-left: 3px; background: #1d1d1f; }
+  .km-sh-quick { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 12px; }
+  .km-sh-quick .km-btn { height: 48px; font-weight: 600; }
+  .km-sh-change { display: flex; justify-content: space-between; align-items: center; margin-top: 16px; padding: 14px 20px; border-radius: 12px;
+    background: #f0f8f3; color: #17663f; }
+  .km-sh-change span { font-size: 14px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
+  .km-sh-change b { font-size: 40px; line-height: 48px; font-weight: 700; letter-spacing: -.03em; }
+  .km-sh-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 20px; padding-top: 20px; border-top: 1px solid #e5e5ea; }
+  .km-sh-print { display: flex; align-items: center; gap: 10px; font-weight: 500; }
+  .km-sh-actions { display: flex; gap: 8px; }
+  .km-sh-done { min-width: 152px; }
+  .km-sh-done .km-ic { stroke-width: 2.5; }
+
+  /* ================= B · Lembar putih ================= */
+  .km-b { display: flex; flex-direction: column; }
+  .km-b-hd { flex: none; height: 68px; display: flex; align-items: center; justify-content: space-between; padding: 0 32px; border-bottom: 1px solid #e5e5ea; }
+  .km-b-left { display: flex; align-items: center; gap: 24px; }
+  .km-b-brand { font-size: 20px; font-weight: 700; letter-spacing: -.02em; color: #1f7a4d; }
+  .km-b-right { display: flex; align-items: center; gap: 4px; }
+  .km-b-user { display: flex; align-items: center; gap: 8px; margin-right: 20px; font-weight: 500; }
+  .km-b-user .km-ic { color: #636366; }
+  .km-sepv { width: 1px; height: 24px; margin: 0 8px 0 16px; background: #d1d1d6; }
+  .km-b-tools { flex: none; display: flex; align-items: center; gap: 24px; padding: 20px 32px 12px; }
+  .km-b-scan { flex: 1; height: 52px; border-radius: 12px; background: #f7f7f9; font-size: 16px; }
+  .km-b-scan > .km-ic { color: #1d1d1f; }
+  .km-b-curah { flex: none; display: flex; align-items: center; gap: 12px; }
+  .km-seg--btn { padding: 0; gap: 0; background: #fff; overflow: hidden; }
+  .km-seg--btn > span { height: 50px; padding: 0 14px; border-radius: 0; }
+  .km-seg--btn > span + span { border-left: 1px solid #c7c7cc; }
+  .km-b-tblwrap { flex: 1; min-height: 0; display: flex; padding: 0 20px; }
+  .km-b .km-tbl { flex: 1; --km-cols: 44px 1fr 170px 150px 150px 52px; }
+  .km-b .km-head { border-bottom: 1px solid #d1d1d6; }
+  .km-b .km-rows .km-row { border-bottom: 1px solid #ededf0; }
+  .km-b .km-rows .km-sel { background: #e6f2ea; border-radius: 10px; border-bottom-color: transparent; }
+  .km-b-foot { flex: none; height: 124px; display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 32px 4px;
+    border-top: 1px solid #e5e5ea; }
+  .km-b-opts { display: flex; align-items: center; gap: 24px; }
+  .km-b-tog { display: flex; align-items: center; gap: 12px; height: 44px; font-weight: 500; }
+  .km-b-card { width: 620px; height: 96px; display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 16px 16px 16px 24px;
+    border-radius: 16px; background: #fff; border: 1px solid #e0e0e5; box-shadow: 0 1px 2px rgba(0,0,0,.05), 0 10px 28px rgba(0,0,0,.09); }
+  .km-b-card .km-total { margin-top: 2px; }
+  .km-b-card .km-pay { width: 260px; }
+
+  /* ================= C · Daftar sumber ================= */
+  .km-c { display: flex; }
+  .km-c-side { width: 264px; flex: none; display: flex; flex-direction: column; padding: 0 12px 16px; background: #f2f2f7; border-right: 1px solid #d1d1d6; }
+  .km-c-brand { flex: none; height: 72px; display: flex; align-items: center; gap: 12px; padding: 0 8px; }
+  .km-c-h { padding: 12px 10px 6px; font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: #636366; }
+  .km-c-item { display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 10px; border-radius: 8px; }
+  .km-c-n { flex: 1; min-width: 0; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .km-c-n small { display: block; font-size: 12px; line-height: 15px; font-weight: 400; color: #636366; }
+  .km-c-m { font-size: 13px; color: #636366; }
+  .km-c-cart { height: 52px; }
+  .km-c-on { background: #1f7a4d; color: #fff; }
+  .km-c-on .km-c-m, .km-c-on small { color: #fff; }
+  .km-c-shift { margin-top: auto; display: flex; flex-direction: column; gap: 8px; padding: 12px; background: #fff; border: 1px solid #d1d1d6; border-radius: 12px; }
+  .km-c-who { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; }
+  .km-c-who b { font-weight: 600; }
+  .km-c-who .km-online { width: 100%; font-size: 13px; margin: 4px 0 2px 2px; }
+  .km-c-av { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: #e3f1e9; color: #17663f; font-weight: 700; }
+  .km-c-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .km-c-btns .km-btn { padding: 0 10px; }
+  .km-c-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .km-c-tb { flex: none; height: 72px; display: flex; align-items: center; gap: 24px; padding: 0 24px; border-bottom: 1px solid #d1d1d6; }
+  .km-c-title { font-size: 20px; line-height: 24px; font-weight: 700; letter-spacing: -.02em; }
+  .km-c-scan { flex: 1; }
+  .km-c-split { flex: 1; min-height: 0; display: flex; }
+  .km-c-tbl { flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 8px 8px 0; }
+  .km-c .km-tbl { flex: 1; --km-cols: 28px 1fr 156px 92px 96px 44px; }
+  .km-c .km-row { padding: 0 12px; column-gap: 10px; }
+  .km-c .km-head { border-bottom: 1px solid #d1d1d6; }
+  .km-c .km-rows .km-row { border-bottom: 1px solid #ededf0; }
+  .km-c .km-rows .km-sel { background: #e6f2ea; border-radius: 8px; border-bottom-color: transparent; box-shadow: inset 3px 0 0 #1f7a4d; }
+  .km-c .km-rows .km-empty { border-bottom-color: transparent; }
+  .km-c-tot { width: 300px; flex: none; display: flex; flex-direction: column; gap: 12px; padding: 24px; border-left: 1px solid #d1d1d6; }
+  .km-c-tot .km-total { margin: -8px 0 8px; }
+  .km-c-opt { display: flex; align-items: center; gap: 12px; height: 52px; padding-top: 8px; border-top: 1px solid #e5e5ea; font-weight: 500; }
+  .km-c-tot .km-pay { margin-top: auto; }
+
+  .km-c-hint { padding: 0 8px; border-top: 1px solid #e5e5ea; }
+</style>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><symbol id="km-i-scan" viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M8 7v10"/><path d="M12 7v10"/><path d="M16 7v10"/></symbol><symbol id="km-i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol><symbol id="km-i-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></symbol><symbol id="km-i-lock" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol><symbol id="km-i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></symbol><symbol id="km-i-basket" viewBox="0 0 24 24"><path d="m15 11-1 9"/><path d="m19 11-4-7"/><path d="M2 11h20"/><path d="m3.5 11 1.6 7.4a2 2 0 0 0 2 1.6h9.8a2 2 0 0 0 2-1.6l1.7-7.4"/><path d="M4.5 15.5h15"/><path d="m5 11 4-7"/><path d="m9 11 1 9"/></symbol><symbol id="km-i-scale" viewBox="0 0 24 24"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/></symbol><symbol id="km-i-egg" viewBox="0 0 24 24"><path d="M12 22c4.4 0 7-3.1 7-7.5C19 9.3 15.9 2 12 2S5 9.3 5 14.5C5 18.9 7.6 22 12 22Z"/></symbol><symbol id="km-i-droplet" viewBox="0 0 24 24"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5S5 13 5 15a7 7 0 0 0 7 7z"/></symbol><symbol id="km-i-wheat" viewBox="0 0 24 24"><path d="M2 22 16 8"/><path d="M3.47 12.53 5 11l1.53 1.53a3.5 3.5 0 0 1 0 4.94L5 19l-1.53-1.53a3.5 3.5 0 0 1 0-4.94Z"/><path d="M7.47 8.53 9 7l1.53 1.53a3.5 3.5 0 0 1 0 4.94L9 15l-1.53-1.53a3.5 3.5 0 0 1 0-4.94Z"/><path d="M11.47 4.53 13 3l1.53 1.53a3.5 3.5 0 0 1 0 4.94L13 11l-1.53-1.53a3.5 3.5 0 0 1 0-4.94Z"/><path d="M20 2h2v2a4 4 0 0 1-4 4h-2V6a4 4 0 0 1 4-4Z"/></symbol><symbol id="km-i-sack" viewBox="0 0 24 24"><path d="M8 3h8l-2 4h-4Z"/><path d="M10 7c-4 2-6 6-6 9a5 5 0 0 0 5 5h6a5 5 0 0 0 5-5c0-3-2-7-6-9"/></symbol><symbol id="km-i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol><symbol id="km-i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol><symbol id="km-i-trash" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M10 11v6"/><path d="M14 11v6"/></symbol><symbol id="km-i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol><symbol id="km-i-pause" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M10 9v6"/><path d="M14 9v6"/></symbol><symbol id="km-i-archive" viewBox="0 0 24 24"><rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/></symbol><symbol id="km-i-chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol><symbol id="km-i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4.5"/><path d="M20 21a8 8 0 0 0-16 0"/></symbol><symbol id="km-i-printer" viewBox="0 0 24 24"><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6"/><rect x="6" y="14" width="12" height="8" rx="1"/></symbol><symbol id="km-i-cash" viewBox="0 0 24 24"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></symbol><symbol id="km-i-qr" viewBox="0 0 24 24"><rect width="5" height="5" x="3" y="3" rx="1"/><rect width="5" height="5" x="16" y="3" rx="1"/><rect width="5" height="5" x="3" y="16" rx="1"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/><path d="M21 21v.01"/><path d="M12 7v3a2 2 0 0 1-2 2H7"/><path d="M3 12h.01"/><path d="M12 3h.01"/><path d="M12 16v.01"/><path d="M16 12h1"/><path d="M21 12v.01"/><path d="M12 21v-1"/></symbol><symbol id="km-i-book" viewBox="0 0 24 24"><path d="M2 6h4"/><path d="M2 10h4"/><path d="M2 14h4"/><path d="M2 18h4"/><rect width="16" height="20" x="4" y="2" rx="2"/><path d="M9.5 8h5"/><path d="M9.5 12h5"/></symbol><symbol id="km-i-layers" viewBox="0 0 24 24"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m2 12 8.58 3.91a2 2 0 0 0 1.66 0L21 12"/><path d="m2 17 8.58 3.91a2 2 0 0 0 1.66 0L21 17"/></symbol><symbol id="km-i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol></defs></svg>
+<h2>Kasir gaya C (Daftar sumber) + baris petunjuk</h2>
+<p class="subtitle">Pilihan C dengan baris petunjuk di bawah tabel (ditampilkan 70%), lalu contoh jendela bayar. Acuan gaya visual saja; bila berbeda dengan tabel spec §12c (judul kolom, baris petunjuk, Lainnya, hapus keranjang ditahan, Riwayat), yang berlaku spec. Angka contoh.</p>
+
+<div class="km-list">
+<div class="km-pick" data-choice="c" >
+  <div class="km-stage"><div class="km-screen km-c">
+<nav class="km-c-side">
+  <div class="km-c-brand"><span class="km-appic"><svg class="km-ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#km-i-basket"/></svg></span><div><div class="km-a-title">ShaziaMart</div><div class="km-a-sub">Layar kasir</div></div></div>
+  <div class="km-c-h">Curah cepat</div>
+  <div class="km-c-item"><svg class="km-ic km-g" viewBox="0 0 24 24" aria-hidden="true"><use href="#km-i-sack"/></svg><span class="km-c-n">Gula curah</span><span class="km-c-m">18.000/kg</span></div><div class="km-c-item"><svg class="km-ic km-g" viewBox="0 0 24 24" aria-hidden="true"><use href="#km-i-wheat"/></svg><span class="km-c-n">Beras curah</span><span class="km-c-m">13.500/kg</span></div><div class="km-c-item"><svg class="km-ic km-g" viewBox="0 0 24 24" aria-hidden="true"><use href="#km-i-egg"/></svg><span class="km-c-n">Telur</span><span class="km-c-m">29.000/kg</span></div><div class="km-c-item"><svg class="km-ic km-g" viewBox="0 0 24 24" aria-hidden="true"><use href="#km-i-droplet"/></svg><span class="km-c-n">Minyak curah</span><span class="km-c-m">17.000/L</span></div><div class="km-c-item"><svg class="km-ic km-g" viewBox="0 0 24 24" aria-hidden="true"><use href="#km-i-sack"/></svg><span class="km-c-n">Tepung</span><span class="km-c-m">13.000/kg</span></div>
+  <div class="km-c-h">Keranjang &amp; ditahan</div>
+  <div class="km-c-item km-c-cart km-c-on"><svg class="km-ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#km-i-basket"/></svg><span class="km-c-n">Sedang dilayani<small>12 barang</small></span><span class="km-c-m">494.000</span></div>
+  <div class="km-c-item km-c-cart"><svg class="km-ic km-g" viewBox="0 0 24 24" aria-hidden="true"><use href="#km-i-archive"/></svg><span class="km-c-n">Keranjang 1<small>09.42 · 4 barang</small></span><span class="km-c-m">86.500</span></div>
+  <div class="km-c-item km-c-cart"><svg class="km-ic km-g" viewBox="0 0 24 24" aria-hidden="true"><use href="#km-i-archive"/></svg><span class="km-c-n">Keranjang 2<small>09.51 · 2 barang</small></span><span class="km-c-m">31.000</span></div>
+  <div class="km-c-shift">
+    <div class="km-c-who"><span class="km-c-av">R</span><div><b>Rina</b><div class="km-a-sub">Shift 08.00</div></div><span class="km-online"><i></i>Server tersambung</span></div>
+    <div class="km-c-btns"><span class="km-btn"><svg class="km-ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#km-i-history"/></svg>Riwayat</span><span class="km-btn"><svg class="km-ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#km-i-lock"/></svg>Kunci</span></div>
+    <span class="km-btn km-wide"><svg class="km-ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#km-i-logout"/></svg>Tutup shift</span>
+  </div>
+</nav>
+<div class="km-c-main">
+  <header class="km-c-tb"><div><div class="km-c-title">Sedang dilayani</div><div class="km-a-sub">12 barang di keranjang</div></div>
+    <div class="km-scan km-c-scan"><svg class="km-ic km-g" viewBox="0 0 24 24" aria-hidden="true"><use href="#km-i-scan"/></svg><span class="km-ph">Scan barcode / ketik nama atau kode…</span></div></header>
+  <div class="km-c-split">
+    <div class="km-c-tbl"><div class="km-tbl"><div class="km-row km-head"><span>No.</span><span>Barang</span><span>Qty</span><span class="km-r">Harga</span><span class="km-r">Subtotal</span><span></span></div><div class="km-rows"><div class="km-row"><span class="km-no">1</span><span class="km-name">Beras Pandan Wangi 5 kg</span><span>1 pcs</span><span class="km-r">78.000</span><span class="km-r km-b">78.000</span><span></span></div><div class="km-row"><span class="km-no">2</span><span class="km-name">Minyak Goreng Bimoli 2 L</span><span>2 pcs</span><span class="km-r">36.000</span><span class="km-r km-b">72.000</span><span></span></div><div class="km-row"><span class="km-no">3</span><span class="km-name">Gula Pasir<span class="km-tag km-tag--curah">curah</span></span><span>1,5 kg</span><span class="km-r">18.000/kg</span><span class="km-r km-b">27.000</span><span></span></div><div class="km-row"><span class="km-no">4</span><span class="km-name">Telur Ayam<span class="km-tag km-tag--curah">curah</span></span><span>1 kg</span><span class="km-r">29.000/kg</span><span class="km-r km-b">29.000</span><span></span></div><div class="km-row"><span class="km-no">5</span><span class="km-name">Indomie Goreng<span class="km-tag km-tag--grosir">grosir</span></span><span>1 dus</span><span class="km-r">112.000</span><span class="km-r km-b">112.000</span><span></span></div><div class="km-row km-sel"><span class="km-no">6</span><span class="km-name">Kopi Kapal Api 165 g</span><span class="km-step"><span class="km-sq" title="Kurangi"><svg class="km-ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#km-i-minus"/></svg></span><b>3 pcs</b><span class="km-sq" title="Tambah"><svg class="km-ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#km-i-plus"/></svg></span></span><span class="km-r">14.500</span><span class="km-r km-b">43.500</span><span class="km-act"><span class="km-sq km-del" title="Hapus"><svg class="km-ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#km-i-trash"/></svg></span></span></div><div class="km-row"><span class="km-no">7</span><span class="km-name">Teh Celup Sariwangi 25 s</span><span>2 pcs</span><span class="km-r">6.500</span><span class="km-r km-b">13.000</span><span></span></div><div class="km-row"><span class="km-no">8</span><span class="km-name">Sabun Lifebuoy 110 g</span><span>3 pcs</span><span class="km-r">4.000</span><span class="km-r km-b">12.000</span><span></span></div><div class="km-row"><span class="km-no">9</span><span class="km-name">SKM Frisian Flag 370 g</span><span>2 pcs</span><span class="km-r">12.500</span><span class="km-r km-b">25.000</span><span></span></div><div class="km-row"><span class="km-no">10</span><span class="km-name">Kecap Manis Bango 520 ml</span><span>1 pcs</span><span class="km-r">24.000</span><span class="km-r km-b">24.000</span><span></span></div><div class="km-row"><span class="km-no">11</span><span class="km-name">Tepung Terigu Segitiga Biru<span class="km-tag km-tag--curah">curah</span></span><span>0,5 kg</span><span class="km-r">13.000/kg</span><span class="km-r km-b">6.500</span><span></span></div><div class="km-row"><span class="km-no">12</span><span class="km-name">Aqua 600 ml<span class="km-tag km-tag--grosir">grosir</span></span><span>1 dus</span><span class="km-r">52.000</span><span class="km-r km-b">52.000</span><span></span></div><div class="km-row km-empty"></div><div class="km-row km-empty"></div><div class="km-row km-empty"></div></div></div><div class="km-a-hint km-c-hint">Klik baris untuk ubah jumlah<span class="km-dot">·</span><span class="km-kbd">↑</span><span class="km-kbd">↓</span> pilih baris<span class="km-dot">·</span><span class="km-kbd">Delete</span> hapus baris<span class="km-dot">·</span><span class="km-kbd">Esc</span> tutup daftar cari</div></div>
+    <aside class="km-c-tot">
+      <div class="km-cap">Total · 12 barang</div>
+      <div class="km-total">Rp494.000</div>
+      <div class="km-c-opt"><span class="km-check"><svg class="km-ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#km-i-check"/></svg></span>Cetak struk</div>
+      <span class="km-btn km-wide"><svg class="km-ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#km-i-pause"/></svg>Tahan transaksi</span>
+      <span class="km-btn km-btn--primary km-pay">Bayar</span>
+    </aside>
+  </div>
+</div>
+</div></div>
+  <h3>C · Daftar sumber — dengan petunjuk di bawah tabel</h3>
+  <p>Sidebar kiri ala Finder/Notes: curah cepat, keranjang aktif dan yang ditahan, serta info shift; tabel di tengah, total di kanan.</p>
+</div>
+</div>
+
+<div class="km-ref">
+  <div class="km-stage km-stage--sheet"><div class="km-screen km-a km-has-sheet">
+<header class="km-a-tb">
+  <div class="km-a-app"><span class="km-appic"><svg class="km-ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#km-i-basket"/></svg></span><div><div class="km-a-title">ShaziaMart</div><div class="km-a-sub">Rina · Shift 08.00</div></div></div>
+  <div class="km-scan km-a-scan"><svg class="km-ic km-g" viewBox="0 0 24 24" aria-hidden="true"><use href="#km-i-scan"/></svg><span class="km-ph">Scan barcode / ketik nama atau kode…</span></div>
+  <div class="km-a-tools"><span class="km-online"><i></i>Server tersambung</span><span class="km-btn"><svg class="km-ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#km-i-history"/></svg>Riwayat</span><span class="km-btn"><svg class="km-ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#km-i-lock"/></svg>Kunci</span><span class="km-btn"><svg class="km-ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#km-i-logout"/></svg>Tutup shift</span></div>
+</header>
+<div class="km-a-body">
+  <main class="km-a-main">
+    <div class="km-a-strip"><span class="km-cap">Curah cepat</span><span class="km-btn km-a-cb"><svg class="km-ic km-g" viewBox="0 0 24 24" aria-hidden="true"><use href="#km-i-sack"/></svg>Gula curah</span><span class="km-btn km-a-cb"><svg class="km-ic km-g" viewBox="0 0 24 24" aria-hidden="true"><use href="#km-i-wheat"/></svg>Beras curah</span><span class="km-btn km-a-cb"><svg class="km-ic km-g" viewBox="0 0 24 24" aria-hidden="true"><use href="#km-i-egg"/></svg>Telur</span><span class="km-btn km-a-cb"><svg class="km-ic km-g" viewBox="0 0 24 24" aria-hidden="true"><use href="#km-i-droplet"/></svg>Minyak curah</span><span class="km-btn km-a-cb"><svg class="km-ic km-g" viewBox="0 0 24 24" aria-hidden="true"><use href="#km-i-sack"/></svg>Tepung</span></div>
+    <div class="km-tbl"><div class="km-row km-head"><span>No.</span><span>Barang</span><span>Qty</span><span class="km-r">Harga</span><span class="km-r">Subtotal</span><span></span></div><div class="km-rows"><div class="km-row"><span class="km-no">1</span><span class="km-name">Beras Pandan Wangi 5 kg</span><span>1 pcs</span><span class="km-r">78.000</span><span class="km-r km-b">78.000</span><span></span></div><div class="km-row"><span class="km-no">2</span><span class="km-name">Minyak Goreng Bimoli 2 L</span><span>2 pcs</span><span class="km-r">36.000</span><span class="km-r km-b">72.000</span><span></span></div><div class="km-row"><span class="km-no">3</span><span class="km-name">Gula Pasir<span class="km-tag km-tag--curah">curah</span></span><span>1,5 kg</span><span class="km-r">18.000/kg</span><span class="km-r km-b">27.000</span><span></span></div><div class="km-row"><span class="km-no">4</span><span class="km-name">Telur Ayam<span class="km-tag km-tag--curah">curah</span></span><span>1 kg</span><span class="km-r">29.000/kg</span><span class="km-r km-b">29.000</span><span></span></div><div class="km-row"><span class="km-no">5</span><span class="km-name">Indomie Goreng<span class="km-tag km-tag--grosir">grosir</span></span><span>1 dus</span><span class="km-r">112.000</span><span class="km-r km-b">112.000</span><span></span></div><div class="km-row km-sel"><span class="km-no">6</span><span class="km-name">Kopi Kapal Api 165 g</span><span class="km-step"><span class="km-sq" title="Kurangi"><svg class="km-ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#km-i-minus"/></svg></span><b>3 pcs</b><span class="km-sq" title="Tambah"><svg class="km-ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#km-i-plus"/></svg></span></span><span class="km-r">14.500</span><span class="km-r km-b">43.500</span><span class="km-act"><span class="km-sq km-del" title="Hapus"><svg class="km-ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#km-i-trash"/></svg></span></span></div><div class="km-row"><span class="km-no">7</span><span class="km-name">Teh Celup Sariwangi 25 s</span><span>2 pcs</span><span class="km-r">6.500</span><span class="km-r km-b">13.000</span><span></span></div><div class="km-row"><span class="km-no">8</span><span class="km-name">Sabun Lifebuoy 110 g</span><span>3 pcs</span><span class="km-r">4.000</span><span class="km-r km-b">12.000</span><span></span></div><div class="km-row"><span class="km-no">9</span><span class="km-name">SKM Frisian Flag 370 g</span><span>2 pcs</span><span class="km-r">12.500</span><span class="km-r km-b">25.000</span><span></span></div><div class="km-row"><span class="km-no">10</span><span class="km-name">Kecap Manis Bango 520 ml</span><span>1 pcs</span><span class="km-r">24.000</span><span class="km-r km-b">24.000</span><span></span></div><div class="km-row"><span class="km-no">11</span><span class="km-name">Tepung Terigu Segitiga Biru<span class="km-tag km-tag--curah">curah</span></span><span>0,5 kg</span><span class="km-r">13.000/kg</span><span class="km-r km-b">6.500</span><span></span></div><div class="km-row"><span class="km-no">12</span><span class="km-name">Aqua 600 ml<span class="km-tag km-tag--grosir">grosir</span></span><span>1 dus</span><span class="km-r">52.000</span><span class="km-r km-b">52.000</span><span></span></div><div class="km-row km-empty"></div><div class="km-row km-empty"></div><div class="km-row km-empty"></div><div class="km-row km-empty"></div></div></div>
+    <div class="km-a-hint">Klik baris untuk ubah jumlah<span class="km-dot">·</span><span class="km-kbd">↑</span><span class="km-kbd">↓</span> pilih baris<span class="km-dot">·</span><span class="km-kbd">Delete</span> hapus baris<span class="km-dot">·</span><span class="km-kbd">Esc</span> tutup daftar cari</div>
+  </main>
+  <aside class="km-a-insp">
+    <div class="km-cap">Total belanja</div>
+    <div class="km-a-count">12 barang</div>
+    <div class="km-total">Rp494.000</div>
+    <div class="km-group">
+      <div class="km-grow"><span class="km-grow-l"><svg class="km-ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#km-i-printer"/></svg>Cetak struk</span><span class="km-check"><svg class="km-ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#km-i-check"/></svg></span></div>
+      <div class="km-grow"><span class="km-grow-l"><svg class="km-ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#km-i-archive"/></svg>Keranjang ditahan</span><span class="km-grow-r"><span class="km-badge">2</span><svg class="km-ic km-chev" viewBox="0 0 24 24" aria-hidden="true"><use href="#km-i-chev"/></svg></span></div>
+    </div>
+    <span class="km-btn km-wide"><svg class="km-ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#km-i-pause"/></svg>Tahan transaksi</span>
+    <span class="km-btn km-btn--primary km-pay">Bayar</span>
+  </aside>
+</div><div class="km-dim"></div>
+<div class="km-sheet" role="dialog" aria-label="Pembayaran">
+  <div class="km-sh-head"><div><div class="km-sh-title">Pembayaran</div><div class="km-sh-sub">12 barang · Rina</div></div>
+    <div class="km-sh-tot"><span class="km-cap">Total belanja</span><b>Rp494.000</b></div></div>
+  <div class="km-seg km-seg--full"><span class="on"><svg class="km-ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#km-i-cash"/></svg>Tunai</span><span><svg class="km-ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#km-i-qr"/></svg>QRIS</span><span><svg class="km-ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#km-i-book"/></svg>Kasbon</span><span><svg class="km-ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#km-i-layers"/></svg>Campuran</span></div>
+  <div class="km-cap km-sh-lbl">Uang diterima</div>
+  <div class="km-sh-input"><span class="km-sh-rp">Rp</span>500.000<span class="km-caret"></span></div>
+  <div class="km-sh-quick"><span class="km-btn">Uang pas</span><span class="km-btn km-on">500.000</span><span class="km-btn">600.000</span><span class="km-btn">700.000</span></div>
+  <div class="km-sh-change"><span>Kembalian</span><b>Rp6.000</b></div>
+  <div class="km-sh-foot"><span class="km-sh-print"><span class="km-check"><svg class="km-ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#km-i-check"/></svg></span>Cetak struk</span>
+    <span class="km-sh-actions"><span class="km-btn">Batal <span class="km-kbd">Esc</span></span><span class="km-btn km-btn--primary km-sh-done"><svg class="km-ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#km-i-check"/></svg>Selesai</span></span></div>
+</div></div></div>
+  <h3>Referensi · Lembar Bayar (gaya A)</h3>
+  <p>Sheet melayang di tengah dengan bayangan halus; segmented control Tunai/QRIS/Kasbon/Campuran; kembalian besar; Batal (Esc) dan Selesai di kanan bawah seperti dialog Mac.</p>
+</div>
+
+</body></html>

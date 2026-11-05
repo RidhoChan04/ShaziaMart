@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Curah Cepat Lainnya</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f2f2f7; --card: #ffffff; --ink: #1d1d1f; --muted: #636366; --line: #d1d1d6; --hair: #ededf0;
+    --ctrl: #7c7c80; --green: #1f7a4d; --green-ink: #17663f; --green-soft: #e6f2ea; --danger: #b42318;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #e9e9ee; color: var(--ink); font: 15px/20px Inter, system-ui, "Segoe UI", sans-serif;
+    font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 1360px; margin: 0 auto; padding: 32px 16px 80px; }
+  h1 { font-size: 26px; line-height: 32px; letter-spacing: -.02em; margin: 0 0 6px; }
+  .lead { color: var(--muted); max-width: 860px; margin: 0 0 24px; line-height: 1.5; }
+  .grid { display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start; }
+  .col { min-width: 0; max-width: 100%; }
+  .cap { font-weight: 700; font-size: 16px; margin: 0 0 4px; }
+  .cap span { display: inline-grid; place-items: center; width: 22px; height: 22px; margin-right: 8px; border-radius: 6px; background: var(--ink); color: #fff; font-size: 12px; vertical-align: 1px; }
+  .cap.bad span { background: var(--danger); }
+  .sub { color: var(--muted); font-size: 14px; margin: 0 0 12px; max-width: 600px; line-height: 1.45; }
+  .scroll { overflow-x: auto; max-width: 100%; padding-bottom: 4px; }
+
+  /* ---------- simulated screen slice, real pixels (height 768) ---------- */
+  .screen { position: relative; display: flex; width: 640px; height: 768px; background: #fff; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .ic { width: 20px; height: 20px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+  .g { color: var(--green); }
+  .side { width: 264px; flex: none; display: flex; flex-direction: column; background: var(--bg); border-right: 1px solid var(--line); }
+  .brand { display: flex; align-items: center; gap: 10px; height: 56px; padding: 0 22px; flex: none; }
+  .logo { width: 36px; height: 36px; border-radius: 9px; background: var(--green); color: #fff; display: grid; place-items: center; }
+  .brand b { display: block; font-size: 15px; } .brand small { display: block; font-size: 12px; color: var(--muted); line-height: 15px; }
+  .side-mid { flex: 1; min-height: 0; overflow: hidden; padding: 0 12px; position: relative; }
+  .side-h { padding: 8px 10px 4px; font-size: 12px; font-weight: 600; color: var(--muted); }
+  .row { display: flex; align-items: center; gap: 10px; width: 100%; height: 44px; padding: 0 10px; border: 0; border-radius: 8px; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+  .row:hover { background: #e5e5ea; }
+  .row:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; }
+  .n { flex: 1; min-width: 0; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .n small { display: block; font-size: 12px; line-height: 15px; font-weight: 400; color: var(--muted); }
+  .m { font-size: 13px; color: var(--muted); }
+  .more { color: var(--green-ink); font-weight: 600; font-size: 14px; }
+  .more .m { color: var(--green-ink); font-weight: 600; }
+  .more[aria-expanded="true"] { background: #dcdce2; }
+  .cart { height: 52px; }
+  .cart.on { background: var(--green); color: #fff; cursor: default; } .cart.on .m, .cart.on small { color: #fff; }
+  .held { position: relative; padding-right: 4px; padding-left: 12px; }
+  .held .m { margin-right: 2px; }
+  .del { flex: none; width: 44px; height: 44px; margin-right: -6px; display: grid; place-items: center; border-radius: 8px; color: var(--muted); }
+  .del:hover { background: #dcdce2; color: var(--danger); }
+  .shift { flex: none; margin: 0 12px 12px; padding: 12px; background: #fff; border: 1px solid var(--line); border-radius: 12px; }
+  .who { display: flex; align-items: center; gap: 10px; }
+  .av { width: 32px; height: 32px; border-radius: 50%; background: var(--green-soft); color: var(--green-ink); font-weight: 700; font-size: 13px; display: grid; place-items: center; flex: none; }
+  .who b { display: block; font-size: 14px; } .who small { display: block; font-size: 12px; color: var(--muted); line-height: 15px; }
+  .q { margin-left: auto; width: 44px; height: 44px; margin-right: -6px; display: grid; place-items: center; border-radius: 8px; color: var(--muted); font-weight: 700; font-size: 15px; }
+  .q span { width: 22px; height: 22px; border-radius: 50%; border: 1.75px solid currentColor; display: grid; place-items: center; font-size: 12px; }
+  .srv { display: flex; align-items: center; gap: 6px; margin: 4px 0 8px; font-size: 12px; color: var(--muted); }
+  .srv i { width: 8px; height: 8px; border-radius: 50%; background: #34a853; }
+  .btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .btn { display: flex; align-items: center; justify-content: center; gap: 6px; height: 44px; border-radius: 10px; border: 1px solid var(--ctrl); background: #fff; font: inherit; font-weight: 500; font-size: 14px; color: var(--ink); }
+  .btn.wide { grid-column: 1 / -1; }
+
+  .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .title { height: 64px; display: flex; align-items: center; padding: 0 20px; font-size: 20px; font-weight: 700; border-bottom: 1px solid var(--line); flex: none; }
+  .th, .tr { display: grid; grid-template-columns: 28px minmax(0, 1fr) 70px; column-gap: 10px; align-items: center; padding: 0 20px; }
+  .th { height: 34px; font-size: 13px; font-weight: 600; color: var(--muted); border-bottom: 1px solid var(--line); }
+  .tr { height: 36px; border-bottom: 1px solid var(--hair); }
+  .tr .no { color: var(--muted); } .tr .r { text-align: right; }
+  .tag { display: inline-flex; align-items: center; height: 20px; padding: 0 7px; margin-left: 8px; border-radius: 5px; font-size: 12px; font-weight: 600; background: #ededf0; color: #505055; }
+
+  /* ---------- popover ---------- */
+  .pop { position: absolute; z-index: 5; width: 272px; padding: 6px; background: #fff; border: 1px solid var(--line); border-radius: 12px;
+    box-shadow: 0 2px 6px rgba(0,0,0,.08), 0 12px 32px rgba(0,0,0,.14); }
+  .pop[hidden] { display: none; }
+  .pop::before { content: ""; position: absolute; left: -7px; top: 15px; width: 12px; height: 12px; background: #fff; border-left: 1px solid var(--line); border-bottom: 1px solid var(--line); transform: rotate(45deg); }
+  .pop-h { padding: 6px 10px 4px; font-size: 12px; font-weight: 600; color: var(--muted); }
+  .pop .row.active { background: var(--green-soft); }
+  .pop .row.active .n { color: var(--green-ink); }
+  .pop-f { display: flex; align-items: center; flex-wrap: wrap; gap: 2px; margin-top: 4px; padding: 8px 10px 4px; border-top: 1px solid var(--hair); font-size: 12px; color: var(--muted); }
+  .kbd { display: inline-flex; align-items: center; justify-content: center; height: 20px; min-width: 20px; padding: 0 5px; border-radius: 5px; border: 1px solid #a1a1a6; border-bottom-width: 2px; background: #fff; color: #3a3a3c; font-size: 11px; font-weight: 600; }
+  .dot { margin: 0 4px; }
+
+  .toast { position: absolute; z-index: 6; right: 16px; top: 76px; display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 4px 16px rgba(0,0,0,.12); font-size: 14px; }
+  .toast[hidden] { display: none; }
+
+  /* ---------- "bad" variant markers ---------- */
+  .cut { position: absolute; left: 0; right: 0; bottom: 0; height: 56px; background: linear-gradient(rgba(242,242,247,0), var(--bg) 70%); pointer-events: none; }
+  .flag { position: absolute; z-index: 4; left: 276px; padding: 8px 12px; max-width: 330px; border-radius: 10px; background: #fdecea; color: #7a1c13; font-size: 13px; line-height: 18px; border: 1px solid #f3b8b1; }
+  .flag::before { content: ""; position: absolute; left: -7px; top: 12px; width: 12px; height: 12px; background: #fdecea; border-left: 1px solid #f3b8b1; border-bottom: 1px solid #f3b8b1; transform: rotate(45deg); }
+
+  .facts { margin-top: 28px; max-width: 900px; background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 20px 24px; }
+  .facts h2 { font-size: 17px; margin: 0 0 8px; }
+  .facts li { margin: 6px 0; line-height: 1.5; }
+  code { font-size: 13px; background: #f2f2f7; padding: 1px 5px; border-radius: 5px; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-sack" viewBox="0 0 24 24"><path d="M8 3h8l-2 4h-4Z"/><path d="M10 7c-4 2-6 6-6 9a5 5 0 0 0 5 5h6a5 5 0 0 0 5-5c0-3-2-7-6-9"/></symbol>
+  <symbol id="i-wheat" viewBox="0 0 24 24"><path d="M2 22 16 8"/><path d="M3.47 12.53 5 11l1.53 1.53a3.5 3.5 0 0 1 0 4.94L5 19l-1.53-1.53a3.5 3.5 0 0 1 0-4.94Z"/><path d="M7.47 8.53 9 7l1.53 1.53a3.5 3.5 0 0 1 0 4.94L9 15l-1.53-1.53a3.5 3.5 0 0 1 0-4.94Z"/><path d="M11.47 4.53 13 3l1.53 1.53a3.5 3.5 0 0 1 0 4.94L13 11l-1.53-1.53a3.5 3.5 0 0 1 0-4.94Z"/></symbol>
+  <symbol id="i-egg" viewBox="0 0 24 24"><path d="M12 22c4.4 0 7-3.1 7-7.5C19 9.3 15.9 2 12 2S5 9.3 5 14.5C5 18.9 7.6 22 12 22Z"/></symbol>
+  <symbol id="i-drop" viewBox="0 0 24 24"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5S5 13 5 15a7 7 0 0 0 7 7z"/></symbol>
+  <symbol id="i-basket" viewBox="0 0 24 24"><path d="M2 11h20"/><path d="m3.5 11 1.6 7.4a2 2 0 0 0 2 1.6h9.8a2 2 0 0 0 2-1.6l1.7-7.4"/><path d="m5 11 4-7"/><path d="m19 11-4-7"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M10 9v6"/><path d="M14 9v6"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+  <symbol id="i-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24"><path d="m18 15-6-6-6 6"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="i-store" viewBox="0 0 24 24"><path d="M3 9 5 4h14l2 5"/><path d="M4 9v11h16V9"/><path d="M9 20v-6h6v6"/></symbol>
+</defs></svg>
+
+<div class="wrap">
+  <h1>Curah cepat: baris "Lainnya"</h1>
+  <p class="lead">Bagian dari spec §12c (disetujui 5 Nov 2026). Ukurannya sesuai aslinya. Tinggi layar 768 px, sidebar 264 px, baris 44 px; potongan tengah layar cuma sebagian supaya muat. Contohnya: pemilik memasang 8 barang curah cepat, jadi 5 tampil dan 3 masuk "Lainnya". Contoh <b>A bisa dicoba</b>: popover sudah terbuka saat halaman dimuat. Kalau tertutup, klik baris "› Lainnya 3" di sidebar A untuk membukanya lagi. Coba juga ↑ ↓, Enter, dan Esc.</p>
+
+  <div class="grid">
+    <!-- A: popover (interactive) -->
+    <div class="col">
+      <p class="cap"><span>A</span>Popover di samping (dipilih)</p>
+      <p class="sub">Sisa barang muncul di kartu kecil yang menempel di kanan baris "Lainnya", di atas tabel. Sidebar tidak bergeser, jadi keranjang ditahan dan kartu shift tetap di tempatnya.</p>
+      <div class="scroll"><div class="screen" id="demo">
+        <aside class="side">
+          <div class="brand"><div class="logo"><svg class="ic"><use href="#i-store"/></svg></div><div><b>ShaziaMart</b><small>Layar kasir</small></div></div>
+          <div class="side-mid">
+            <div class="side-h">Curah cepat</div>
+            <button class="row" type="button"><svg class="ic g"><use href="#i-sack"/></svg><span class="n">Gula curah</span><span class="m">18.000/kg</span></button>
+            <button class="row" type="button"><svg class="ic g"><use href="#i-wheat"/></svg><span class="n">Beras curah</span><span class="m">13.500/kg</span></button>
+            <button class="row" type="button"><svg class="ic g"><use href="#i-egg"/></svg><span class="n">Telur</span><span class="m">29.000/kg</span></button>
+            <button class="row" type="button"><svg class="ic g"><use href="#i-drop"/></svg><span class="n">Minyak curah</span><span class="m">17.000/L</span></button>
+            <button class="row" type="button"><svg class="ic g"><use href="#i-sack"/></svg><span class="n">Tepung terigu</span><span class="m">13.000/kg</span></button>
+            <button class="row more" type="button" id="moreBtn" aria-haspopup="listbox" aria-expanded="false" aria-controls="pop"><svg class="ic"><use href="#i-right"/></svg><span class="n">Lainnya</span><span class="m">3</span></button>
+            <div class="side-h">Keranjang &amp; ditahan</div>
+            <div class="row cart on"><svg class="ic"><use href="#i-basket"/></svg><span class="n">Sedang dilayani<small>12 barang</small></span><span class="m">494.000</span></div>
+            <div class="row cart held"><span class="n">Keranjang 1<small>09.14 · 3 barang</small></span><span class="m">45.000</span><span class="del" title="Hapus Keranjang 1"><svg class="ic" style="width:16px;height:16px"><use href="#i-x"/></svg></span></div>
+            <div class="row cart held"><span class="n">Keranjang 2<small>09.20 · 7 barang</small></span><span class="m">126.500</span><span class="del" title="Hapus Keranjang 2"><svg class="ic" style="width:16px;height:16px"><use href="#i-x"/></svg></span></div>
+          </div>
+          <div class="shift">
+            <div class="who"><div class="av">SI</div><div><b>Siti</b><small>Shift 08.00</small></div><span class="q" title="Tampilkan petunjuk"><span>?</span></span></div>
+            <div class="srv"><i></i>Server tersambung</div>
+            <div class="btns"><span class="btn"><svg class="ic" style="width:18px;height:18px"><use href="#i-clock"/></svg>Riwayat</span><span class="btn"><svg class="ic" style="width:18px;height:18px"><use href="#i-lock"/></svg>Kunci</span><span class="btn wide">Tutup shift</span></div>
+          </div>
+        </aside>
+        <section class="main">
+          <div class="title">Transaksi</div>
+          <div class="th"><span>No.</span><span>Barang</span><span style="text-align:right">Qty</span></div>
+          <div class="tr"><span class="no">1</span><span>Indomie Goreng</span><span class="r">5</span></div>
+          <div class="tr"><span class="no">2</span><span>Gula curah<span class="tag">curah</span></span><span class="r">1,5 kg</span></div>
+          <div class="tr"><span class="no">3</span><span>Kecap Bango 520 ml</span><span class="r">1</span></div>
+          <div class="tr"><span class="no">4</span><span>Aqua 600 ml</span><span class="r">12</span></div>
+          <div class="tr"><span class="no">5</span><span>Telur<span class="tag">curah</span></span><span class="r">1 kg</span></div>
+          <div class="tr"><span class="no">6</span><span>Sabun Lifebuoy</span><span class="r">2</span></div>
+        </section>
+
+        <div class="pop" id="pop" hidden>
+          <div class="pop-h" id="popH">Curah lainnya</div>
+          <div role="listbox" aria-labelledby="popH" id="list">
+            <div class="row" role="option" data-name="Ketan curah"><svg class="ic g"><use href="#i-wheat"/></svg><span class="n">Ketan curah</span><span class="m">16.000/kg</span></div>
+            <div class="row" role="option" data-name="Kacang hijau"><svg class="ic g"><use href="#i-sack"/></svg><span class="n">Kacang hijau</span><span class="m">24.000/kg</span></div>
+            <div class="row" role="option" data-name="Minyak goreng premium"><svg class="ic g"><use href="#i-drop"/></svg><span class="n">Minyak goreng premium</span><span class="m">19.500/L</span></div>
+          </div>
+          <div class="pop-f"><span class="kbd">↑</span><span class="kbd">↓</span> pilih<span class="dot">·</span><span class="kbd">Enter</span> buka<span class="dot">·</span><span class="kbd">Esc</span> tutup</div>
+        </div>
+        <div class="toast" id="toast" hidden><svg class="ic g"><use href="#i-check"/></svg><span id="toastT"></span></div>
+      </div></div>
+    </div>
+
+    <!-- B: inline expand (why not) -->
+    <div class="col">
+      <p class="cap bad"><span>×</span>Kalau dibentangkan di sidebar</p>
+      <p class="sub">Sebagai pembanding: 3 barang tambahan mendorong bagian keranjang 132 px ke bawah. Di layar 768 px, keranjang ditahan masuk ke bawah kartu shift dan tidak terlihat, padahal kasir sering memakai bagian itu saat antrean.</p>
+      <div class="scroll"><div class="screen">
+        <aside class="side">
+          <div class="brand"><div class="logo"><svg class="ic"><use href="#i-store"/></svg></div><div><b>ShaziaMart</b><small>Layar kasir</small></div></div>
+          <div class="side-mid">
+            <div class="side-h">Curah cepat</div>
+            <div class="row"><svg class="ic g"><use href="#i-sack"/></svg><span class="n">Gula curah</span><span class="m">18.000/kg</span></div>
+            <div class="row"><svg class="ic g"><use href="#i-wheat"/></svg><span class="n">Beras curah</span><span class="m">13.500/kg</span></div>
+            <div class="row"><svg class="ic g"><use href="#i-egg"/></svg><span class="n">Telur</span><span class="m">29.000/kg</span></div>
+            <div class="row"><svg class="ic g"><use href="#i-drop"/></svg><span class="n">Minyak curah</span><span class="m">17.000/L</span></div>
+            <div class="row"><svg class="ic g"><use href="#i-sack"/></svg><span class="n">Tepung terigu</span><span class="m">13.000/kg</span></div>
+            <div class="row"><svg class="ic g"><use href="#i-wheat"/></svg><span class="n">Ketan curah</span><span class="m">16.000/kg</span></div>
+            <div class="row"><svg class="ic g"><use href="#i-sack"/></svg><span class="n">Kacang hijau</span><span class="m">24.000/kg</span></div>
+            <div class="row"><svg class="ic g"><use href="#i-drop"/></svg><span class="n">Minyak goreng premium</span><span class="m">19.500/L</span></div>
+            <div class="row more"><svg class="ic"><use href="#i-up"/></svg><span class="n">Lebih sedikit</span></div>
+            <div class="side-h">Keranjang &amp; ditahan</div>
+            <div class="row cart on"><svg class="ic"><use href="#i-basket"/></svg><span class="n">Sedang dilayani<small>12 barang</small></span><span class="m">494.000</span></div>
+            <div class="row cart held"><span class="n">Keranjang 1<small>09.14 · 3 barang</small></span><span class="m">45.000</span><span class="del"><svg class="ic" style="width:16px;height:16px"><use href="#i-x"/></svg></span></div>
+            <div class="row cart held"><span class="n">Keranjang 2<small>09.20 · 7 barang</small></span><span class="m">126.500</span><span class="del"><svg class="ic" style="width:16px;height:16px"><use href="#i-x"/></svg></span></div>
+            <div class="cut"></div>
+          </div>
+          <div class="shift">
+            <div class="who"><div class="av">SI</div><div><b>Siti</b><small>Shift 08.00</small></div><span class="q"><span>?</span></span></div>
+            <div class="srv"><i></i>Server tersambung</div>
+            <div class="btns"><span class="btn"><svg class="ic" style="width:18px;height:18px"><use href="#i-clock"/></svg>Riwayat</span><span class="btn"><svg class="ic" style="width:18px;height:18px"><use href="#i-lock"/></svg>Kunci</span><span class="btn wide">Tutup shift</span></div>
+          </div>
+        </aside>
+        <section class="main">
+          <div class="title">Transaksi</div>
+          <div class="th"><span>No.</span><span>Barang</span><span style="text-align:right">Qty</span></div>
+          <div class="tr"><span class="no">1</span><span>Indomie Goreng</span><span class="r">5</span></div>
+          <div class="tr"><span class="no">2</span><span>Gula curah<span class="tag">curah</span></span><span class="r">1,5 kg</span></div>
+          <div class="tr"><span class="no">3</span><span>Kecap Bango 520 ml</span><span class="r">1</span></div>
+        </section>
+        <div class="flag" style="top:500px">"Sedang dilayani" pun tertutup, dan kedua keranjang ditahan hilang di bawah kartu shift. Sidebar harus digulir dulu sebelum bisa melanjutkan keranjang ditahan.</div>
+      </div></div>
+    </div>
+  </div>
+
+  <div class="facts">
+    <h2>Detail perilaku popover</h2>
+    <ul>
+      <li>"Lainnya" muncul <b>hanya kalau barang curah cepat lebih dari 5</b>. Angka di kanan adalah jumlah sisanya. Kalau barangnya 5 atau kurang, sidebar sama seperti sekarang.</li>
+      <li>Klik barang di popover membuka <b>jendela curah</b> yang sama seperti 5 barang di atas, lalu popover tertutup.</li>
+      <li>Keyboard: ↑ ↓ memilih, Enter membuka, Esc menutup dan fokus kembali ke "Lainnya". Klik di luar popover juga menutupnya.</li>
+      <li>Kalau isinya lebih dari 8 barang, popover baru bisa digulir. Tingginya maksimal 8 × 44 px, jadi tetap muat di layar 768 px.</li>
+      <li>Urutan barang tetap mengikuti pengaturan pemilik (<code>quickCurahProductIds</code>): 5 teratas di sidebar, sisanya di popover dengan urutan yang sama.</li>
+      <li>Ikut tergambar: tombol "?" di kartu shift (memunculkan lagi baris petunjuk) dan tombol × di keranjang ditahan (membuka konfirmasi dulu).</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+(() => {
+  const demo = document.getElementById("demo");
+  const btn = document.getElementById("moreBtn");
+  const pop = document.getElementById("pop");
+  const opts = [...pop.querySelectorAll('[role="option"]')];
+  const toast = document.getElementById("toast");
+  let active = 0, timer;
+
+  function place() {
+    const d = demo.getBoundingClientRect(), b = btn.getBoundingClientRect();
+    pop.style.left = (b.right - d.left + 14) + "px";
+    pop.style.top = (b.top - d.top - 8) + "px";
+  }
+  function paint() { opts.forEach((o, i) => { o.classList.toggle("active", i === active); o.setAttribute("aria-selected", i === active); }); }
+  function open() { place(); pop.hidden = false; btn.setAttribute("aria-expanded", "true"); active = 0; paint(); }
+  function close(refocus) { pop.hidden = true; btn.setAttribute("aria-expanded", "false"); if (refocus) btn.focus(); }
+  function choose(i) {
+    close(true);
+    document.getElementById("toastT").textContent = "Jendela curah dibuka: " + opts[i].dataset.name;
+    toast.hidden = false; clearTimeout(timer); timer = setTimeout(() => { toast.hidden = true; }, 2500);
+  }
+
+  btn.addEventListener("click", () => (pop.hidden ? open() : close(true)));
+  btn.addEventListener("keydown", (e) => {
+    if (pop.hidden && (e.key === "ArrowDown" || e.key === "ArrowRight")) { e.preventDefault(); open(); return; }
+    if (pop.hidden) return;
+    if (e.key === "ArrowDown") { e.preventDefault(); active = (active + 1) % opts.length; paint(); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); active = (active - 1 + opts.length) % opts.length; paint(); }
+    else if (e.key === "Enter") { e.preventDefault(); choose(active); }
+    else if (e.key === "Escape") { e.preventDefault(); close(true); }
+  });
+  opts.forEach((o, i) => {
+    o.addEventListener("mouseenter", () => { active = i; paint(); });
+    o.addEventListener("click", () => choose(i));
+  });
+  demo.addEventListener("pointerdown", (e) => { if (!pop.hidden && !pop.contains(e.target) && !btn.contains(e.target)) close(false); });
+  window.addEventListener("resize", () => { if (!pop.hidden) place(); });
+  open();
+})();
+</script>
+</body>
+</html>
