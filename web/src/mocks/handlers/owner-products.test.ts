@@ -778,7 +778,7 @@ describe("barang pemilik", () => {
     expect((await del(`/api/owner/products/${newId()}`)).status).toBe(404);
   });
 
-  test("mutasi: Rina jual 2 Indomie lalu batal → movements[0] {kind:'batal', qtyBase:2, kasirName:'Rina'}, [1] {kind:'jual', qtyBase:-2}; recentMovements ≤ 5", async () => {
+  test("mutasi: Rina jual 2 Indomie lalu batal → movements[0] {kind:'batal', qtyBase:2, kasirName:'Rina', reason:null}, [1] {kind:'jual', qtyBase:-2}; recentMovements ≤ 5", async () => {
     await loginWithShift();
     const res = await post("/api/sales", {
       saleId: newId(),
@@ -803,6 +803,7 @@ describe("barang pemilik", () => {
       kind: "batal",
       qtyBase: 2,
       kasirName: "Rina",
+      reason: null,
     });
     expect(moves[1]).toEqual({
       id: `${sale.id}:jual`,
@@ -810,6 +811,7 @@ describe("barang pemilik", () => {
       kind: "jual",
       qtyBase: -2,
       kasirName: "Rina",
+      reason: null,
     });
     const ats = moves.map((m) => m.at);
     expect(ats).toEqual([...ats].sort((x, y) => y - x));

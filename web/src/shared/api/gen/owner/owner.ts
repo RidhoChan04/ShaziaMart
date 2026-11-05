@@ -48,13 +48,20 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  ExpiryDateInput,
+  ExpiryRemovalInput,
   ImportCheck,
   ImportRequest,
   ImportResult,
   LockedOutResponse,
   LoginInvalidResponse,
   NotFoundResponse,
+  OpnameNotHeldResponse,
+  OpnameRecountInput,
+  OwnerExpiryList,
   OwnerLogin,
+  OwnerOpnameRow,
+  OwnerOpnameSession,
   OwnerProduct,
   OwnerProductRow,
   OwnerReceipt,
@@ -2126,4 +2133,733 @@ export const usePayOwnerSupplierDebt = <TError = ErrorType<UnauthorizedResponse 
         TContext
       > => {
       return useMutation(getPayOwnerSupplierDebtMutationOptions(options), queryClient);
+    }
+    export const getListOwnerOpnameSessionsUrl = () => {
+
+
+
+
+  return `/api/owner/opname-sessions`
+}
+
+/**
+ * @summary Hasil opname (semua orang toko)
+ */
+export const listOwnerOpnameSessions = async ( options?: Parameters<typeof customFetch>[1]): Promise<OwnerOpnameRow[]> => {
+
+  return customFetch<OwnerOpnameRow[]>(getListOwnerOpnameSessionsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListOwnerOpnameSessionsQueryKey = () => {
+    return [
+    `/api/owner/opname-sessions`
+    ] as const;
+    }
+
+
+export const getListOwnerOpnameSessionsQueryOptions = <TData = Awaited<ReturnType<typeof listOwnerOpnameSessions>>, TError = ErrorType<UnauthorizedResponse>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOwnerOpnameSessions>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListOwnerOpnameSessionsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listOwnerOpnameSessions>>> = ({ signal }) => listOwnerOpnameSessions({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listOwnerOpnameSessions>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListOwnerOpnameSessionsQueryResult = NonNullable<Awaited<ReturnType<typeof listOwnerOpnameSessions>>>
+export type ListOwnerOpnameSessionsQueryError = ErrorType<UnauthorizedResponse>
+
+
+export function useListOwnerOpnameSessions<TData = Awaited<ReturnType<typeof listOwnerOpnameSessions>>, TError = ErrorType<UnauthorizedResponse>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOwnerOpnameSessions>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listOwnerOpnameSessions>>,
+          TError,
+          Awaited<ReturnType<typeof listOwnerOpnameSessions>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListOwnerOpnameSessions<TData = Awaited<ReturnType<typeof listOwnerOpnameSessions>>, TError = ErrorType<UnauthorizedResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOwnerOpnameSessions>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listOwnerOpnameSessions>>,
+          TError,
+          Awaited<ReturnType<typeof listOwnerOpnameSessions>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListOwnerOpnameSessions<TData = Awaited<ReturnType<typeof listOwnerOpnameSessions>>, TError = ErrorType<UnauthorizedResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOwnerOpnameSessions>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Hasil opname (semua orang toko)
+ */
+
+export function useListOwnerOpnameSessions<TData = Awaited<ReturnType<typeof listOwnerOpnameSessions>>, TError = ErrorType<UnauthorizedResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOwnerOpnameSessions>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListOwnerOpnameSessionsQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+export const getGetOwnerOpnameSessionUrl = (sessionId: string,) => {
+
+
+
+
+  return `/api/owner/opname-sessions/${sessionId}`
+}
+
+/**
+ * @summary Detail hasil opname dengan nilai rupiah selisih
+ */
+export const getOwnerOpnameSession = async (sessionId: string, options?: Parameters<typeof customFetch>[1]): Promise<OwnerOpnameSession> => {
+
+  return customFetch<OwnerOpnameSession>(getGetOwnerOpnameSessionUrl(sessionId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetOwnerOpnameSessionQueryKey = (sessionId: string,) => {
+    return [
+    `/api/owner/opname-sessions/${sessionId}`
+    ] as const;
+    }
+
+
+export const getGetOwnerOpnameSessionQueryOptions = <TData = Awaited<ReturnType<typeof getOwnerOpnameSession>>, TError = ErrorType<UnauthorizedResponse | NotFoundResponse>>(sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerOpnameSession>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetOwnerOpnameSessionQueryKey(sessionId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOwnerOpnameSession>>> = ({ signal }) => getOwnerOpnameSession(sessionId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: sessionId !== null && sessionId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getOwnerOpnameSession>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetOwnerOpnameSessionQueryResult = NonNullable<Awaited<ReturnType<typeof getOwnerOpnameSession>>>
+export type GetOwnerOpnameSessionQueryError = ErrorType<UnauthorizedResponse | NotFoundResponse>
+
+
+export function useGetOwnerOpnameSession<TData = Awaited<ReturnType<typeof getOwnerOpnameSession>>, TError = ErrorType<UnauthorizedResponse | NotFoundResponse>>(
+ sessionId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerOpnameSession>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getOwnerOpnameSession>>,
+          TError,
+          Awaited<ReturnType<typeof getOwnerOpnameSession>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetOwnerOpnameSession<TData = Awaited<ReturnType<typeof getOwnerOpnameSession>>, TError = ErrorType<UnauthorizedResponse | NotFoundResponse>>(
+ sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerOpnameSession>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getOwnerOpnameSession>>,
+          TError,
+          Awaited<ReturnType<typeof getOwnerOpnameSession>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetOwnerOpnameSession<TData = Awaited<ReturnType<typeof getOwnerOpnameSession>>, TError = ErrorType<UnauthorizedResponse | NotFoundResponse>>(
+ sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerOpnameSession>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Detail hasil opname dengan nilai rupiah selisih
+ */
+
+export function useGetOwnerOpnameSession<TData = Awaited<ReturnType<typeof getOwnerOpnameSession>>, TError = ErrorType<UnauthorizedResponse | NotFoundResponse>>(
+ sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerOpnameSession>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetOwnerOpnameSessionQueryOptions(sessionId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+export const getApproveOpnameItemUrl = (sessionId: string,
+    productId: string,) => {
+
+
+
+
+  return `/api/owner/opname-sessions/${sessionId}/items/${productId}/approve`
+}
+
+/**
+ * Hanya barang berstate ditahan: stok disesuaikan sebesar diffQtyBase (entri ledger opname
+ * dengan alasan barang itu, waktu efektif = countedAt asli), state → disetujui, resolvedByName
+ * dan resolvedAt diisi. Barang yang tidak ditahan (termasuk yang sudah disetujui, dihitung
+ * ulang, atau diganti) → 409 OPNAME_NOT_HELD tanpa perubahan; stok disesuaikan tepat sekali.
+ * @summary Setujui selisih yang ditahan
+ */
+export const approveOpnameItem = async (sessionId: string,
+    productId: string, options?: Parameters<typeof customFetch>[1]): Promise<OwnerOpnameSession> => {
+
+  return customFetch<OwnerOpnameSession>(getApproveOpnameItemUrl(sessionId,productId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getApproveOpnameItemMutationKey = () => ['approveOpnameItem'] as const;
+
+export const getApproveOpnameItemMutationOptions = <TError = ErrorType<UnauthorizedResponse | NotFoundResponse | OpnameNotHeldResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approveOpnameItem>>, TError,ApproveOpnameItemMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof approveOpnameItem>>, TError,ApproveOpnameItemMutationVariables, TContext> => {
+
+const mutationKey = getApproveOpnameItemMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof approveOpnameItem>>, ApproveOpnameItemMutationVariables> = (props) => {
+          const {sessionId,productId} = props ?? {};
+
+          return  approveOpnameItem(sessionId,productId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ApproveOpnameItemMutationResult = NonNullable<Awaited<ReturnType<typeof approveOpnameItem>>>
+
+    export type ApproveOpnameItemMutationError = ErrorType<UnauthorizedResponse | NotFoundResponse | OpnameNotHeldResponse>
+    export type ApproveOpnameItemMutationVariables = {sessionId: string;productId: string}
+
+    /**
+ * @summary Setujui selisih yang ditahan
+ */
+export const useApproveOpnameItem = <TError = ErrorType<UnauthorizedResponse | NotFoundResponse | OpnameNotHeldResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approveOpnameItem>>, TError,ApproveOpnameItemMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof approveOpnameItem>>,
+        TError,
+        ApproveOpnameItemMutationVariables,
+        TContext
+      > => {
+      return useMutation(getApproveOpnameItemMutationOptions(options), queryClient);
+    }
+    export const getRecountOpnameItemUrl = (sessionId: string,
+    productId: string,) => {
+
+
+
+
+  return `/api/owner/opname-sessions/${sessionId}/items/${productId}/recount`
+}
+
+/**
+ * Hanya barang berstate ditahan (selain itu 409 OPNAME_NOT_HELD tanpa perubahan). Hitungan
+ * pemilik langsung disesuaikan tanpa batas (J5): selisih = qtyBase − stok sekarang, entri
+ * ledger opname dengan waktu efektif = sekarang; state → dihitung_ulang dan recount diisi.
+ * qtyBase tidak valid → 422 VALIDATION.
+ * @summary Hitung ulang barang yang ditahan
+ */
+export const recountOpnameItem = async (sessionId: string,
+    productId: string,
+    opnameRecountInput: OpnameRecountInput, options?: Parameters<typeof customFetch>[1]): Promise<OwnerOpnameSession> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<OwnerOpnameSession>(getRecountOpnameItemUrl(sessionId,productId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(opnameRecountInput)
+  }
+);}
+
+
+
+
+
+export const getRecountOpnameItemMutationKey = () => ['recountOpnameItem'] as const;
+
+export const getRecountOpnameItemMutationOptions = <TError = ErrorType<UnauthorizedResponse | NotFoundResponse | OpnameNotHeldResponse | ValidationFailedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recountOpnameItem>>, TError,RecountOpnameItemMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof recountOpnameItem>>, TError,RecountOpnameItemMutationVariables, TContext> => {
+
+const mutationKey = getRecountOpnameItemMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof recountOpnameItem>>, RecountOpnameItemMutationVariables> = (props) => {
+          const {sessionId,productId,data} = props ?? {};
+
+          return  recountOpnameItem(sessionId,productId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RecountOpnameItemMutationResult = NonNullable<Awaited<ReturnType<typeof recountOpnameItem>>>
+    export type RecountOpnameItemMutationBody = OpnameRecountInput
+    export type RecountOpnameItemMutationError = ErrorType<UnauthorizedResponse | NotFoundResponse | OpnameNotHeldResponse | ValidationFailedResponse>
+    export type RecountOpnameItemMutationVariables = {sessionId: string;productId: string;data: OpnameRecountInput}
+
+    /**
+ * @summary Hitung ulang barang yang ditahan
+ */
+export const useRecountOpnameItem = <TError = ErrorType<UnauthorizedResponse | NotFoundResponse | OpnameNotHeldResponse | ValidationFailedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recountOpnameItem>>, TError,RecountOpnameItemMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof recountOpnameItem>>,
+        TError,
+        RecountOpnameItemMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRecountOpnameItemMutationOptions(options), queryClient);
+    }
+    export const getReviewOpnameSessionUrl = (sessionId: string,) => {
+
+
+
+
+  return `/api/owner/opname-sessions/${sessionId}/review`
+}
+
+/**
+ * Mengisi reviewedByName dan reviewedAt; sesi hilang dari Attention.opnameFlags. Idempoten:
+ * sesi yang sudah ditinjau dikembalikan apa adanya. flagged tidak berubah.
+ * @summary Tandai sesi bertanda selisih besar sudah ditinjau
+ */
+export const reviewOpnameSession = async (sessionId: string, options?: Parameters<typeof customFetch>[1]): Promise<OwnerOpnameSession> => {
+
+  return customFetch<OwnerOpnameSession>(getReviewOpnameSessionUrl(sessionId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getReviewOpnameSessionMutationKey = () => ['reviewOpnameSession'] as const;
+
+export const getReviewOpnameSessionMutationOptions = <TError = ErrorType<UnauthorizedResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reviewOpnameSession>>, TError,ReviewOpnameSessionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reviewOpnameSession>>, TError,ReviewOpnameSessionMutationVariables, TContext> => {
+
+const mutationKey = getReviewOpnameSessionMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reviewOpnameSession>>, ReviewOpnameSessionMutationVariables> = (props) => {
+          const {sessionId} = props ?? {};
+
+          return  reviewOpnameSession(sessionId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReviewOpnameSessionMutationResult = NonNullable<Awaited<ReturnType<typeof reviewOpnameSession>>>
+
+    export type ReviewOpnameSessionMutationError = ErrorType<UnauthorizedResponse | NotFoundResponse>
+    export type ReviewOpnameSessionMutationVariables = {sessionId: string}
+
+    /**
+ * @summary Tandai sesi bertanda selisih besar sudah ditinjau
+ */
+export const useReviewOpnameSession = <TError = ErrorType<UnauthorizedResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reviewOpnameSession>>, TError,ReviewOpnameSessionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof reviewOpnameSession>>,
+        TError,
+        ReviewOpnameSessionMutationVariables,
+        TContext
+      > => {
+      return useMutation(getReviewOpnameSessionMutationOptions(options), queryClient);
+    }
+    export const getGetOwnerExpiryUrl = () => {
+
+
+
+
+  return `/api/owner/expiry`
+}
+
+/**
+ * Sama dengan getStaffExpiry ditambah nilai rupiah dari HPP sekarang (lossValue per kiriman
+ * dan expiredLossValue); log keluar memakai lossValue yang disimpan saat kejadian.
+ * @summary Barang sudah/segera kedaluwarsa dengan perkiraan kerugian
+ */
+export const getOwnerExpiry = async ( options?: Parameters<typeof customFetch>[1]): Promise<OwnerExpiryList> => {
+
+  return customFetch<OwnerExpiryList>(getGetOwnerExpiryUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetOwnerExpiryQueryKey = () => {
+    return [
+    `/api/owner/expiry`
+    ] as const;
+    }
+
+
+export const getGetOwnerExpiryQueryOptions = <TData = Awaited<ReturnType<typeof getOwnerExpiry>>, TError = ErrorType<UnauthorizedResponse>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerExpiry>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetOwnerExpiryQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOwnerExpiry>>> = ({ signal }) => getOwnerExpiry({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getOwnerExpiry>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetOwnerExpiryQueryResult = NonNullable<Awaited<ReturnType<typeof getOwnerExpiry>>>
+export type GetOwnerExpiryQueryError = ErrorType<UnauthorizedResponse>
+
+
+export function useGetOwnerExpiry<TData = Awaited<ReturnType<typeof getOwnerExpiry>>, TError = ErrorType<UnauthorizedResponse>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerExpiry>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getOwnerExpiry>>,
+          TError,
+          Awaited<ReturnType<typeof getOwnerExpiry>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetOwnerExpiry<TData = Awaited<ReturnType<typeof getOwnerExpiry>>, TError = ErrorType<UnauthorizedResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerExpiry>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getOwnerExpiry>>,
+          TError,
+          Awaited<ReturnType<typeof getOwnerExpiry>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetOwnerExpiry<TData = Awaited<ReturnType<typeof getOwnerExpiry>>, TError = ErrorType<UnauthorizedResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerExpiry>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Barang sudah/segera kedaluwarsa dengan perkiraan kerugian
+ */
+
+export function useGetOwnerExpiry<TData = Awaited<ReturnType<typeof getOwnerExpiry>>, TError = ErrorType<UnauthorizedResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerExpiry>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetOwnerExpiryQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+export const getCreateOwnerExpiryRemovalUrl = () => {
+
+
+
+
+  return `/api/owner/expiry-removals`
+}
+
+/**
+ * Aturan sama dengan createStaffExpiryRemoval; tercatat atas nama pemilik.
+ * @summary Keluarkan barang kedaluwarsa dari stok (pemilik)
+ */
+export const createOwnerExpiryRemoval = async (expiryRemovalInput: ExpiryRemovalInput, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<void>(getCreateOwnerExpiryRemovalUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(expiryRemovalInput)
+  }
+);}
+
+
+
+
+
+export const getCreateOwnerExpiryRemovalMutationKey = () => ['createOwnerExpiryRemoval'] as const;
+
+export const getCreateOwnerExpiryRemovalMutationOptions = <TError = ErrorType<UnauthorizedResponse | NotFoundResponse | ValidationFailedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createOwnerExpiryRemoval>>, TError,CreateOwnerExpiryRemovalMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createOwnerExpiryRemoval>>, TError,CreateOwnerExpiryRemovalMutationVariables, TContext> => {
+
+const mutationKey = getCreateOwnerExpiryRemovalMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createOwnerExpiryRemoval>>, CreateOwnerExpiryRemovalMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  createOwnerExpiryRemoval(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateOwnerExpiryRemovalMutationResult = NonNullable<Awaited<ReturnType<typeof createOwnerExpiryRemoval>>>
+    export type CreateOwnerExpiryRemovalMutationBody = ExpiryRemovalInput
+    export type CreateOwnerExpiryRemovalMutationError = ErrorType<UnauthorizedResponse | NotFoundResponse | ValidationFailedResponse>
+    export type CreateOwnerExpiryRemovalMutationVariables = {data: ExpiryRemovalInput}
+
+    /**
+ * @summary Keluarkan barang kedaluwarsa dari stok (pemilik)
+ */
+export const useCreateOwnerExpiryRemoval = <TError = ErrorType<UnauthorizedResponse | NotFoundResponse | ValidationFailedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createOwnerExpiryRemoval>>, TError,CreateOwnerExpiryRemovalMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof createOwnerExpiryRemoval>>,
+        TError,
+        CreateOwnerExpiryRemovalMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateOwnerExpiryRemovalMutationOptions(options), queryClient);
+    }
+    export const getPutOwnerLineExpiryUrl = (receiptId: string,
+    lineId: string,) => {
+
+
+
+
+  return `/api/owner/receipts/${receiptId}/lines/${lineId}/expiry`
+}
+
+/**
+ * Aturan sama dengan putStaffLineExpiry; berlaku untuk nota siapa pun.
+ * @summary Ubah tanggal ED satu kiriman (pemilik)
+ */
+export const putOwnerLineExpiry = async (receiptId: string,
+    lineId: string,
+    expiryDateInput: ExpiryDateInput, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<void>(getPutOwnerLineExpiryUrl(receiptId,lineId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(expiryDateInput)
+  }
+);}
+
+
+
+
+
+export const getPutOwnerLineExpiryMutationKey = () => ['putOwnerLineExpiry'] as const;
+
+export const getPutOwnerLineExpiryMutationOptions = <TError = ErrorType<UnauthorizedResponse | NotFoundResponse | ValidationFailedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putOwnerLineExpiry>>, TError,PutOwnerLineExpiryMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof putOwnerLineExpiry>>, TError,PutOwnerLineExpiryMutationVariables, TContext> => {
+
+const mutationKey = getPutOwnerLineExpiryMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof putOwnerLineExpiry>>, PutOwnerLineExpiryMutationVariables> = (props) => {
+          const {receiptId,lineId,data} = props ?? {};
+
+          return  putOwnerLineExpiry(receiptId,lineId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PutOwnerLineExpiryMutationResult = NonNullable<Awaited<ReturnType<typeof putOwnerLineExpiry>>>
+    export type PutOwnerLineExpiryMutationBody = ExpiryDateInput
+    export type PutOwnerLineExpiryMutationError = ErrorType<UnauthorizedResponse | NotFoundResponse | ValidationFailedResponse>
+    export type PutOwnerLineExpiryMutationVariables = {receiptId: string;lineId: string;data: ExpiryDateInput}
+
+    /**
+ * @summary Ubah tanggal ED satu kiriman (pemilik)
+ */
+export const usePutOwnerLineExpiry = <TError = ErrorType<UnauthorizedResponse | NotFoundResponse | ValidationFailedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putOwnerLineExpiry>>, TError,PutOwnerLineExpiryMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof putOwnerLineExpiry>>,
+        TError,
+        PutOwnerLineExpiryMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPutOwnerLineExpiryMutationOptions(options), queryClient);
     }

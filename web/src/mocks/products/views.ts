@@ -138,6 +138,7 @@ export function movementsOf(
       kind: "jual",
       qtyBase: -qty,
       kasirName,
+      reason: null,
     });
     if (sale.status === "dibatalkan") {
       out.push({
@@ -146,13 +147,14 @@ export function movementsOf(
         kind: "batal",
         qtyBase: qty,
         kasirName,
+        reason: null,
       });
     }
   }
   for (const e of state.stockEntries) {
     if (e.productId !== productId) continue;
     const { id, at, kind, qtyBase, actorName: kasirName } = e;
-    out.push({ id, at, kind, qtyBase, kasirName });
+    out.push({ id, at, kind, qtyBase, kasirName, reason: null });
   }
   // Batal di milidetik yang sama dengan jualnya tetap tampil di atas.
   const rank = (m: StockMovement) => (m.kind === "batal" ? 0 : 1);

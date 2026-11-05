@@ -1,12 +1,17 @@
 import {
+  ClipboardCheck,
   type LucideIcon,
+  PackageMinus,
   PackagePlus,
   PackageX,
   RotateCcw,
   ShoppingCart,
 } from "lucide-react";
 import { useListOwnerProductMovements } from "@/shared/api/gen/owner/owner";
-import type { StockMovement } from "@/shared/api/gen/shaziaMartAPI.schemas";
+import type {
+  OpnameReason,
+  StockMovement,
+} from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { relativeDayTime } from "@/shared/lib/business-day";
 import { cn } from "@/shared/lib/cn";
 import { pesanError } from "@/shared/lib/error-messages";
@@ -37,9 +42,24 @@ const KINDS: Record<Kind, { label: string; icon: LucideIcon; by: string }> = {
     by: "",
   },
   batal_masuk: { label: "Barang masuk dibatalkan", icon: PackageX, by: "" },
+  opname: { label: "Opname", icon: ClipboardCheck, by: "" },
+  stok_awal: { label: "Stok awal (opname)", icon: ClipboardCheck, by: "" },
+  keluar_kedaluwarsa: {
+    label: "Dikeluarkan — kedaluwarsa",
+    icon: PackageMinus,
+    by: "",
+  },
 };
 
-/** Satu mutasi stok: `Terjual 2 pcs` / `Barang masuk 80 pcs`, `{waktu} · {pencatat}`, jumlah bertanda. */
+const REASONS: Record<OpnameReason, string> = {
+  rusak: "Rusak",
+  hilang: "Hilang",
+  kedaluwarsa: "Kedaluwarsa",
+  salah_input: "Salah input sebelumnya",
+  tidak_diketahui: "Tidak diketahui",
+};
+
+/** Satu mutasi stok: `Terjual 2 pcs` / `Opname · Hilang 7 pcs`, `{waktu} · {pencatat}`, jumlah bertanda. */
 export function MovementRow({
   movement,
   unit,
@@ -51,6 +71,8 @@ export function MovementRow({
 }) {
   const abs = Math.abs(movement.qtyBase);
   const { label, icon: Icon, by } = KINDS[movement.kind];
+  const reason =
+    movement.reason === null ? "" : ` · ${REASONS[movement.reason]}`;
   const out = movement.qtyBase < 0;
   const sign = out ? "−" : "+";
   return (
@@ -66,7 +88,8 @@ export function MovementRow({
       </span>
       <div className="min-w-0 flex-1">
         <p className="text-[15px] font-medium">
-          {label} {formatQty(abs, unit.size, unit.name)}
+          {label}
+          {reason} {formatQty(abs, unit.size, unit.name)}
         </p>
         <p className="text-[13px] text-muted">
           {relativeDayTime(movement.at, now)} · {by}
@@ -135,8 +158,8 @@ export function MovementsSheet({
       >
         <SheetTitle className="text-[20px] font-bold">Riwayat stok</SheetTitle>
         <SheetDescription className="sr-only">
-          Penjualan, barang masuk, dan pembatalannya yang mengubah stok barang
-          ini
+          Penjualan, barang masuk, opname, barang kedaluwarsa, dan pembatalannya
+          yang mengubah stok barang ini
         </SheetDescription>
         <MovementsList productId={productId} unit={unit} />
         <SheetClose asChild>

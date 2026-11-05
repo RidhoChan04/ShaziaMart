@@ -385,3 +385,384 @@ export const GetStaffReceiptPhotoParams = zod.object({
 
 export const GetStaffReceiptPhotoResponse = zod.unknown()
 
+/**
+ * Hitung buta: tanpa stok. Barang berstatus selain nonaktif dikelompokkan per lingkup
+ * (kategori menurut nama; tanpa_kategori = barang berkategori null); lingkup tanpa barang tidak
+ * tampil. lastCountedAt = submittedAt sesi terakhir (siapa pun) dengan lingkup itu atau semua.
+ * Urut lastCountedAt null dulu lalu terlama; suggested = lingkup pertama (null bila tidak ada).
+ * @summary Lingkup opname (kategori, tanpa kategori, semua) dengan saran
+ */
+export const ListStaffOpnameCategoriesResponse = zod.object({
+  "categories": zod.array(zod.object({
+  "scope": zod.object({
+  "kind": zod.enum(['kategori', 'tanpa_kategori', 'semua']),
+  "category": zod.string().nullable()
+}).describe('Lingkup opname. kategori = barang berkategori category; tanpa_kategori = barang berkategori\nnull (mis. barang baru dari nota); semua = semua barang. category wajib iff kind = kategori\n(selain itu null).\n'),
+  "productCount": zod.int(),
+  "lastCountedAt": zod.int().nullable().describe('submittedAt sesi terakhir dengan lingkup ini atau semua; null = belum pernah dihitung.')
+}).describe('Satu lingkup opname; scope.kind kategori atau tanpa_kategori.')).describe('Belum pernah dihitung dulu, lalu paling lama dihitung.'),
+  "allCount": zod.int().describe('Jumlah barang berstatus selain nonaktif (lingkup semua).'),
+  "suggested": zod.union([zod.object({
+  "kind": zod.enum(['kategori', 'tanpa_kategori', 'semua']),
+  "category": zod.string().nullable()
+}).describe('Lingkup opname. kategori = barang berkategori category; tanpa_kategori = barang berkategori\nnull (mis. barang baru dari nota); semua = semua barang. category wajib iff kind = kategori\n(selain itu null).\n'),zod.null()]).describe('Lingkup pertama di categories; null bila kosong.')
+})
+
+/**
+ * Hitung buta: tanpa stok, harga jual, atau modal. Barang berstatus selain nonaktif di
+ * lingkup itu, urut nama; HP menyalinnya ke draf agar bisa menghitung tanpa sinyal.
+ * kategori wajib bila lingkup = kategori dan dilarang untuk lingkup lain → 422 VALIDATION.
+ * @summary Daftar barang yang dihitung untuk satu lingkup
+ */
+export const ListStaffOpnameProductsQueryParams = zod.object({
+  "lingkup": zod.enum(['kategori', 'tanpa_kategori', 'semua']),
+  "kategori": zod.string().optional().describe('Nama kategori; hanya untuk lingkup = kategori.')
+})
+
+
+
+
+
+export const ListStaffOpnameProductsResponseItem = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "category": zod.string().nullable(),
+  "isCurah": zod.boolean(),
+  "baseUnit": zod.enum(['pcs', 'gram', 'ml']),
+  "status": zod.enum(['aktif', 'tidak_diambil', 'nonaktif', 'menunggu_harga']).describe('aktif; tidak_diambil = tetap dijual sampai habis, tanpa peringatan menipis;\nnonaktif = tidak muncul di kasir (pencarian, scan, curah cepat), riwayat tetap;\nmenunggu_harga = barang baru dari barang masuk, semua satuannya price 0 sampai pemilik\nmenyimpan form barang dengan harga jual (lalu aktif); tidak muncul di pencarian dan curah\ncepat kasir, scan/kode → 410 PRODUCT_NO_PRICE.\n'),
+  "units": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "unitSize": zod.int().min(1).describe('Jumlah satuan dasar per satuan ini.'),
+  "barcodes": zod.array(zod.string())
+}).describe('Satuan barang untuk orang toko; tanpa harga jual, modal, dan stok.')).min(1)
+}).describe('Barang untuk orang toko; tanpa harga jual, modal, dan stok. units[0] = satuan eceran; hanya satuan aktif.')
+export const ListStaffOpnameProductsResponse = zod.array(ListStaffOpnameProductsResponseItem)
+
+/**
+ * @summary Sesi opname milik sendiri
+ */
+export const ListStaffOpnameSessionsResponseItem = zod.object({
+  "id": zod.string(),
+  "scope": zod.object({
+  "kind": zod.enum(['kategori', 'tanpa_kategori', 'semua']),
+  "category": zod.string().nullable()
+}).describe('Lingkup opname. kategori = barang berkategori category; tanpa_kategori = barang berkategori\nnull (mis. barang baru dari nota); semua = semua barang. category wajib iff kind = kategori\n(selain itu null).\n'),
+  "status": zod.enum(['menunggu_alasan', 'selesai']).describe('menunggu_alasan = ada barang menunggu_alasan; selesai = alasan sudah disimpan, atau tidak\nada (lagi) barang menunggu_alasan — sesi yang semua barang menunggu_alasan-nya menjadi\ndiganti otomatis selesai (finishedAt = saat itu).\n'),
+  "submittedAt": zod.int(),
+  "finishedAt": zod.int().nullable(),
+  "itemCount": zod.int().describe('Jumlah barang dihitung.'),
+  "diffCount": zod.int().describe('Jumlah barang selisih (bukan cocok, stok_awal, atau diganti).'),
+  "heldCount": zod.int().describe('Jumlah barang ditahan.')
+})
+export const ListStaffOpnameSessionsResponse = zod.array(ListStaffOpnameSessionsResponseItem)
+
+/**
+ * Langkah 1 dari 2 (K2); bisa dari draf offline yang dikirim belakangan.
+ * Idempoten menurut (pembuat, id) — id = ID draf dari HP: id yang sudah dikirim pengguna ini
+ * mengembalikan sesi lama dengan 200 tanpa menerapkan ulang; id sudah dipakai pengguna lain →
+ * 409 ID_TAKEN; sesi milik pengguna lain tidak pernah dikembalikan.
+ * Jam hitung (K6): at = countedAt + (serverNow − deviceNow); clockEstimated bila
+ * |serverNow − deviceNow| > 5 menit; hasil di atas serverNow dijepit ke serverNow (juga
+ * clockEstimated). systemQtyBase = stok pada jam itu, sehingga penjualan di sela-sela tidak
+ * membuat selisih palsu; diffQtyBase = countedQtyBase − systemQtyBase.
+ * Per barang: barang stockCounted false → stok_awal (J1: langsung jadi stok, tanpa alasan,
+ * bukan kerugian); selisih 0 → cocok; selain itu menunggu_alasan. cocok dan stok_awal langsung
+ * diterapkan ke stok tanpa alasan; sesi tanpa barang menunggu_alasan langsung selesai.
+ * Barang yang sama di beberapa sesi (K5): hanya hitungan dengan countedAt terbaru yang
+ * berlaku. Barang di sesi ini menjadi diganti bila sesi lain punya hitungan barang itu dengan
+ * countedAt lebih baru yang belum diganti; selain itu hitungan lama barang itu yang masih
+ * menunggu_alasan atau ditahan menjadi diganti (replacedBySessionId).
+ * Atomik: 422 OpnameProblem dengan galat per barang (barang tidak ditemukan, nonaktif,
+ * dihitung dua kali, jumlah atau jam tidak valid), tanpa perubahan sebagian.
+ * Batas min/max di skema adalah panduan klien; server selalu memvalidasi isi mentah.
+ * @summary Kirim hitungan opname
+ */
+export const createStaffOpnameSessionBodyIdMax = 64;
+
+export const createStaffOpnameSessionBodyItemsItemQtyBaseMin = 0;
+
+
+
+
+export const CreateStaffOpnameSessionBody = zod.object({
+  "id": zod.string().min(1).max(createStaffOpnameSessionBodyIdMax).describe('ID draf dari HP (idempotensi).'),
+  "scope": zod.object({
+  "kind": zod.enum(['kategori', 'tanpa_kategori', 'semua']),
+  "category": zod.string().nullable()
+}).describe('Lingkup opname. kategori = barang berkategori category; tanpa_kategori = barang berkategori\nnull (mis. barang baru dari nota); semua = semua barang. category wajib iff kind = kategori\n(selain itu null).\n'),
+  "deviceNow": zod.int().describe('Jam HP saat mengirim; dipakai menggeser countedAt ke jam server (K6).'),
+  "items": zod.array(zod.object({
+  "productId": zod.string(),
+  "qtyBase": zod.int().min(createStaffOpnameSessionBodyItemsItemQtyBaseMin).describe('Jumlah fisik dalam satuan dasar; 0 sah.'),
+  "countedAt": zod.int().describe('Jam HP saat barang dibuka untuk dihitung (scan/ketuk); membuka ulang memperbarui jamnya.')
+})).min(1)
+})
+
+
+export const createStaffOpnameSessionResponseItemsItemReceiptOptionsMax = 5;
+
+
+
+export const CreateStaffOpnameSessionResponse = zod.object({
+  "id": zod.string(),
+  "scope": zod.object({
+  "kind": zod.enum(['kategori', 'tanpa_kategori', 'semua']),
+  "category": zod.string().nullable()
+}).describe('Lingkup opname. kategori = barang berkategori category; tanpa_kategori = barang berkategori\nnull (mis. barang baru dari nota); semua = semua barang. category wajib iff kind = kategori\n(selain itu null).\n'),
+  "status": zod.enum(['menunggu_alasan', 'selesai']).describe('menunggu_alasan = ada barang menunggu_alasan; selesai = alasan sudah disimpan, atau tidak\nada (lagi) barang menunggu_alasan — sesi yang semua barang menunggu_alasan-nya menjadi\ndiganti otomatis selesai (finishedAt = saat itu).\n'),
+  "createdByName": zod.string(),
+  "submittedAt": zod.int().describe('Waktu server saat hitungan diterima.'),
+  "finishedAt": zod.int().nullable(),
+  "items": zod.array(zod.object({
+  "productId": zod.string(),
+  "productName": zod.string(),
+  "unitName": zod.string().describe('Satuan eceran.'),
+  "unitSize": zod.int().min(1).describe('Isi satuan eceran dalam satuan dasar.'),
+  "isCurah": zod.boolean(),
+  "countedQtyBase": zod.int(),
+  "countedAt": zod.int().describe('Jam hitung setelah digeser ke jam server (K6).'),
+  "clockEstimated": zod.boolean().describe('Jam HP melenceng > 5 menit dari jam server, atau jam hasil geser dijepit ke jam server.'),
+  "systemQtyBase": zod.int(),
+  "diffQtyBase": zod.int(),
+  "state": zod.enum(['cocok', 'stok_awal', 'menunggu_alasan', 'disesuaikan', 'ditahan', 'disetujui', 'dihitung_ulang', 'diganti']).describe('cocok = selisih 0; stok_awal = hitungan pertama barang stockCounted false, langsung jadi\nstok (J1); menunggu_alasan = selisih, alasan belum disimpan; disesuaikan = stok sudah\ndikoreksi; ditahan = menunggu persetujuan pemilik (nilai > Rp100.000 atau HPP belum ada);\ndisetujui = disetujui pemilik; dihitung_ulang = dihitung ulang pemilik; diganti = kalah\noleh hitungan barang yang sama dengan countedAt lebih baru, tidak pernah diterapkan.\n'),
+  "reason": zod.union([zod.enum(['rusak', 'hilang', 'kedaluwarsa', 'salah_input', 'tidak_diketahui']).describe('Alasan selisih opname. rusak, hilang, kedaluwarsa, dan salah_input dipilih staf;\ntidak_diketahui = salah_input tanpa nota rujukan (J4).\n'),zod.null()]).describe('Alasan tersimpan; null bila belum ada atau tidak perlu.'),
+  "receiptRef": zod.union([zod.object({
+  "receiptId": zod.string(),
+  "supplierName": zod.string(),
+  "notaDate": zod.iso.date()
+}).describe('Nota barang masuk aktif yang memuat barang itu (rujukan salah input sebelumnya).'),zod.null()]).describe('Nota rujukan untuk salah_input (J4).'),
+  "receiptOptions": zod.array(zod.object({
+  "receiptId": zod.string(),
+  "supplierName": zod.string(),
+  "notaDate": zod.iso.date()
+}).describe('Nota barang masuk aktif yang memuat barang itu (rujukan salah input sebelumnya).')).max(createStaffOpnameSessionResponseItemsItemReceiptOptionsMax).describe('Barang selisih: paling banyak 5 nota aktif terakhir yang memuat barang itu (notaDate lalu\ncreatedAt terbaru dulu); kosong untuk barang lain.\n')
+}).describe('Satu barang yang dihitung. systemQtyBase baru dikirim setelah hitungan diterima server\n(hitung buta, K8): stok pada jam hitung (countedAt server), diffQtyBase = countedQtyBase −\nsystemQtyBase. Tanpa nilai rupiah.\n')).describe('Urut nama barang.')
+})
+
+/**
+ * Sesi milik orang lain juga 404.
+ * @summary Hasil opname milik sendiri
+ */
+export const GetStaffOpnameSessionParams = zod.object({
+  "sessionId": zod.string()
+})
+
+
+export const getStaffOpnameSessionResponseItemsItemReceiptOptionsMax = 5;
+
+
+
+export const GetStaffOpnameSessionResponse = zod.object({
+  "id": zod.string(),
+  "scope": zod.object({
+  "kind": zod.enum(['kategori', 'tanpa_kategori', 'semua']),
+  "category": zod.string().nullable()
+}).describe('Lingkup opname. kategori = barang berkategori category; tanpa_kategori = barang berkategori\nnull (mis. barang baru dari nota); semua = semua barang. category wajib iff kind = kategori\n(selain itu null).\n'),
+  "status": zod.enum(['menunggu_alasan', 'selesai']).describe('menunggu_alasan = ada barang menunggu_alasan; selesai = alasan sudah disimpan, atau tidak\nada (lagi) barang menunggu_alasan — sesi yang semua barang menunggu_alasan-nya menjadi\ndiganti otomatis selesai (finishedAt = saat itu).\n'),
+  "createdByName": zod.string(),
+  "submittedAt": zod.int().describe('Waktu server saat hitungan diterima.'),
+  "finishedAt": zod.int().nullable(),
+  "items": zod.array(zod.object({
+  "productId": zod.string(),
+  "productName": zod.string(),
+  "unitName": zod.string().describe('Satuan eceran.'),
+  "unitSize": zod.int().min(1).describe('Isi satuan eceran dalam satuan dasar.'),
+  "isCurah": zod.boolean(),
+  "countedQtyBase": zod.int(),
+  "countedAt": zod.int().describe('Jam hitung setelah digeser ke jam server (K6).'),
+  "clockEstimated": zod.boolean().describe('Jam HP melenceng > 5 menit dari jam server, atau jam hasil geser dijepit ke jam server.'),
+  "systemQtyBase": zod.int(),
+  "diffQtyBase": zod.int(),
+  "state": zod.enum(['cocok', 'stok_awal', 'menunggu_alasan', 'disesuaikan', 'ditahan', 'disetujui', 'dihitung_ulang', 'diganti']).describe('cocok = selisih 0; stok_awal = hitungan pertama barang stockCounted false, langsung jadi\nstok (J1); menunggu_alasan = selisih, alasan belum disimpan; disesuaikan = stok sudah\ndikoreksi; ditahan = menunggu persetujuan pemilik (nilai > Rp100.000 atau HPP belum ada);\ndisetujui = disetujui pemilik; dihitung_ulang = dihitung ulang pemilik; diganti = kalah\noleh hitungan barang yang sama dengan countedAt lebih baru, tidak pernah diterapkan.\n'),
+  "reason": zod.union([zod.enum(['rusak', 'hilang', 'kedaluwarsa', 'salah_input', 'tidak_diketahui']).describe('Alasan selisih opname. rusak, hilang, kedaluwarsa, dan salah_input dipilih staf;\ntidak_diketahui = salah_input tanpa nota rujukan (J4).\n'),zod.null()]).describe('Alasan tersimpan; null bila belum ada atau tidak perlu.'),
+  "receiptRef": zod.union([zod.object({
+  "receiptId": zod.string(),
+  "supplierName": zod.string(),
+  "notaDate": zod.iso.date()
+}).describe('Nota barang masuk aktif yang memuat barang itu (rujukan salah input sebelumnya).'),zod.null()]).describe('Nota rujukan untuk salah_input (J4).'),
+  "receiptOptions": zod.array(zod.object({
+  "receiptId": zod.string(),
+  "supplierName": zod.string(),
+  "notaDate": zod.iso.date()
+}).describe('Nota barang masuk aktif yang memuat barang itu (rujukan salah input sebelumnya).')).max(getStaffOpnameSessionResponseItemsItemReceiptOptionsMax).describe('Barang selisih: paling banyak 5 nota aktif terakhir yang memuat barang itu (notaDate lalu\ncreatedAt terbaru dulu); kosong untuk barang lain.\n')
+}).describe('Satu barang yang dihitung. systemQtyBase baru dikirim setelah hitungan diterima server\n(hitung buta, K8): stok pada jam hitung (countedAt server), diffQtyBase = countedQtyBase −\nsystemQtyBase. Tanpa nilai rupiah.\n')).describe('Urut nama barang.')
+})
+
+/**
+ * Langkah 2 dari 2 (K2); hanya pembuat sesi (sesi orang lain 404). Satu alasan untuk tepat
+ * setiap barang menunggu_alasan; barang diganti diabaikan. Alasan untuk barang yang tidak
+ * perlu alasan, barang tanpa alasan, atau receiptId di luar receiptOptions → 422
+ * OpnameProblem, tanpa perubahan sebagian.
+ * salah_input (J4): receiptId dari receiptOptions disimpan sebagai rujukan (nota tidak
+ * diubah, stok dikoreksi oleh opname); receiptId null → tercatat tidak_diketahui.
+ * Nilai (K3): value = round_half_up(|diffQtyBase| × cost.amount ÷ cost.qtyBase) dari HPP
+ * sekarang; null bila HPP belum ada. Barang ditahan bila value null (J3) atau > Rp100.000
+ * (J2, nilai mutlak, kurang maupun lebih); selain itu langsung disesuaikan (entri ledger
+ * opname dengan alasan, waktu efektif = countedAt). Sesi flagged bila Σ value yang diketahui
+ * pada barang selisih > Rp250.000; ditetapkan sekali di sini.
+ * Replay pada sesi selesai → 200 sesi apa adanya, tanpa menerapkan ulang.
+ * @summary Simpan alasan selisih (online)
+ */
+export const FinishStaffOpnameSessionParams = zod.object({
+  "sessionId": zod.string()
+})
+
+export const FinishStaffOpnameSessionBody = zod.object({
+  "reasons": zod.array(zod.object({
+  "productId": zod.string(),
+  "reason": zod.enum(['rusak', 'hilang', 'kedaluwarsa', 'salah_input']),
+  "receiptId": zod.string().nullable().describe('Hanya untuk salah_input; dari receiptOptions barang itu; null = tidak tahu notanya.')
+}))
+})
+
+
+export const finishStaffOpnameSessionResponseItemsItemReceiptOptionsMax = 5;
+
+
+
+export const FinishStaffOpnameSessionResponse = zod.object({
+  "id": zod.string(),
+  "scope": zod.object({
+  "kind": zod.enum(['kategori', 'tanpa_kategori', 'semua']),
+  "category": zod.string().nullable()
+}).describe('Lingkup opname. kategori = barang berkategori category; tanpa_kategori = barang berkategori\nnull (mis. barang baru dari nota); semua = semua barang. category wajib iff kind = kategori\n(selain itu null).\n'),
+  "status": zod.enum(['menunggu_alasan', 'selesai']).describe('menunggu_alasan = ada barang menunggu_alasan; selesai = alasan sudah disimpan, atau tidak\nada (lagi) barang menunggu_alasan — sesi yang semua barang menunggu_alasan-nya menjadi\ndiganti otomatis selesai (finishedAt = saat itu).\n'),
+  "createdByName": zod.string(),
+  "submittedAt": zod.int().describe('Waktu server saat hitungan diterima.'),
+  "finishedAt": zod.int().nullable(),
+  "items": zod.array(zod.object({
+  "productId": zod.string(),
+  "productName": zod.string(),
+  "unitName": zod.string().describe('Satuan eceran.'),
+  "unitSize": zod.int().min(1).describe('Isi satuan eceran dalam satuan dasar.'),
+  "isCurah": zod.boolean(),
+  "countedQtyBase": zod.int(),
+  "countedAt": zod.int().describe('Jam hitung setelah digeser ke jam server (K6).'),
+  "clockEstimated": zod.boolean().describe('Jam HP melenceng > 5 menit dari jam server, atau jam hasil geser dijepit ke jam server.'),
+  "systemQtyBase": zod.int(),
+  "diffQtyBase": zod.int(),
+  "state": zod.enum(['cocok', 'stok_awal', 'menunggu_alasan', 'disesuaikan', 'ditahan', 'disetujui', 'dihitung_ulang', 'diganti']).describe('cocok = selisih 0; stok_awal = hitungan pertama barang stockCounted false, langsung jadi\nstok (J1); menunggu_alasan = selisih, alasan belum disimpan; disesuaikan = stok sudah\ndikoreksi; ditahan = menunggu persetujuan pemilik (nilai > Rp100.000 atau HPP belum ada);\ndisetujui = disetujui pemilik; dihitung_ulang = dihitung ulang pemilik; diganti = kalah\noleh hitungan barang yang sama dengan countedAt lebih baru, tidak pernah diterapkan.\n'),
+  "reason": zod.union([zod.enum(['rusak', 'hilang', 'kedaluwarsa', 'salah_input', 'tidak_diketahui']).describe('Alasan selisih opname. rusak, hilang, kedaluwarsa, dan salah_input dipilih staf;\ntidak_diketahui = salah_input tanpa nota rujukan (J4).\n'),zod.null()]).describe('Alasan tersimpan; null bila belum ada atau tidak perlu.'),
+  "receiptRef": zod.union([zod.object({
+  "receiptId": zod.string(),
+  "supplierName": zod.string(),
+  "notaDate": zod.iso.date()
+}).describe('Nota barang masuk aktif yang memuat barang itu (rujukan salah input sebelumnya).'),zod.null()]).describe('Nota rujukan untuk salah_input (J4).'),
+  "receiptOptions": zod.array(zod.object({
+  "receiptId": zod.string(),
+  "supplierName": zod.string(),
+  "notaDate": zod.iso.date()
+}).describe('Nota barang masuk aktif yang memuat barang itu (rujukan salah input sebelumnya).')).max(finishStaffOpnameSessionResponseItemsItemReceiptOptionsMax).describe('Barang selisih: paling banyak 5 nota aktif terakhir yang memuat barang itu (notaDate lalu\ncreatedAt terbaru dulu); kosong untuk barang lain.\n')
+}).describe('Satu barang yang dihitung. systemQtyBase baru dikirim setelah hitungan diterima server\n(hitung buta, K8): stok pada jam hitung (countedAt server), diffQtyBase = countedQtyBase −\nsystemQtyBase. Tanpa nilai rupiah.\n')).describe('Urut nama barang.')
+})
+
+/**
+ * Perkiraan FIFO (K9): kiriman = semua baris nota aktif barang itu, ber-ED maupun tidak,
+ * dikunci (receiptId, lineId), urut terbaru dulu (notaDate, createdAt, lalu urutan baris
+ * menurun); capacityQtyBase = max(0, qty × unitSize − Σ yang sudah dikeluarkan dari baris
+ * itu); max(stok, 0) dialokasikan mulai dari kiriman terbaru, jadi barang lama dianggap
+ * terjual lebih dulu. lots = kiriman ber-ED dengan estimateQtyBase > 0 dan tahap lewat (ED
+ * sebelum hari ini) atau segera (0–soonDays hari lagi, termasuk hari ini), urut lewat dulu
+ * lalu segera, masing-masing ED naik. recent = log keluar dan ubah ED 14 hari terakhir,
+ * terbaru dulu, paling banyak 20. Tanpa nilai rupiah.
+ * @summary Barang sudah/segera kedaluwarsa (perkiraan per kiriman)
+ */
+
+
+export const getStaffExpiryResponseRecentMax = 20;
+
+
+
+export const GetStaffExpiryResponse = zod.object({
+  "soonDays": zod.int().describe('Batas tahap segera (hari), dari pengaturan server.'),
+  "lots": zod.array(zod.object({
+  "lineId": zod.string(),
+  "receiptId": zod.string(),
+  "productId": zod.string(),
+  "productName": zod.string(),
+  "unitName": zod.string().describe('Satuan eceran.'),
+  "unitSize": zod.int().min(1),
+  "isCurah": zod.boolean(),
+  "estimateQtyBase": zod.int(),
+  "capacityQtyBase": zod.int(),
+  "expiryDate": zod.iso.date(),
+  "stage": zod.enum(['lewat', 'segera']).describe('lewat = ED sebelum hari ini; segera = 0–soonDays hari lagi (ED hari ini termasuk).'),
+  "supplierName": zod.string(),
+  "notaDate": zod.iso.date()
+}).describe('Satu kiriman (baris nota) ber-ED. estimateQtyBase = perkiraan sisa FIFO (K9);\ncapacityQtyBase = batas keluarkan dari kiriman ini.\n')),
+  "recent": zod.array(zod.object({
+  "id": zod.string(),
+  "at": zod.int(),
+  "actorName": zod.string(),
+  "kind": zod.enum(['keluar', 'ubah_ed']),
+  "receiptId": zod.string(),
+  "lineId": zod.string(),
+  "productId": zod.string(),
+  "productName": zod.string(),
+  "unitName": zod.string(),
+  "unitSize": zod.int().min(1),
+  "isCurah": zod.boolean(),
+  "qtyBase": zod.int().nullable(),
+  "fromDate": zod.iso.date().nullable(),
+  "toDate": zod.iso.date().nullable()
+}).describe('keluar = dikeluarkan dari stok (qtyBase positif, tanggal null); ubah_ed = tanggal ED dibetulkan (qtyBase null).')).max(getStaffExpiryResponseRecentMax)
+})
+
+/**
+ * Pengeluaran dicatat pada kiriman (baris nota) yang dipilih (J6), sehingga kiriman itu yang
+ * berkurang: entri ledger keluar_kedaluwarsa (qtyBase negatif) atas nama pengguna ini.
+ * 1 ≤ qtyBase ≤ capacityQtyBase kiriman itu, selain itu 422 VALIDATION (detail = pesan);
+ * stok boleh menjadi minus. Nota tidak ada, dibatalkan, atau tanpa baris itu → 404.
+ * Idempoten menurut (pembuat, id): id yang sama tetap 204 tanpa mencatat ulang. Online saja.
+ * @summary Keluarkan barang kedaluwarsa dari stok
+ */
+export const createStaffExpiryRemovalBodyIdMax = 64;
+
+
+
+
+export const CreateStaffExpiryRemovalBody = zod.object({
+  "id": zod.string().min(1).max(createStaffExpiryRemovalBodyIdMax).describe('ID dari HP (idempotensi).'),
+  "receiptId": zod.string(),
+  "lineId": zod.string(),
+  "qtyBase": zod.int().min(1).describe('Jumlah dalam satuan dasar; paling banyak capacityQtyBase kiriman itu.')
+})
+
+export const CreateStaffExpiryRemovalResponse = zod.void()
+
+/**
+ * Berlaku untuk nota siapa pun. Nota tidak ada, dibatalkan, atau tanpa baris itu → 404;
+ * tanggal tidak sah → 422 VALIDATION. Mencatat riwayat perubahan nota (ubah, "{barang}: ED
+ * a → b") dan log ubah_ed; tanggal sama → 204 tanpa entri.
+ * @summary Ubah tanggal ED satu kiriman
+ */
+export const PutStaffLineExpiryParams = zod.object({
+  "receiptId": zod.string(),
+  "lineId": zod.string()
+})
+
+export const PutStaffLineExpiryBody = zod.object({
+  "expiryDate": zod.iso.date()
+})
+
+export const PutStaffLineExpiryResponse = zod.void()
+
+/**
+ * Tanpa angka sisa stok. Aturan sama dengan stockAlert menipis (termasuk penanda diam);
+ * urut nama.
+ * @summary Barang menipis
+ */
+
+
+
+export const ListStaffLowStockResponseItem = zod.object({
+  "productId": zod.string(),
+  "productName": zod.string(),
+  "unitName": zod.string().describe('Satuan eceran.'),
+  "unitSize": zod.int().min(1),
+  "isCurah": zod.boolean(),
+  "minQtyBase": zod.int().describe('Batas menipis (minStock) dalam satuan dasar.')
+}).describe('Barang menipis untuk orang toko; tanpa angka sisa stok (J7).')
+export const ListStaffLowStockResponse = zod.array(ListStaffLowStockResponseItem)
+

@@ -1,10 +1,14 @@
 import { expect, expectTypeOf, test } from "vitest";
 import type { z } from "zod";
+import * as ownerApi from "./gen/owner/owner";
 import type {
   Attention,
   CostChangeItem,
   CreditLimitProblem,
+  ExpiryAttention,
   ImportRowResult,
+  OpnameFlag,
+  OpnameReason,
   OwnerProduct,
   OwnerProductRow,
   OwnerProductUnit,
@@ -22,15 +26,24 @@ import {
   PriceSource,
   ProductStatus,
 } from "./gen/shaziaMartAPI.schemas";
+import * as staffApi from "./gen/staff/staff";
 import { LookupCatalogResponse } from "./gen/zod/catalog/catalog";
 import {
   CheckOwnerProductImportBody,
   CreateOwnerProductBody,
   GetOwnerTodaySummaryResponse,
   OwnerLoginBody,
+  RecountOpnameItemBody,
   UpdateOwnerProductPricesBody,
 } from "./gen/zod/owner/owner";
 import { CreateSaleBody, VoidSaleBody } from "./gen/zod/sales/sales";
+import {
+  CreateStaffExpiryRemovalBody,
+  CreateStaffOpnameSessionBody,
+  FinishStaffOpnameSessionBody,
+  ListStaffOpnameProductsQueryParams,
+  PutStaffLineExpiryBody,
+} from "./gen/zod/staff/staff";
 import { creditLimitProblemSchema, priceChangedProblemSchema } from "./problem";
 
 test("skema zod createSale menolak body tanpa saleId", () => {
@@ -87,8 +100,8 @@ test("creditLimitProblemSchema cocok dengan tipe hasil generate", () => {
   expect(ok.success).toBe(true);
 });
 
-test("ErrorCode 21 nilai termasuk 5 kode baru", () => {
-  expect(Object.values(ErrorCode)).toHaveLength(21);
+test("ErrorCode 22 nilai termasuk OPNAME_NOT_HELD", () => {
+  expect(Object.values(ErrorCode)).toHaveLength(22);
   expect(Object.values(ErrorCode)).toEqual(
     expect.arrayContaining([
       "PRODUCT_INACTIVE",
@@ -98,6 +111,7 @@ test("ErrorCode 21 nilai termasuk 5 kode baru", () => {
       "RECEIPT_CANCELLED",
       "DEBT_ALREADY_PAID",
       "ID_TAKEN",
+      "OPNAME_NOT_HELD",
     ]),
   );
   expect(ErrorCode.LOGIN_INVALID).toBe("LOGIN_INVALID");
@@ -117,8 +131,17 @@ test("enum diperluas", () => {
     "ubah_nota",
   ]);
   expectTypeOf<StockMovement["kind"]>().toEqualTypeOf<
-    "jual" | "batal" | "masuk" | "koreksi_masuk" | "batal_masuk"
+    | "jual"
+    | "batal"
+    | "masuk"
+    | "koreksi_masuk"
+    | "batal_masuk"
+    | "opname"
+    | "stok_awal"
+    | "keluar_kedaluwarsa"
   >();
+  expectTypeOf<StockMovement["reason"]>().toEqualTypeOf<OpnameReason | null>();
+  expectTypeOf<Required<StockMovement>>().toEqualTypeOf<StockMovement>();
 });
 
 test("ShiftClosure.supplierPayments, Attention.supplierDebts/awaitingPriceCount, OwnerProduct.hasReceipts", () => {
@@ -232,6 +255,128 @@ test("UpdateOwnerProductPricesBody menolak lines kosong dan harga 0", () => {
 test("Attention memuat costChanges dan stockOuts", () => {
   expectTypeOf<Attention["costChanges"]>().toEqualTypeOf<CostChangeItem[]>();
   expectTypeOf<Attention["stockOuts"]>().toEqualTypeOf<StockOutItem[]>();
+});
+
+test("Attention memuat kedaluwarsa dan opname (K19)", () => {
+  expectTypeOf<Attention["expiry"]>().toEqualTypeOf<ExpiryAttention>();
+  expectTypeOf<Attention["opnameHeldCount"]>().toEqualTypeOf<number>();
+  expectTypeOf<Attention["opnameFlags"]>().toEqualTypeOf<OpnameFlag[]>();
+  expectTypeOf<keyof ExpiryAttention>().toEqualTypeOf<
+    "expiredCount" | "soonCount" | "soonDays"
+  >();
+  expectTypeOf<keyof OpnameFlag>().toEqualTypeOf<
+    "sessionId" | "scope" | "finishedAt" | "totalValue"
+  >();
+  expectTypeOf<Required<Attention>>().toEqualTypeOf<Attention>();
+});
+
+/** Operasi F3b-2b (kontrak opname, kedaluwarsa, menipis). */
+const STOCK_OPS = {
+  staff: [
+    "listStaffOpnameCategories",
+    "listStaffOpnameProducts",
+    "listStaffOpnameSessions",
+    "createStaffOpnameSession",
+    "getStaffOpnameSession",
+    "finishStaffOpnameSession",
+    "getStaffExpiry",
+    "createStaffExpiryRemoval",
+    "putStaffLineExpiry",
+    "listStaffLowStock",
+  ],
+  owner: [
+    "listOwnerOpnameSessions",
+    "getOwnerOpnameSession",
+    "approveOpnameItem",
+    "recountOpnameItem",
+    "reviewOpnameSession",
+    "getOwnerExpiry",
+    "createOwnerExpiryRemoval",
+    "putOwnerLineExpiry",
+  ],
+} as const;
+
+test("operasi opname, kedaluwarsa, dan menipis ada di klien hasil generate", () => {
+  const modules: Record<string, Record<string, unknown>> = {
+    staff: staffApi,
+    owner: ownerApi,
+  };
+  for (const [tag, ids] of Object.entries(STOCK_OPS)) {
+    for (const id of ids) {
+      expect({ id, type: typeof modules[tag]?.[id] }).toEqual({
+        id,
+        type: "function",
+      });
+    }
+  }
+});
+
+test("OpnameSessionInput: id 1..64, lingkup sah, items minimal 1, qtyBase bulat >= 0", () => {
+  const body = {
+    id: "d1",
+    scope: { kind: "kategori", category: "Mi Instan" },
+    deviceNow: 1793600000000,
+    items: [{ productId: "p1", qtyBase: 0, countedAt: 1793599000000 }],
+  };
+  const parse = (b: unknown) => CreateStaffOpnameSessionBody.safeParse(b);
+  const item = body.items[0];
+  expect(parse(body).success).toBe(true);
+  expect(
+    parse({ ...body, scope: { kind: "semua", category: null } }).success,
+  ).toBe(true);
+  expect(parse({ ...body, items: [] }).success).toBe(false);
+  expect(parse({ ...body, id: "" }).success).toBe(false);
+  expect(parse({ ...body, id: "x".repeat(65) }).success).toBe(false);
+  expect(
+    parse({ ...body, scope: { kind: "rak", category: null } }).success,
+  ).toBe(false);
+  expect(parse({ ...body, items: [{ ...item, qtyBase: -1 }] }).success).toBe(
+    false,
+  );
+  expect(parse({ ...body, items: [{ ...item, qtyBase: 1.5 }] }).success).toBe(
+    false,
+  );
+});
+
+test("OpnameFinishInput: alasan staf tanpa tidak_diketahui; receiptId nullable", () => {
+  const parse = (b: unknown) => FinishStaffOpnameSessionBody.safeParse(b);
+  const reason = { productId: "p1", reason: "salah_input", receiptId: "r1" };
+  expect(parse({ reasons: [reason] }).success).toBe(true);
+  expect(parse({ reasons: [] }).success).toBe(true);
+  expect(
+    parse({ reasons: [{ ...reason, reason: "rusak", receiptId: null }] })
+      .success,
+  ).toBe(true);
+  expect(
+    parse({ reasons: [{ ...reason, reason: "tidak_diketahui" }] }).success,
+  ).toBe(false);
+});
+
+test("kedaluwarsa & hitung ulang: keluarkan qtyBase >= 1, hitung ulang >= 0, tanggal ED ISO", () => {
+  const removal = { id: "x1", receiptId: "r1", lineId: "l1", qtyBase: 1 };
+  const parse = (b: unknown) => CreateStaffExpiryRemovalBody.safeParse(b);
+  expect(parse(removal).success).toBe(true);
+  expect(parse({ ...removal, qtyBase: 0 }).success).toBe(false);
+  expect(parse({ ...removal, id: "" }).success).toBe(false);
+  expect(RecountOpnameItemBody.safeParse({ qtyBase: 0 }).success).toBe(true);
+  expect(RecountOpnameItemBody.safeParse({ qtyBase: -1 }).success).toBe(false);
+  expect(
+    PutStaffLineExpiryBody.safeParse({ expiryDate: "2027-01-31" }).success,
+  ).toBe(true);
+  expect(
+    PutStaffLineExpiryBody.safeParse({ expiryDate: "31-01-2027" }).success,
+  ).toBe(false);
+});
+
+test("query barang opname: lingkup wajib dan dibatasi", () => {
+  const parse = (q: unknown) => ListStaffOpnameProductsQueryParams.safeParse(q);
+  expect(parse({ lingkup: "kategori", kategori: "Mi Instan" }).success).toBe(
+    true,
+  );
+  expect(parse({ lingkup: "semua" }).success).toBe(true);
+  expect(parse({ lingkup: "tanpa_kategori" }).success).toBe(true);
+  expect(parse({}).success).toBe(false);
+  expect(parse({ lingkup: "rak" }).success).toBe(false);
 });
 
 test("bentuk OwnerProduct, OwnerProductRow, ProductInput, ImportRowResult: key lengkap & semua wajib", () => {
@@ -362,6 +507,16 @@ test("fixture OwnerTodaySummary valid terhadap skema respons dan tipe", () => {
         dueSoonTotal: 350000,
       },
       awaitingPriceCount: 3,
+      expiry: { expiredCount: 1, soonCount: 2, soonDays: 30 },
+      opnameHeldCount: 1,
+      opnameFlags: [
+        {
+          sessionId: "o1",
+          scope: { kind: "kategori", category: "Susu" },
+          finishedAt: 1790000000000,
+          totalValue: 262000,
+        },
+      ],
     },
   } satisfies OwnerTodaySummary;
   expect(GetOwnerTodaySummaryResponse.safeParse(summary).success).toBe(true);

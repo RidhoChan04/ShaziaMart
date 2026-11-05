@@ -35,6 +35,7 @@ test.each([
   ["RECEIPT_CANCELLED", "Nota ini sudah dibatalkan"],
   ["DEBT_ALREADY_PAID", "Utang ini sudah lunas"],
   ["ID_TAKEN", "Data ini milik pengguna lain"],
+  ["OPNAME_NOT_HELD", "Barang ini tidak lagi menunggu persetujuan"],
 ] as const)("pesanError %s", (code, text) =>
   expect(pesanError(new ApiError({ status: 403, code }))).toBe(text),
 );

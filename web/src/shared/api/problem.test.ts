@@ -1,7 +1,11 @@
 import { expect, test } from "vitest";
 import { z } from "zod";
 import { ApiError } from "./fetcher";
-import { readProblem, receiptProblemSchema } from "./problem";
+import {
+  opnameProblemSchema,
+  readProblem,
+  receiptProblemSchema,
+} from "./problem";
 
 const priceChangedProblemSchema = z.object({
   code: z.literal("PRICE_CHANGED"),
@@ -62,4 +66,25 @@ test("receiptProblemSchema membaca errors per baris", () => {
     field: "product",
     message: "Barang ini tidak dijual lagi",
   });
+});
+
+test("opnameProblemSchema membaca galat per barang (productId null = tingkat sesi)", () => {
+  const body = {
+    type: "about:blank",
+    title: "Hasil opname tidak valid",
+    status: 422,
+    code: "VALIDATION",
+    errors: [
+      { productId: "p1", message: "Pilih alasan" },
+      { productId: null, message: "Belum ada barang yang dihitung" },
+    ],
+  };
+  const err = new ApiError({ status: 422, code: "VALIDATION", body });
+  expect(readProblem(err, opnameProblemSchema)?.errors).toEqual(body.errors);
+  const notArray = new ApiError({
+    status: 422,
+    code: "VALIDATION",
+    body: { ...body, errors: { productId: "p1", message: "Pilih alasan" } },
+  });
+  expect(readProblem(notArray, opnameProblemSchema)).toBeNull();
 });

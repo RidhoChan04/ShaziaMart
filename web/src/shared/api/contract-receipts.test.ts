@@ -3,6 +3,9 @@ import { z } from "zod";
 import type {
   DebtPayment,
   DrawerShift,
+  ExpiryEvent,
+  OpnameReceiptOption,
+  OpnameScope,
   OwnerReceipt,
   OwnerReceiptRow,
   ReceiptError,
@@ -11,6 +14,14 @@ import type {
   ReceiptLineInput,
   ReceiptPayment,
   ReceiptProblem,
+  StaffExpiryList,
+  StaffExpiryLot,
+  StaffLowStockItem,
+  StaffOpnameCategories,
+  StaffOpnameCategory,
+  StaffOpnameItem,
+  StaffOpnameRow,
+  StaffOpnameSession,
   StaffProduct,
   StaffReceipt,
   StaffReceiptRow,
@@ -329,6 +340,48 @@ const RECEIPT = [
   "editedByName",
 ];
 
+const STAFF_PRODUCT = [
+  "id",
+  "name",
+  "category",
+  "isCurah",
+  "baseUnit",
+  "status",
+  "units",
+  "unitSize",
+  "barcodes",
+];
+const SCOPE = ["scope", "kind", "category"];
+const ITEM_BASE = [
+  "productId",
+  "productName",
+  "unitName",
+  "unitSize",
+  "isCurah",
+];
+const OPNAME_SESSION = [
+  "id",
+  ...SCOPE,
+  "status",
+  "createdByName",
+  "submittedAt",
+  "finishedAt",
+  "items",
+  ...ITEM_BASE,
+  "countedQtyBase",
+  "countedAt",
+  "clockEstimated",
+  "systemQtyBase",
+  "diffQtyBase",
+  "state",
+  "reason",
+  "receiptRef",
+  "receiptOptions",
+  "receiptId",
+  "supplierName",
+  "notaDate",
+];
+
 /** Allowlist: setiap respons /api/staff hanya boleh memuat key ini (di kedalaman mana pun). */
 const STAFF_RESPONSE_KEYS: Record<string, readonly string[]> = {
   ListStaffUsersResponse: USER,
@@ -336,17 +389,7 @@ const STAFF_RESPONSE_KEYS: Record<string, readonly string[]> = {
   GetStaffSessionResponse: ["user", ...USER],
   StaffLogoutResponse: [],
   GetStaffShiftResponse: ["shift", "kasirName", "openedAt"],
-  SearchStaffProductsResponse: [
-    "id",
-    "name",
-    "category",
-    "isCurah",
-    "baseUnit",
-    "status",
-    "units",
-    "unitSize",
-    "barcodes",
-  ],
+  SearchStaffProductsResponse: STAFF_PRODUCT,
   ListStaffSuppliersResponse: ["id", "name"],
   CreateStaffReceiptResponse: RECEIPT,
   ListStaffReceiptsResponse: [
@@ -362,6 +405,52 @@ const STAFF_RESPONSE_KEYS: Record<string, readonly string[]> = {
   UpdateStaffReceiptResponse: RECEIPT,
   PutStaffReceiptPhotoResponse: [],
   GetStaffReceiptPhotoResponse: [],
+  ListStaffOpnameCategoriesResponse: [
+    "categories",
+    ...SCOPE,
+    "productCount",
+    "lastCountedAt",
+    "allCount",
+    "suggested",
+  ],
+  ListStaffOpnameProductsResponse: STAFF_PRODUCT,
+  ListStaffOpnameSessionsResponse: [
+    "id",
+    ...SCOPE,
+    "status",
+    "submittedAt",
+    "finishedAt",
+    "itemCount",
+    "diffCount",
+    "heldCount",
+  ],
+  CreateStaffOpnameSessionResponse: OPNAME_SESSION,
+  GetStaffOpnameSessionResponse: OPNAME_SESSION,
+  FinishStaffOpnameSessionResponse: OPNAME_SESSION,
+  GetStaffExpiryResponse: [
+    "soonDays",
+    "lots",
+    "lineId",
+    "receiptId",
+    ...ITEM_BASE,
+    "estimateQtyBase",
+    "capacityQtyBase",
+    "expiryDate",
+    "stage",
+    "supplierName",
+    "notaDate",
+    "recent",
+    "id",
+    "at",
+    "actorName",
+    "kind",
+    "qtyBase",
+    "fromDate",
+    "toDate",
+  ],
+  CreateStaffExpiryRemovalResponse: [],
+  PutStaffLineExpiryResponse: [],
+  ListStaffLowStockResponse: [...ITEM_BASE, "minQtyBase"],
 };
 
 const keysOf = (schema: unknown): string[] =>
@@ -391,6 +480,197 @@ test("allowlist respons /api/staff: setiap respons punya daftar key, tanpa key l
   expect(keysOf(staffZod.GetStaffReceiptResponse)).toEqual(
     [...new Set(RECEIPT)].sort(),
   );
+  expect(keysOf(staffZod.GetStaffOpnameSessionResponse)).toEqual(
+    [...new Set(OPNAME_SESSION)].sort(),
+  );
+});
+
+test("hitung buta: barang opname = StaffProduct tanpa stok; respons staf memakai nama *QtyBase", () => {
+  expect(keysOf(staffZod.ListStaffOpnameProductsResponse)).toEqual(
+    [...STAFF_PRODUCT].sort(),
+  );
+  expectTypeOf<keyof OpnameScope>().toEqualTypeOf<"kind" | "category">();
+  expectTypeOf<OpnameScope["category"]>().toEqualTypeOf<string | null>();
+  expectTypeOf<keyof StaffOpnameCategory>().toEqualTypeOf<
+    "scope" | "productCount" | "lastCountedAt"
+  >();
+  expectTypeOf<keyof StaffOpnameCategories>().toEqualTypeOf<
+    "categories" | "allCount" | "suggested"
+  >();
+  expectTypeOf<
+    StaffOpnameCategories["suggested"]
+  >().toEqualTypeOf<OpnameScope | null>();
+  expectTypeOf<keyof OpnameReceiptOption>().toEqualTypeOf<
+    "receiptId" | "supplierName" | "notaDate"
+  >();
+  expectTypeOf<keyof StaffOpnameItem>().toEqualTypeOf<
+    | "productId"
+    | "productName"
+    | "unitName"
+    | "unitSize"
+    | "isCurah"
+    | "countedQtyBase"
+    | "countedAt"
+    | "clockEstimated"
+    | "systemQtyBase"
+    | "diffQtyBase"
+    | "state"
+    | "reason"
+    | "receiptRef"
+    | "receiptOptions"
+  >();
+  expectTypeOf<Required<StaffOpnameItem>>().toEqualTypeOf<StaffOpnameItem>();
+  expectTypeOf<
+    StaffOpnameItem["receiptRef"]
+  >().toEqualTypeOf<OpnameReceiptOption | null>();
+  expectTypeOf<keyof StaffOpnameSession>().toEqualTypeOf<
+    | "id"
+    | "scope"
+    | "status"
+    | "createdByName"
+    | "submittedAt"
+    | "finishedAt"
+    | "items"
+  >();
+  expectTypeOf<
+    Required<StaffOpnameSession>
+  >().toEqualTypeOf<StaffOpnameSession>();
+  expectTypeOf<keyof StaffOpnameRow>().toEqualTypeOf<
+    | "id"
+    | "scope"
+    | "status"
+    | "submittedAt"
+    | "finishedAt"
+    | "itemCount"
+    | "diffCount"
+    | "heldCount"
+  >();
+  expectTypeOf<keyof StaffExpiryLot>().toEqualTypeOf<
+    | "lineId"
+    | "receiptId"
+    | "productId"
+    | "productName"
+    | "unitName"
+    | "unitSize"
+    | "isCurah"
+    | "estimateQtyBase"
+    | "capacityQtyBase"
+    | "expiryDate"
+    | "stage"
+    | "supplierName"
+    | "notaDate"
+  >();
+  expectTypeOf<keyof ExpiryEvent>().toEqualTypeOf<
+    | "id"
+    | "at"
+    | "actorName"
+    | "kind"
+    | "receiptId"
+    | "lineId"
+    | "productId"
+    | "productName"
+    | "unitName"
+    | "unitSize"
+    | "isCurah"
+    | "qtyBase"
+    | "fromDate"
+    | "toDate"
+  >();
+  expectTypeOf<Required<ExpiryEvent>>().toEqualTypeOf<ExpiryEvent>();
+  expectTypeOf<keyof StaffExpiryList>().toEqualTypeOf<
+    "soonDays" | "lots" | "recent"
+  >();
+  expectTypeOf<keyof StaffLowStockItem>().toEqualTypeOf<
+    | "productId"
+    | "productName"
+    | "unitName"
+    | "unitSize"
+    | "isCurah"
+    | "minQtyBase"
+  >();
+});
+
+test("respons staf opname & kedaluwarsa contoh mockup valid", () => {
+  const session = {
+    id: "d1",
+    scope: { kind: "kategori", category: "Susu" },
+    status: "menunggu_alasan",
+    createdByName: "Rina",
+    submittedAt: 1793600000000,
+    finishedAt: null,
+    items: [
+      {
+        productId: "p1",
+        productName: "Susu Bendera Kotak 200 ml",
+        unitName: "kotak",
+        unitSize: 1,
+        isCurah: false,
+        countedQtyBase: 10,
+        countedAt: 1793599000000,
+        clockEstimated: false,
+        systemQtyBase: 12,
+        diffQtyBase: -2,
+        state: "menunggu_alasan",
+        reason: null,
+        receiptRef: null,
+        receiptOptions: [
+          {
+            receiptId: "r1",
+            supplierName: "CV Sumber Rejeki",
+            notaDate: "2026-11-02",
+          },
+        ],
+      },
+    ],
+  } satisfies StaffOpnameSession;
+  expect(
+    staffZod.GetStaffOpnameSessionResponse.safeParse(session).success,
+  ).toBe(true);
+  const expiry = {
+    soonDays: 30,
+    lots: [
+      {
+        lineId: "l1",
+        receiptId: "r1",
+        productId: "p1",
+        productName: "Sari Roti Tawar",
+        unitName: "bungkus",
+        unitSize: 1,
+        isCurah: false,
+        estimateQtyBase: 3,
+        capacityQtyBase: 3,
+        expiryDate: "2026-11-03",
+        stage: "lewat",
+        supplierName: "CV Sumber Rejeki",
+        notaDate: "2026-10-30",
+      },
+    ],
+    recent: [
+      {
+        id: "x1",
+        at: 1793600000000,
+        actorName: "Rina",
+        kind: "keluar",
+        receiptId: "r1",
+        lineId: "l1",
+        productId: "p1",
+        productName: "Sari Roti Tawar",
+        unitName: "bungkus",
+        unitSize: 1,
+        isCurah: false,
+        qtyBase: 2,
+        fromDate: null,
+        toDate: null,
+      },
+    ],
+  } satisfies StaffExpiryList;
+  expect(staffZod.GetStaffExpiryResponse.safeParse(expiry).success).toBe(true);
+  expect(
+    staffZod.GetStaffExpiryResponse.safeParse({
+      ...expiry,
+      lots: [{ ...expiry.lots[0], stage: "aman" }],
+    }).success,
+  ).toBe(false);
 });
 
 test("HPP tidak pernah ke staf: respons /api/staff tanpa key modal, harga jual, atau stok", () => {
@@ -404,6 +684,10 @@ test("HPP tidak pernah ke staf: respons /api/staff tanpa key modal, harga jual, 
     "stock",
     "grossProfit",
     "openingCash",
+    "value",
+    "totalValue",
+    "lossValue",
+    "gainValue",
   ];
   for (const [name, schema] of staffResponses) {
     const keys = keysOf(schema);

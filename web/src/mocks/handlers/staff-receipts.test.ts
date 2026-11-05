@@ -223,7 +223,7 @@ describe("terima barang masuk", () => {
     expect(dataOf()).toEqual(before);
   });
 
-  test("mutasi Indomie[0] = {kind:'masuk', qtyBase:80, kasirName:'Rina'}", async () => {
+  test("mutasi Indomie[0] = {kind:'masuk', qtyBase:80, kasirName:'Rina', reason:null}", async () => {
     expect((await send(receiptInput())).status).toBe(201);
     expect((await ownerLogin()).status).toBe(200);
     const res = await get(`/api/owner/products/${productOf(INDOMIE).id}`);
@@ -235,6 +235,7 @@ describe("terima barang masuk", () => {
       kind: "masuk",
       qtyBase: 80,
       kasirName: "Rina",
+      reason: null,
     });
     expect(mockDb.get().stockEntries.map((e) => e.qtyBase)).toEqual([
       80, 12, 50_000,

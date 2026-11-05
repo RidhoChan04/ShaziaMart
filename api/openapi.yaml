@@ -949,6 +949,199 @@ paths:
                 $ref: "#/components/schemas/Problem"
         "422":
           $ref: "#/components/responses/ValidationFailed"
+  /api/owner/opname-sessions:
+    get:
+      tags: [owner]
+      operationId: listOwnerOpnameSessions
+      summary: Hasil opname (semua orang toko)
+      security:
+        - ownerCookieAuth: []
+      responses:
+        "200":
+          description: Sesi opname, terbaru dulu (submittedAt)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OwnerOpnameRow"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/owner/opname-sessions/{sessionId}:
+    get:
+      tags: [owner]
+      operationId: getOwnerOpnameSession
+      summary: Detail hasil opname dengan nilai rupiah selisih
+      security:
+        - ownerCookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+      responses:
+        "200":
+          description: Sesi opname
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnerOpnameSession"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /api/owner/opname-sessions/{sessionId}/items/{productId}/approve:
+    post:
+      tags: [owner]
+      operationId: approveOpnameItem
+      summary: Setujui selisih yang ditahan
+      description: |
+        Hanya barang berstate ditahan: stok disesuaikan sebesar diffQtyBase (entri ledger opname
+        dengan alasan barang itu, waktu efektif = countedAt asli), state → disetujui, resolvedByName
+        dan resolvedAt diisi. Barang yang tidak ditahan (termasuk yang sudah disetujui, dihitung
+        ulang, atau diganti) → 409 OPNAME_NOT_HELD tanpa perubahan; stok disesuaikan tepat sekali.
+      security:
+        - ownerCookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+        - $ref: "#/components/parameters/ProductId"
+      responses:
+        "200":
+          description: Sesi setelah disetujui
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnerOpnameSession"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/OpnameNotHeld"
+  /api/owner/opname-sessions/{sessionId}/items/{productId}/recount:
+    post:
+      tags: [owner]
+      operationId: recountOpnameItem
+      summary: Hitung ulang barang yang ditahan
+      description: |
+        Hanya barang berstate ditahan (selain itu 409 OPNAME_NOT_HELD tanpa perubahan). Hitungan
+        pemilik langsung disesuaikan tanpa batas (J5): selisih = qtyBase − stok sekarang, entri
+        ledger opname dengan waktu efektif = sekarang; state → dihitung_ulang dan recount diisi.
+        qtyBase tidak valid → 422 VALIDATION.
+      security:
+        - ownerCookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+        - $ref: "#/components/parameters/ProductId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OpnameRecountInput"
+      responses:
+        "200":
+          description: Sesi setelah hitung ulang
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnerOpnameSession"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/OpnameNotHeld"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+  /api/owner/opname-sessions/{sessionId}/review:
+    post:
+      tags: [owner]
+      operationId: reviewOpnameSession
+      summary: Tandai sesi bertanda selisih besar sudah ditinjau
+      description: |
+        Mengisi reviewedByName dan reviewedAt; sesi hilang dari Attention.opnameFlags. Idempoten:
+        sesi yang sudah ditinjau dikembalikan apa adanya. flagged tidak berubah.
+      security:
+        - ownerCookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+      responses:
+        "200":
+          description: Sesi setelah ditinjau
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnerOpnameSession"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /api/owner/expiry:
+    get:
+      tags: [owner]
+      operationId: getOwnerExpiry
+      summary: Barang sudah/segera kedaluwarsa dengan perkiraan kerugian
+      description: |
+        Sama dengan getStaffExpiry ditambah nilai rupiah dari HPP sekarang (lossValue per kiriman
+        dan expiredLossValue); log keluar memakai lossValue yang disimpan saat kejadian.
+      security:
+        - ownerCookieAuth: []
+      responses:
+        "200":
+          description: Kiriman ber-ED dan log terbaru
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnerExpiryList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/owner/expiry-removals:
+    post:
+      tags: [owner]
+      operationId: createOwnerExpiryRemoval
+      summary: Keluarkan barang kedaluwarsa dari stok (pemilik)
+      description: Aturan sama dengan createStaffExpiryRemoval; tercatat atas nama pemilik.
+      security:
+        - ownerCookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExpiryRemovalInput"
+      responses:
+        "204":
+          description: Dikeluarkan (atau id sudah pernah dicatat pengguna ini)
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+  /api/owner/receipts/{receiptId}/lines/{lineId}/expiry:
+    put:
+      tags: [owner]
+      operationId: putOwnerLineExpiry
+      summary: Ubah tanggal ED satu kiriman (pemilik)
+      description: Aturan sama dengan putStaffLineExpiry; berlaku untuk nota siapa pun.
+      security:
+        - ownerCookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ReceiptId"
+        - $ref: "#/components/parameters/LineId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExpiryDateInput"
+      responses:
+        "204":
+          description: Tanggal ED tersimpan
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
   /api/staff/users:
     get:
       tags: [staff]
@@ -1275,6 +1468,317 @@ paths:
           $ref: "#/components/responses/LanOnly"
         "404":
           $ref: "#/components/responses/NotFound"
+  /api/staff/opname/categories:
+    get:
+      tags: [staff]
+      operationId: listStaffOpnameCategories
+      summary: Lingkup opname (kategori, tanpa kategori, semua) dengan saran
+      description: |
+        Hitung buta: tanpa stok. Barang berstatus selain nonaktif dikelompokkan per lingkup
+        (kategori menurut nama; tanpa_kategori = barang berkategori null); lingkup tanpa barang tidak
+        tampil. lastCountedAt = submittedAt sesi terakhir (siapa pun) dengan lingkup itu atau semua.
+        Urut lastCountedAt null dulu lalu terlama; suggested = lingkup pertama (null bila tidak ada).
+      security:
+        - staffCookieAuth: []
+      responses:
+        "200":
+          description: Lingkup opname
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaffOpnameCategories"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/LanOnly"
+  /api/staff/opname/products:
+    get:
+      tags: [staff]
+      operationId: listStaffOpnameProducts
+      summary: Daftar barang yang dihitung untuk satu lingkup
+      description: |
+        Hitung buta: tanpa stok, harga jual, atau modal. Barang berstatus selain nonaktif di
+        lingkup itu, urut nama; HP menyalinnya ke draf agar bisa menghitung tanpa sinyal.
+        kategori wajib bila lingkup = kategori dan dilarang untuk lingkup lain → 422 VALIDATION.
+      security:
+        - staffCookieAuth: []
+      parameters:
+        - name: lingkup
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [kategori, tanpa_kategori, semua]
+        - name: kategori
+          in: query
+          required: false
+          description: Nama kategori; hanya untuk lingkup = kategori.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Barang dalam lingkup
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StaffProduct"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/LanOnly"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+  /api/staff/opname-sessions:
+    get:
+      tags: [staff]
+      operationId: listStaffOpnameSessions
+      summary: Sesi opname milik sendiri
+      security:
+        - staffCookieAuth: []
+      responses:
+        "200":
+          description: Sesi yang dikirim pengguna ini dalam 30 hari terakhir, terbaru dulu (submittedAt)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StaffOpnameRow"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/LanOnly"
+    post:
+      tags: [staff]
+      operationId: createStaffOpnameSession
+      summary: Kirim hitungan opname
+      description: |
+        Langkah 1 dari 2 (K2); bisa dari draf offline yang dikirim belakangan.
+        Idempoten menurut (pembuat, id) — id = ID draf dari HP: id yang sudah dikirim pengguna ini
+        mengembalikan sesi lama dengan 200 tanpa menerapkan ulang; id sudah dipakai pengguna lain →
+        409 ID_TAKEN; sesi milik pengguna lain tidak pernah dikembalikan.
+        Jam hitung (K6): at = countedAt + (serverNow − deviceNow); clockEstimated bila
+        |serverNow − deviceNow| > 5 menit; hasil di atas serverNow dijepit ke serverNow (juga
+        clockEstimated). systemQtyBase = stok pada jam itu, sehingga penjualan di sela-sela tidak
+        membuat selisih palsu; diffQtyBase = countedQtyBase − systemQtyBase.
+        Per barang: barang stockCounted false → stok_awal (J1: langsung jadi stok, tanpa alasan,
+        bukan kerugian); selisih 0 → cocok; selain itu menunggu_alasan. cocok dan stok_awal langsung
+        diterapkan ke stok tanpa alasan; sesi tanpa barang menunggu_alasan langsung selesai.
+        Barang yang sama di beberapa sesi (K5): hanya hitungan dengan countedAt terbaru yang
+        berlaku. Barang di sesi ini menjadi diganti bila sesi lain punya hitungan barang itu dengan
+        countedAt lebih baru yang belum diganti; selain itu hitungan lama barang itu yang masih
+        menunggu_alasan atau ditahan menjadi diganti (replacedBySessionId).
+        Atomik: 422 OpnameProblem dengan galat per barang (barang tidak ditemukan, nonaktif,
+        dihitung dua kali, jumlah atau jam tidak valid), tanpa perubahan sebagian.
+        Batas min/max di skema adalah panduan klien; server selalu memvalidasi isi mentah.
+      security:
+        - staffCookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OpnameSessionInput"
+      responses:
+        "200":
+          description: id sudah pernah dikirim; sesi lama dikembalikan (replay)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaffOpnameSession"
+        "201":
+          description: Sesi dibuat
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaffOpnameSession"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/LanOnly"
+        "409":
+          $ref: "#/components/responses/IdTaken"
+        "422":
+          $ref: "#/components/responses/OpnameValidationFailed"
+  /api/staff/opname-sessions/{sessionId}:
+    get:
+      tags: [staff]
+      operationId: getStaffOpnameSession
+      summary: Hasil opname milik sendiri
+      description: Sesi milik orang lain juga 404.
+      security:
+        - staffCookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+      responses:
+        "200":
+          description: Sesi opname
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaffOpnameSession"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/LanOnly"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /api/staff/opname-sessions/{sessionId}/finish:
+    post:
+      tags: [staff]
+      operationId: finishStaffOpnameSession
+      summary: Simpan alasan selisih (online)
+      description: |
+        Langkah 2 dari 2 (K2); hanya pembuat sesi (sesi orang lain 404). Satu alasan untuk tepat
+        setiap barang menunggu_alasan; barang diganti diabaikan. Alasan untuk barang yang tidak
+        perlu alasan, barang tanpa alasan, atau receiptId di luar receiptOptions → 422
+        OpnameProblem, tanpa perubahan sebagian.
+        salah_input (J4): receiptId dari receiptOptions disimpan sebagai rujukan (nota tidak
+        diubah, stok dikoreksi oleh opname); receiptId null → tercatat tidak_diketahui.
+        Nilai (K3): value = round_half_up(|diffQtyBase| × cost.amount ÷ cost.qtyBase) dari HPP
+        sekarang; null bila HPP belum ada. Barang ditahan bila value null (J3) atau > Rp100.000
+        (J2, nilai mutlak, kurang maupun lebih); selain itu langsung disesuaikan (entri ledger
+        opname dengan alasan, waktu efektif = countedAt). Sesi flagged bila Σ value yang diketahui
+        pada barang selisih > Rp250.000; ditetapkan sekali di sini.
+        Replay pada sesi selesai → 200 sesi apa adanya, tanpa menerapkan ulang.
+      security:
+        - staffCookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OpnameFinishInput"
+      responses:
+        "200":
+          description: Sesi selesai
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaffOpnameSession"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/LanOnly"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/OpnameValidationFailed"
+  /api/staff/expiry:
+    get:
+      tags: [staff]
+      operationId: getStaffExpiry
+      summary: Barang sudah/segera kedaluwarsa (perkiraan per kiriman)
+      description: |
+        Perkiraan FIFO (K9): kiriman = semua baris nota aktif barang itu, ber-ED maupun tidak,
+        dikunci (receiptId, lineId), urut terbaru dulu (notaDate, createdAt, lalu urutan baris
+        menurun); capacityQtyBase = max(0, qty × unitSize − Σ yang sudah dikeluarkan dari baris
+        itu); max(stok, 0) dialokasikan mulai dari kiriman terbaru, jadi barang lama dianggap
+        terjual lebih dulu. lots = kiriman ber-ED dengan estimateQtyBase > 0 dan tahap lewat (ED
+        sebelum hari ini) atau segera (0–soonDays hari lagi, termasuk hari ini), urut lewat dulu
+        lalu segera, masing-masing ED naik. recent = log keluar dan ubah ED 14 hari terakhir,
+        terbaru dulu, paling banyak 20. Tanpa nilai rupiah.
+      security:
+        - staffCookieAuth: []
+      responses:
+        "200":
+          description: Kiriman ber-ED dan log terbaru
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaffExpiryList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/LanOnly"
+  /api/staff/expiry-removals:
+    post:
+      tags: [staff]
+      operationId: createStaffExpiryRemoval
+      summary: Keluarkan barang kedaluwarsa dari stok
+      description: |
+        Pengeluaran dicatat pada kiriman (baris nota) yang dipilih (J6), sehingga kiriman itu yang
+        berkurang: entri ledger keluar_kedaluwarsa (qtyBase negatif) atas nama pengguna ini.
+        1 ≤ qtyBase ≤ capacityQtyBase kiriman itu, selain itu 422 VALIDATION (detail = pesan);
+        stok boleh menjadi minus. Nota tidak ada, dibatalkan, atau tanpa baris itu → 404.
+        Idempoten menurut (pembuat, id): id yang sama tetap 204 tanpa mencatat ulang. Online saja.
+      security:
+        - staffCookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExpiryRemovalInput"
+      responses:
+        "204":
+          description: Dikeluarkan (atau id sudah pernah dicatat pengguna ini)
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/LanOnly"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+  /api/staff/receipts/{receiptId}/lines/{lineId}/expiry:
+    put:
+      tags: [staff]
+      operationId: putStaffLineExpiry
+      summary: Ubah tanggal ED satu kiriman
+      description: |
+        Berlaku untuk nota siapa pun. Nota tidak ada, dibatalkan, atau tanpa baris itu → 404;
+        tanggal tidak sah → 422 VALIDATION. Mencatat riwayat perubahan nota (ubah, "{barang}: ED
+        a → b") dan log ubah_ed; tanggal sama → 204 tanpa entri.
+      security:
+        - staffCookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ReceiptId"
+        - $ref: "#/components/parameters/LineId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExpiryDateInput"
+      responses:
+        "204":
+          description: Tanggal ED tersimpan
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/LanOnly"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+  /api/staff/low-stock:
+    get:
+      tags: [staff]
+      operationId: listStaffLowStock
+      summary: Barang menipis
+      description: |
+        Tanpa angka sisa stok. Aturan sama dengan stockAlert menipis (termasuk penanda diam);
+        urut nama.
+      security:
+        - staffCookieAuth: []
+      responses:
+        "200":
+          description: Barang menipis
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StaffLowStockItem"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/LanOnly"
 components:
   parameters:
     ProductId:
@@ -1291,6 +1795,18 @@ components:
         type: string
     PhotoId:
       name: photoId
+      in: path
+      required: true
+      schema:
+        type: string
+    SessionId:
+      name: sessionId
+      in: path
+      required: true
+      schema:
+        type: string
+    LineId:
+      name: lineId
       in: path
       required: true
       schema:
@@ -1335,6 +1851,18 @@ components:
         application/problem+json:
           schema:
             $ref: "#/components/schemas/ReceiptProblem"
+    OpnameValidationFailed:
+      description: Hitungan atau alasan opname tidak valid (VALIDATION) dengan galat per barang
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/OpnameProblem"
+    OpnameNotHeld:
+      description: Barang tidak (lagi) ditahan menunggu persetujuan pemilik (OPNAME_NOT_HELD)
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
     LoginInvalid:
       description: Nama atau password salah (LOGIN_INVALID)
       content:
@@ -1444,6 +1972,7 @@ components:
         - RECEIPT_CANCELLED
         - DEBT_ALREADY_PAID
         - ID_TAKEN
+        - OPNAME_NOT_HELD
     Problem:
       type: object
       required: [type, title, status, code]
@@ -1587,7 +2116,7 @@ components:
           description: Jumlah saldo kasbon seluruh pelanggan tersebut (rupiah).
     Attention:
       type: object
-      required: [lowStockCount, negativeStockCount, cashDifferences, overdueCredit, costChanges, stockOuts, supplierDebts, awaitingPriceCount]
+      required: [lowStockCount, negativeStockCount, cashDifferences, overdueCredit, costChanges, stockOuts, supplierDebts, awaitingPriceCount, expiry, opnameHeldCount, opnameFlags]
       properties:
         lowStockCount:
           type: integer
@@ -1622,6 +2151,16 @@ components:
         awaitingPriceCount:
           type: integer
           description: Jumlah barang menunggu_harga (barang baru dari barang masuk yang belum punya harga jual).
+        expiry:
+          $ref: "#/components/schemas/ExpiryAttention"
+        opnameHeldCount:
+          type: integer
+          description: Jumlah barang opname berstate ditahan (menunggu persetujuan pemilik).
+        opnameFlags:
+          type: array
+          description: Sesi opname flagged yang belum ditinjau (reviewOpnameSession); terbaru dulu (finishedAt).
+          items:
+            $ref: "#/components/schemas/OpnameFlag"
     SupplierDebtAttention:
       type: object
       description: |
@@ -2039,25 +2578,35 @@ components:
           $ref: "#/components/schemas/PriceSource"
     StockMovement:
       type: object
-      required: [id, at, kind, qtyBase, kasirName]
+      required: [id, at, kind, qtyBase, kasirName, reason]
       properties:
         id:
           type: string
         at:
           type: integer
           format: int64
+          description: Waktu dicatat (epoch ms UTC), juga untuk opname yang berlaku pada jam hitung.
         kind:
           type: string
           description: |
             jual / batal = penjualan dan pembatalannya; masuk = barang masuk; koreksi_masuk = nota
-            barang masuk diubah; batal_masuk = nota barang masuk dibatalkan.
-          enum: [jual, batal, masuk, koreksi_masuk, batal_masuk]
+            barang masuk diubah; batal_masuk = nota barang masuk dibatalkan; opname = koreksi stok
+            dari selisih opname; stok_awal = hitungan opname pertama menjadi stok;
+            keluar_kedaluwarsa = dikeluarkan dari stok karena kedaluwarsa.
+          enum: [jual, batal, masuk, koreksi_masuk, batal_masuk, opname, stok_awal, keluar_kedaluwarsa]
         qtyBase:
           type: integer
-          description: Bertanda; jual negatif, batal positif, masuk positif, koreksi_masuk bertanda, batal_masuk negatif.
+          description: |
+            Bertanda; jual negatif, batal positif, masuk positif, koreksi_masuk bertanda, batal_masuk
+            negatif, opname bertanda, stok_awal bertanda, keluar_kedaluwarsa negatif.
         kasirName:
           type: string
           description: nama orang yang mencatat
+        reason:
+          nullable: true
+          description: Alasan selisih untuk opname (K27); null untuk jenis lain.
+          allOf:
+            - $ref: "#/components/schemas/OpnameReason"
     PriceHistoryEntry:
       type: object
       required: [id, at, unitId, unitName, isEceran, unitSize, tierMinQty, oldPrice, newPrice, source]
@@ -3004,3 +3553,606 @@ components:
               type: array
               items:
                 $ref: "#/components/schemas/ReceiptError"
+    OpnameScope:
+      type: object
+      description: |
+        Lingkup opname. kategori = barang berkategori category; tanpa_kategori = barang berkategori
+        null (mis. barang baru dari nota); semua = semua barang. category wajib iff kind = kategori
+        (selain itu null).
+      required: [kind, category]
+      properties:
+        kind:
+          type: string
+          enum: [kategori, tanpa_kategori, semua]
+        category:
+          type: string
+          nullable: true
+    OpnameReason:
+      type: string
+      description: |
+        Alasan selisih opname. rusak, hilang, kedaluwarsa, dan salah_input dipilih staf;
+        tidak_diketahui = salah_input tanpa nota rujukan (J4).
+      enum: [rusak, hilang, kedaluwarsa, salah_input, tidak_diketahui]
+    OpnameItemState:
+      type: string
+      description: |
+        cocok = selisih 0; stok_awal = hitungan pertama barang stockCounted false, langsung jadi
+        stok (J1); menunggu_alasan = selisih, alasan belum disimpan; disesuaikan = stok sudah
+        dikoreksi; ditahan = menunggu persetujuan pemilik (nilai > Rp100.000 atau HPP belum ada);
+        disetujui = disetujui pemilik; dihitung_ulang = dihitung ulang pemilik; diganti = kalah
+        oleh hitungan barang yang sama dengan countedAt lebih baru, tidak pernah diterapkan.
+      enum: [cocok, stok_awal, menunggu_alasan, disesuaikan, ditahan, disetujui, dihitung_ulang, diganti]
+    OpnameSessionStatus:
+      type: string
+      description: |
+        menunggu_alasan = ada barang menunggu_alasan; selesai = alasan sudah disimpan, atau tidak
+        ada (lagi) barang menunggu_alasan — sesi yang semua barang menunggu_alasan-nya menjadi
+        diganti otomatis selesai (finishedAt = saat itu).
+      enum: [menunggu_alasan, selesai]
+    StaffOpnameCategory:
+      type: object
+      description: Satu lingkup opname; scope.kind kategori atau tanpa_kategori.
+      required: [scope, productCount, lastCountedAt]
+      properties:
+        scope:
+          $ref: "#/components/schemas/OpnameScope"
+        productCount:
+          type: integer
+        lastCountedAt:
+          type: integer
+          format: int64
+          nullable: true
+          description: submittedAt sesi terakhir dengan lingkup ini atau semua; null = belum pernah dihitung.
+    StaffOpnameCategories:
+      type: object
+      required: [categories, allCount, suggested]
+      properties:
+        categories:
+          type: array
+          description: Belum pernah dihitung dulu, lalu paling lama dihitung.
+          items:
+            $ref: "#/components/schemas/StaffOpnameCategory"
+        allCount:
+          type: integer
+          description: Jumlah barang berstatus selain nonaktif (lingkup semua).
+        suggested:
+          nullable: true
+          description: Lingkup pertama di categories; null bila kosong.
+          allOf:
+            - $ref: "#/components/schemas/OpnameScope"
+    OpnameCountInput:
+      type: object
+      required: [productId, qtyBase, countedAt]
+      properties:
+        productId:
+          type: string
+        qtyBase:
+          type: integer
+          minimum: 0
+          description: Jumlah fisik dalam satuan dasar; 0 sah.
+        countedAt:
+          type: integer
+          format: int64
+          description: Jam HP saat barang dibuka untuk dihitung (scan/ketuk); membuka ulang memperbarui jamnya.
+    OpnameSessionInput:
+      type: object
+      required: [id, scope, deviceNow, items]
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: ID draf dari HP (idempotensi).
+        scope:
+          $ref: "#/components/schemas/OpnameScope"
+        deviceNow:
+          type: integer
+          format: int64
+          description: Jam HP saat mengirim; dipakai menggeser countedAt ke jam server (K6).
+        items:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/OpnameCountInput"
+    OpnameReceiptOption:
+      type: object
+      description: Nota barang masuk aktif yang memuat barang itu (rujukan salah input sebelumnya).
+      required: [receiptId, supplierName, notaDate]
+      properties:
+        receiptId:
+          type: string
+        supplierName:
+          type: string
+        notaDate:
+          type: string
+          format: date
+    StaffOpnameItem:
+      type: object
+      description: |
+        Satu barang yang dihitung. systemQtyBase baru dikirim setelah hitungan diterima server
+        (hitung buta, K8): stok pada jam hitung (countedAt server), diffQtyBase = countedQtyBase −
+        systemQtyBase. Tanpa nilai rupiah.
+      required: [productId, productName, unitName, unitSize, isCurah, countedQtyBase, countedAt, clockEstimated, systemQtyBase, diffQtyBase, state, reason, receiptRef, receiptOptions]
+      properties:
+        productId:
+          type: string
+        productName:
+          type: string
+        unitName:
+          type: string
+          description: Satuan eceran.
+        unitSize:
+          type: integer
+          minimum: 1
+          description: Isi satuan eceran dalam satuan dasar.
+        isCurah:
+          type: boolean
+        countedQtyBase:
+          type: integer
+        countedAt:
+          type: integer
+          format: int64
+          description: Jam hitung setelah digeser ke jam server (K6).
+        clockEstimated:
+          type: boolean
+          description: Jam HP melenceng > 5 menit dari jam server, atau jam hasil geser dijepit ke jam server.
+        systemQtyBase:
+          type: integer
+        diffQtyBase:
+          type: integer
+        state:
+          $ref: "#/components/schemas/OpnameItemState"
+        reason:
+          nullable: true
+          description: Alasan tersimpan; null bila belum ada atau tidak perlu.
+          allOf:
+            - $ref: "#/components/schemas/OpnameReason"
+        receiptRef:
+          nullable: true
+          description: Nota rujukan untuk salah_input (J4).
+          allOf:
+            - $ref: "#/components/schemas/OpnameReceiptOption"
+        receiptOptions:
+          type: array
+          description: |
+            Barang selisih: paling banyak 5 nota aktif terakhir yang memuat barang itu (notaDate lalu
+            createdAt terbaru dulu); kosong untuk barang lain.
+          maxItems: 5
+          items:
+            $ref: "#/components/schemas/OpnameReceiptOption"
+    StaffOpnameSession:
+      type: object
+      required: [id, scope, status, createdByName, submittedAt, finishedAt, items]
+      properties:
+        id:
+          type: string
+        scope:
+          $ref: "#/components/schemas/OpnameScope"
+        status:
+          $ref: "#/components/schemas/OpnameSessionStatus"
+        createdByName:
+          type: string
+        submittedAt:
+          type: integer
+          format: int64
+          description: Waktu server saat hitungan diterima.
+        finishedAt:
+          type: integer
+          format: int64
+          nullable: true
+        items:
+          type: array
+          description: Urut nama barang.
+          items:
+            $ref: "#/components/schemas/StaffOpnameItem"
+    StaffOpnameRow:
+      type: object
+      required: [id, scope, status, submittedAt, finishedAt, itemCount, diffCount, heldCount]
+      properties:
+        id:
+          type: string
+        scope:
+          $ref: "#/components/schemas/OpnameScope"
+        status:
+          $ref: "#/components/schemas/OpnameSessionStatus"
+        submittedAt:
+          type: integer
+          format: int64
+        finishedAt:
+          type: integer
+          format: int64
+          nullable: true
+        itemCount:
+          type: integer
+          description: Jumlah barang dihitung.
+        diffCount:
+          type: integer
+          description: Jumlah barang selisih (bukan cocok, stok_awal, atau diganti).
+        heldCount:
+          type: integer
+          description: Jumlah barang ditahan.
+    OpnameReasonInput:
+      type: object
+      required: [productId, reason, receiptId]
+      properties:
+        productId:
+          type: string
+        reason:
+          type: string
+          enum: [rusak, hilang, kedaluwarsa, salah_input]
+        receiptId:
+          type: string
+          nullable: true
+          description: Hanya untuk salah_input; dari receiptOptions barang itu; null = tidak tahu notanya.
+    OpnameFinishInput:
+      type: object
+      required: [reasons]
+      properties:
+        reasons:
+          type: array
+          items:
+            $ref: "#/components/schemas/OpnameReasonInput"
+    OpnameRecount:
+      type: object
+      description: Hitung ulang pemilik; systemQtyBase = stok saat hitung ulang.
+      required: [countedQtyBase, countedAt, systemQtyBase, diffQtyBase, value]
+      properties:
+        countedQtyBase:
+          type: integer
+        countedAt:
+          type: integer
+          format: int64
+        systemQtyBase:
+          type: integer
+        diffQtyBase:
+          type: integer
+        value:
+          type: integer
+          nullable: true
+          description: Nilai rupiah |diffQtyBase| (K3); null bila HPP belum ada.
+    OwnerOpnameItem:
+      description: Barang opname versi pemilik (field StaffOpnameItem ditambah nilai rupiah dan penyelesaian).
+      allOf:
+        - $ref: "#/components/schemas/StaffOpnameItem"
+        - type: object
+          required: [value, units, resolvedByName, resolvedAt, replacedBySessionId, recount]
+          properties:
+            value:
+              type: integer
+              nullable: true
+              description: |
+                round_half_up(|diffQtyBase| × cost.amount ÷ cost.qtyBase) dari HPP saat dinilai (K3);
+                null bila HPP belum ada (selisih ≠ 0 selalu ditahan, J3).
+            units:
+              type: array
+              description: Satuan aktif barang sekarang (untuk penghitung hitung ulang); units[0] = eceran.
+              items:
+                $ref: "#/components/schemas/StaffUnit"
+            resolvedByName:
+              type: string
+              nullable: true
+              description: Pemilik yang menyetujui atau menghitung ulang.
+            resolvedAt:
+              type: integer
+              format: int64
+              nullable: true
+            replacedBySessionId:
+              type: string
+              nullable: true
+              description: Sesi yang hitungannya menggantikan barang ini (state diganti).
+            recount:
+              nullable: true
+              allOf:
+                - $ref: "#/components/schemas/OpnameRecount"
+    OwnerOpnameSession:
+      type: object
+      description: |
+        lossValue / gainValue (K26) = Σ value barang menunggu_alasan, disesuaikan, ditahan,
+        disetujui, dan recount.value barang dihitung_ulang (kurang → loss, lebih → gain); cocok,
+        stok_awal, dan diganti tidak dihitung. totalValue = lossValue + gainValue. flagged
+        ditetapkan saat alasan disimpan (Σ > Rp250.000) dan tidak berubah.
+      required: [id, scope, status, createdByName, submittedAt, finishedAt, items, lossValue, gainValue, totalValue, flagged, reviewedByName, reviewedAt]
+      properties:
+        id:
+          type: string
+        scope:
+          $ref: "#/components/schemas/OpnameScope"
+        status:
+          $ref: "#/components/schemas/OpnameSessionStatus"
+        createdByName:
+          type: string
+        submittedAt:
+          type: integer
+          format: int64
+        finishedAt:
+          type: integer
+          format: int64
+          nullable: true
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OwnerOpnameItem"
+        lossValue:
+          type: integer
+        gainValue:
+          type: integer
+        totalValue:
+          type: integer
+        flagged:
+          type: boolean
+        reviewedByName:
+          type: string
+          nullable: true
+        reviewedAt:
+          type: integer
+          format: int64
+          nullable: true
+    OwnerOpnameRow:
+      type: object
+      required: [id, scope, status, createdByName, submittedAt, finishedAt, itemCount, diffCount, heldCount, totalValue, flagged, reviewed]
+      properties:
+        id:
+          type: string
+        scope:
+          $ref: "#/components/schemas/OpnameScope"
+        status:
+          $ref: "#/components/schemas/OpnameSessionStatus"
+        createdByName:
+          type: string
+        submittedAt:
+          type: integer
+          format: int64
+        finishedAt:
+          type: integer
+          format: int64
+          nullable: true
+        itemCount:
+          type: integer
+        diffCount:
+          type: integer
+        heldCount:
+          type: integer
+        totalValue:
+          type: integer
+        flagged:
+          type: boolean
+        reviewed:
+          type: boolean
+    OpnameRecountInput:
+      type: object
+      required: [qtyBase]
+      properties:
+        qtyBase:
+          type: integer
+          minimum: 0
+    OpnameError:
+      type: object
+      required: [productId, message]
+      properties:
+        productId:
+          type: string
+          nullable: true
+          description: null = galat tingkat sesi.
+        message:
+          type: string
+    OpnameProblem:
+      description: Problem VALIDATION dengan galat per barang opname.
+      allOf:
+        - $ref: "#/components/schemas/Problem"
+        - type: object
+          required: [code, errors]
+          properties:
+            code:
+              type: string
+              enum: [VALIDATION]
+            errors:
+              type: array
+              items:
+                $ref: "#/components/schemas/OpnameError"
+    ExpiryStage:
+      type: string
+      description: lewat = ED sebelum hari ini; segera = 0–soonDays hari lagi (ED hari ini termasuk).
+      enum: [lewat, segera]
+    StaffExpiryLot:
+      type: object
+      description: |
+        Satu kiriman (baris nota) ber-ED. estimateQtyBase = perkiraan sisa FIFO (K9);
+        capacityQtyBase = batas keluarkan dari kiriman ini.
+      required: [lineId, receiptId, productId, productName, unitName, unitSize, isCurah, estimateQtyBase, capacityQtyBase, expiryDate, stage, supplierName, notaDate]
+      properties:
+        lineId:
+          type: string
+        receiptId:
+          type: string
+        productId:
+          type: string
+        productName:
+          type: string
+        unitName:
+          type: string
+          description: Satuan eceran.
+        unitSize:
+          type: integer
+          minimum: 1
+        isCurah:
+          type: boolean
+        estimateQtyBase:
+          type: integer
+        capacityQtyBase:
+          type: integer
+        expiryDate:
+          type: string
+          format: date
+        stage:
+          $ref: "#/components/schemas/ExpiryStage"
+        supplierName:
+          type: string
+        notaDate:
+          type: string
+          format: date
+    ExpiryEvent:
+      type: object
+      description: keluar = dikeluarkan dari stok (qtyBase positif, tanggal null); ubah_ed = tanggal ED dibetulkan (qtyBase null).
+      required: [id, at, actorName, kind, receiptId, lineId, productId, productName, unitName, unitSize, isCurah, qtyBase, fromDate, toDate]
+      properties:
+        id:
+          type: string
+        at:
+          type: integer
+          format: int64
+        actorName:
+          type: string
+        kind:
+          type: string
+          enum: [keluar, ubah_ed]
+        receiptId:
+          type: string
+        lineId:
+          type: string
+        productId:
+          type: string
+        productName:
+          type: string
+        unitName:
+          type: string
+        unitSize:
+          type: integer
+          minimum: 1
+        isCurah:
+          type: boolean
+        qtyBase:
+          type: integer
+          nullable: true
+        fromDate:
+          type: string
+          format: date
+          nullable: true
+        toDate:
+          type: string
+          format: date
+          nullable: true
+    StaffExpiryList:
+      type: object
+      required: [soonDays, lots, recent]
+      properties:
+        soonDays:
+          type: integer
+          description: Batas tahap segera (hari), dari pengaturan server.
+        lots:
+          type: array
+          items:
+            $ref: "#/components/schemas/StaffExpiryLot"
+        recent:
+          type: array
+          maxItems: 20
+          items:
+            $ref: "#/components/schemas/ExpiryEvent"
+    OwnerExpiryLot:
+      description: Kiriman ber-ED versi pemilik.
+      allOf:
+        - $ref: "#/components/schemas/StaffExpiryLot"
+        - type: object
+          required: [lossValue]
+          properties:
+            lossValue:
+              type: integer
+              nullable: true
+              description: round_half_up(estimateQtyBase × cost.amount ÷ cost.qtyBase) dari HPP sekarang; null bila HPP belum ada.
+    OwnerExpiryEvent:
+      description: Log kedaluwarsa versi pemilik.
+      allOf:
+        - $ref: "#/components/schemas/ExpiryEvent"
+        - type: object
+          required: [lossValue]
+          properties:
+            lossValue:
+              type: integer
+              nullable: true
+              description: Nilai yang dikeluarkan dari HPP saat kejadian (K28, tidak dihitung ulang); null untuk ubah_ed atau tanpa HPP.
+    OwnerExpiryList:
+      type: object
+      required: [soonDays, lots, recent, expiredLossValue]
+      properties:
+        soonDays:
+          type: integer
+        lots:
+          type: array
+          items:
+            $ref: "#/components/schemas/OwnerExpiryLot"
+        recent:
+          type: array
+          maxItems: 20
+          items:
+            $ref: "#/components/schemas/OwnerExpiryEvent"
+        expiredLossValue:
+          type: integer
+          description: Perkiraan kerugian = Σ lossValue yang diketahui pada kiriman tahap lewat.
+    ExpiryRemovalInput:
+      type: object
+      required: [id, receiptId, lineId, qtyBase]
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: ID dari HP (idempotensi).
+        receiptId:
+          type: string
+        lineId:
+          type: string
+        qtyBase:
+          type: integer
+          minimum: 1
+          description: Jumlah dalam satuan dasar; paling banyak capacityQtyBase kiriman itu.
+    ExpiryDateInput:
+      type: object
+      required: [expiryDate]
+      properties:
+        expiryDate:
+          type: string
+          format: date
+    StaffLowStockItem:
+      type: object
+      description: Barang menipis untuk orang toko; tanpa angka sisa stok (J7).
+      required: [productId, productName, unitName, unitSize, isCurah, minQtyBase]
+      properties:
+        productId:
+          type: string
+        productName:
+          type: string
+        unitName:
+          type: string
+          description: Satuan eceran.
+        unitSize:
+          type: integer
+          minimum: 1
+        isCurah:
+          type: boolean
+        minQtyBase:
+          type: integer
+          description: Batas menipis (minStock) dalam satuan dasar.
+    ExpiryAttention:
+      type: object
+      description: Jumlah barang berbeda yang punya ≥ 1 kiriman di tahap lewat / segera (K19).
+      required: [expiredCount, soonCount, soonDays]
+      properties:
+        expiredCount:
+          type: integer
+        soonCount:
+          type: integer
+        soonDays:
+          type: integer
+    OpnameFlag:
+      type: object
+      description: Sesi opname bertanda selisih besar yang belum ditinjau.
+      required: [sessionId, scope, finishedAt, totalValue]
+      properties:
+        sessionId:
+          type: string
+        scope:
+          $ref: "#/components/schemas/OpnameScope"
+        finishedAt:
+          type: integer
+          format: int64
+        totalValue:
+          type: integer

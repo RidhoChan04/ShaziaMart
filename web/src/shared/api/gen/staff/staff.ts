@@ -48,10 +48,16 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  ExpiryDateInput,
+  ExpiryRemovalInput,
   IdTakenResponse,
   LanOnlyResponse,
+  ListStaffOpnameProductsParams,
   LockedOutResponse,
   NotFoundResponse,
+  OpnameFinishInput,
+  OpnameSessionInput,
+  OpnameValidationFailedResponse,
   PinInvalidResponse,
   PinLoginRequest,
   ReceiptCancelledResponse,
@@ -60,6 +66,11 @@ import type {
   ReceiptValidationFailedResponse,
   SearchStaffProductsParams,
   Session,
+  StaffExpiryList,
+  StaffLowStockItem,
+  StaffOpnameCategories,
+  StaffOpnameRow,
+  StaffOpnameSession,
   StaffProduct,
   StaffReceipt,
   StaffReceiptRow,
@@ -1342,6 +1353,1021 @@ export function useGetStaffReceiptPhoto<TData = Awaited<ReturnType<typeof getSta
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetStaffReceiptPhotoQueryOptions(photoId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+export const getListStaffOpnameCategoriesUrl = () => {
+
+
+
+
+  return `/api/staff/opname/categories`
+}
+
+/**
+ * Hitung buta: tanpa stok. Barang berstatus selain nonaktif dikelompokkan per lingkup
+ * (kategori menurut nama; tanpa_kategori = barang berkategori null); lingkup tanpa barang tidak
+ * tampil. lastCountedAt = submittedAt sesi terakhir (siapa pun) dengan lingkup itu atau semua.
+ * Urut lastCountedAt null dulu lalu terlama; suggested = lingkup pertama (null bila tidak ada).
+ * @summary Lingkup opname (kategori, tanpa kategori, semua) dengan saran
+ */
+export const listStaffOpnameCategories = async ( options?: Parameters<typeof customFetch>[1]): Promise<StaffOpnameCategories> => {
+
+  return customFetch<StaffOpnameCategories>(getListStaffOpnameCategoriesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListStaffOpnameCategoriesQueryKey = () => {
+    return [
+    `/api/staff/opname/categories`
+    ] as const;
+    }
+
+
+export const getListStaffOpnameCategoriesQueryOptions = <TData = Awaited<ReturnType<typeof listStaffOpnameCategories>>, TError = ErrorType<UnauthorizedResponse | LanOnlyResponse>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listStaffOpnameCategories>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListStaffOpnameCategoriesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listStaffOpnameCategories>>> = ({ signal }) => listStaffOpnameCategories({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listStaffOpnameCategories>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListStaffOpnameCategoriesQueryResult = NonNullable<Awaited<ReturnType<typeof listStaffOpnameCategories>>>
+export type ListStaffOpnameCategoriesQueryError = ErrorType<UnauthorizedResponse | LanOnlyResponse>
+
+
+export function useListStaffOpnameCategories<TData = Awaited<ReturnType<typeof listStaffOpnameCategories>>, TError = ErrorType<UnauthorizedResponse | LanOnlyResponse>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listStaffOpnameCategories>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listStaffOpnameCategories>>,
+          TError,
+          Awaited<ReturnType<typeof listStaffOpnameCategories>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListStaffOpnameCategories<TData = Awaited<ReturnType<typeof listStaffOpnameCategories>>, TError = ErrorType<UnauthorizedResponse | LanOnlyResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listStaffOpnameCategories>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listStaffOpnameCategories>>,
+          TError,
+          Awaited<ReturnType<typeof listStaffOpnameCategories>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListStaffOpnameCategories<TData = Awaited<ReturnType<typeof listStaffOpnameCategories>>, TError = ErrorType<UnauthorizedResponse | LanOnlyResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listStaffOpnameCategories>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Lingkup opname (kategori, tanpa kategori, semua) dengan saran
+ */
+
+export function useListStaffOpnameCategories<TData = Awaited<ReturnType<typeof listStaffOpnameCategories>>, TError = ErrorType<UnauthorizedResponse | LanOnlyResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listStaffOpnameCategories>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListStaffOpnameCategoriesQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+export const getListStaffOpnameProductsUrl = (params: ListStaffOpnameProductsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/staff/opname/products?${stringifiedParams}` : `/api/staff/opname/products`
+}
+
+/**
+ * Hitung buta: tanpa stok, harga jual, atau modal. Barang berstatus selain nonaktif di
+ * lingkup itu, urut nama; HP menyalinnya ke draf agar bisa menghitung tanpa sinyal.
+ * kategori wajib bila lingkup = kategori dan dilarang untuk lingkup lain → 422 VALIDATION.
+ * @summary Daftar barang yang dihitung untuk satu lingkup
+ */
+export const listStaffOpnameProducts = async (params: ListStaffOpnameProductsParams, options?: Parameters<typeof customFetch>[1]): Promise<StaffProduct[]> => {
+
+  return customFetch<StaffProduct[]>(getListStaffOpnameProductsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListStaffOpnameProductsQueryKey = (params?: ListStaffOpnameProductsParams,) => {
+    return [
+    `/api/staff/opname/products`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListStaffOpnameProductsQueryOptions = <TData = Awaited<ReturnType<typeof listStaffOpnameProducts>>, TError = ErrorType<UnauthorizedResponse | LanOnlyResponse | ValidationFailedResponse>>(params: ListStaffOpnameProductsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listStaffOpnameProducts>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListStaffOpnameProductsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listStaffOpnameProducts>>> = ({ signal }) => listStaffOpnameProducts(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listStaffOpnameProducts>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListStaffOpnameProductsQueryResult = NonNullable<Awaited<ReturnType<typeof listStaffOpnameProducts>>>
+export type ListStaffOpnameProductsQueryError = ErrorType<UnauthorizedResponse | LanOnlyResponse | ValidationFailedResponse>
+
+
+export function useListStaffOpnameProducts<TData = Awaited<ReturnType<typeof listStaffOpnameProducts>>, TError = ErrorType<UnauthorizedResponse | LanOnlyResponse | ValidationFailedResponse>>(
+ params: ListStaffOpnameProductsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listStaffOpnameProducts>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listStaffOpnameProducts>>,
+          TError,
+          Awaited<ReturnType<typeof listStaffOpnameProducts>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListStaffOpnameProducts<TData = Awaited<ReturnType<typeof listStaffOpnameProducts>>, TError = ErrorType<UnauthorizedResponse | LanOnlyResponse | ValidationFailedResponse>>(
+ params: ListStaffOpnameProductsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listStaffOpnameProducts>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listStaffOpnameProducts>>,
+          TError,
+          Awaited<ReturnType<typeof listStaffOpnameProducts>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListStaffOpnameProducts<TData = Awaited<ReturnType<typeof listStaffOpnameProducts>>, TError = ErrorType<UnauthorizedResponse | LanOnlyResponse | ValidationFailedResponse>>(
+ params: ListStaffOpnameProductsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listStaffOpnameProducts>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Daftar barang yang dihitung untuk satu lingkup
+ */
+
+export function useListStaffOpnameProducts<TData = Awaited<ReturnType<typeof listStaffOpnameProducts>>, TError = ErrorType<UnauthorizedResponse | LanOnlyResponse | ValidationFailedResponse>>(
+ params: ListStaffOpnameProductsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listStaffOpnameProducts>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListStaffOpnameProductsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+export const getListStaffOpnameSessionsUrl = () => {
+
+
+
+
+  return `/api/staff/opname-sessions`
+}
+
+/**
+ * @summary Sesi opname milik sendiri
+ */
+export const listStaffOpnameSessions = async ( options?: Parameters<typeof customFetch>[1]): Promise<StaffOpnameRow[]> => {
+
+  return customFetch<StaffOpnameRow[]>(getListStaffOpnameSessionsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListStaffOpnameSessionsQueryKey = () => {
+    return [
+    `/api/staff/opname-sessions`
+    ] as const;
+    }
+
+
+export const getListStaffOpnameSessionsQueryOptions = <TData = Awaited<ReturnType<typeof listStaffOpnameSessions>>, TError = ErrorType<UnauthorizedResponse | LanOnlyResponse>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listStaffOpnameSessions>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListStaffOpnameSessionsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listStaffOpnameSessions>>> = ({ signal }) => listStaffOpnameSessions({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listStaffOpnameSessions>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListStaffOpnameSessionsQueryResult = NonNullable<Awaited<ReturnType<typeof listStaffOpnameSessions>>>
+export type ListStaffOpnameSessionsQueryError = ErrorType<UnauthorizedResponse | LanOnlyResponse>
+
+
+export function useListStaffOpnameSessions<TData = Awaited<ReturnType<typeof listStaffOpnameSessions>>, TError = ErrorType<UnauthorizedResponse | LanOnlyResponse>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listStaffOpnameSessions>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listStaffOpnameSessions>>,
+          TError,
+          Awaited<ReturnType<typeof listStaffOpnameSessions>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListStaffOpnameSessions<TData = Awaited<ReturnType<typeof listStaffOpnameSessions>>, TError = ErrorType<UnauthorizedResponse | LanOnlyResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listStaffOpnameSessions>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listStaffOpnameSessions>>,
+          TError,
+          Awaited<ReturnType<typeof listStaffOpnameSessions>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListStaffOpnameSessions<TData = Awaited<ReturnType<typeof listStaffOpnameSessions>>, TError = ErrorType<UnauthorizedResponse | LanOnlyResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listStaffOpnameSessions>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Sesi opname milik sendiri
+ */
+
+export function useListStaffOpnameSessions<TData = Awaited<ReturnType<typeof listStaffOpnameSessions>>, TError = ErrorType<UnauthorizedResponse | LanOnlyResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listStaffOpnameSessions>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListStaffOpnameSessionsQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+export const getCreateStaffOpnameSessionUrl = () => {
+
+
+
+
+  return `/api/staff/opname-sessions`
+}
+
+/**
+ * Langkah 1 dari 2 (K2); bisa dari draf offline yang dikirim belakangan.
+ * Idempoten menurut (pembuat, id) — id = ID draf dari HP: id yang sudah dikirim pengguna ini
+ * mengembalikan sesi lama dengan 200 tanpa menerapkan ulang; id sudah dipakai pengguna lain →
+ * 409 ID_TAKEN; sesi milik pengguna lain tidak pernah dikembalikan.
+ * Jam hitung (K6): at = countedAt + (serverNow − deviceNow); clockEstimated bila
+ * |serverNow − deviceNow| > 5 menit; hasil di atas serverNow dijepit ke serverNow (juga
+ * clockEstimated). systemQtyBase = stok pada jam itu, sehingga penjualan di sela-sela tidak
+ * membuat selisih palsu; diffQtyBase = countedQtyBase − systemQtyBase.
+ * Per barang: barang stockCounted false → stok_awal (J1: langsung jadi stok, tanpa alasan,
+ * bukan kerugian); selisih 0 → cocok; selain itu menunggu_alasan. cocok dan stok_awal langsung
+ * diterapkan ke stok tanpa alasan; sesi tanpa barang menunggu_alasan langsung selesai.
+ * Barang yang sama di beberapa sesi (K5): hanya hitungan dengan countedAt terbaru yang
+ * berlaku. Barang di sesi ini menjadi diganti bila sesi lain punya hitungan barang itu dengan
+ * countedAt lebih baru yang belum diganti; selain itu hitungan lama barang itu yang masih
+ * menunggu_alasan atau ditahan menjadi diganti (replacedBySessionId).
+ * Atomik: 422 OpnameProblem dengan galat per barang (barang tidak ditemukan, nonaktif,
+ * dihitung dua kali, jumlah atau jam tidak valid), tanpa perubahan sebagian.
+ * Batas min/max di skema adalah panduan klien; server selalu memvalidasi isi mentah.
+ * @summary Kirim hitungan opname
+ */
+export const createStaffOpnameSession = async (opnameSessionInput: OpnameSessionInput, options?: Parameters<typeof customFetch>[1]): Promise<StaffOpnameSession> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<StaffOpnameSession>(getCreateStaffOpnameSessionUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(opnameSessionInput)
+  }
+);}
+
+
+
+
+
+export const getCreateStaffOpnameSessionMutationKey = () => ['createStaffOpnameSession'] as const;
+
+export const getCreateStaffOpnameSessionMutationOptions = <TError = ErrorType<UnauthorizedResponse | LanOnlyResponse | IdTakenResponse | OpnameValidationFailedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createStaffOpnameSession>>, TError,CreateStaffOpnameSessionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createStaffOpnameSession>>, TError,CreateStaffOpnameSessionMutationVariables, TContext> => {
+
+const mutationKey = getCreateStaffOpnameSessionMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createStaffOpnameSession>>, CreateStaffOpnameSessionMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  createStaffOpnameSession(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateStaffOpnameSessionMutationResult = NonNullable<Awaited<ReturnType<typeof createStaffOpnameSession>>>
+    export type CreateStaffOpnameSessionMutationBody = OpnameSessionInput
+    export type CreateStaffOpnameSessionMutationError = ErrorType<UnauthorizedResponse | LanOnlyResponse | IdTakenResponse | OpnameValidationFailedResponse>
+    export type CreateStaffOpnameSessionMutationVariables = {data: OpnameSessionInput}
+
+    /**
+ * @summary Kirim hitungan opname
+ */
+export const useCreateStaffOpnameSession = <TError = ErrorType<UnauthorizedResponse | LanOnlyResponse | IdTakenResponse | OpnameValidationFailedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createStaffOpnameSession>>, TError,CreateStaffOpnameSessionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof createStaffOpnameSession>>,
+        TError,
+        CreateStaffOpnameSessionMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateStaffOpnameSessionMutationOptions(options), queryClient);
+    }
+    export const getGetStaffOpnameSessionUrl = (sessionId: string,) => {
+
+
+
+
+  return `/api/staff/opname-sessions/${sessionId}`
+}
+
+/**
+ * Sesi milik orang lain juga 404.
+ * @summary Hasil opname milik sendiri
+ */
+export const getStaffOpnameSession = async (sessionId: string, options?: Parameters<typeof customFetch>[1]): Promise<StaffOpnameSession> => {
+
+  return customFetch<StaffOpnameSession>(getGetStaffOpnameSessionUrl(sessionId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetStaffOpnameSessionQueryKey = (sessionId: string,) => {
+    return [
+    `/api/staff/opname-sessions/${sessionId}`
+    ] as const;
+    }
+
+
+export const getGetStaffOpnameSessionQueryOptions = <TData = Awaited<ReturnType<typeof getStaffOpnameSession>>, TError = ErrorType<UnauthorizedResponse | LanOnlyResponse | NotFoundResponse>>(sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStaffOpnameSession>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetStaffOpnameSessionQueryKey(sessionId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStaffOpnameSession>>> = ({ signal }) => getStaffOpnameSession(sessionId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: sessionId !== null && sessionId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getStaffOpnameSession>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetStaffOpnameSessionQueryResult = NonNullable<Awaited<ReturnType<typeof getStaffOpnameSession>>>
+export type GetStaffOpnameSessionQueryError = ErrorType<UnauthorizedResponse | LanOnlyResponse | NotFoundResponse>
+
+
+export function useGetStaffOpnameSession<TData = Awaited<ReturnType<typeof getStaffOpnameSession>>, TError = ErrorType<UnauthorizedResponse | LanOnlyResponse | NotFoundResponse>>(
+ sessionId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStaffOpnameSession>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getStaffOpnameSession>>,
+          TError,
+          Awaited<ReturnType<typeof getStaffOpnameSession>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetStaffOpnameSession<TData = Awaited<ReturnType<typeof getStaffOpnameSession>>, TError = ErrorType<UnauthorizedResponse | LanOnlyResponse | NotFoundResponse>>(
+ sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStaffOpnameSession>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getStaffOpnameSession>>,
+          TError,
+          Awaited<ReturnType<typeof getStaffOpnameSession>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetStaffOpnameSession<TData = Awaited<ReturnType<typeof getStaffOpnameSession>>, TError = ErrorType<UnauthorizedResponse | LanOnlyResponse | NotFoundResponse>>(
+ sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStaffOpnameSession>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Hasil opname milik sendiri
+ */
+
+export function useGetStaffOpnameSession<TData = Awaited<ReturnType<typeof getStaffOpnameSession>>, TError = ErrorType<UnauthorizedResponse | LanOnlyResponse | NotFoundResponse>>(
+ sessionId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStaffOpnameSession>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetStaffOpnameSessionQueryOptions(sessionId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+export const getFinishStaffOpnameSessionUrl = (sessionId: string,) => {
+
+
+
+
+  return `/api/staff/opname-sessions/${sessionId}/finish`
+}
+
+/**
+ * Langkah 2 dari 2 (K2); hanya pembuat sesi (sesi orang lain 404). Satu alasan untuk tepat
+ * setiap barang menunggu_alasan; barang diganti diabaikan. Alasan untuk barang yang tidak
+ * perlu alasan, barang tanpa alasan, atau receiptId di luar receiptOptions → 422
+ * OpnameProblem, tanpa perubahan sebagian.
+ * salah_input (J4): receiptId dari receiptOptions disimpan sebagai rujukan (nota tidak
+ * diubah, stok dikoreksi oleh opname); receiptId null → tercatat tidak_diketahui.
+ * Nilai (K3): value = round_half_up(|diffQtyBase| × cost.amount ÷ cost.qtyBase) dari HPP
+ * sekarang; null bila HPP belum ada. Barang ditahan bila value null (J3) atau > Rp100.000
+ * (J2, nilai mutlak, kurang maupun lebih); selain itu langsung disesuaikan (entri ledger
+ * opname dengan alasan, waktu efektif = countedAt). Sesi flagged bila Σ value yang diketahui
+ * pada barang selisih > Rp250.000; ditetapkan sekali di sini.
+ * Replay pada sesi selesai → 200 sesi apa adanya, tanpa menerapkan ulang.
+ * @summary Simpan alasan selisih (online)
+ */
+export const finishStaffOpnameSession = async (sessionId: string,
+    opnameFinishInput: OpnameFinishInput, options?: Parameters<typeof customFetch>[1]): Promise<StaffOpnameSession> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<StaffOpnameSession>(getFinishStaffOpnameSessionUrl(sessionId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(opnameFinishInput)
+  }
+);}
+
+
+
+
+
+export const getFinishStaffOpnameSessionMutationKey = () => ['finishStaffOpnameSession'] as const;
+
+export const getFinishStaffOpnameSessionMutationOptions = <TError = ErrorType<UnauthorizedResponse | LanOnlyResponse | NotFoundResponse | OpnameValidationFailedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof finishStaffOpnameSession>>, TError,FinishStaffOpnameSessionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof finishStaffOpnameSession>>, TError,FinishStaffOpnameSessionMutationVariables, TContext> => {
+
+const mutationKey = getFinishStaffOpnameSessionMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof finishStaffOpnameSession>>, FinishStaffOpnameSessionMutationVariables> = (props) => {
+          const {sessionId,data} = props ?? {};
+
+          return  finishStaffOpnameSession(sessionId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type FinishStaffOpnameSessionMutationResult = NonNullable<Awaited<ReturnType<typeof finishStaffOpnameSession>>>
+    export type FinishStaffOpnameSessionMutationBody = OpnameFinishInput
+    export type FinishStaffOpnameSessionMutationError = ErrorType<UnauthorizedResponse | LanOnlyResponse | NotFoundResponse | OpnameValidationFailedResponse>
+    export type FinishStaffOpnameSessionMutationVariables = {sessionId: string;data: OpnameFinishInput}
+
+    /**
+ * @summary Simpan alasan selisih (online)
+ */
+export const useFinishStaffOpnameSession = <TError = ErrorType<UnauthorizedResponse | LanOnlyResponse | NotFoundResponse | OpnameValidationFailedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof finishStaffOpnameSession>>, TError,FinishStaffOpnameSessionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof finishStaffOpnameSession>>,
+        TError,
+        FinishStaffOpnameSessionMutationVariables,
+        TContext
+      > => {
+      return useMutation(getFinishStaffOpnameSessionMutationOptions(options), queryClient);
+    }
+    export const getGetStaffExpiryUrl = () => {
+
+
+
+
+  return `/api/staff/expiry`
+}
+
+/**
+ * Perkiraan FIFO (K9): kiriman = semua baris nota aktif barang itu, ber-ED maupun tidak,
+ * dikunci (receiptId, lineId), urut terbaru dulu (notaDate, createdAt, lalu urutan baris
+ * menurun); capacityQtyBase = max(0, qty × unitSize − Σ yang sudah dikeluarkan dari baris
+ * itu); max(stok, 0) dialokasikan mulai dari kiriman terbaru, jadi barang lama dianggap
+ * terjual lebih dulu. lots = kiriman ber-ED dengan estimateQtyBase > 0 dan tahap lewat (ED
+ * sebelum hari ini) atau segera (0–soonDays hari lagi, termasuk hari ini), urut lewat dulu
+ * lalu segera, masing-masing ED naik. recent = log keluar dan ubah ED 14 hari terakhir,
+ * terbaru dulu, paling banyak 20. Tanpa nilai rupiah.
+ * @summary Barang sudah/segera kedaluwarsa (perkiraan per kiriman)
+ */
+export const getStaffExpiry = async ( options?: Parameters<typeof customFetch>[1]): Promise<StaffExpiryList> => {
+
+  return customFetch<StaffExpiryList>(getGetStaffExpiryUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetStaffExpiryQueryKey = () => {
+    return [
+    `/api/staff/expiry`
+    ] as const;
+    }
+
+
+export const getGetStaffExpiryQueryOptions = <TData = Awaited<ReturnType<typeof getStaffExpiry>>, TError = ErrorType<UnauthorizedResponse | LanOnlyResponse>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStaffExpiry>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetStaffExpiryQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStaffExpiry>>> = ({ signal }) => getStaffExpiry({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getStaffExpiry>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetStaffExpiryQueryResult = NonNullable<Awaited<ReturnType<typeof getStaffExpiry>>>
+export type GetStaffExpiryQueryError = ErrorType<UnauthorizedResponse | LanOnlyResponse>
+
+
+export function useGetStaffExpiry<TData = Awaited<ReturnType<typeof getStaffExpiry>>, TError = ErrorType<UnauthorizedResponse | LanOnlyResponse>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStaffExpiry>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getStaffExpiry>>,
+          TError,
+          Awaited<ReturnType<typeof getStaffExpiry>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetStaffExpiry<TData = Awaited<ReturnType<typeof getStaffExpiry>>, TError = ErrorType<UnauthorizedResponse | LanOnlyResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStaffExpiry>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getStaffExpiry>>,
+          TError,
+          Awaited<ReturnType<typeof getStaffExpiry>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetStaffExpiry<TData = Awaited<ReturnType<typeof getStaffExpiry>>, TError = ErrorType<UnauthorizedResponse | LanOnlyResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStaffExpiry>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Barang sudah/segera kedaluwarsa (perkiraan per kiriman)
+ */
+
+export function useGetStaffExpiry<TData = Awaited<ReturnType<typeof getStaffExpiry>>, TError = ErrorType<UnauthorizedResponse | LanOnlyResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStaffExpiry>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetStaffExpiryQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+export const getCreateStaffExpiryRemovalUrl = () => {
+
+
+
+
+  return `/api/staff/expiry-removals`
+}
+
+/**
+ * Pengeluaran dicatat pada kiriman (baris nota) yang dipilih (J6), sehingga kiriman itu yang
+ * berkurang: entri ledger keluar_kedaluwarsa (qtyBase negatif) atas nama pengguna ini.
+ * 1 ≤ qtyBase ≤ capacityQtyBase kiriman itu, selain itu 422 VALIDATION (detail = pesan);
+ * stok boleh menjadi minus. Nota tidak ada, dibatalkan, atau tanpa baris itu → 404.
+ * Idempoten menurut (pembuat, id): id yang sama tetap 204 tanpa mencatat ulang. Online saja.
+ * @summary Keluarkan barang kedaluwarsa dari stok
+ */
+export const createStaffExpiryRemoval = async (expiryRemovalInput: ExpiryRemovalInput, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<void>(getCreateStaffExpiryRemovalUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(expiryRemovalInput)
+  }
+);}
+
+
+
+
+
+export const getCreateStaffExpiryRemovalMutationKey = () => ['createStaffExpiryRemoval'] as const;
+
+export const getCreateStaffExpiryRemovalMutationOptions = <TError = ErrorType<UnauthorizedResponse | LanOnlyResponse | NotFoundResponse | ValidationFailedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createStaffExpiryRemoval>>, TError,CreateStaffExpiryRemovalMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createStaffExpiryRemoval>>, TError,CreateStaffExpiryRemovalMutationVariables, TContext> => {
+
+const mutationKey = getCreateStaffExpiryRemovalMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createStaffExpiryRemoval>>, CreateStaffExpiryRemovalMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  createStaffExpiryRemoval(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateStaffExpiryRemovalMutationResult = NonNullable<Awaited<ReturnType<typeof createStaffExpiryRemoval>>>
+    export type CreateStaffExpiryRemovalMutationBody = ExpiryRemovalInput
+    export type CreateStaffExpiryRemovalMutationError = ErrorType<UnauthorizedResponse | LanOnlyResponse | NotFoundResponse | ValidationFailedResponse>
+    export type CreateStaffExpiryRemovalMutationVariables = {data: ExpiryRemovalInput}
+
+    /**
+ * @summary Keluarkan barang kedaluwarsa dari stok
+ */
+export const useCreateStaffExpiryRemoval = <TError = ErrorType<UnauthorizedResponse | LanOnlyResponse | NotFoundResponse | ValidationFailedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createStaffExpiryRemoval>>, TError,CreateStaffExpiryRemovalMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof createStaffExpiryRemoval>>,
+        TError,
+        CreateStaffExpiryRemovalMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateStaffExpiryRemovalMutationOptions(options), queryClient);
+    }
+    export const getPutStaffLineExpiryUrl = (receiptId: string,
+    lineId: string,) => {
+
+
+
+
+  return `/api/staff/receipts/${receiptId}/lines/${lineId}/expiry`
+}
+
+/**
+ * Berlaku untuk nota siapa pun. Nota tidak ada, dibatalkan, atau tanpa baris itu → 404;
+ * tanggal tidak sah → 422 VALIDATION. Mencatat riwayat perubahan nota (ubah, "{barang}: ED
+ * a → b") dan log ubah_ed; tanggal sama → 204 tanpa entri.
+ * @summary Ubah tanggal ED satu kiriman
+ */
+export const putStaffLineExpiry = async (receiptId: string,
+    lineId: string,
+    expiryDateInput: ExpiryDateInput, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<void>(getPutStaffLineExpiryUrl(receiptId,lineId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(expiryDateInput)
+  }
+);}
+
+
+
+
+
+export const getPutStaffLineExpiryMutationKey = () => ['putStaffLineExpiry'] as const;
+
+export const getPutStaffLineExpiryMutationOptions = <TError = ErrorType<UnauthorizedResponse | LanOnlyResponse | NotFoundResponse | ValidationFailedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putStaffLineExpiry>>, TError,PutStaffLineExpiryMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof putStaffLineExpiry>>, TError,PutStaffLineExpiryMutationVariables, TContext> => {
+
+const mutationKey = getPutStaffLineExpiryMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof putStaffLineExpiry>>, PutStaffLineExpiryMutationVariables> = (props) => {
+          const {receiptId,lineId,data} = props ?? {};
+
+          return  putStaffLineExpiry(receiptId,lineId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PutStaffLineExpiryMutationResult = NonNullable<Awaited<ReturnType<typeof putStaffLineExpiry>>>
+    export type PutStaffLineExpiryMutationBody = ExpiryDateInput
+    export type PutStaffLineExpiryMutationError = ErrorType<UnauthorizedResponse | LanOnlyResponse | NotFoundResponse | ValidationFailedResponse>
+    export type PutStaffLineExpiryMutationVariables = {receiptId: string;lineId: string;data: ExpiryDateInput}
+
+    /**
+ * @summary Ubah tanggal ED satu kiriman
+ */
+export const usePutStaffLineExpiry = <TError = ErrorType<UnauthorizedResponse | LanOnlyResponse | NotFoundResponse | ValidationFailedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putStaffLineExpiry>>, TError,PutStaffLineExpiryMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof putStaffLineExpiry>>,
+        TError,
+        PutStaffLineExpiryMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPutStaffLineExpiryMutationOptions(options), queryClient);
+    }
+    export const getListStaffLowStockUrl = () => {
+
+
+
+
+  return `/api/staff/low-stock`
+}
+
+/**
+ * Tanpa angka sisa stok. Aturan sama dengan stockAlert menipis (termasuk penanda diam);
+ * urut nama.
+ * @summary Barang menipis
+ */
+export const listStaffLowStock = async ( options?: Parameters<typeof customFetch>[1]): Promise<StaffLowStockItem[]> => {
+
+  return customFetch<StaffLowStockItem[]>(getListStaffLowStockUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListStaffLowStockQueryKey = () => {
+    return [
+    `/api/staff/low-stock`
+    ] as const;
+    }
+
+
+export const getListStaffLowStockQueryOptions = <TData = Awaited<ReturnType<typeof listStaffLowStock>>, TError = ErrorType<UnauthorizedResponse | LanOnlyResponse>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listStaffLowStock>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListStaffLowStockQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listStaffLowStock>>> = ({ signal }) => listStaffLowStock({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listStaffLowStock>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListStaffLowStockQueryResult = NonNullable<Awaited<ReturnType<typeof listStaffLowStock>>>
+export type ListStaffLowStockQueryError = ErrorType<UnauthorizedResponse | LanOnlyResponse>
+
+
+export function useListStaffLowStock<TData = Awaited<ReturnType<typeof listStaffLowStock>>, TError = ErrorType<UnauthorizedResponse | LanOnlyResponse>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listStaffLowStock>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listStaffLowStock>>,
+          TError,
+          Awaited<ReturnType<typeof listStaffLowStock>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListStaffLowStock<TData = Awaited<ReturnType<typeof listStaffLowStock>>, TError = ErrorType<UnauthorizedResponse | LanOnlyResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listStaffLowStock>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listStaffLowStock>>,
+          TError,
+          Awaited<ReturnType<typeof listStaffLowStock>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListStaffLowStock<TData = Awaited<ReturnType<typeof listStaffLowStock>>, TError = ErrorType<UnauthorizedResponse | LanOnlyResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listStaffLowStock>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Barang menipis
+ */
+
+export function useListStaffLowStock<TData = Awaited<ReturnType<typeof listStaffLowStock>>, TError = ErrorType<UnauthorizedResponse | LanOnlyResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listStaffLowStock>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListStaffLowStockQueryOptions(options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

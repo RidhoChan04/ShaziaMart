@@ -75,6 +75,7 @@ export const ErrorCode = {
   RECEIPT_CANCELLED: 'RECEIPT_CANCELLED',
   DEBT_ALREADY_PAID: 'DEBT_ALREADY_PAID',
   ID_TAKEN: 'ID_TAKEN',
+  OPNAME_NOT_HELD: 'OPNAME_NOT_HELD',
 } as const;
 
 export interface Problem {
@@ -257,6 +258,45 @@ export interface SupplierDebtAttention {
   dueSoonTotal: number;
 }
 
+/**
+ * Jumlah barang berbeda yang punya ≥ 1 kiriman di tahap lewat / segera (K19).
+ */
+export interface ExpiryAttention {
+  expiredCount: number;
+  soonCount: number;
+  soonDays: number;
+}
+
+export type OpnameScopeKind = typeof OpnameScopeKind[keyof typeof OpnameScopeKind];
+
+
+export const OpnameScopeKind = {
+  kategori: 'kategori',
+  tanpa_kategori: 'tanpa_kategori',
+  semua: 'semua',
+} as const;
+
+/**
+ * Lingkup opname. kategori = barang berkategori category; tanpa_kategori = barang berkategori
+ * null (mis. barang baru dari nota); semua = semua barang. category wajib iff kind = kategori
+ * (selain itu null).
+ */
+export interface OpnameScope {
+  kind: OpnameScopeKind;
+  /** @nullable */
+  category: string | null;
+}
+
+/**
+ * Sesi opname bertanda selisih besar yang belum ditinjau.
+ */
+export interface OpnameFlag {
+  sessionId: string;
+  scope: OpnameScope;
+  finishedAt: number;
+  totalValue: number;
+}
+
 export interface Attention {
   /**
      * Jumlah barang dengan stockAlert menipis (0 <= stok < minStock). Aturan penanda diam:
@@ -279,6 +319,11 @@ export interface Attention {
   supplierDebts: SupplierDebtAttention;
   /** Jumlah barang menunggu_harga (barang baru dari barang masuk yang belum punya harga jual). */
   awaitingPriceCount: number;
+  expiry: ExpiryAttention;
+  /** Jumlah barang opname berstate ditahan (menunggu persetujuan pemilik). */
+  opnameHeldCount: number;
+  /** Sesi opname flagged yang belum ditinjau (reviewOpnameSession); terbaru dulu (finishedAt). */
+  opnameFlags: OpnameFlag[];
 }
 
 /**
@@ -509,7 +554,9 @@ export interface CostAlert {
 
 /**
  * jual / batal = penjualan dan pembatalannya; masuk = barang masuk; koreksi_masuk = nota
- * barang masuk diubah; batal_masuk = nota barang masuk dibatalkan.
+ * barang masuk diubah; batal_masuk = nota barang masuk dibatalkan; opname = koreksi stok
+ * dari selisih opname; stok_awal = hitungan opname pertama menjadi stok;
+ * keluar_kedaluwarsa = dikeluarkan dari stok karena kedaluwarsa.
  */
 export type StockMovementKind = typeof StockMovementKind[keyof typeof StockMovementKind];
 
@@ -520,20 +567,46 @@ export const StockMovementKind = {
   masuk: 'masuk',
   koreksi_masuk: 'koreksi_masuk',
   batal_masuk: 'batal_masuk',
+  opname: 'opname',
+  stok_awal: 'stok_awal',
+  keluar_kedaluwarsa: 'keluar_kedaluwarsa',
+} as const;
+
+/**
+ * Alasan selisih opname. rusak, hilang, kedaluwarsa, dan salah_input dipilih staf;
+ * tidak_diketahui = salah_input tanpa nota rujukan (J4).
+ */
+export type OpnameReason = typeof OpnameReason[keyof typeof OpnameReason];
+
+
+export const OpnameReason = {
+  rusak: 'rusak',
+  hilang: 'hilang',
+  kedaluwarsa: 'kedaluwarsa',
+  salah_input: 'salah_input',
+  tidak_diketahui: 'tidak_diketahui',
 } as const;
 
 export interface StockMovement {
   id: string;
+  /** Waktu dicatat (epoch ms UTC), juga untuk opname yang berlaku pada jam hitung. */
   at: number;
   /**
      * jual / batal = penjualan dan pembatalannya; masuk = barang masuk; koreksi_masuk = nota
-     * barang masuk diubah; batal_masuk = nota barang masuk dibatalkan.
+     * barang masuk diubah; batal_masuk = nota barang masuk dibatalkan; opname = koreksi stok
+     * dari selisih opname; stok_awal = hitungan opname pertama menjadi stok;
+     * keluar_kedaluwarsa = dikeluarkan dari stok karena kedaluwarsa.
      */
   kind: StockMovementKind;
-  /** Bertanda; jual negatif, batal positif, masuk positif, koreksi_masuk bertanda, batal_masuk negatif. */
+  /**
+     * Bertanda; jual negatif, batal positif, masuk positif, koreksi_masuk bertanda, batal_masuk
+     * negatif, opname bertanda, stok_awal bertanda, keluar_kedaluwarsa negatif.
+     */
   qtyBase: number;
   /** nama orang yang mencatat */
   kasirName: string;
+  /** Alasan selisih untuk opname (K27); null untuk jenis lain. */
+  reason: OpnameReason | null;
 }
 
 export interface PriceHistoryEntry {
@@ -1445,6 +1518,435 @@ export type ReceiptProblem = Problem & {
 };
 
 /**
+ * cocok = selisih 0; stok_awal = hitungan pertama barang stockCounted false, langsung jadi
+ * stok (J1); menunggu_alasan = selisih, alasan belum disimpan; disesuaikan = stok sudah
+ * dikoreksi; ditahan = menunggu persetujuan pemilik (nilai > Rp100.000 atau HPP belum ada);
+ * disetujui = disetujui pemilik; dihitung_ulang = dihitung ulang pemilik; diganti = kalah
+ * oleh hitungan barang yang sama dengan countedAt lebih baru, tidak pernah diterapkan.
+ */
+export type OpnameItemState = typeof OpnameItemState[keyof typeof OpnameItemState];
+
+
+export const OpnameItemState = {
+  cocok: 'cocok',
+  stok_awal: 'stok_awal',
+  menunggu_alasan: 'menunggu_alasan',
+  disesuaikan: 'disesuaikan',
+  ditahan: 'ditahan',
+  disetujui: 'disetujui',
+  dihitung_ulang: 'dihitung_ulang',
+  diganti: 'diganti',
+} as const;
+
+/**
+ * menunggu_alasan = ada barang menunggu_alasan; selesai = alasan sudah disimpan, atau tidak
+ * ada (lagi) barang menunggu_alasan — sesi yang semua barang menunggu_alasan-nya menjadi
+ * diganti otomatis selesai (finishedAt = saat itu).
+ */
+export type OpnameSessionStatus = typeof OpnameSessionStatus[keyof typeof OpnameSessionStatus];
+
+
+export const OpnameSessionStatus = {
+  menunggu_alasan: 'menunggu_alasan',
+  selesai: 'selesai',
+} as const;
+
+/**
+ * Satu lingkup opname; scope.kind kategori atau tanpa_kategori.
+ */
+export interface StaffOpnameCategory {
+  scope: OpnameScope;
+  productCount: number;
+  /**
+     * submittedAt sesi terakhir dengan lingkup ini atau semua; null = belum pernah dihitung.
+     * @nullable
+     */
+  lastCountedAt: number | null;
+}
+
+export interface StaffOpnameCategories {
+  /** Belum pernah dihitung dulu, lalu paling lama dihitung. */
+  categories: StaffOpnameCategory[];
+  /** Jumlah barang berstatus selain nonaktif (lingkup semua). */
+  allCount: number;
+  /** Lingkup pertama di categories; null bila kosong. */
+  suggested: OpnameScope | null;
+}
+
+export interface OpnameCountInput {
+  productId: string;
+  /**
+     * Jumlah fisik dalam satuan dasar; 0 sah.
+     * @minimum 0
+     */
+  qtyBase: number;
+  /** Jam HP saat barang dibuka untuk dihitung (scan/ketuk); membuka ulang memperbarui jamnya. */
+  countedAt: number;
+}
+
+export interface OpnameSessionInput {
+  /**
+     * ID draf dari HP (idempotensi).
+     * @minLength 1
+     * @maxLength 64
+     */
+  id: string;
+  scope: OpnameScope;
+  /** Jam HP saat mengirim; dipakai menggeser countedAt ke jam server (K6). */
+  deviceNow: number;
+  /** @minItems 1 */
+  items: OpnameCountInput[];
+}
+
+/**
+ * Nota barang masuk aktif yang memuat barang itu (rujukan salah input sebelumnya).
+ */
+export interface OpnameReceiptOption {
+  receiptId: string;
+  supplierName: string;
+  notaDate: string;
+}
+
+/**
+ * Satu barang yang dihitung. systemQtyBase baru dikirim setelah hitungan diterima server
+ * (hitung buta, K8): stok pada jam hitung (countedAt server), diffQtyBase = countedQtyBase −
+ * systemQtyBase. Tanpa nilai rupiah.
+ */
+export interface StaffOpnameItem {
+  productId: string;
+  productName: string;
+  /** Satuan eceran. */
+  unitName: string;
+  /**
+     * Isi satuan eceran dalam satuan dasar.
+     * @minimum 1
+     */
+  unitSize: number;
+  isCurah: boolean;
+  countedQtyBase: number;
+  /** Jam hitung setelah digeser ke jam server (K6). */
+  countedAt: number;
+  /** Jam HP melenceng > 5 menit dari jam server, atau jam hasil geser dijepit ke jam server. */
+  clockEstimated: boolean;
+  systemQtyBase: number;
+  diffQtyBase: number;
+  state: OpnameItemState;
+  /** Alasan tersimpan; null bila belum ada atau tidak perlu. */
+  reason: OpnameReason | null;
+  /** Nota rujukan untuk salah_input (J4). */
+  receiptRef: OpnameReceiptOption | null;
+  /**
+     * Barang selisih: paling banyak 5 nota aktif terakhir yang memuat barang itu (notaDate lalu
+     * createdAt terbaru dulu); kosong untuk barang lain.
+     * @maxItems 5
+     */
+  receiptOptions: OpnameReceiptOption[];
+}
+
+export interface StaffOpnameSession {
+  id: string;
+  scope: OpnameScope;
+  status: OpnameSessionStatus;
+  createdByName: string;
+  /** Waktu server saat hitungan diterima. */
+  submittedAt: number;
+  /** @nullable */
+  finishedAt: number | null;
+  /** Urut nama barang. */
+  items: StaffOpnameItem[];
+}
+
+export interface StaffOpnameRow {
+  id: string;
+  scope: OpnameScope;
+  status: OpnameSessionStatus;
+  submittedAt: number;
+  /** @nullable */
+  finishedAt: number | null;
+  /** Jumlah barang dihitung. */
+  itemCount: number;
+  /** Jumlah barang selisih (bukan cocok, stok_awal, atau diganti). */
+  diffCount: number;
+  /** Jumlah barang ditahan. */
+  heldCount: number;
+}
+
+export type OpnameReasonInputReason = typeof OpnameReasonInputReason[keyof typeof OpnameReasonInputReason];
+
+
+export const OpnameReasonInputReason = {
+  rusak: 'rusak',
+  hilang: 'hilang',
+  kedaluwarsa: 'kedaluwarsa',
+  salah_input: 'salah_input',
+} as const;
+
+export interface OpnameReasonInput {
+  productId: string;
+  reason: OpnameReasonInputReason;
+  /**
+     * Hanya untuk salah_input; dari receiptOptions barang itu; null = tidak tahu notanya.
+     * @nullable
+     */
+  receiptId: string | null;
+}
+
+export interface OpnameFinishInput {
+  reasons: OpnameReasonInput[];
+}
+
+/**
+ * Hitung ulang pemilik; systemQtyBase = stok saat hitung ulang.
+ */
+export interface OpnameRecount {
+  countedQtyBase: number;
+  countedAt: number;
+  systemQtyBase: number;
+  diffQtyBase: number;
+  /**
+     * Nilai rupiah |diffQtyBase| (K3); null bila HPP belum ada.
+     * @nullable
+     */
+  value: number | null;
+}
+
+/**
+ * Barang opname versi pemilik (field StaffOpnameItem ditambah nilai rupiah dan penyelesaian).
+ */
+export type OwnerOpnameItem = StaffOpnameItem & ({
+  /**
+     * round_half_up(|diffQtyBase| × cost.amount ÷ cost.qtyBase) dari HPP saat dinilai (K3);
+     * null bila HPP belum ada (selisih ≠ 0 selalu ditahan, J3).
+     * @nullable
+     */
+  value: number | null;
+  /** Satuan aktif barang sekarang (untuk penghitung hitung ulang); units[0] = eceran. */
+  units: StaffUnit[];
+  /**
+     * Pemilik yang menyetujui atau menghitung ulang.
+     * @nullable
+     */
+  resolvedByName: string | null;
+  /** @nullable */
+  resolvedAt: number | null;
+  /**
+     * Sesi yang hitungannya menggantikan barang ini (state diganti).
+     * @nullable
+     */
+  replacedBySessionId: string | null;
+  recount: OpnameRecount | null;
+});
+
+/**
+ * lossValue / gainValue (K26) = Σ value barang menunggu_alasan, disesuaikan, ditahan,
+ * disetujui, dan recount.value barang dihitung_ulang (kurang → loss, lebih → gain); cocok,
+ * stok_awal, dan diganti tidak dihitung. totalValue = lossValue + gainValue. flagged
+ * ditetapkan saat alasan disimpan (Σ > Rp250.000) dan tidak berubah.
+ */
+export interface OwnerOpnameSession {
+  id: string;
+  scope: OpnameScope;
+  status: OpnameSessionStatus;
+  createdByName: string;
+  submittedAt: number;
+  /** @nullable */
+  finishedAt: number | null;
+  items: OwnerOpnameItem[];
+  lossValue: number;
+  gainValue: number;
+  totalValue: number;
+  flagged: boolean;
+  /** @nullable */
+  reviewedByName: string | null;
+  /** @nullable */
+  reviewedAt: number | null;
+}
+
+export interface OwnerOpnameRow {
+  id: string;
+  scope: OpnameScope;
+  status: OpnameSessionStatus;
+  createdByName: string;
+  submittedAt: number;
+  /** @nullable */
+  finishedAt: number | null;
+  itemCount: number;
+  diffCount: number;
+  heldCount: number;
+  totalValue: number;
+  flagged: boolean;
+  reviewed: boolean;
+}
+
+export interface OpnameRecountInput {
+  /** @minimum 0 */
+  qtyBase: number;
+}
+
+export interface OpnameError {
+  /**
+     * null = galat tingkat sesi.
+     * @nullable
+     */
+  productId: string | null;
+  message: string;
+}
+
+export type OpnameProblemCode = typeof OpnameProblemCode[keyof typeof OpnameProblemCode];
+
+
+export const OpnameProblemCode = {
+  VALIDATION: 'VALIDATION',
+} as const;
+
+/**
+ * Problem VALIDATION dengan galat per barang opname.
+ */
+export type OpnameProblem = Problem & {
+  code: OpnameProblemCode;
+  errors: OpnameError[];
+};
+
+/**
+ * lewat = ED sebelum hari ini; segera = 0–soonDays hari lagi (ED hari ini termasuk).
+ */
+export type ExpiryStage = typeof ExpiryStage[keyof typeof ExpiryStage];
+
+
+export const ExpiryStage = {
+  lewat: 'lewat',
+  segera: 'segera',
+} as const;
+
+/**
+ * Satu kiriman (baris nota) ber-ED. estimateQtyBase = perkiraan sisa FIFO (K9);
+ * capacityQtyBase = batas keluarkan dari kiriman ini.
+ */
+export interface StaffExpiryLot {
+  lineId: string;
+  receiptId: string;
+  productId: string;
+  productName: string;
+  /** Satuan eceran. */
+  unitName: string;
+  /** @minimum 1 */
+  unitSize: number;
+  isCurah: boolean;
+  estimateQtyBase: number;
+  capacityQtyBase: number;
+  expiryDate: string;
+  stage: ExpiryStage;
+  supplierName: string;
+  notaDate: string;
+}
+
+export type ExpiryEventKind = typeof ExpiryEventKind[keyof typeof ExpiryEventKind];
+
+
+export const ExpiryEventKind = {
+  keluar: 'keluar',
+  ubah_ed: 'ubah_ed',
+} as const;
+
+/**
+ * keluar = dikeluarkan dari stok (qtyBase positif, tanggal null); ubah_ed = tanggal ED dibetulkan (qtyBase null).
+ */
+export interface ExpiryEvent {
+  id: string;
+  at: number;
+  actorName: string;
+  kind: ExpiryEventKind;
+  receiptId: string;
+  lineId: string;
+  productId: string;
+  productName: string;
+  unitName: string;
+  /** @minimum 1 */
+  unitSize: number;
+  isCurah: boolean;
+  /** @nullable */
+  qtyBase: number | null;
+  /** @nullable */
+  fromDate: string | null;
+  /** @nullable */
+  toDate: string | null;
+}
+
+export interface StaffExpiryList {
+  /** Batas tahap segera (hari), dari pengaturan server. */
+  soonDays: number;
+  lots: StaffExpiryLot[];
+  /** @maxItems 20 */
+  recent: ExpiryEvent[];
+}
+
+/**
+ * Kiriman ber-ED versi pemilik.
+ */
+export type OwnerExpiryLot = StaffExpiryLot & ({
+  /**
+     * round_half_up(estimateQtyBase × cost.amount ÷ cost.qtyBase) dari HPP sekarang; null bila HPP belum ada.
+     * @nullable
+     */
+  lossValue: number | null;
+});
+
+/**
+ * Log kedaluwarsa versi pemilik.
+ */
+export type OwnerExpiryEvent = ExpiryEvent & ({
+  /**
+     * Nilai yang dikeluarkan dari HPP saat kejadian (K28, tidak dihitung ulang); null untuk ubah_ed atau tanpa HPP.
+     * @nullable
+     */
+  lossValue: number | null;
+});
+
+export interface OwnerExpiryList {
+  soonDays: number;
+  lots: OwnerExpiryLot[];
+  /** @maxItems 20 */
+  recent: OwnerExpiryEvent[];
+  /** Perkiraan kerugian = Σ lossValue yang diketahui pada kiriman tahap lewat. */
+  expiredLossValue: number;
+}
+
+export interface ExpiryRemovalInput {
+  /**
+     * ID dari HP (idempotensi).
+     * @minLength 1
+     * @maxLength 64
+     */
+  id: string;
+  receiptId: string;
+  lineId: string;
+  /**
+     * Jumlah dalam satuan dasar; paling banyak capacityQtyBase kiriman itu.
+     * @minimum 1
+     */
+  qtyBase: number;
+}
+
+export interface ExpiryDateInput {
+  expiryDate: string;
+}
+
+/**
+ * Barang menipis untuk orang toko; tanpa angka sisa stok (J7).
+ */
+export interface StaffLowStockItem {
+  productId: string;
+  productName: string;
+  /** Satuan eceran. */
+  unitName: string;
+  /** @minimum 1 */
+  unitSize: number;
+  isCurah: boolean;
+  /** Batas menipis (minStock) dalam satuan dasar. */
+  minQtyBase: number;
+}
+
+/**
  * Bukan dari Wi-Fi toko (STAFF_LAN_ONLY): header Cf-Connecting-Ip/Cf-Ray → 403 STAFF_LAN_ONLY;
  * backend menolak semua yang bukan LAN (gagal-tertutup)
  */
@@ -1464,6 +1966,16 @@ export type ReceiptCancelledResponse = Problem;
  * Nota tidak valid (VALIDATION) dengan galat per baris/field
  */
 export type ReceiptValidationFailedResponse = ReceiptProblem;
+
+/**
+ * Hitungan atau alasan opname tidak valid (VALIDATION) dengan galat per barang
+ */
+export type OpnameValidationFailedResponse = OpnameProblem;
+
+/**
+ * Barang tidak (lagi) ditahan menunggu persetujuan pemilik (OPNAME_NOT_HELD)
+ */
+export type OpnameNotHeldResponse = Problem;
 
 /**
  * Nama atau password salah (LOGIN_INVALID)
@@ -1552,4 +2064,21 @@ export type SearchStaffProductsParams = {
  */
 q: string;
 };
+
+export type ListStaffOpnameProductsParams = {
+lingkup: ListStaffOpnameProductsLingkup;
+/**
+ * Nama kategori; hanya untuk lingkup = kategori.
+ */
+kategori?: string;
+};
+
+export type ListStaffOpnameProductsLingkup = typeof ListStaffOpnameProductsLingkup[keyof typeof ListStaffOpnameProductsLingkup];
+
+
+export const ListStaffOpnameProductsLingkup = {
+  kategori: 'kategori',
+  tanpa_kategori: 'tanpa_kategori',
+  semua: 'semua',
+} as const;
 

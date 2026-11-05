@@ -33,6 +33,7 @@ const MESSAGES: Record<string, string> = {
   RECEIPT_CANCELLED: "Nota ini sudah dibatalkan",
   DEBT_ALREADY_PAID: "Utang ini sudah lunas",
   ID_TAKEN: ID_TAKEN_MESSAGE,
+  OPNAME_NOT_HELD: "Barang ini tidak lagi menunggu persetujuan",
   INTERNAL: GENERIC,
 };
 

@@ -3,6 +3,8 @@ import { z } from "zod/mini";
 import { ApiError } from "./fetcher";
 import {
   type CreditLimitProblem,
+  type OpnameProblem,
+  OpnameProblemCode,
   type PriceChangedProblem,
   ProductField,
   type ProductValidationProblem,
@@ -89,3 +91,15 @@ export const receiptProblemSchema = z.object({
     }),
   ),
 }) satisfies z.core.$ZodType<ReceiptProblem>;
+
+/** 422 `VALIDATION` dari opname: galat per barang (`productId`) atau tingkat sesi (`null`). */
+export const opnameProblemSchema = z.object({
+  type: z.string(),
+  title: z.string(),
+  status: z.number(),
+  code: z.literal(OpnameProblemCode.VALIDATION),
+  detail: z.exactOptional(z.string()),
+  errors: z.array(
+    z.object({ productId: z.nullable(z.string()), message: z.string() }),
+  ),
+}) satisfies z.core.$ZodType<OpnameProblem>;

@@ -73,6 +73,10 @@ function attention(state: Readonly<MockState>, now: number): Attention {
     awaitingPriceCount: state.products.filter(
       (p) => p.status === "menunggu_harga",
     ).length,
+    // Sementara nol: server kedaluwarsa & opname belum ada.
+    expiry: { expiredCount: 0, soonCount: 0, soonDays: 30 },
+    opnameHeldCount: 0,
+    opnameFlags: [],
   };
 }
 
