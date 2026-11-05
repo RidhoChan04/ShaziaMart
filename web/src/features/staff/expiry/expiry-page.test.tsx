@@ -42,8 +42,8 @@ test("grup 'Sudah lewat' sebelum '≤ 30 hari'; baris ±3 bungkus · ED 31 Okt 2
   ).toBeVisible();
   const headings = await screen.findAllByRole("heading", { level: 2 });
   expect(headings.map((h) => h.textContent)).toEqual([
-    "Sudah lewat1",
-    "≤ 30 hari3",
+    "Sudah lewat,1",
+    "≤ 30 hari,3",
   ]);
   const roti = rowOf("Sari Roti Tawar");
   expect(roti).toHaveTextContent("±3 bungkus · ED 31 Okt 2026");
@@ -254,4 +254,44 @@ test("daftar kosong → teks kosong", async () => {
     await screen.findByText("Tidak ada barang yang mendekati kedaluwarsa"),
   ).toBeVisible();
   expect(screen.queryByRole("heading", { level: 2 })).toBeNull();
+});
+
+test("berhasil mengeluarkan semua → baris hilang, fokus tidak jatuh ke body", async () => {
+  const user = userEvent.setup();
+  renderApp("/staff/kedaluwarsa");
+  await screen.findByText("Sari Roti Tawar");
+  await user.click(
+    within(rowOf("Sari Roti Tawar")).getByRole("button", { name: "Pilihan" }),
+  );
+  await user.click(
+    await screen.findByRole("button", { name: /Keluarkan dari stok/ }),
+  );
+  const dialog = await screen.findByRole("dialog", {
+    name: "Keluarkan dari stok",
+  });
+  await user.click(within(dialog).getByRole("button", { name: "Keluarkan 3" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  await waitFor(() =>
+    expect(screen.queryByRole("heading", { name: /Sudah lewat/ })).toBeNull(),
+  );
+  await waitFor(() => expect(document.body).not.toHaveFocus());
+});
+
+test("ubah ED: isian tanggal kosong menonaktifkan 'Simpan tanggal'", async () => {
+  const user = userEvent.setup();
+  renderApp("/staff/kedaluwarsa");
+  await screen.findByText("Sari Roti Tawar");
+  await user.click(
+    within(rowOf("Sari Roti Tawar")).getByRole("button", { name: "Pilihan" }),
+  );
+  await user.click(
+    await screen.findByRole("button", { name: /Ubah tanggal ED/ }),
+  );
+  const dialog = await screen.findByRole("dialog", { name: "Ubah tanggal ED" });
+  fireEvent.change(within(dialog).getByLabelText("Tanggal kedaluwarsa"), {
+    target: { value: "" },
+  });
+  expect(
+    within(dialog).getByRole("button", { name: "Simpan tanggal" }),
+  ).toBeDisabled();
 });

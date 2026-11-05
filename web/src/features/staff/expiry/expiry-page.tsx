@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { Clock, OctagonAlert } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type {
   ExpiryEvent,
@@ -57,6 +57,7 @@ function GroupHeading({
     >
       <Icon aria-hidden="true" className="size-4" />
       {children}
+      <span className="sr-only">,</span>
       <em className="font-medium text-muted not-italic">{count}</em>
     </h2>
   );
@@ -95,6 +96,9 @@ export function ExpiryPage() {
   const [session, setSession] = useState(0);
   const removalId = useRef("");
   const opener = useRef<HTMLElement | null>(null);
+  const container = useRef<HTMLDivElement>(null);
+  // Setelah berhasil, baris bisa pindah/hilang; fokus lalu jatuh ke wadah halaman.
+  const needsFocus = useRef(false);
 
   const refresh = () =>
     client.invalidateQueries({ queryKey: getGetStaffExpiryQueryKey() });
@@ -118,6 +122,12 @@ export function ExpiryPage() {
   };
 
   const data = list.data;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: dijalankan tiap data daftar baru
+  useEffect(() => {
+    if (!needsFocus.current || mode !== null) return;
+    needsFocus.current = false;
+    if (!opener.current?.isConnected) container.current?.focus();
+  }, [list.dataUpdatedAt, mode]);
   const today = jakartaIsoDate(Date.now());
   const lots = data?.lots ?? [];
   const expired = lots.filter((l) => l.stage === "lewat");
@@ -142,7 +152,7 @@ export function ExpiryPage() {
   );
 
   return (
-    <div className="max-w-xl">
+    <div ref={container} tabIndex={-1} className="max-w-xl outline-none">
       <p className="text-[15px] text-muted">
         Jumlah adalah perkiraan: barang lama dianggap terjual lebih dulu.
       </p>
@@ -219,6 +229,7 @@ export function ExpiryPage() {
                 {
                   onSuccess: () => {
                     toast.success("Tanggal ED diperbarui");
+                    needsFocus.current = true;
                     void refresh();
                     close();
                   },
@@ -255,6 +266,7 @@ export function ExpiryPage() {
                     toast.success(
                       `${removedText(qtyBase, lot.unitSize, lot.unitName, lot.isCurah)} ${lot.productName} dikeluarkan`,
                     );
+                    needsFocus.current = true;
                     void refresh();
                     close();
                   },

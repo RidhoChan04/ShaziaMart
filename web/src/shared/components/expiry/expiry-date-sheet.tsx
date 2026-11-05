@@ -33,7 +33,7 @@ export function ExpiryDateSheet({
       title="Ubah tanggal ED"
       description={name}
     >
-      <div className="relative flex min-h-12 items-center justify-between gap-3 rounded-lg bg-bg px-4">
+      <div className="relative flex min-h-12 items-center justify-between gap-3 rounded-lg bg-bg px-4 focus-within:ring-2 focus-within:ring-primary">
         <span className="text-[17px]">Tanggal kedaluwarsa</span>
         <span className="flex min-w-0 items-center gap-1 text-[17px] font-medium text-primary tabular-nums">
           {isIsoDate(date) ? formatIsoDate(date) : "Pilih tanggal"}
@@ -53,7 +53,7 @@ export function ExpiryDateSheet({
       <SheetNotes error={error} offline={offline} />
       <Button
         size="lg"
-        disabled={pending || offline}
+        disabled={pending || offline || !isIsoDate(date)}
         onClick={() => onSave(date)}
       >
         Simpan tanggal
