@@ -1,7 +1,8 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import { OctagonAlert } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { ApiError } from "@/shared/api/fetcher";
 import {
   getGetOwnerOpnameSessionQueryKey,
   getGetOwnerTodaySummaryQueryKey,
@@ -110,6 +111,7 @@ export function OpnameDetailPage() {
   const [approving, setApproving] = useState<OwnerOpnameItem | null>(null);
   const [recounting, setRecounting] = useState<OwnerOpnameItem | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [dialogError, setDialogError] = useState<string | null>(null);
   const detailKey = getGetOwnerOpnameSessionQueryKey(sessionId);
 
   const refresh = () =>
@@ -119,26 +121,55 @@ export function OpnameDetailPage() {
       }),
       client.invalidateQueries({ queryKey: getGetOwnerTodaySummaryQueryKey() }),
     ]);
+  // Tombol pemicu hilang setelah sukses (baris pindah bagian): fokus ke judul halaman, bukan body.
+  const focusTitleOnClose = useRef(false);
+  const focusTitle = () =>
+    document.querySelector<HTMLElement>("main h1")?.focus();
+  const closeSheets = () => {
+    focusTitleOnClose.current = true;
+    setApproving(null);
+    setRecounting(null);
+  };
+  const keepFocus = (e: Event) => {
+    if (!focusTitleOnClose.current) return;
+    focusTitleOnClose.current = false;
+    e.preventDefault();
+    focusTitle();
+  };
   const mutationOptions = {
     onSuccess: async (session: OwnerOpnameSession) => {
       client.setQueryData(detailKey, session);
       setActionError(null);
-      setApproving(null);
-      setRecounting(null);
+      setDialogError(null);
+      closeSheets();
       await refresh();
     },
-    // 409 OPNAME_NOT_HELD dan galat lain: tutup lembar, tampilkan pesan, muat ulang agar tampilan sama dengan server.
+    // 409 OPNAME_NOT_HELD: tutup lembar, tampilkan pesan, muat ulang. Galat lain: lembar tetap terbuka dengan pesannya agar hitungan tidak hilang.
     onError: (error: unknown) => {
-      setActionError(pesanError(error));
-      setApproving(null);
-      setRecounting(null);
-      void client.invalidateQueries({ queryKey: detailKey });
-      void refresh();
+      if (error instanceof ApiError && error.code === "OPNAME_NOT_HELD") {
+        setActionError(pesanError(error));
+        setDialogError(null);
+        closeSheets();
+        void client.invalidateQueries({ queryKey: detailKey });
+        void refresh();
+      } else {
+        setDialogError(pesanError(error));
+      }
     },
   };
   const approve = useApproveOpnameItem({ mutation: mutationOptions });
   const recount = useRecountOpnameItem({ mutation: mutationOptions });
-  const review = useReviewOpnameSession({ mutation: mutationOptions });
+  const review = useReviewOpnameSession({
+    mutation: {
+      onSuccess: async (session: OwnerOpnameSession) => {
+        client.setQueryData(detailKey, session);
+        setActionError(null);
+        focusTitle();
+        await refresh();
+      },
+      onError: (error: unknown) => setActionError(pesanError(error)),
+    },
+  });
   const busy = approve.isPending || recount.isPending || review.isPending;
 
   const session = query.data;
@@ -204,8 +235,14 @@ export function OpnameDetailPage() {
                   item={item}
                   now={now}
                   busy={busy}
-                  onApprove={setApproving}
-                  onRecount={setRecounting}
+                  onApprove={(i) => {
+                    setDialogError(null);
+                    setApproving(i);
+                  }}
+                  onRecount={(i) => {
+                    setDialogError(null);
+                    setRecounting(i);
+                  }}
                 />
               ))}
             </RowList>
@@ -215,7 +252,12 @@ export function OpnameDetailPage() {
       <ApproveDialog
         item={approving}
         pending={approve.isPending}
-        onClose={() => setApproving(null)}
+        error={dialogError}
+        onCloseAutoFocus={keepFocus}
+        onClose={() => {
+          setDialogError(null);
+          setApproving(null);
+        }}
         onApprove={(item) => {
           setActionError(null);
           approve.mutate({ sessionId, productId: item.productId });
@@ -224,7 +266,12 @@ export function OpnameDetailPage() {
       <RecountSheet
         item={recounting}
         pending={recount.isPending}
-        onClose={() => setRecounting(null)}
+        error={dialogError}
+        onCloseAutoFocus={keepFocus}
+        onClose={() => {
+          setDialogError(null);
+          setRecounting(null);
+        }}
         onSave={(item, qtyBase) => {
           setActionError(null);
           recount.mutate({

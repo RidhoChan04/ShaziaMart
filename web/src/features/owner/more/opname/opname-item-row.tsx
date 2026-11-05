@@ -86,7 +86,8 @@ export function OpnameItemRow({
 }) {
   const c = effectiveCount(item);
   const status = statusText(item, now);
-  const hasDiff = c.diffQtyBase !== 0;
+  // Barang yang diganti tidak masuk total (K26): hanya statusnya yang tampil.
+  const hasDiff = c.diffQtyBase !== 0 && item.state !== "diganti";
   return (
     <li className="grid gap-2 px-4 py-3">
       <div className="flex items-start justify-between gap-3">
@@ -109,7 +110,7 @@ export function OpnameItemRow({
         )}
       </div>
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <DiffBadge diffQtyBase={c.diffQtyBase} item={item} />
+        <DiffBadge diffQtyBase={hasDiff ? c.diffQtyBase : 0} item={item} />
         {status && (
           <span className="text-[13px] font-semibold text-primary">
             {status}

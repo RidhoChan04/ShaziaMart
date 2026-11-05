@@ -49,11 +49,15 @@ function RecountForm({
 export function RecountSheet({
   item,
   pending,
+  error,
+  onCloseAutoFocus,
   onSave,
   onClose,
 }: {
   item: OwnerOpnameItem | null;
   pending: boolean;
+  error: string | null;
+  onCloseAutoFocus: (e: Event) => void;
   onSave: (item: OwnerOpnameItem, qtyBase: number) => void;
   onClose: () => void;
 }) {
@@ -67,6 +71,7 @@ export function RecountSheet({
       <SheetContent
         side="bottom"
         showCloseButton={false}
+        onCloseAutoFocus={onCloseAutoFocus}
         className="max-h-[90dvh] gap-3 overflow-y-auto rounded-t-lg p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] lg:mx-auto lg:max-w-md"
       >
         <SheetTitle className="text-[20px] font-bold">Hitung ulang</SheetTitle>
@@ -78,6 +83,11 @@ export function RecountSheet({
             pending={pending}
             onSave={onSave}
           />
+        )}
+        {error !== null && (
+          <p role="alert" className="text-sm font-medium text-danger">
+            {error}
+          </p>
         )}
         <SheetClose asChild>
           <Button

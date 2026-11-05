@@ -1,8 +1,10 @@
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { HttpResponse, http } from "msw";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { mockDb } from "@/mocks/db";
 import { ownerLogin, post } from "@/mocks/handlers/test-helpers";
+import { server } from "@/mocks/node";
 import { renderApp } from "@/test/render-app";
 import {
   BERAS5,
@@ -221,4 +223,95 @@ test("sesi tidak ada -> pesan galat dan tautan kembali", async () => {
   expect(await screen.findByRole("alert")).toHaveTextContent(
     "Data tidak ditemukan",
   );
+});
+
+test("fokus pindah ke judul setelah Setujui (bukan body)", async () => {
+  const user = userEvent.setup();
+  renderApp("/owner/lainnya/opname/A");
+  const held = await screen.findByRole("region", {
+    name: "Menunggu persetujuan",
+  });
+  await user.click(
+    within(held).getByRole("button", { name: `Setujui ${INDOMIE}` }),
+  );
+  const dialog = await screen.findByRole("alertdialog");
+  await user.click(within(dialog).getByRole("button", { name: "Setujui" }));
+  await screen.findByText("Disetujui Pak Ahmad · Hari ini 14.05");
+  await vi.waitFor(() =>
+    expect(document.activeElement).toBe(
+      screen.getByRole("heading", { level: 1, name: "Mi Instan" }),
+    ),
+  );
+});
+
+test("galat server saat hitung ulang: lembar tetap terbuka, hitungan tidak hilang, pesan tampil", async () => {
+  const user = userEvent.setup();
+  server.use(
+    http.post("/api/owner/opname-sessions/:sid/items/:pid/recount", () =>
+      HttpResponse.json(
+        { code: "INTERNAL", title: "x", status: 500 },
+        { status: 500 },
+      ),
+    ),
+  );
+  renderApp("/owner/lainnya/opname/A");
+  const held = await screen.findByRole("region", {
+    name: "Menunggu persetujuan",
+  });
+  await user.click(
+    within(held).getByRole("button", { name: `Hitung ulang ${INDOMIE}` }),
+  );
+  const sheet = await screen.findByRole("dialog", { name: "Hitung ulang" });
+  const pcs = within(sheet).getByRole("textbox", { name: "Jumlah Pcs" });
+  await user.clear(pcs);
+  await user.type(pcs, "48");
+  await user.click(
+    within(sheet).getByRole("button", { name: "Simpan hitungan" }),
+  );
+  expect(await within(sheet).findByRole("alert")).toHaveTextContent(
+    "Terjadi kesalahan di server",
+  );
+  expect(screen.getByRole("textbox", { name: "Jumlah Pcs" })).toHaveValue("48");
+});
+
+test("galat server saat Setujui: dialog tetap terbuka dengan pesan", async () => {
+  const user = userEvent.setup();
+  server.use(
+    http.post("/api/owner/opname-sessions/:sid/items/:pid/approve", () =>
+      HttpResponse.json(
+        { code: "INTERNAL", title: "x", status: 500 },
+        { status: 500 },
+      ),
+    ),
+  );
+  renderApp("/owner/lainnya/opname/A");
+  const held = await screen.findByRole("region", {
+    name: "Menunggu persetujuan",
+  });
+  await user.click(
+    within(held).getByRole("button", { name: `Setujui ${KOPI}` }),
+  );
+  const dialog = await screen.findByRole("alertdialog");
+  await user.click(within(dialog).getByRole("button", { name: "Setujui" }));
+  expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+    "Terjadi kesalahan di server",
+  );
+  expect(screen.getByRole("alertdialog")).toBeVisible();
+});
+
+test("barang 'diganti': hanya status, tanpa nilai Rp", async () => {
+  vi.setSystemTime(T("11.00"));
+  await submitCount("C", { kind: "kategori", category: "Mi Instan" }, [
+    countOf(INDOMIE, 59, "11.00"),
+  ]);
+  renderApp("/owner/lainnya/opname/A");
+  await screen.findByRole("heading", { level: 1, name: "Mi Instan" });
+  const li = await vi.waitFor(() => {
+    const row = rowOf(INDOMIE);
+    expect(row).toHaveTextContent("Diganti hitungan baru");
+    return row;
+  });
+  expect(li).not.toHaveTextContent("Rp");
+  expect(li).not.toHaveTextContent("Kurang");
+  expect(within(li).queryByRole("button")).toBeNull();
 });

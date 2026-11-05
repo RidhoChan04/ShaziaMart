@@ -14,11 +14,15 @@ import { signedQty } from "./opname-model";
 export function ApproveDialog({
   item,
   pending,
+  error,
+  onCloseAutoFocus,
   onApprove,
   onClose,
 }: {
   item: OwnerOpnameItem | null;
   pending: boolean;
+  error: string | null;
+  onCloseAutoFocus: (e: Event) => void;
   onApprove: (item: OwnerOpnameItem) => void;
   onClose: () => void;
 }) {
@@ -29,7 +33,11 @@ export function ApproveDialog({
         if (!next && !pending) onClose();
       }}
     >
-      <DialogContent role="alertdialog" showCloseButton={false}>
+      <DialogContent
+        role="alertdialog"
+        showCloseButton={false}
+        onCloseAutoFocus={onCloseAutoFocus}
+      >
         <DialogHeader>
           <DialogTitle>Setujui selisih ini?</DialogTitle>
           <DialogDescription>
@@ -38,6 +46,11 @@ export function ApproveDialog({
               : ""}
           </DialogDescription>
         </DialogHeader>
+        {error !== null && (
+          <p role="alert" className="text-sm font-medium text-danger">
+            {error}
+          </p>
+        )}
         <DialogFooter>
           <Button variant="outline" disabled={pending} onClick={onClose}>
             Kembali
