@@ -8,7 +8,7 @@ import type { MockProduct, MockState, MockUnit, MockUser } from "./db";
 import { generateHistory } from "./history";
 import { KIND, makeId, rng } from "./seed";
 import { CATALOG_NAMES, TEMPLATE_CATEGORIES } from "./seed-catalog-names";
-import { seedCustomers } from "./seed-customers";
+import { seedCustomers, settleSeedBalanceAfter } from "./seed-customers";
 
 type UnitSpec = {
   name: string;
@@ -245,8 +245,11 @@ export function createSeedState(now: number = Date.now()): MockState {
     ...u,
     id: makeId(KIND.user, i + 1),
   }));
+  // Pencatat pelunasan seed (pra-cek): Rina, jalur kasir.
+  const [rina] = users;
+  if (!rina) throw new Error("Seed tanpa kasir");
   const state: MockState = {
-    version: 6,
+    version: 7,
     store: { id: makeId(KIND.store, 1), name: "ShaziaMart" },
     users,
     session: null,
@@ -264,7 +267,7 @@ export function createSeedState(now: number = Date.now()): MockState {
     stock,
     minStock,
     sales: [],
-    ...seedCustomers(now),
+    ...seedCustomers(now, rina),
     settings: {
       storeName: "ShaziaMart",
       autoPrint: true,
@@ -287,5 +290,6 @@ export function createSeedState(now: number = Date.now()): MockState {
     },
   };
   generateHistory(state, now);
+  settleSeedBalanceAfter(state);
   return state;
 }

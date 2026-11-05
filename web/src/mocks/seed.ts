@@ -22,6 +22,7 @@ export const KIND = {
   credit: 5,
   sale: 6,
   shift: 7,
+  payment: 8,
 } as const;
 
 export function makeId(kind: number, n: number): string {

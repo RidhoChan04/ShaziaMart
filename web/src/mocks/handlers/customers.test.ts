@@ -17,6 +17,50 @@ describe("pelanggan", () => {
     expect(await search("")).toHaveLength(mockDb.get().customers.length);
   });
 
+  test("owing=true: hanya saldo > 0 (Mbak Dewi tidak ikut), urutan nama tetap; tanpa owing perilaku lama", async () => {
+    const owing = async (q = "") =>
+      (await (
+        await fetch(`/api/customers?owing=true&q=${q}`)
+      ).json()) as Customer[];
+    expect((await owing()).map((c) => [c.name, c.balance])).toEqual([
+      ["Bu Sari", 120_000],
+      ["Bu Tini", 640_000],
+      ["Pak Joko", 290_000],
+      ["Pak Udin", 50_000],
+    ]);
+    expect((await owing("bu")).map((c) => c.name)).toEqual([
+      "Bu Sari",
+      "Bu Tini",
+    ]);
+    expect(await owing("dewi")).toEqual([]);
+    expect((await search("dewi")).map((c) => c.name)).toEqual(["Mbak Dewi"]);
+    const off = (await (
+      await fetch("/api/customers?owing=false")
+    ).json()) as Customer[];
+    expect(off).toHaveLength(5);
+  });
+
+  test("owing=true disaring sebelum batas 20 hasil", async () => {
+    mockDb.update((s) => {
+      for (let i = 0; i < 30; i++) {
+        s.customers.push({
+          id: `c${i}`,
+          name: `A Warga ${String(i).padStart(2, "0")}`,
+          phone: `0899000000${String(i).padStart(2, "0")}`,
+          balance: 0,
+          creditLimit: 500000,
+        });
+      }
+    });
+    const res = await fetch("/api/customers?owing=true");
+    expect(((await res.json()) as Customer[]).map((c) => c.name)).toEqual([
+      "Bu Sari",
+      "Bu Tini",
+      "Pak Joko",
+      "Pak Udin",
+    ]);
+  });
+
   test("hasil cari maksimal 20", async () => {
     mockDb.update((s) => {
       for (let i = 0; i < 30; i++) {

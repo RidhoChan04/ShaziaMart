@@ -1,5 +1,7 @@
 import type {
   CostAlert,
+  CreditPaymentChannel,
+  CreditPaymentMethod,
   Customer,
   DebtPayment,
   KasirSettings,
@@ -7,6 +9,7 @@ import type {
   OpnameReason,
   OpnameScope,
   PriceHistoryEntry,
+  PrintStatus,
   Product,
   ProductCost,
   ProductStatus,
@@ -26,9 +29,10 @@ import { createSeedState } from "./seed-data";
 
 /** `password` hanya untuk pemilik (login aplikasi pemilik); mock saja. */
 export type MockUser = User & { pin: string; password?: string };
-/** Shift tertutup + nama kasir dan waktu tutup (untuk ringkasan pemilik). */
+/** Shift tertutup + nama kasir, waktu buka, dan waktu tutup (untuk ringkasan & laporan pemilik). */
 export type MockClosedShift = ShiftClosure & {
   kasirName: string;
+  openedAt: number;
   closedAt: number;
 };
 /** Uang keluar laci di shift ini (barang masuk, koreksi nota, pelunasan utang); keluar = positif. */
@@ -39,10 +43,30 @@ export type MockCashOut = {
   receiptId: string;
   kind: "bayar" | "koreksi" | "lunas";
 };
+/**
+ * Pelunasan kasbon tunai jalur kasir di laci shift ini (append-only): `pelunasan` +jumlah,
+ * `batal_pelunasan` −jumlah (hanya pelunasan shift ini yang bisa dibatalkan kasir → Σ ≥ 0).
+ */
+export type MockCreditCash = {
+  id: string;
+  at: number;
+  amount: number;
+  paymentId: string;
+  kind: "pelunasan" | "batal_pelunasan";
+};
+/** (ruling R12) Tunai transaksi shift lama yang dibatalkan kasir di shift ini; keluar laci, > 0. */
+export type MockSaleRefund = {
+  id: string;
+  at: number;
+  amount: number;
+  saleId: string;
+};
 export type MockShift = Shift & {
   cashSales: number;
   salesCount: number;
   cashOuts: MockCashOut[];
+  creditCash: MockCreditCash[];
+  saleRefunds: MockSaleRefund[];
 };
 /** HPP disalin saat penjualan; tidak pernah dikirim ke endpoint kasir. */
 export type MockSale = Sale & { costTotal: number; voidedAt: number | null };
@@ -61,13 +85,43 @@ export type MockProduct = Omit<Product, "units"> & {
 };
 export type MockCostAlert = CostAlert;
 
-/** Buku kasbon append-only: + kasbon, − pelunasan/batal. */
+/**
+ * Buku kasbon append-only: + kasbon, − pelunasan/batal kasbon, + pembalik batal pelunasan.
+ * `paymentId` mengikat entri pelunasan dan pembaliknya ke rekaman `creditPayments`.
+ */
 export type CreditEntry = {
   id: string;
   customerId: string;
   amount: number;
   at: number;
   saleId: string | null;
+  paymentId: string | null;
+};
+
+/**
+ * Pelunasan kasbon dua jalur (K2): kasir (`tunai`/`qris`, ber-`shiftId`) dan pemilik
+ * (`transfer`/`titip`, tanpa shift). Idempoten per (`createdById`, `id`); hanya `cancelled*` dan
+ * `printStatus` yang berubah. Rekaman seed: jalur kasir tanpa shift.
+ */
+export type MockCreditPayment = {
+  id: string;
+  customerId: string;
+  amount: number;
+  at: number;
+  channel: CreditPaymentChannel;
+  method: CreditPaymentMethod;
+  createdById: string;
+  createdByName: string;
+  shiftId: string | null;
+  cashReceived: number;
+  change: number;
+  balanceAfter: number;
+  printStatus: PrintStatus;
+  cancelledAt: number | null;
+  cancelledById: string | null;
+  cancelledByName: string | null;
+  cancelledChannel: CreditPaymentChannel | null;
+  cancelReason: string | null;
 };
 
 export type MockSupplier = Supplier & { lastUsedAt: number };
@@ -196,7 +250,7 @@ type LoginFailures = Record<
 >;
 
 export type MockState = {
-  version: 6;
+  version: 7;
   store: { id: string; name: string };
   users: MockUser[];
   session: { userId: string } | null;
@@ -222,6 +276,7 @@ export type MockState = {
   customers: Customer[];
   /** `customer.balance` selalu = Σ entri pelanggan itu. */
   creditLedger: CreditEntry[];
+  creditPayments: MockCreditPayment[];
   settings: KasirSettings;
   /** "YYYYMMDD" -> urutan terakhir */
   saleSeq: Record<string, number>;
@@ -244,7 +299,7 @@ const isObj = (x: unknown): x is Record<string, unknown> =>
 
 /** Pemeriksaan struktur murah (bukan validasi mendalam). */
 function isState(value: unknown): value is MockState {
-  if (!isObj(value) || value.version !== 6) return false;
+  if (!isObj(value) || value.version !== 7) return false;
   const { store } = value;
   return (
     isObj(store) &&
@@ -259,6 +314,7 @@ function isState(value: unknown): value is MockState {
       "sales",
       "customers",
       "creditLedger",
+      "creditPayments",
       "suppliers",
       "receipts",
       "receiptAudit",

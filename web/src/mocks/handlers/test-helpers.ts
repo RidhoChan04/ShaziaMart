@@ -68,6 +68,24 @@ export const FORBIDDEN_STAFF_KEYS: readonly string[] = [
   "gainValue",
 ];
 
+/**
+ * Key yang tidak boleh ada di respons kasir (`/api/credit-payments*`, `/api/customers*`,
+ * `/api/sales*`) di kedalaman mana pun: HPP, laba, nilai stok, dan data pengecualian pemilik.
+ */
+export const FORBIDDEN_KASIR_KEYS: readonly string[] = [
+  "cost",
+  "costTotal",
+  "lineCosts",
+  "grossProfit",
+  "unitCost",
+  "heldValue",
+  "value",
+  "lossValue",
+  "gainValue",
+  "voidReason",
+  "creditOverLimit",
+];
+
 /** Semua key objek di nilai JSON, rekursif (termasuk di dalam array). */
 export function deepKeys(value: unknown, out = new Set<string>()): Set<string> {
   if (Array.isArray(value)) {

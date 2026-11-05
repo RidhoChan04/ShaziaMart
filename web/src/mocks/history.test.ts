@@ -153,6 +153,53 @@ describe("riwayat 14 hari", () => {
     expect(rina?.salesCount).toBe(rinaSales.length);
   });
 
+  test("closedShifts: openedAt Rina 06.00, Budi 13.00, < closedAt; pelunasan & pengembalian 0; invarian uang seharusnya", () => {
+    for (const c of state.closedShifts) {
+      const day = businessDay(c.closedAt);
+      expect(c.openedAt).toBe(
+        day.start + (c.kasirName === "Rina" ? 6 : 13) * HOUR_MS,
+      );
+      expect(c.openedAt).toBeLessThan(c.closedAt);
+      expect([c.creditPayments, c.saleRefunds]).toEqual([0, 0]);
+      expect(c.expectedCash).toBe(
+        c.openingCash +
+          c.cashSales -
+          c.supplierPayments +
+          c.creditPayments -
+          c.saleRefunds,
+      );
+    }
+  });
+
+  test("pelunasan kasbon riwayat Mbak Dewi tercatat sebagai rekaman (Tunai, jalur kasir, Rina, tanpa shift)", () => {
+    const dewi = state.customers.find((c) => c.name === "Mbak Dewi");
+    const repayments = state.creditLedger.filter(
+      (e) => e.customerId === dewi?.id && e.amount < 0,
+    );
+    expect(repayments.length).toBeGreaterThan(1);
+    for (const e of repayments) {
+      expect(e.paymentId).not.toBeNull();
+      expect(
+        state.creditPayments.find((p) => p.id === e.paymentId),
+      ).toMatchObject({
+        customerId: dewi?.id,
+        amount: -e.amount,
+        at: e.at,
+        channel: "kasir",
+        method: "tunai",
+        createdByName: "Rina",
+        shiftId: null,
+        cancelledAt: null,
+      });
+    }
+    // Kasbon penjualan tidak ber-paymentId.
+    expect(
+      state.creditLedger
+        .filter((e) => e.saleId !== null)
+        .every((e) => e.paymentId === null),
+    ).toBe(true);
+  });
+
   test("stok: 7 barang menipis tetap, fixture >= 20 satuan", () => {
     const low = state.products.filter(
       (p) => (state.stock[p.id] ?? 0) < (state.minStock[p.id] ?? 0),

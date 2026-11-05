@@ -326,6 +326,7 @@ describe("createSale", () => {
         amount: 36000,
         at: Date.now(),
         saleId: null,
+        paymentId: null,
       });
     });
     const cash = await post("/api/sales", {

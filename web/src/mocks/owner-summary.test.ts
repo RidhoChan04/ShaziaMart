@@ -144,6 +144,7 @@ describe("ownerTodaySummary", () => {
     const shift = (id: string, closedAt: number, difference: number) => ({
       shiftId: id,
       kasirName: id,
+      openedAt: closedAt - 1,
       closedAt,
       difference,
       openingCash: 0,

@@ -81,6 +81,7 @@ function applyVoid(s: MockState, sale: Sale): void {
       amount: -credit,
       at: Date.now(),
       saleId: sale.id,
+      paymentId: null,
     });
   }
   // Kas hanya dikoreksi bila penjualan milik shift yang sedang terbuka.
@@ -164,6 +165,7 @@ function commitSale(
         amount: paid.credit,
         at: createdAt,
         saleId: sale.id,
+        paymentId: null,
       });
     }
     if (s.shift) {

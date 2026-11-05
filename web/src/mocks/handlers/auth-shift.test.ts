@@ -235,6 +235,22 @@ describe("tutup shift dengan Bayar supplier", () => {
     await loginWithShift(100_000);
     expect(mockDb.get().shift?.cashOuts).toEqual([]);
   });
+
+  test("shift baru: laci pelunasan & pengembalian kosong; tutup shift menyimpan openedAt = shift.openedAt di closedShifts", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(NOW);
+    await loginWithShift(100_000);
+    expect(mockDb.get().shift).toMatchObject({
+      openedAt: NOW,
+      creditCash: [],
+      saleRefunds: [],
+    });
+    vi.setSystemTime(NOW + 3 * 3_600_000);
+    await close(100_000);
+    expect(placedShifts()).toEqual([
+      expect.objectContaining({ openedAt: NOW, closedAt: NOW + 3 * 3_600_000 }),
+    ]);
+  });
 });
 
 describe("skenario server-mati", () => {

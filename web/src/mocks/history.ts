@@ -12,6 +12,7 @@ import { appendCredit } from "./ledger";
 import { formatSaleNumber } from "./sale-number";
 import { saleCost } from "./sale-rules";
 import { KIND, makeId, rng } from "./seed";
+import { appendSeedRepayment } from "./seed-customers";
 
 const HISTORY_DAYS = 14;
 const HISTORY_SEED = 0x5eed1d;
@@ -93,7 +94,7 @@ type Ctx = {
   today: BusinessDay;
   dewi: MockState["customers"][number] | undefined;
   pending: Pending[];
-  credits: Omit<CreditEntry, "id">[];
+  credits: Omit<CreditEntry, "id" | "paymentId">[];
   saleN: number;
   shiftN: number;
 };
@@ -162,11 +163,11 @@ function makeSale(
   };
 }
 
-/** Shift pagi (Rina) dan sore (Budi) ditutup dengan selisih acak. */
+/** Shift pagi (Rina 06.00–13.05) dan sore (Budi 13.00–21.05) ditutup dengan selisih acak. */
 function closeShifts(ctx: Ctx, day: BusinessDay, sales: readonly MockSale[]) {
-  for (const [kasirName, closeHour] of [
-    ["Rina", 13],
-    ["Budi", 21],
+  for (const [kasirName, openHour, closeHour] of [
+    ["Rina", 6, 13],
+    ["Budi", 13, 21],
   ] as const) {
     const own = sales.filter((s) => s.kasirName === kasirName);
     const cashSales = own.reduce(
@@ -188,6 +189,7 @@ function closeShifts(ctx: Ctx, day: BusinessDay, sales: readonly MockSale[]) {
       difference,
       salesCount: own.length,
       kasirName,
+      openedAt: day.start + openHour * HOUR_MS,
       closedAt: day.start + closeHour * HOUR_MS + 5 * 60_000,
     });
   }
@@ -239,8 +241,19 @@ export function generateHistory(state: MockState, now: number): void {
     state.saleSeq[day.key] = sales.length;
     closeShifts(ctx, day, sales);
   }
+  // Pelunasan Mbak Dewi = rekaman pelunasan seed (Tunai jalur kasir oleh Rina, tanpa shift).
+  const rina = state.users.find((u) => u.name === "Rina");
+  if (!rina) throw new Error("Seed tanpa Rina");
   for (const entry of ctx.credits.sort((a, b) => a.at - b.at)) {
-    appendCredit(state, entry);
+    if (entry.amount < 0 && entry.saleId === null) {
+      appendSeedRepayment(state, rina, {
+        customerId: entry.customerId,
+        amount: -entry.amount,
+        at: entry.at,
+      });
+    } else {
+      appendCredit(state, { ...entry, paymentId: null });
+    }
   }
   restock(state, baseStock, low);
 }

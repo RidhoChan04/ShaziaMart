@@ -147,6 +147,8 @@ function openShift(id = "shift-1"): void {
     cashSales: 0,
     salesCount: 0,
     cashOuts: [],
+    creditCash: [],
+    saleRefunds: [],
   };
 }
 

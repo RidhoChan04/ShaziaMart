@@ -1,7 +1,9 @@
 import { authHandlers } from "./auth";
 import { catalogHandlers } from "./catalog";
+import { creditPaymentHandlers } from "./credit-payments";
 import { customerHandlers } from "./customers";
 import { ownerHandlers } from "./owner";
+import { ownerCustomerHandlers } from "./owner-customers";
 import { ownerDebtHandlers } from "./owner-debts";
 import { ownerExpiryHandlers } from "./owner-expiry";
 import { ownerOpnameHandlers } from "./owner-opname";
@@ -27,7 +29,9 @@ export const handlers = [
   ...catalogHandlers,
   ...salesHandlers,
   ...customerHandlers,
+  ...creditPaymentHandlers,
   ...ownerHandlers,
+  ...ownerCustomerHandlers,
   ...ownerProductHandlers,
   ...ownerReceiptHandlers,
   ...ownerDebtHandlers,

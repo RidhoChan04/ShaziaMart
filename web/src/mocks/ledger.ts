@@ -25,8 +25,10 @@ export function appendCredit(
 }
 
 /**
- * Waktu kasbon tertua yang belum lunas. Batal (entri negatif ber-saleId) membatalkan
- * kasbon penjualannya sendiri; hanya pelunasan (saleId null) yang memakan utang terlama dulu (FIFO).
+ * Waktu kasbon tertua yang belum lunas (FIFO, R6). Batal (entri negatif ber-saleId) membatalkan
+ * kasbon penjualannya sendiri; pelunasan (saleId null) memakan utang terlama dulu. Entri positif
+ * ber-paymentId adalah pembalik batal pelunasan: mengurangi yang sudah dibayar, bukan kasbon baru,
+ * sehingga umur lama kembali. Lebih bayar (saldo minus) memotong kasbon berikutnya dulu (Q8).
  */
 export function oldestUnpaidAt(
   state: Readonly<Ledger>,
@@ -34,12 +36,15 @@ export function oldestUnpaidAt(
 ): number | null {
   const entries = entriesOf(state, customerId);
   const debts = entries
-    .filter((e) => e.amount > 0)
+    .filter((e) => e.amount > 0 && e.paymentId === null)
     .map((e) => ({ at: e.at, saleId: e.saleId, left: e.amount }))
     .sort((a, b) => a.at - b.at);
   let paid = 0;
   for (const e of entries) {
-    if (e.amount >= 0) continue;
+    if (e.amount >= 0) {
+      if (e.paymentId !== null) paid -= e.amount;
+      continue;
+    }
     let rest = -e.amount;
     for (const debt of debts) {
       if (e.saleId === null || debt.saleId !== e.saleId) continue;

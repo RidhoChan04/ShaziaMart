@@ -105,7 +105,7 @@ test("deterministik untuk now yang sama", () => {
 
 test("PIN seed dan state awal", () => {
   const s = createSeedState();
-  expect(s.version).toBe(6);
+  expect(s.version).toBe(7);
   expect(s.users.map((u) => [u.name, u.role, u.pin, u.password])).toEqual([
     ["Rina", "kasir", "123456", undefined],
     ["Budi", "kasir", "654321", undefined],
@@ -169,17 +169,18 @@ test("ID unik di seluruh state", () => {
     ...s.customers.map((c) => c.id),
     ...s.products.flatMap((p) => [p.id, ...p.units.map((u) => u.id)]),
     ...s.creditLedger.map((e) => e.id),
+    ...s.creditPayments.map((p) => p.id),
   ];
   expect(new Set(ids).size).toBe(ids.length);
 });
 
-test("state versi lama di localStorage diganti default v6", () => {
+test("state versi lama di localStorage diganti default v7", () => {
   localStorage.setItem(
     "mock.db",
     JSON.stringify({ store: { id: "x", name: "y" } }),
   );
   __resetMockDbCacheForTests();
-  expect(mockDb.get().version).toBe(6);
+  expect(mockDb.get().version).toBe(7);
   expect(mockDb.get().products).toHaveLength(60);
 });
 
@@ -346,4 +347,63 @@ test("seed: 7 barang di bawah stok minimum; saldo pelanggan = Σ ledger seed", (
   expect(new Set(s.creditLedger.map((e) => e.id)).size).toBe(
     s.creditLedger.length,
   );
+});
+
+test("setiap entri negatif seed punya rekaman pelunasan (paymentId): Tunai jalur kasir oleh Rina, tanpa shift, aktif", () => {
+  const s = createSeedState(NOW);
+  const rina = s.users.find((u) => u.name === "Rina");
+  const negatives = s.creditLedger.filter((e) => e.amount < 0);
+  expect(negatives.length).toBeGreaterThan(2);
+  // Seed tidak punya batal penjualan maupun pembalik: semua entri negatif = pelunasan.
+  expect(
+    s.creditLedger.filter((e) => e.amount > 0 && e.paymentId !== null),
+  ).toEqual([]);
+  expect(s.creditPayments).toHaveLength(negatives.length);
+  for (const e of negatives) {
+    expect(e.saleId).toBeNull();
+    const p = s.creditPayments.find((x) => x.id === e.paymentId);
+    expect(p).toMatchObject({
+      customerId: e.customerId,
+      amount: -e.amount,
+      at: e.at,
+      channel: "kasir",
+      method: "tunai",
+      createdById: rina?.id,
+      createdByName: "Rina",
+      shiftId: null,
+      cashReceived: -e.amount,
+      change: 0,
+      cancelledAt: null,
+      cancelledById: null,
+      cancelledByName: null,
+      cancelledChannel: null,
+      cancelReason: null,
+    });
+  }
+  expect(
+    s.creditLedger
+      .filter((e) => e.amount > 0)
+      .every((e) => e.paymentId === null),
+  ).toBe(true);
+  const names = (ids: string[]) =>
+    new Set(ids.map((id) => s.customers.find((c) => c.id === id)?.name));
+  expect(names(s.creditPayments.map((p) => p.customerId))).toEqual(
+    new Set(["Mbak Dewi", "Bu Tini"]),
+  );
+});
+
+test("balanceAfter rekaman seed = saldo menurut urutan waktu buku", () => {
+  const s = createSeedState(NOW);
+  for (const p of s.creditPayments) {
+    const own = s.creditLedger
+      .filter((e) => e.customerId === p.customerId)
+      .sort((a, b) => a.at - b.at);
+    let running = 0;
+    for (const e of own) {
+      running += e.amount;
+      if (e.paymentId === p.id) break;
+    }
+    expect(p.balanceAfter).toBe(running);
+    expect(p.balanceAfter).toBeGreaterThanOrEqual(0);
+  }
 });

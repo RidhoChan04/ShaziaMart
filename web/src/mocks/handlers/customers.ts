@@ -12,13 +12,16 @@ export const customerHandlers = [
   http.get(
     "/api/customers",
     withScenario(({ request }) => {
-      const q = (new URL(request.url).searchParams.get("q") ?? "")
-        .trim()
-        .toLowerCase();
+      const params = new URL(request.url).searchParams;
+      const q = (params.get("q") ?? "").trim().toLowerCase();
+      // owing=true (lembar Pelunasan kasbon): disaring sebelum batas 20 hasil.
+      const owing = params.get("owing") === "true";
       const matches: Customer[] = mockDb
         .get()
         .customers.filter(
-          (c) => c.name.toLowerCase().includes(q) || c.phone.includes(q),
+          (c) =>
+            (!owing || c.balance > 0) &&
+            (c.name.toLowerCase().includes(q) || c.phone.includes(q)),
         )
         .sort((a, b) => a.name.localeCompare(b.name, "id"))
         .slice(0, MAX_RESULTS);
