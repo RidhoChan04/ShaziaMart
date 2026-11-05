@@ -19,6 +19,7 @@ import { meaningfulCostAlert } from "./products/cost-alert";
 import { eceranOf, stockAlertOf } from "./products/views";
 import { debtAttention } from "./receipts/debts";
 import { expiryAttention } from "./stock/expiry";
+import { opnameAttention } from "./stock/opname-owner";
 
 const WEEKDAYS = [
   "Minggu",
@@ -75,9 +76,7 @@ function attention(state: Readonly<MockState>, now: number): Attention {
       (p) => p.status === "menunggu_harga",
     ).length,
     expiry: expiryAttention(state, now),
-    // Sementara nol: server opname belum ada.
-    opnameHeldCount: 0,
-    opnameFlags: [],
+    ...opnameAttention(state),
   };
 }
 

@@ -321,6 +321,17 @@ export const mockDb = {
   },
 };
 
+/** Jalankan `fn` di dalam `mockDb.update` dan kembalikan hasilnya. */
+export function updateWith<T>(fn: (s: MockState) => T): T {
+  const out: T[] = [];
+  mockDb.update((s) => {
+    out.push(fn(s));
+  });
+  const [result] = out;
+  if (result === undefined) throw new Error("State tidak diproses");
+  return result;
+}
+
 /** Hanya untuk test: buang cache memori agar `get()` memuat ulang dari localStorage. */
 export function __resetMockDbCacheForTests(): void {
   current = null;

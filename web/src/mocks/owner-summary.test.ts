@@ -4,7 +4,12 @@ import type {
   StockAlert,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { businessDay, DAY_MS, HOUR_MS } from "@/shared/lib/business-day";
-import type { MockSale, MockState } from "./db";
+import type {
+  MockOpnameItem,
+  MockOpnameSession,
+  MockSale,
+  MockState,
+} from "./db";
 import { ownerTodaySummary } from "./owner-summary";
 import { stockAlertOf, toOwnerProduct } from "./products/views";
 import { formatSaleNumber } from "./sale-number";
@@ -338,6 +343,104 @@ describe("Perlu perhatian: kedaluwarsa (K19)", () => {
       expiredCount: 1,
       soonCount: 3,
       soonDays: 30,
+    });
+  });
+});
+
+describe("Perlu perhatian: opname (K19)", () => {
+  const item = (
+    productId: string,
+    state: MockOpnameItem["state"],
+    diffQtyBase: number,
+    value: number | null,
+  ): MockOpnameItem => ({
+    productId,
+    productName: productId,
+    unitName: "pcs",
+    unitSize: 1,
+    isCurah: false,
+    countedQtyBase: 0,
+    countedAt: NOW,
+    clockEstimated: false,
+    systemQtyBase: 0,
+    diffQtyBase,
+    value,
+    state,
+    reason: "hilang",
+    receiptRefId: null,
+    resolvedByName: null,
+    resolvedAt: null,
+    replacedBySessionId: null,
+    recount: null,
+  });
+  const session = (
+    id: string,
+    finishedAt: number,
+    o: Partial<MockOpnameSession>,
+  ): MockOpnameSession => ({
+    id,
+    scope: { kind: "kategori", category: id },
+    createdById: "u",
+    createdByName: "Rina",
+    submittedAt: finishedAt - 60_000,
+    finishedAt,
+    status: "selesai",
+    flagged: false,
+    reviewedByName: null,
+    reviewedAt: null,
+    items: [],
+    ...o,
+  });
+
+  test("opnameHeldCount = barang ditahan; opnameFlags = sesi flagged belum ditinjau, terbaru dulu, total = loss + gain", () => {
+    const s = fresh();
+    expect(ownerTodaySummary(s, NOW).attention).toMatchObject({
+      opnameHeldCount: 0,
+      opnameFlags: [],
+    });
+    s.opnameSessions.push(
+      session("Lama", at(TODAY, 8), {
+        flagged: true,
+        items: [
+          item("a", "ditahan", -100, 150_000),
+          item("b", "disesuaikan", 40, 90_000),
+          item("c", "stok_awal", 5, null),
+        ],
+      }),
+      session("Baru", at(TODAY, 10), {
+        flagged: true,
+        items: [
+          item("d", "ditahan", -1, null),
+          item("e", "diganti", -300, 300_000),
+          item("f", "disetujui", -260, 260_000),
+        ],
+      }),
+      session("Ditinjau", at(TODAY, 11), {
+        flagged: true,
+        reviewedByName: "Pak Ahmad",
+        reviewedAt: at(TODAY, 12),
+        items: [item("g", "ditahan", -200, 200_000)],
+      }),
+      session("Kecil", at(TODAY, 12), {
+        items: [item("h", "cocok", 0, 0)],
+      }),
+    );
+    expect(ownerTodaySummary(s, NOW).attention).toMatchObject({
+      opnameHeldCount: 3,
+      opnameFlags: [
+        {
+          sessionId: "Baru",
+          scope: { kind: "kategori", category: "Baru" },
+          finishedAt: at(TODAY, 10),
+          totalValue: 260_000,
+        },
+        {
+          sessionId: "Lama",
+          scope: { kind: "kategori", category: "Lama" },
+          finishedAt: at(TODAY, 8),
+          totalValue: 240_000,
+        },
+      ],
     });
   });
 });

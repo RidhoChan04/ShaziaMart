@@ -1,6 +1,6 @@
 import { HttpResponse, http } from "msw";
 import type { StaffOpnameRow } from "@/shared/api/gen/shaziaMartAPI.schemas";
-import { type MockOpnameSession, type MockState, mockDb } from "../db";
+import { type MockOpnameSession, mockDb, updateWith } from "../db";
 import { submitSession } from "../stock/opname";
 import { finishSession } from "../stock/opname-finish";
 import { toScope } from "../stock/opname-input";
@@ -19,17 +19,6 @@ const HISTORY_MS = 30 * 86_400_000;
 
 const notFound = (): Response =>
   problem(404, "NOT_FOUND", "Sesi opname tidak ditemukan");
-
-/** Jalankan `fn` di dalam `mockDb.update` dan kembalikan hasilnya. */
-function updateWith<T>(fn: (s: MockState) => T): T {
-  const out: T[] = [];
-  mockDb.update((s) => {
-    out.push(fn(s));
-  });
-  const [result] = out;
-  if (result === undefined) throw new Error("State tidak diproses");
-  return result;
-}
 
 /** Sesi tersimpan menurut id (sesudah `mockDb.update`). */
 function savedSession(id: string): MockOpnameSession {

@@ -4,6 +4,7 @@ import { customerHandlers } from "./customers";
 import { ownerHandlers } from "./owner";
 import { ownerDebtHandlers } from "./owner-debts";
 import { ownerExpiryHandlers } from "./owner-expiry";
+import { ownerOpnameHandlers } from "./owner-opname";
 import { ownerProductHandlers } from "./owner-products";
 import { ownerReceiptHandlers } from "./owner-receipts";
 import { salesHandlers } from "./sales";
@@ -31,6 +32,7 @@ export const handlers = [
   ...ownerReceiptHandlers,
   ...ownerDebtHandlers,
   ...ownerExpiryHandlers,
+  ...ownerOpnameHandlers,
   ...staffHandlers,
   ...staffReceiptHandlers,
   ...staffExpiryHandlers,
