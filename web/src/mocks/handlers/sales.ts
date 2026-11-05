@@ -1,21 +1,26 @@
 import { HttpResponse, http } from "msw";
 import type {
+  KasirLookupSale,
   PriceChangedProblem,
   PrintResult,
   PrintStatus,
   Sale,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { jakartaDateKey } from "@/shared/lib/business-day";
-import { type MockSale, type MockState, type MockUser, mockDb } from "../db";
+import {
+  kasirVoidWindow,
+  type MockSale,
+  type MockState,
+  mockDb,
+  updateWith,
+} from "../db";
 import { appendCredit } from "../ledger";
 import { NO_PRICE_DETAIL, sellsAwaitingPrice } from "../products/guards";
-import { productOfUnit } from "../products/views";
 import { formatSaleNumber } from "../sale-number";
 import {
   type CheckedPayments,
   checkPayments,
-  creditExcess,
-  isOwnerPin,
+  creditGate,
   isRejection,
   type PricedItem,
   priceChanges,
@@ -26,6 +31,7 @@ import {
 } from "../sale-rules";
 import { getScenario, withScenario } from "../scenarios";
 import { invalid, problem, readJson, requireSession } from "./respond";
+import { toPublicSale, voidSaleAs } from "./sales-void";
 
 const PRICE_BUMP = 500;
 
@@ -44,14 +50,13 @@ const printOutcome = (): PrintStatus =>
 
 const notFound = () => problem(404, "NOT_FOUND", "Penjualan tidak ditemukan");
 
-const amountOf = (sale: Sale, method: "cash" | "credit"): number =>
-  sale.payments.find((p) => p.method === method)?.amount ?? 0;
+/** (ruling R12) Cari nomor struk: 1..20 digit/tanda hubung, maksimal 20 hasil. */
+const LOOKUP_Q = /^[0-9-]{1,20}$/;
+const LOOKUP_MAX = 20;
 
-/** HPP dan waktu batal hanya untuk endpoint pemilik; respons kasir tidak boleh memuatnya. */
-function toPublicSale(s: MockSale): Sale {
-  const { costTotal: _c, voidedAt: _v, ...sale } = s;
-  return sale;
-}
+/** Dibalik dulu agar penjualan dengan jam sama tetap terbaru (tercatat belakangan) dulu. */
+const newestFirst = (sales: readonly MockSale[]): MockSale[] =>
+  [...sales].reverse().sort((a, b) => b.createdAt - a.createdAt);
 
 /** Aturan 4: naikkan harga satuan item pertama sekali per saleId. */
 function bumpFirstPrice(saleId: string, items: readonly PricedItem[]): boolean {
@@ -66,34 +71,6 @@ function bumpFirstPrice(saleId: string, items: readonly PricedItem[]): boolean {
     }
   });
   return true;
-}
-
-function applyVoid(s: MockState, sale: Sale): void {
-  for (const item of sale.items) {
-    const productId = productOfUnit(s, item.unitId)?.id;
-    if (productId)
-      s.stock[productId] = (s.stock[productId] ?? 0) + item.qtyBase;
-  }
-  const credit = amountOf(sale, "credit");
-  if (sale.customerId && credit > 0) {
-    appendCredit(s, {
-      customerId: sale.customerId,
-      amount: -credit,
-      at: Date.now(),
-      saleId: sale.id,
-      paymentId: null,
-    });
-  }
-  // Kas hanya dikoreksi bila penjualan milik shift yang sedang terbuka.
-  if (s.shift && sale.createdAt >= s.shift.openedAt) {
-    s.shift.cashSales -= amountOf(sale, "cash");
-    s.shift.salesCount -= 1;
-  }
-  const stored = s.sales.find((x) => x.id === sale.id);
-  if (stored) {
-    stored.status = "dibatalkan";
-    stored.voidedAt = Date.now();
-  }
 }
 
 /** Aturan 3–5: harga server per item, setelah skenario harga-berubah. */
@@ -121,25 +98,9 @@ function priceRequest(
   return { state, items };
 }
 
-/** Aturan 7: kasbon di atas limit butuh PIN pemilik. */
-function creditGate(
-  users: readonly MockUser[],
-  paid: CheckedPayments,
-  ownerPin: unknown,
-): Response | null {
-  const excess = creditExcess(paid);
-  if (!excess) return null;
-  if (ownerPin === undefined) {
-    return problem(409, "CREDIT_LIMIT", "Kasbon melebihi batas", excess);
-  }
-  return isOwnerPin(users, ownerPin)
-    ? null
-    : problem(401, "PIN_INVALID", "PIN salah");
-}
-
 /** Aturan 8: simpan penjualan beserta HPP dan efeknya ke stok, buku kasbon, dan shift. */
 function commitSale(
-  draft: Omit<Sale, "number" | "createdAt">,
+  draft: Omit<Sale, "number" | "createdAt"> & Pick<MockSale, "creditOverLimit">,
   items: readonly PricedItem[],
   paid: CheckedPayments,
 ): MockSale {
@@ -153,6 +114,11 @@ function commitSale(
     createdAt,
     costTotal: saleCost(products, draft.items),
     voidedAt: null,
+    voidedById: null,
+    voidedByName: null,
+    voidReason: null,
+    voidChannel: null,
+    voidRefund: null,
   };
   mockDb.update((s) => {
     s.saleSeq[dateKey] = seq;
@@ -193,7 +159,8 @@ export const salesHandlers = [
       }
       const existing = state.sales.find((s) => s.id === saleId);
       if (existing) return HttpResponse.json(toPublicSale(existing));
-      if (!state.shift) {
+      const { shift } = state;
+      if (!shift) {
         return problem(409, "SHIFT_CLOSED", "Tidak ada shift yang terbuka");
       }
       if (typeof body.print !== "boolean") return invalid("print wajib diisi");
@@ -207,13 +174,23 @@ export const salesHandlers = [
       }
       const paid = checkPayments(body, total, priced.state.customers);
       if (isRejection(paid)) return reject(paid);
-      const denied = creditGate(state.users, paid, body.ownerPin);
-      if (denied) return denied;
+      // Aturan 7 (ruling R3): lewat limit tanpa alasan → 409; dengan alasan → tercatat.
+      const gate = creditGate(paid, body.creditLimitReason);
+      if (isRejection(gate)) return reject(gate);
+      if ("limit" in gate) {
+        return problem(
+          409,
+          "CREDIT_LIMIT",
+          "Kasbon melebihi batas",
+          gate.limit,
+        );
+      }
 
       const sale = commitSale(
         {
           id: saleId,
           kasirName: user.name,
+          shiftId: shift.id,
           items: items.map((p) => p.item),
           total,
           payments: paid.payments,
@@ -222,6 +199,7 @@ export const salesHandlers = [
           customerId: paid.customer?.id ?? null,
           status: "selesai",
           printStatus: body.print ? printOutcome() : "tidak_dicetak",
+          creditOverLimit: gate.creditOverLimit,
         },
         items,
         paid,
@@ -230,19 +208,51 @@ export const salesHandlers = [
     }),
   ),
   http.get(
-    "/api/sales/today",
+    "/api/sales/shift",
     withScenario(() => {
       const state = mockDb.get();
       const user = requireSession(state);
       if (user instanceof Response) return user;
-      const today = jakartaDateKey(Date.now());
-      // Dibalik dulu agar penjualan dengan waktu sama tetap terbaru dulu.
-      const sales = [...state.sales]
-        .reverse()
-        .filter((s) => jakartaDateKey(s.createdAt) === today)
-        .sort((a, b) => b.createdAt - a.createdAt)
-        .map(toPublicSale);
+      // (jawaban pemilik J0) shift yang sedang buka, bukan hari ini.
+      const { shift } = state;
+      if (!shift) return HttpResponse.json([]);
+      const sales = newestFirst(
+        state.sales.filter((s) => s.shiftId === shift.id),
+      ).map(toPublicSale);
       return HttpResponse.json(sales);
+    }),
+  ),
+  http.get(
+    "/api/sales/lookup",
+    withScenario(({ request }) => {
+      const state = mockDb.get();
+      const user = requireSession(state);
+      if (user instanceof Response) return user;
+      const q = new URL(request.url).searchParams.get("q")?.trim() ?? "";
+      if (q === "") return invalid("Nomor struk wajib diisi");
+      if (!LOOKUP_Q.test(q)) return invalid("Nomor struk tidak valid");
+      const { shift } = state;
+      if (!shift) {
+        return problem(409, "SHIFT_CLOSED", "Tidak ada shift yang terbuka");
+      }
+      // (ruling R12) shift lain, hari kalender WIB paling lama 7 hari lalu.
+      const now = Date.now();
+      const rows = newestFirst(
+        state.sales.filter(
+          (s) =>
+            s.number.includes(q) &&
+            kasirVoidWindow(s, shift, now) === "shift_lama",
+        ),
+      )
+        .slice(0, LOOKUP_MAX)
+        .map(
+          (s): KasirLookupSale => ({
+            ...toPublicSale(s),
+            customerName:
+              state.customers.find((c) => c.id === s.customerId)?.name ?? null,
+          }),
+        );
+      return HttpResponse.json(rows);
     }),
   ),
   http.post<{ saleId: string }>(
@@ -263,28 +273,22 @@ export const salesHandlers = [
   http.post<{ saleId: string }>(
     "/api/sales/:saleId/void",
     withScenario(async ({ request, params }) => {
+      // Setelah body dibaca semuanya sinkron: cek shift & batal atomik (seperti createSale).
       const body = await readJson(request);
-      const state = mockDb.get();
-      const user = requireSession(state);
+      const user = requireSession(mockDb.get());
       if (user instanceof Response) return user;
-      const sale = state.sales.find((s) => s.id === params.saleId);
-      if (!sale) return notFound();
-      const ownerPin = body?.ownerPin;
-      if (ownerPin === undefined || ownerPin === null || ownerPin === "") {
-        return problem(403, "PIN_REQUIRED", "PIN pemilik diperlukan");
-      }
-      if (!isOwnerPin(state.users, ownerPin)) {
-        return problem(401, "PIN_INVALID", "PIN salah");
-      }
-      const reason = body?.reason;
-      if (typeof reason !== "string" || reason.trim() === "") {
-        return invalid("Alasan wajib diisi");
-      }
-      const voided: Sale = { ...toPublicSale(sale), status: "dibatalkan" };
-      if (sale.status !== "dibatalkan") {
-        mockDb.update((s) => applyVoid(s, sale));
-      }
-      return HttpResponse.json(voided);
+      const now = Date.now();
+      const res = updateWith((s) =>
+        voidSaleAs(
+          s,
+          String(params.saleId),
+          { user, channel: "kasir" },
+          body,
+          now,
+        ),
+      );
+      if (res instanceof Response) return res;
+      return HttpResponse.json(toPublicSale(res));
     }),
   ),
 ];

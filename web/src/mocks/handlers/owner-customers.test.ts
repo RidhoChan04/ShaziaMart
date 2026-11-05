@@ -239,7 +239,7 @@ describe("getOwnerCustomer", () => {
     });
   });
 
-  test("kasbon dari penjualan membawa nomor struk & kasir; batal jual dilipat ke barisnya (sementara tanpa nama & alasan, T2b)", async () => {
+  test("kasbon dari penjualan membawa nomor struk & kasir; batal jual dilipat ke barisnya dengan pembatal & alasan dari penjualan (ruling R4)", async () => {
     await loginWithShift();
     const sale = await json<Sale>(
       await post("/api/sales", {
@@ -250,9 +250,7 @@ describe("getOwnerCustomer", () => {
       }),
     );
     vi.setSystemTime(NOW + 60_000);
-    expect(
-      (await voidSale(sale.id, { ownerPin: "999999", reason: "Salah" })).status,
-    ).toBe(200);
+    expect((await voidSale(sale.id, { reason: "Salah" })).status).toBe(200);
     const body = await detail("Bu Sari");
     expect(body.balance).toBe(120_000);
     expect(body.history).toHaveLength(3);
@@ -264,7 +262,12 @@ describe("getOwnerCustomer", () => {
       saleNumber: sale.number,
       kasirName: "Rina",
       payment: null,
-      cancelled: { at: NOW + 60_000, byName: "", reason: "", channel: "kasir" },
+      cancelled: {
+        at: NOW + 60_000,
+        byName: "Rina",
+        reason: "Salah",
+        channel: "kasir",
+      },
     });
   });
 

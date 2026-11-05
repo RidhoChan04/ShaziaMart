@@ -1,5 +1,6 @@
 import type {
   DebtPayment,
+  PaymentInput,
   ReceiptPayment,
 } from "../api/gen/shaziaMartAPI.schemas";
 import { formatIsoDate } from "./business-day";
@@ -63,4 +64,18 @@ export function cancelNoteText(laci: number): string {
   const base = "Stok, HPP, dan utang nota ini dibalik. Tidak bisa diurungkan.";
   if (laci <= 0) return `${base} Tidak ada uang laci yang berubah.`;
   return `${base} Uang ${formatRupiah(laci)} yang tadi keluar dari laci dicatat masuk lagi ke shift kasir yang sedang berjalan. Kalau tidak ada shift berjalan, uang ini tidak dicatat ulang — sesuaikan uang laci sendiri.`;
+}
+
+/** Label metode penjualan di kasir (Riwayat) & pemilik (Transaksi). */
+export const SALE_METHOD_LABEL = {
+  cash: "Tunai",
+  qris: "QRIS",
+  credit: "Kasbon",
+} as const;
+
+/** "Tunai" | "QRIS" | "Kasbon", atau "Campuran" bila lebih dari satu metode. */
+export function saleMethodLabel(payments: readonly PaymentInput[]): string {
+  const [first] = payments;
+  if (!first || payments.length > 1) return "Campuran";
+  return SALE_METHOD_LABEL[first.method];
 }

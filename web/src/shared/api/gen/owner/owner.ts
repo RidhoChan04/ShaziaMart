@@ -50,12 +50,15 @@ import type {
 import type {
   CancelCreditPaymentInput,
   CreditLimitInput,
+  ExceptionReviewInput,
   ExpiryDateInput,
   ExpiryRemovalInput,
   IdTakenResponse,
   ImportCheck,
   ImportRequest,
   ImportResult,
+  ListOwnerExceptionsParams,
+  ListOwnerSalesParams,
   LockedOutResponse,
   LoginInvalidResponse,
   NotFoundResponse,
@@ -64,6 +67,7 @@ import type {
   OwnerCreditPaymentInput,
   OwnerCustomer,
   OwnerCustomerList,
+  OwnerExceptionList,
   OwnerExpiryList,
   OwnerLogin,
   OwnerOpnameRow,
@@ -72,6 +76,8 @@ import type {
   OwnerProductRow,
   OwnerReceipt,
   OwnerReceiptRow,
+  OwnerSale,
+  OwnerSaleRow,
   OwnerSession,
   OwnerTodaySummary,
   PayDebtInput,
@@ -85,7 +91,8 @@ import type {
   SupplierDebt,
   SupplierDebtList,
   UnauthorizedResponse,
-  ValidationFailedResponse
+  ValidationFailedResponse,
+  VoidRequest
 } from '../shaziaMartAPI.schemas';
 
 import { customFetch } from '../../fetcher';
@@ -3359,4 +3366,517 @@ export const useCancelOwnerCreditPayment = <TError = ErrorType<UnauthorizedRespo
         TContext
       > => {
       return useMutation(getCancelOwnerCreditPaymentMutationOptions(options), queryClient);
+    }
+    export const getListOwnerSalesUrl = (params?: ListOwnerSalesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/owner/sales?${stringifiedParams}` : `/api/owner/sales`
+}
+
+/**
+ * Penjualan semua status dengan createdAt pada tanggal Asia/Jakarta date (bawaan hari ini),
+ * terbaru dulu; q = sebagian nomor struk (disaring di tanggal itu). date bukan tanggal
+ * YYYY-MM-DD yang sah → 422 VALIDATION. methodLabel = label metode kasir (Tunai, QRIS, Kasbon,
+ * atau Campuran bila lebih dari satu metode). shiftOpen = penjualan milik shift yang sedang
+ * buka (batal hanya dari kasir).
+ * @summary Transaksi satu hari (Lainnya > Transaksi)
+ */
+export const listOwnerSales = async (params?: ListOwnerSalesParams, options?: Parameters<typeof customFetch>[1]): Promise<OwnerSaleRow[]> => {
+
+  return customFetch<OwnerSaleRow[]>(getListOwnerSalesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListOwnerSalesQueryKey = (params?: ListOwnerSalesParams,) => {
+    return [
+    `/api/owner/sales`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListOwnerSalesQueryOptions = <TData = Awaited<ReturnType<typeof listOwnerSales>>, TError = ErrorType<UnauthorizedResponse | ValidationFailedResponse>>(params?: ListOwnerSalesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOwnerSales>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListOwnerSalesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listOwnerSales>>> = ({ signal }) => listOwnerSales(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listOwnerSales>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListOwnerSalesQueryResult = NonNullable<Awaited<ReturnType<typeof listOwnerSales>>>
+export type ListOwnerSalesQueryError = ErrorType<UnauthorizedResponse | ValidationFailedResponse>
+
+
+export function useListOwnerSales<TData = Awaited<ReturnType<typeof listOwnerSales>>, TError = ErrorType<UnauthorizedResponse | ValidationFailedResponse>>(
+ params: undefined |  ListOwnerSalesParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOwnerSales>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listOwnerSales>>,
+          TError,
+          Awaited<ReturnType<typeof listOwnerSales>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListOwnerSales<TData = Awaited<ReturnType<typeof listOwnerSales>>, TError = ErrorType<UnauthorizedResponse | ValidationFailedResponse>>(
+ params?: ListOwnerSalesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOwnerSales>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listOwnerSales>>,
+          TError,
+          Awaited<ReturnType<typeof listOwnerSales>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListOwnerSales<TData = Awaited<ReturnType<typeof listOwnerSales>>, TError = ErrorType<UnauthorizedResponse | ValidationFailedResponse>>(
+ params?: ListOwnerSalesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOwnerSales>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Transaksi satu hari (Lainnya > Transaksi)
+ */
+
+export function useListOwnerSales<TData = Awaited<ReturnType<typeof listOwnerSales>>, TError = ErrorType<UnauthorizedResponse | ValidationFailedResponse>>(
+ params?: ListOwnerSalesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOwnerSales>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListOwnerSalesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+export const getGetOwnerSaleUrl = (saleId: string,) => {
+
+
+
+
+  return `/api/owner/sales/${saleId}`
+}
+
+/**
+ * Barang, pembayaran, pelanggan, dan (bila dibatalkan) siapa, jam, alasan, jalur, serta
+ * pengembaliannya; kasbon lewat limit membawa kelebihan dan alasannya. Tanpa HPP.
+ * @summary Detail transaksi untuk pemilik
+ */
+export const getOwnerSale = async (saleId: string, options?: Parameters<typeof customFetch>[1]): Promise<OwnerSale> => {
+
+  return customFetch<OwnerSale>(getGetOwnerSaleUrl(saleId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetOwnerSaleQueryKey = (saleId: string,) => {
+    return [
+    `/api/owner/sales/${saleId}`
+    ] as const;
+    }
+
+
+export const getGetOwnerSaleQueryOptions = <TData = Awaited<ReturnType<typeof getOwnerSale>>, TError = ErrorType<UnauthorizedResponse | NotFoundResponse>>(saleId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerSale>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetOwnerSaleQueryKey(saleId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOwnerSale>>> = ({ signal }) => getOwnerSale(saleId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: saleId !== null && saleId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getOwnerSale>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetOwnerSaleQueryResult = NonNullable<Awaited<ReturnType<typeof getOwnerSale>>>
+export type GetOwnerSaleQueryError = ErrorType<UnauthorizedResponse | NotFoundResponse>
+
+
+export function useGetOwnerSale<TData = Awaited<ReturnType<typeof getOwnerSale>>, TError = ErrorType<UnauthorizedResponse | NotFoundResponse>>(
+ saleId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerSale>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getOwnerSale>>,
+          TError,
+          Awaited<ReturnType<typeof getOwnerSale>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetOwnerSale<TData = Awaited<ReturnType<typeof getOwnerSale>>, TError = ErrorType<UnauthorizedResponse | NotFoundResponse>>(
+ saleId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerSale>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getOwnerSale>>,
+          TError,
+          Awaited<ReturnType<typeof getOwnerSale>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetOwnerSale<TData = Awaited<ReturnType<typeof getOwnerSale>>, TError = ErrorType<UnauthorizedResponse | NotFoundResponse>>(
+ saleId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerSale>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Detail transaksi untuk pemilik
+ */
+
+export function useGetOwnerSale<TData = Awaited<ReturnType<typeof getOwnerSale>>, TError = ErrorType<UnauthorizedResponse | NotFoundResponse>>(
+ saleId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerSale>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetOwnerSaleQueryOptions(saleId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+export const getVoidOwnerSaleUrl = (saleId: string,) => {
+
+
+
+
+  return `/api/owner/sales/${saleId}/void`
+}
+
+/**
+ * Pembatalan dari app pemilik tidak pernah mengoreksi laci (jawaban pemilik Q1): cashSales
+ * shift penjualan dan shift yang sedang buka tidak berubah, tanpa ShiftClosure.saleRefunds;
+ * uang dikembalikan pemilik. Urutan pemeriksaan: id tidak dikenal → 404; sudah dibatalkan →
+ * 200 apa adanya tanpa perubahan; reason kosong (setelah trim) atau > 200 karakter → 422
+ * VALIDATION; penjualan dari shift yang masih buka → 409 IN_OPEN_SHIFT (batalkan dari kasir).
+ * Umur transaksi tidak dibatasi. Berhasil: stok kembali, bagian kasbon dibatalkan di buku
+ * (saldo boleh minus — Lebih bayar; pelunasan yang sudah diterima tidak ikut batal).
+ * qrisRefundSource diabaikan (bagian QRIS dicatat pemilik). Tercatat jam server, pembatal (id
+ * + nama), alasan, dan jalur pemilik; bukan butir Perlu perhatian.
+ * @summary Batalkan transaksi dari app pemilik (alasan wajib)
+ */
+export const voidOwnerSale = async (saleId: string,
+    voidRequest: VoidRequest, options?: Parameters<typeof customFetch>[1]): Promise<OwnerSale> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<OwnerSale>(getVoidOwnerSaleUrl(saleId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(voidRequest)
+  }
+);}
+
+
+
+
+
+export const getVoidOwnerSaleMutationKey = () => ['voidOwnerSale'] as const;
+
+export const getVoidOwnerSaleMutationOptions = <TError = ErrorType<UnauthorizedResponse | NotFoundResponse | Problem | ValidationFailedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof voidOwnerSale>>, TError,VoidOwnerSaleMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof voidOwnerSale>>, TError,VoidOwnerSaleMutationVariables, TContext> => {
+
+const mutationKey = getVoidOwnerSaleMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof voidOwnerSale>>, VoidOwnerSaleMutationVariables> = (props) => {
+          const {saleId,data} = props ?? {};
+
+          return  voidOwnerSale(saleId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type VoidOwnerSaleMutationResult = NonNullable<Awaited<ReturnType<typeof voidOwnerSale>>>
+    export type VoidOwnerSaleMutationBody = VoidRequest
+    export type VoidOwnerSaleMutationError = ErrorType<UnauthorizedResponse | NotFoundResponse | Problem | ValidationFailedResponse>
+    export type VoidOwnerSaleMutationVariables = {saleId: string;data: VoidRequest}
+
+    /**
+ * @summary Batalkan transaksi dari app pemilik (alasan wajib)
+ */
+export const useVoidOwnerSale = <TError = ErrorType<UnauthorizedResponse | NotFoundResponse | Problem | ValidationFailedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof voidOwnerSale>>, TError,VoidOwnerSaleMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof voidOwnerSale>>,
+        TError,
+        VoidOwnerSaleMutationVariables,
+        TContext
+      > => {
+      return useMutation(getVoidOwnerSaleMutationOptions(options), queryClient);
+    }
+    export const getListOwnerExceptionsUrl = (params: ListOwnerExceptionsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/owner/exceptions?${stringifiedParams}` : `/api/owner/exceptions`
+}
+
+/**
+ * Kejadian jenis kind dengan at > reviewedAt (semua kejadian bila belum pernah ditinjau),
+ * tanpa batas umur, terbaru dulu. batal_transaksi = penjualan yang dibatalkan kasir (amount =
+ * total transaksi); batal_pelunasan = pelunasan yang dibatalkan kasir (amount = nominal
+ * pelunasan); kasbon_lewat_limit = penjualan kasbon lewat limit yang tidak dibatalkan (amount =
+ * kelebihan limit). Pembatalan oleh pemilik bukan pengecualian. kind tidak dikenal → 422.
+ * @summary Pengecualian kasir satu jenis sejak terakhir ditinjau
+ */
+export const listOwnerExceptions = async (params: ListOwnerExceptionsParams, options?: Parameters<typeof customFetch>[1]): Promise<OwnerExceptionList> => {
+
+  return customFetch<OwnerExceptionList>(getListOwnerExceptionsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListOwnerExceptionsQueryKey = (params?: ListOwnerExceptionsParams,) => {
+    return [
+    `/api/owner/exceptions`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListOwnerExceptionsQueryOptions = <TData = Awaited<ReturnType<typeof listOwnerExceptions>>, TError = ErrorType<UnauthorizedResponse | ValidationFailedResponse>>(params: ListOwnerExceptionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOwnerExceptions>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListOwnerExceptionsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listOwnerExceptions>>> = ({ signal }) => listOwnerExceptions(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listOwnerExceptions>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListOwnerExceptionsQueryResult = NonNullable<Awaited<ReturnType<typeof listOwnerExceptions>>>
+export type ListOwnerExceptionsQueryError = ErrorType<UnauthorizedResponse | ValidationFailedResponse>
+
+
+export function useListOwnerExceptions<TData = Awaited<ReturnType<typeof listOwnerExceptions>>, TError = ErrorType<UnauthorizedResponse | ValidationFailedResponse>>(
+ params: ListOwnerExceptionsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOwnerExceptions>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listOwnerExceptions>>,
+          TError,
+          Awaited<ReturnType<typeof listOwnerExceptions>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListOwnerExceptions<TData = Awaited<ReturnType<typeof listOwnerExceptions>>, TError = ErrorType<UnauthorizedResponse | ValidationFailedResponse>>(
+ params: ListOwnerExceptionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOwnerExceptions>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listOwnerExceptions>>,
+          TError,
+          Awaited<ReturnType<typeof listOwnerExceptions>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListOwnerExceptions<TData = Awaited<ReturnType<typeof listOwnerExceptions>>, TError = ErrorType<UnauthorizedResponse | ValidationFailedResponse>>(
+ params: ListOwnerExceptionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOwnerExceptions>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Pengecualian kasir satu jenis sejak terakhir ditinjau
+ */
+
+export function useListOwnerExceptions<TData = Awaited<ReturnType<typeof listOwnerExceptions>>, TError = ErrorType<UnauthorizedResponse | ValidationFailedResponse>>(
+ params: ListOwnerExceptionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOwnerExceptions>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListOwnerExceptionsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+export const getReviewOwnerExceptionsUrl = () => {
+
+
+
+
+  return `/api/owner/exceptions/review`
+}
+
+/**
+ * reviewedAt = max(reviewedAt lama, min(upTo, jam server)); idempoten dan tidak pernah
+ * mundur. upTo = jam kejadian terbaru yang dilihat pemilik, sehingga kejadian yang masuk
+ * setelah daftar dimuat tetap muncul. Respons = daftar jenis itu setelah ditinjau.
+ * @summary Tandai pengecualian satu jenis sudah ditinjau
+ */
+export const reviewOwnerExceptions = async (exceptionReviewInput: ExceptionReviewInput, options?: Parameters<typeof customFetch>[1]): Promise<OwnerExceptionList> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<OwnerExceptionList>(getReviewOwnerExceptionsUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(exceptionReviewInput)
+  }
+);}
+
+
+
+
+
+export const getReviewOwnerExceptionsMutationKey = () => ['reviewOwnerExceptions'] as const;
+
+export const getReviewOwnerExceptionsMutationOptions = <TError = ErrorType<UnauthorizedResponse | ValidationFailedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reviewOwnerExceptions>>, TError,ReviewOwnerExceptionsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reviewOwnerExceptions>>, TError,ReviewOwnerExceptionsMutationVariables, TContext> => {
+
+const mutationKey = getReviewOwnerExceptionsMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reviewOwnerExceptions>>, ReviewOwnerExceptionsMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  reviewOwnerExceptions(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReviewOwnerExceptionsMutationResult = NonNullable<Awaited<ReturnType<typeof reviewOwnerExceptions>>>
+    export type ReviewOwnerExceptionsMutationBody = ExceptionReviewInput
+    export type ReviewOwnerExceptionsMutationError = ErrorType<UnauthorizedResponse | ValidationFailedResponse>
+    export type ReviewOwnerExceptionsMutationVariables = {data: ExceptionReviewInput}
+
+    /**
+ * @summary Tandai pengecualian satu jenis sudah ditinjau
+ */
+export const useReviewOwnerExceptions = <TError = ErrorType<UnauthorizedResponse | ValidationFailedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reviewOwnerExceptions>>, TError,ReviewOwnerExceptionsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof reviewOwnerExceptions>>,
+        TError,
+        ReviewOwnerExceptionsMutationVariables,
+        TContext
+      > => {
+      return useMutation(getReviewOwnerExceptionsMutationOptions(options), queryClient);
     }

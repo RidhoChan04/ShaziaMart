@@ -105,6 +105,7 @@ describe("attentionItems", () => {
     opnameHeldCount: 0,
     opnameFlags: [],
     opnameReplacedHeld: 0,
+    exceptions: [],
   };
 
   test("semua nol -> kosong", () => expect(attentionItems(none)).toEqual([]));
@@ -126,6 +127,7 @@ describe("attentionItems", () => {
       opnameHeldCount: 0,
       opnameFlags: [],
       opnameReplacedHeld: 0,
+      exceptions: [],
     };
     expect(attentionItems(a)).toEqual([
       {
@@ -214,6 +216,7 @@ describe("attentionItems: modal berubah dan barang habis", () => {
     opnameHeldCount: 0,
     opnameFlags: [],
     opnameReplacedHeld: 0,
+    exceptions: [],
   };
   const change = (
     over: Partial<Attention["costChanges"][number]> = {},
@@ -372,6 +375,7 @@ describe("attentionItems: modal berubah dan barang habis", () => {
       opnameHeldCount: 0,
       opnameFlags: [],
       opnameReplacedHeld: 0,
+      exceptions: [],
     });
     expect(items.map((i) => i.key)).toEqual([
       "negative-stock",
@@ -402,6 +406,7 @@ describe("attentionItems: modal berubah dan barang habis", () => {
       opnameHeldCount: 0,
       opnameFlags: [],
       opnameReplacedHeld: 0,
+      exceptions: [],
     });
     expect(items.map((i) => i.key)).toEqual([
       "negative-stock",
@@ -441,6 +446,7 @@ describe("attentionItems: kedaluwarsa", () => {
     opnameHeldCount: 0,
     opnameFlags: [],
     opnameReplacedHeld: 0,
+    exceptions: [],
   };
 
   test("kritis setelah stok minus, 'segera' setelah stok menipis (K19)", () => {
@@ -501,6 +507,7 @@ describe("attentionItems: opname", () => {
       },
     ],
     opnameReplacedHeld: 0,
+    exceptions: [],
   };
 
   test("selisih besar (kritis, tautan detail) tepat sesudah stok minus; menunggu persetujuan (peringatan) sebelum stok menipis", () => {
@@ -562,6 +569,7 @@ describe("attentionItems: opname", () => {
       opnameHeldCount: 0,
       opnameFlags: [],
       opnameReplacedHeld: 0,
+      exceptions: [],
     });
     expect(items.some((i) => i.key.startsWith("opname"))).toBe(false);
   });
@@ -594,6 +602,7 @@ describe("attentionItems: urutan K19 lengkap (kedaluwarsa + opname)", () => {
         },
       ],
       opnameReplacedHeld: 1,
+      exceptions: [],
     });
     expect(items.map((i) => i.key)).toEqual([
       "negative-stock",

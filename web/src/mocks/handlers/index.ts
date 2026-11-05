@@ -5,10 +5,12 @@ import { customerHandlers } from "./customers";
 import { ownerHandlers } from "./owner";
 import { ownerCustomerHandlers } from "./owner-customers";
 import { ownerDebtHandlers } from "./owner-debts";
+import { ownerExceptionHandlers } from "./owner-exceptions";
 import { ownerExpiryHandlers } from "./owner-expiry";
 import { ownerOpnameHandlers } from "./owner-opname";
 import { ownerProductHandlers } from "./owner-products";
 import { ownerReceiptHandlers } from "./owner-receipts";
+import { ownerSaleHandlers } from "./owner-sales";
 import { salesHandlers } from "./sales";
 import { settingsHandlers } from "./settings";
 import { shiftHandlers } from "./shift";
@@ -32,6 +34,8 @@ export const handlers = [
   ...creditPaymentHandlers,
   ...ownerHandlers,
   ...ownerCustomerHandlers,
+  ...ownerSaleHandlers,
+  ...ownerExceptionHandlers,
   ...ownerProductHandlers,
   ...ownerReceiptHandlers,
   ...ownerDebtHandlers,

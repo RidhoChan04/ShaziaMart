@@ -32,9 +32,15 @@ import * as zod from 'zod';
 
 
 /**
- * Idempoten menurut saleId. 401 membawa UNAUTHORIZED atau PIN_INVALID (ownerPin salah).
- * 409 membawa SHIFT_CLOSED, PRICE_CHANGED (PriceChangedProblem), atau CREDIT_LIMIT
- * (CreditLimitProblem). 422 membawa VALIDATION atau INVALID_QUANTITY.
+ * Idempoten menurut saleId. Tanpa PIN pemilik (ruling R1/R3). 409 membawa SHIFT_CLOSED,
+ * PRICE_CHANGED (PriceChangedProblem), atau CREDIT_LIMIT (CreditLimitProblem). 422 membawa
+ * VALIDATION atau INVALID_QUANTITY.
+ * Kasbon melewati limit (limit = batas peringatan): tanpa creditLimitReason (atau kosong
+ * setelah trim) → 409 CREDIT_LIMIT; dengan alasan → penjualan tersimpan beserta kelebihannya
+ * (bagian kasbon ini di atas limit = min(attempted, balance + attempted − creditLimit)), kasir,
+ * jam, dan alasan, lalu menjadi butir Perlu perhatian pemilik. Alasan yang terkirim padahal
+ * tidak melewati limit diabaikan. Penjualan menyimpan shiftId shift yang sedang buka.
+ * Respons kasir tanpa HPP, laba, atau data pengecualian (alasan, kelebihan limit).
  * @summary Simpan penjualan
  */
 
@@ -42,7 +48,8 @@ import * as zod from 'zod';
 
 
 
-export const createSaleBodyOwnerPinRegExp = new RegExp('^\\d{6}$');
+export const createSaleBodyCreditLimitReasonMax = 200;
+
 
 
 export const CreateSaleBody = zod.object({
@@ -60,7 +67,7 @@ export const CreateSaleBody = zod.object({
   "cashReceived": zod.int().optional(),
   "customerId": zod.string().optional(),
   "print": zod.boolean(),
-  "ownerPin": zod.string().regex(createSaleBodyOwnerPinRegExp).optional().describe('Otorisasi pemilik bila server memintanya.')
+  "creditLimitReason": zod.string().min(1).max(createSaleBodyCreditLimitReasonMax).optional().describe('Alasan kasir bila bagian kasbon membuat saldo pelanggan melewati limit (ruling R3). Tanpa\nalasan (atau kosong setelah trim) dan melewati limit → 409 CREDIT_LIMIT; dikirim ulang\ndengan saleId yang sama. Diabaikan bila tidak melewati limit.\n')
 })
 
 
@@ -71,6 +78,7 @@ export const CreateSaleResponse = zod.object({
   "number": zod.string(),
   "createdAt": zod.int(),
   "kasirName": zod.string(),
+  "shiftId": zod.string().describe('Shift kasir tempat penjualan dicatat (menentukan siapa yang boleh membatalkan).'),
   "items": zod.array(zod.object({
   "unitId": zod.string(),
   "productName": zod.string(),
@@ -96,16 +104,20 @@ export const CreateSaleResponse = zod.object({
 })
 
 /**
- * @summary Penjualan hari ini, terbaru dulu
+ * Shift yang sedang buka, bukan hari ini (shift bisa lewat tengah malam); termasuk yang
+ * dibatalkan. Tanpa shift buka → []. HPP, laba, dan data pengecualian tidak pernah ada di
+ * respons kasir.
+ * @summary Penjualan shift yang sedang buka, terbaru dulu
  */
 
 
 
-export const ListTodaySalesResponseItem = zod.object({
+export const ListShiftSalesResponseItem = zod.object({
   "id": zod.string(),
   "number": zod.string(),
   "createdAt": zod.int(),
   "kasirName": zod.string(),
+  "shiftId": zod.string().describe('Shift kasir tempat penjualan dicatat (menentukan siapa yang boleh membatalkan).'),
   "items": zod.array(zod.object({
   "unitId": zod.string(),
   "productName": zod.string(),
@@ -129,7 +141,63 @@ export const ListTodaySalesResponseItem = zod.object({
   "status": zod.enum(['selesai', 'dibatalkan']),
   "printStatus": zod.enum(['tercetak', 'tidak_dicetak', 'gagal'])
 })
-export const ListTodaySalesResponse = zod.array(ListTodaySalesResponseItem)
+export const ListShiftSalesResponse = zod.array(ListShiftSalesResponseItem)
+
+/**
+ * Untuk batal transaksi keesokan hari di kasir (ruling R12). Hanya penjualan dari shift lain
+ * (bukan shift yang sedang buka) dengan hari kalender Asia/Jakarta paling lama 7 hari lalu
+ * (isoDaysBetween(tanggal jual, hari ini) ≤ 7), nomor struk memuat q; termasuk yang
+ * dibatalkan; terbaru dulu, paling banyak 20. Butuh sesi kasir dan shift yang sedang buka
+ * (tanpa shift → 409 SHIFT_CLOSED). q kosong → 422 VALIDATION. customerName = nama pelanggan
+ * (null bila tanpa pelanggan). HPP, laba, dan data pengecualian tidak pernah ada di respons
+ * kasir.
+ * @summary Cari transaksi shift sebelumnya menurut nomor struk (maksimal 7 hari)
+ */
+export const lookupSalesQueryQMax = 20;
+
+
+export const lookupSalesQueryQRegExp = new RegExp('^[0-9-]+$');
+
+
+export const LookupSalesQueryParams = zod.object({
+  "q": zod.string().min(1).max(lookupSalesQueryQMax).regex(lookupSalesQueryQRegExp).describe('Sebagian nomor struk (digit dan tanda hubung), mis. 0145 atau 20261104-0145')
+})
+
+
+
+
+export const LookupSalesResponseItem = zod.object({
+  "id": zod.string(),
+  "number": zod.string(),
+  "createdAt": zod.int(),
+  "kasirName": zod.string(),
+  "shiftId": zod.string().describe('Shift kasir tempat penjualan dicatat (menentukan siapa yang boleh membatalkan).'),
+  "items": zod.array(zod.object({
+  "unitId": zod.string(),
+  "productName": zod.string(),
+  "unitName": zod.string(),
+  "isCurah": zod.boolean(),
+  "baseUnit": zod.enum(['pcs', 'gram', 'ml']),
+  "unitSize": zod.int(),
+  "qtyBase": zod.int(),
+  "unitPrice": zod.int(),
+  "subtotal": zod.int(),
+  "wholesale": zod.boolean()
+})),
+  "total": zod.int(),
+  "payments": zod.array(zod.object({
+  "method": zod.enum(['cash', 'qris', 'credit']),
+  "amount": zod.int().min(1)
+})),
+  "cashReceived": zod.int().describe('Uang tunai diterima; 0 bila penjualan tanpa bagian tunai.'),
+  "change": zod.int().describe('Kembalian; 0 bila penjualan tanpa bagian tunai.'),
+  "customerId": zod.string().nullable(),
+  "status": zod.enum(['selesai', 'dibatalkan']),
+  "printStatus": zod.enum(['tercetak', 'tidak_dicetak', 'gagal'])
+}).and(zod.object({
+  "customerName": zod.string().nullable()
+})).describe('Penjualan untuk Cari nomor struk di kasir: key Sale ditambah customerName (null bila tanpa\npelanggan); tanpa HPP, laba, atau data pengecualian.\n')
+export const LookupSalesResponse = zod.array(LookupSalesResponseItem)
 
 /**
  * @summary Cetak ulang struk
@@ -143,20 +211,36 @@ export const PrintSaleResponse = zod.object({
 })
 
 /**
- * @summary Batalkan penjualan (PIN pemilik)
+ * Tanpa PIN pemilik (ruling R4/R5); alasan wajib. Urutan pemeriksaan: id tidak dikenal → 404;
+ * sudah dibatalkan → 200 apa adanya tanpa perubahan (kirim ulang dengan qrisRefundSource lain
+ * tidak menambah atau mengubah pengembalian); reason kosong (setelah trim) atau > 200 karakter
+ * → 422 VALIDATION; transaksi berbagian QRIS tanpa qrisRefundSource laci/pemilik → 422
+ * VALIDATION; tanpa shift buka → 409 SHIFT_CLOSED; penjualan dari shift lain yang hari
+ * kalender Asia/Jakarta-nya lebih dari 7 hari lalu → 409 VOID_TOO_OLD (batalkan dari app
+ * pemilik).
+ * Berhasil: stok kembali dan bagian kasbon dibatalkan di buku (saldo boleh minus; pelunasan
+ * tidak ikut batal). Penjualan shift yang sedang buka: tunai penjualan shift ini turun
+ * (cashSales, salesCount). Penjualan shift lain (≤ 7 hari, ruling R12): shift lama tidak
+ * diubah; bagian tunai keluar dari laci shift yang sedang buka. Bagian QRIS dengan
+ * qrisRefundSource laci (shift ini maupun shift lama) juga keluar dari laci shift yang
+ * sedang buka; pemilik = ditransfer pemilik nanti, di luar laci. Uang yang keluar dari laci
+ * dicatat sebagai ShiftClosure.saleRefunds shift yang sedang buka. Bagian kasbon dan
+ * kembalian tidak pernah menyentuh laci. Tercatat jam server, pembatal (id + nama), alasan,
+ * dan pengembaliannya di rekaman penjualan; menjadi butir Perlu perhatian pemilik.
+ * @summary Batalkan penjualan di kasir (alasan wajib)
  */
 export const VoidSaleParams = zod.object({
   "saleId": zod.string()
 })
 
-export const voidSaleBodyOwnerPinRegExp = new RegExp('^\\d{6}$');
+export const voidSaleBodyReasonMax = 200;
 
 
 
 export const VoidSaleBody = zod.object({
-  "ownerPin": zod.string().regex(voidSaleBodyOwnerPinRegExp).optional().describe('PIN pemilik; tanpa PIN server menjawab 403 PIN_REQUIRED.'),
-  "reason": zod.string().min(1)
-})
+  "reason": zod.string().min(1).max(voidSaleBodyReasonMax).describe('Alasan pembatalan, wajib (1..200 karakter setelah trim); tanpa PIN pemilik.'),
+  "qrisRefundSource": zod.union([zod.literal('laci'),zod.literal('pemilik'),zod.literal(null)]).nullish()
+}).describe('Tanpa PIN pemilik; alasan wajib. qrisRefundSource wajib bila kasir membatalkan transaksi\nyang punya bagian QRIS: laci = dikembalikan tunai dari laci shift yang sedang buka (masuk\nShiftClosure.saleRefunds), pemilik = ditransfer pemilik nanti (di luar laci). Tanpa nilai\nlaci/pemilik → 422 VALIDATION "Pilih cara mengembalikan QRIS". Transaksi tanpa bagian QRIS:\nnilainya diabaikan. qrisRefundSource diabaikan di jalur pemilik (voidOwnerSale): pemilik\ntidak pernah memakai laci.\n')
 
 
 
@@ -166,6 +250,7 @@ export const VoidSaleResponse = zod.object({
   "number": zod.string(),
   "createdAt": zod.int(),
   "kasirName": zod.string(),
+  "shiftId": zod.string().describe('Shift kasir tempat penjualan dicatat (menentukan siapa yang boleh membatalkan).'),
   "items": zod.array(zod.object({
   "unitId": zod.string(),
   "productName": zod.string(),

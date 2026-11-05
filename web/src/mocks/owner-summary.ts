@@ -14,6 +14,7 @@ import {
 import { unitCost } from "@/shared/lib/product-rules";
 import { roundHalfUp } from "@/shared/lib/quantity";
 import type { MockState } from "./db";
+import { exceptionAttention } from "./exceptions";
 import { oldestUnpaidAt } from "./ledger";
 import { meaningfulCostAlert } from "./products/cost-alert";
 import { eceranOf, stockAlertOf } from "./products/views";
@@ -77,6 +78,7 @@ function attention(state: Readonly<MockState>, now: number): Attention {
     ).length,
     expiry: expiryAttention(state, now),
     ...opnameAttention(state),
+    exceptions: exceptionAttention(state),
   };
 }
 

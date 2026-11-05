@@ -5,6 +5,7 @@ import {
   laciPaidOf,
   paidSummary,
   paymentSummary,
+  saleMethodLabel,
 } from "./payment-labels";
 
 const laci: ReceiptPayment = {
@@ -84,4 +85,16 @@ describe("laciPaidOf & cancelNoteText", () => {
       "Stok, HPP, dan utang nota ini dibalik. Tidak bisa diurungkan. Uang Rp1.442.000 yang tadi keluar dari laci dicatat masuk lagi ke shift kasir yang sedang berjalan. Kalau tidak ada shift berjalan, uang ini tidak dicatat ulang — sesuaikan uang laci sendiri.",
     );
   });
+});
+
+test("saleMethodLabel: satu metode → labelnya; lebih dari satu → Campuran", () => {
+  expect(saleMethodLabel([{ method: "cash", amount: 1 }])).toBe("Tunai");
+  expect(saleMethodLabel([{ method: "qris", amount: 1 }])).toBe("QRIS");
+  expect(saleMethodLabel([{ method: "credit", amount: 1 }])).toBe("Kasbon");
+  expect(
+    saleMethodLabel([
+      { method: "cash", amount: 1 },
+      { method: "credit", amount: 1 },
+    ]),
+  ).toBe("Campuran");
 });

@@ -49,14 +49,16 @@ import type {
 
 import type {
   CreditLimitProblem,
+  KasirLookupSale,
+  LookupSalesParams,
   NotFoundResponse,
-  PinRequiredResponse,
   PriceChangedProblem,
   PrintResult,
+  Problem,
   Sale,
   SaleRequest,
   ShiftClosedProblem,
-  UnauthorizedOrPinInvalidResponse,
+  ShiftClosedResponse,
   UnauthorizedResponse,
   ValidationFailedResponse,
   VoidRequest
@@ -94,9 +96,15 @@ export const getCreateSaleUrl = () => {
 }
 
 /**
- * Idempoten menurut saleId. 401 membawa UNAUTHORIZED atau PIN_INVALID (ownerPin salah).
- * 409 membawa SHIFT_CLOSED, PRICE_CHANGED (PriceChangedProblem), atau CREDIT_LIMIT
- * (CreditLimitProblem). 422 membawa VALIDATION atau INVALID_QUANTITY.
+ * Idempoten menurut saleId. Tanpa PIN pemilik (ruling R1/R3). 409 membawa SHIFT_CLOSED,
+ * PRICE_CHANGED (PriceChangedProblem), atau CREDIT_LIMIT (CreditLimitProblem). 422 membawa
+ * VALIDATION atau INVALID_QUANTITY.
+ * Kasbon melewati limit (limit = batas peringatan): tanpa creditLimitReason (atau kosong
+ * setelah trim) → 409 CREDIT_LIMIT; dengan alasan → penjualan tersimpan beserta kelebihannya
+ * (bagian kasbon ini di atas limit = min(attempted, balance + attempted − creditLimit)), kasir,
+ * jam, dan alasan, lalu menjadi butir Perlu perhatian pemilik. Alasan yang terkirim padahal
+ * tidak melewati limit diabaikan. Penjualan menyimpan shiftId shift yang sedang buka.
+ * Respons kasir tanpa HPP, laba, atau data pengecualian (alasan, kelebihan limit).
  * @summary Simpan penjualan
  */
 export const createSale = async (saleRequest: SaleRequest, options?: Parameters<typeof customFetch>[1]): Promise<Sale> => {
@@ -130,7 +138,7 @@ return customFetch<Sale>(getCreateSaleUrl(),
 
 export const getCreateSaleMutationKey = () => ['createSale'] as const;
 
-export const getCreateSaleMutationOptions = <TError = ErrorType<UnauthorizedOrPinInvalidResponse | ShiftClosedProblem | PriceChangedProblem | CreditLimitProblem | ValidationFailedResponse>,
+export const getCreateSaleMutationOptions = <TError = ErrorType<UnauthorizedResponse | ShiftClosedProblem | PriceChangedProblem | CreditLimitProblem | ValidationFailedResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSale>>, TError,CreateSaleMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof createSale>>, TError,CreateSaleMutationVariables, TContext> => {
 
@@ -159,13 +167,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type CreateSaleMutationResult = NonNullable<Awaited<ReturnType<typeof createSale>>>
     export type CreateSaleMutationBody = SaleRequest
-    export type CreateSaleMutationError = ErrorType<UnauthorizedOrPinInvalidResponse | ShiftClosedProblem | PriceChangedProblem | CreditLimitProblem | ValidationFailedResponse>
+    export type CreateSaleMutationError = ErrorType<UnauthorizedResponse | ShiftClosedProblem | PriceChangedProblem | CreditLimitProblem | ValidationFailedResponse>
     export type CreateSaleMutationVariables = {data: SaleRequest}
 
     /**
  * @summary Simpan penjualan
  */
-export const useCreateSale = <TError = ErrorType<UnauthorizedOrPinInvalidResponse | ShiftClosedProblem | PriceChangedProblem | CreditLimitProblem | ValidationFailedResponse>,
+export const useCreateSale = <TError = ErrorType<UnauthorizedResponse | ShiftClosedProblem | PriceChangedProblem | CreditLimitProblem | ValidationFailedResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSale>>, TError,CreateSaleMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof createSale>>,
@@ -175,20 +183,23 @@ export const useCreateSale = <TError = ErrorType<UnauthorizedOrPinInvalidRespons
       > => {
       return useMutation(getCreateSaleMutationOptions(options), queryClient);
     }
-    export const getListTodaySalesUrl = () => {
+    export const getListShiftSalesUrl = () => {
 
 
 
 
-  return `/api/sales/today`
+  return `/api/sales/shift`
 }
 
 /**
- * @summary Penjualan hari ini, terbaru dulu
+ * Shift yang sedang buka, bukan hari ini (shift bisa lewat tengah malam); termasuk yang
+ * dibatalkan. Tanpa shift buka → []. HPP, laba, dan data pengecualian tidak pernah ada di
+ * respons kasir.
+ * @summary Penjualan shift yang sedang buka, terbaru dulu
  */
-export const listTodaySales = async ( options?: Parameters<typeof customFetch>[1]): Promise<Sale[]> => {
+export const listShiftSales = async ( options?: Parameters<typeof customFetch>[1]): Promise<Sale[]> => {
 
-  return customFetch<Sale[]>(getListTodaySalesUrl(),
+  return customFetch<Sale[]>(getListShiftSalesUrl(),
   {
     ...options,
     method: 'GET'
@@ -201,69 +212,183 @@ export const listTodaySales = async ( options?: Parameters<typeof customFetch>[1
 
 
 
-export const getListTodaySalesQueryKey = () => {
+export const getListShiftSalesQueryKey = () => {
     return [
-    `/api/sales/today`
+    `/api/sales/shift`
     ] as const;
     }
 
 
-export const getListTodaySalesQueryOptions = <TData = Awaited<ReturnType<typeof listTodaySales>>, TError = ErrorType<UnauthorizedResponse>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTodaySales>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+export const getListShiftSalesQueryOptions = <TData = Awaited<ReturnType<typeof listShiftSales>>, TError = ErrorType<UnauthorizedResponse>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listShiftSales>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getListTodaySalesQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getListShiftSalesQueryKey();
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listTodaySales>>> = ({ signal }) => listTodaySales({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listShiftSales>>> = ({ signal }) => listShiftSales({ signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listTodaySales>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listShiftSales>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
-export type ListTodaySalesQueryResult = NonNullable<Awaited<ReturnType<typeof listTodaySales>>>
-export type ListTodaySalesQueryError = ErrorType<UnauthorizedResponse>
+export type ListShiftSalesQueryResult = NonNullable<Awaited<ReturnType<typeof listShiftSales>>>
+export type ListShiftSalesQueryError = ErrorType<UnauthorizedResponse>
 
 
-export function useListTodaySales<TData = Awaited<ReturnType<typeof listTodaySales>>, TError = ErrorType<UnauthorizedResponse>>(
-  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTodaySales>>, TError, TData>> & Pick<
+export function useListShiftSales<TData = Awaited<ReturnType<typeof listShiftSales>>, TError = ErrorType<UnauthorizedResponse>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listShiftSales>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof listTodaySales>>,
+          Awaited<ReturnType<typeof listShiftSales>>,
           TError,
-          Awaited<ReturnType<typeof listTodaySales>>
+          Awaited<ReturnType<typeof listShiftSales>>
         > , 'initialData'
       >, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useListTodaySales<TData = Awaited<ReturnType<typeof listTodaySales>>, TError = ErrorType<UnauthorizedResponse>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTodaySales>>, TError, TData>> & Pick<
+export function useListShiftSales<TData = Awaited<ReturnType<typeof listShiftSales>>, TError = ErrorType<UnauthorizedResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listShiftSales>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof listTodaySales>>,
+          Awaited<ReturnType<typeof listShiftSales>>,
           TError,
-          Awaited<ReturnType<typeof listTodaySales>>
+          Awaited<ReturnType<typeof listShiftSales>>
         > , 'initialData'
       >, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useListTodaySales<TData = Awaited<ReturnType<typeof listTodaySales>>, TError = ErrorType<UnauthorizedResponse>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTodaySales>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+export function useListShiftSales<TData = Awaited<ReturnType<typeof listShiftSales>>, TError = ErrorType<UnauthorizedResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listShiftSales>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary Penjualan hari ini, terbaru dulu
+ * @summary Penjualan shift yang sedang buka, terbaru dulu
  */
 
-export function useListTodaySales<TData = Awaited<ReturnType<typeof listTodaySales>>, TError = ErrorType<UnauthorizedResponse>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTodaySales>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+export function useListShiftSales<TData = Awaited<ReturnType<typeof listShiftSales>>, TError = ErrorType<UnauthorizedResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listShiftSales>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getListTodaySalesQueryOptions(options)
+  const queryOptions = getListShiftSalesQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+export const getLookupSalesUrl = (params: LookupSalesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/sales/lookup?${stringifiedParams}` : `/api/sales/lookup`
+}
+
+/**
+ * Untuk batal transaksi keesokan hari di kasir (ruling R12). Hanya penjualan dari shift lain
+ * (bukan shift yang sedang buka) dengan hari kalender Asia/Jakarta paling lama 7 hari lalu
+ * (isoDaysBetween(tanggal jual, hari ini) ≤ 7), nomor struk memuat q; termasuk yang
+ * dibatalkan; terbaru dulu, paling banyak 20. Butuh sesi kasir dan shift yang sedang buka
+ * (tanpa shift → 409 SHIFT_CLOSED). q kosong → 422 VALIDATION. customerName = nama pelanggan
+ * (null bila tanpa pelanggan). HPP, laba, dan data pengecualian tidak pernah ada di respons
+ * kasir.
+ * @summary Cari transaksi shift sebelumnya menurut nomor struk (maksimal 7 hari)
+ */
+export const lookupSales = async (params: LookupSalesParams, options?: Parameters<typeof customFetch>[1]): Promise<KasirLookupSale[]> => {
+
+  return customFetch<KasirLookupSale[]>(getLookupSalesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getLookupSalesQueryKey = (params?: LookupSalesParams,) => {
+    return [
+    `/api/sales/lookup`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getLookupSalesQueryOptions = <TData = Awaited<ReturnType<typeof lookupSales>>, TError = ErrorType<UnauthorizedResponse | ShiftClosedResponse | ValidationFailedResponse>>(params: LookupSalesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof lookupSales>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getLookupSalesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof lookupSales>>> = ({ signal }) => lookupSales(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof lookupSales>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type LookupSalesQueryResult = NonNullable<Awaited<ReturnType<typeof lookupSales>>>
+export type LookupSalesQueryError = ErrorType<UnauthorizedResponse | ShiftClosedResponse | ValidationFailedResponse>
+
+
+export function useLookupSales<TData = Awaited<ReturnType<typeof lookupSales>>, TError = ErrorType<UnauthorizedResponse | ShiftClosedResponse | ValidationFailedResponse>>(
+ params: LookupSalesParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof lookupSales>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof lookupSales>>,
+          TError,
+          Awaited<ReturnType<typeof lookupSales>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useLookupSales<TData = Awaited<ReturnType<typeof lookupSales>>, TError = ErrorType<UnauthorizedResponse | ShiftClosedResponse | ValidationFailedResponse>>(
+ params: LookupSalesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof lookupSales>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof lookupSales>>,
+          TError,
+          Awaited<ReturnType<typeof lookupSales>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useLookupSales<TData = Awaited<ReturnType<typeof lookupSales>>, TError = ErrorType<UnauthorizedResponse | ShiftClosedResponse | ValidationFailedResponse>>(
+ params: LookupSalesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof lookupSales>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Cari transaksi shift sebelumnya menurut nomor struk (maksimal 7 hari)
+ */
+
+export function useLookupSales<TData = Awaited<ReturnType<typeof lookupSales>>, TError = ErrorType<UnauthorizedResponse | ShiftClosedResponse | ValidationFailedResponse>>(
+ params: LookupSalesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof lookupSales>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getLookupSalesQueryOptions(params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -357,7 +482,23 @@ export const usePrintSale = <TError = ErrorType<UnauthorizedResponse | NotFoundR
 }
 
 /**
- * @summary Batalkan penjualan (PIN pemilik)
+ * Tanpa PIN pemilik (ruling R4/R5); alasan wajib. Urutan pemeriksaan: id tidak dikenal → 404;
+ * sudah dibatalkan → 200 apa adanya tanpa perubahan (kirim ulang dengan qrisRefundSource lain
+ * tidak menambah atau mengubah pengembalian); reason kosong (setelah trim) atau > 200 karakter
+ * → 422 VALIDATION; transaksi berbagian QRIS tanpa qrisRefundSource laci/pemilik → 422
+ * VALIDATION; tanpa shift buka → 409 SHIFT_CLOSED; penjualan dari shift lain yang hari
+ * kalender Asia/Jakarta-nya lebih dari 7 hari lalu → 409 VOID_TOO_OLD (batalkan dari app
+ * pemilik).
+ * Berhasil: stok kembali dan bagian kasbon dibatalkan di buku (saldo boleh minus; pelunasan
+ * tidak ikut batal). Penjualan shift yang sedang buka: tunai penjualan shift ini turun
+ * (cashSales, salesCount). Penjualan shift lain (≤ 7 hari, ruling R12): shift lama tidak
+ * diubah; bagian tunai keluar dari laci shift yang sedang buka. Bagian QRIS dengan
+ * qrisRefundSource laci (shift ini maupun shift lama) juga keluar dari laci shift yang
+ * sedang buka; pemilik = ditransfer pemilik nanti, di luar laci. Uang yang keluar dari laci
+ * dicatat sebagai ShiftClosure.saleRefunds shift yang sedang buka. Bagian kasbon dan
+ * kembalian tidak pernah menyentuh laci. Tercatat jam server, pembatal (id + nama), alasan,
+ * dan pengembaliannya di rekaman penjualan; menjadi butir Perlu perhatian pemilik.
+ * @summary Batalkan penjualan di kasir (alasan wajib)
  */
 export const voidSale = async (saleId: string,
     voidRequest: VoidRequest, options?: Parameters<typeof customFetch>[1]): Promise<Sale> => {
@@ -391,7 +532,7 @@ return customFetch<Sale>(getVoidSaleUrl(saleId),
 
 export const getVoidSaleMutationKey = () => ['voidSale'] as const;
 
-export const getVoidSaleMutationOptions = <TError = ErrorType<UnauthorizedOrPinInvalidResponse | PinRequiredResponse | NotFoundResponse | ValidationFailedResponse>,
+export const getVoidSaleMutationOptions = <TError = ErrorType<UnauthorizedResponse | NotFoundResponse | Problem | ValidationFailedResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof voidSale>>, TError,VoidSaleMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof voidSale>>, TError,VoidSaleMutationVariables, TContext> => {
 
@@ -420,13 +561,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type VoidSaleMutationResult = NonNullable<Awaited<ReturnType<typeof voidSale>>>
     export type VoidSaleMutationBody = VoidRequest
-    export type VoidSaleMutationError = ErrorType<UnauthorizedOrPinInvalidResponse | PinRequiredResponse | NotFoundResponse | ValidationFailedResponse>
+    export type VoidSaleMutationError = ErrorType<UnauthorizedResponse | NotFoundResponse | Problem | ValidationFailedResponse>
     export type VoidSaleMutationVariables = {saleId: string;data: VoidRequest}
 
     /**
- * @summary Batalkan penjualan (PIN pemilik)
+ * @summary Batalkan penjualan di kasir (alasan wajib)
  */
-export const useVoidSale = <TError = ErrorType<UnauthorizedOrPinInvalidResponse | PinRequiredResponse | NotFoundResponse | ValidationFailedResponse>,
+export const useVoidSale = <TError = ErrorType<UnauthorizedResponse | NotFoundResponse | Problem | ValidationFailedResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof voidSale>>, TError,VoidSaleMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof voidSale>>,

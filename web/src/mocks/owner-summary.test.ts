@@ -10,6 +10,7 @@ import type {
   MockSale,
   MockState,
 } from "./db";
+import { appendCredit } from "./ledger";
 import { ownerTodaySummary } from "./owner-summary";
 import { stockAlertOf, toOwnerProduct } from "./products/views";
 import { formatSaleNumber } from "./sale-number";
@@ -35,6 +36,7 @@ function addSale(
     number: formatSaleNumber(at, n),
     createdAt: at,
     kasirName: "Rina",
+    shiftId: "shift-x",
     items: [],
     total,
     payments: [
@@ -48,6 +50,12 @@ function addSale(
     printStatus: "tercetak",
     costTotal: Math.round(total * 0.9),
     voidedAt: null,
+    voidedById: null,
+    voidedByName: null,
+    voidReason: null,
+    voidChannel: null,
+    voidRefund: null,
+    creditOverLimit: null,
     ...rest,
   });
 }
@@ -121,6 +129,26 @@ describe("ownerTodaySummary", () => {
     expect(ownerTodaySummary(fresh(), NOW).attention.overdueCredit).toEqual({
       count: 3,
       total: 120_000 + 50_000 + 640_000,
+    });
+  });
+
+  test("(jawaban pemilik Q8) pelanggan bersaldo minus (lebih bayar) tidak masuk overdueCredit", () => {
+    const s = fresh();
+    const udin = s.customers.find((c) => c.name === "Pak Udin");
+    // Entri −100.000 (mis. batal kasbon yang sudah dicicil) → saldo −50.000 (lebih bayar).
+    appendCredit(s, {
+      customerId: udin?.id ?? "",
+      amount: -100_000,
+      at: NOW - DAY_MS,
+      saleId: null,
+      paymentId: null,
+    });
+    expect(udin && s.customers.find((c) => c.id === udin.id)?.balance).toBe(
+      -50_000,
+    );
+    expect(ownerTodaySummary(s, NOW).attention.overdueCredit).toEqual({
+      count: 2,
+      total: 120_000 + 640_000,
     });
   });
 
@@ -312,6 +340,36 @@ describe("Perlu perhatian: stok (K5), modal berubah, dan habis", () => {
       .map((p) => ({ productId: p.id, productName: p.name }))
       .sort((x, y) => x.productName.localeCompare(y.productName, "id"));
     expect(ownerTodaySummary(s, NOW).attention.stockOuts).toEqual(expected);
+  });
+});
+
+describe("Perlu perhatian: pengecualian kasir (ruling R9)", () => {
+  test("seed tanpa pengecualian → exceptions []; setelah batal kasir → satu butir batal_transaksi; butir lama tidak berubah", () => {
+    const s = fresh();
+    const before = ownerTodaySummary(s, NOW).attention;
+    expect(before.exceptions).toEqual([]);
+    addSale(s, at(TODAY, 9), 42_000, {
+      status: "dibatalkan",
+      voidedAt: at(TODAY, 10),
+      voidedById: "u1",
+      voidedByName: "Rina",
+      voidReason: "salah scan",
+      voidChannel: "kasir",
+      voidRefund: { cash: 42_000, qris: 0, qrisSource: null, drawer: 0 },
+    });
+    const after = ownerTodaySummary(s, NOW).attention;
+    expect(after.exceptions).toEqual([
+      {
+        kind: "batal_transaksi",
+        count: 1,
+        total: 42_000,
+        from: "2026-10-23",
+        to: "2026-10-23",
+      },
+    ]);
+    const { exceptions: _a, ...oldAfter } = after;
+    const { exceptions: _b, ...oldBefore } = before;
+    expect(oldAfter).toEqual(oldBefore);
   });
 });
 

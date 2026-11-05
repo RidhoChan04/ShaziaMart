@@ -31,6 +31,7 @@ const sale = (s: SaleSpec, i: number): MockSale => ({
   number: `S${i}`,
   createdAt: s.at,
   kasirName: "Rina",
+  shiftId: "shift-x",
   items: [
     {
       unitId: s.unitId ?? indomie.units[0]?.id ?? "",
@@ -54,6 +55,12 @@ const sale = (s: SaleSpec, i: number): MockSale => ({
   printStatus: "tercetak",
   costTotal: 0,
   voidedAt: s.voidedAt ?? null,
+  voidedById: null,
+  voidedByName: null,
+  voidReason: null,
+  voidChannel: null,
+  voidRefund: null,
+  creditOverLimit: null,
 });
 
 const entry = (e: EntrySpec, i: number): MockStockEntry => ({

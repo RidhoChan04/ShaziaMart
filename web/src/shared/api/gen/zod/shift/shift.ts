@@ -81,7 +81,7 @@ export const CloseShiftResponse = zod.object({
   "cashSales": zod.int(),
   "supplierPayments": zod.int().describe('Σ uang keluar ke supplier di shift ini, bertanda; expectedCash = openingCash + cashSales − supplierPayments + creditPayments − saleRefunds'),
   "creditPayments": zod.int().describe('Σ pelunasan kasbon tunai jalur kasir di shift ini, dikurangi pelunasan tunai shift ini yang\ndibatalkan kasir; tidak pernah negatif. QRIS dan uang pemilik (transfer/tunai ke pemilik)\ntidak masuk laci.\n'),
-  "saleRefunds": zod.int().describe('Σ bagian tunai transaksi dari shift yang sudah tutup yang dibatalkan kasir di shift ini\n(uang keluar dari laci shift ini; shift lama tidak diubah). expectedCash = openingCash +\ncashSales − supplierPayments + creditPayments − saleRefunds\n'),
+  "saleRefunds": zod.int().describe('Σ uang yang dikembalikan dari laci shift ini untuk transaksi yang dibatalkan kasir: bagian\ntunai transaksi shift lama + bagian QRIS yang dikembalikan tunai dari laci (shift ini atau\nshift lama). Bagian tunai transaksi shift ini tidak masuk karena cashSales sudah\ndikurangi; shift lama tidak diubah. expectedCash = openingCash + cashSales −\nsupplierPayments + creditPayments − saleRefunds\n'),
   "expectedCash": zod.int(),
   "countedCash": zod.int(),
   "difference": zod.int(),

@@ -116,11 +116,22 @@ function payFor(ctx: Ctx, at: number, total: number) {
   };
 }
 
+/** Shift pagi (Rina 06.00–13.05) dan sore (Budi 13.00–21.05); tumpang 5 menit. */
+const SHIFTS = [
+  ["Rina", 6, 13],
+  ["Budi", 13, 21],
+] as const;
+
+/** Kasir sebuah jam jual: pagi sebelum 13.00, sore sesudahnya (bukan tebakan dari jam tutup). */
+const kasirAt = (day: BusinessDay, at: number): "Rina" | "Budi" =>
+  at - day.start < 13 * HOUR_MS ? "Rina" : "Budi";
+
 function makeSale(
   ctx: Ctx,
   day: BusinessDay,
   at: number,
   seq: number,
+  shiftIds: Readonly<Record<"Rina" | "Budi", string>>,
 ): MockSale {
   const { state, rand } = ctx;
   const lines = buildItems(state.products, rand);
@@ -145,11 +156,13 @@ function makeSale(
       { customerId, amount: -total, at: repayAt, saleId: null },
     );
   }
+  const kasirName = kasirAt(day, at);
   return {
     id,
     number: formatSaleNumber(at, seq),
     createdAt: at,
-    kasirName: at - day.start < 13 * HOUR_MS ? "Rina" : "Budi",
+    kasirName,
+    shiftId: shiftIds[kasirName],
     items,
     total,
     payments: [{ method, amount: total }],
@@ -160,25 +173,42 @@ function makeSale(
     printStatus: "tercetak",
     costTotal: saleCost(state.products, items),
     voidedAt: null,
+    voidedById: null,
+    voidedByName: null,
+    voidReason: null,
+    voidChannel: null,
+    voidRefund: null,
+    creditOverLimit: null,
   };
 }
 
-/** Shift pagi (Rina 06.00–13.05) dan sore (Budi 13.00–21.05) ditutup dengan selisih acak. */
-function closeShifts(ctx: Ctx, day: BusinessDay, sales: readonly MockSale[]) {
-  for (const [kasirName, openHour, closeHour] of [
-    ["Rina", 6, 13],
-    ["Budi", 13, 21],
-  ] as const) {
-    const own = sales.filter((s) => s.kasirName === kasirName);
+/** Id shift pagi & sore hari itu, dibuat sebelum penjualannya (urutan id sama dengan penutupan). */
+function shiftIdsFor(ctx: Ctx): Record<"Rina" | "Budi", string> {
+  const ids = SHIFTS.map(() => {
+    ctx.shiftN += 1;
+    return makeId(KIND.shift, ctx.shiftN);
+  });
+  return { Rina: ids[0] ?? "", Budi: ids[1] ?? "" };
+}
+
+/** Shift pagi & sore ditutup dengan selisih acak; isinya = penjualan yang menunjuk shift itu. */
+function closeShifts(
+  ctx: Ctx,
+  day: BusinessDay,
+  sales: readonly MockSale[],
+  shiftIds: Readonly<Record<"Rina" | "Budi", string>>,
+) {
+  for (const [kasirName, openHour, closeHour] of SHIFTS) {
+    const shiftId = shiftIds[kasirName];
+    const own = sales.filter((s) => s.shiftId === shiftId);
     const cashSales = own.reduce(
       (a, s) => a + (s.payments.find((p) => p.method === "cash")?.amount ?? 0),
       0,
     );
     const expectedCash = OPENING_CASH + cashSales;
     const difference = pick(SHIFT_DIFFS, ctx.rand);
-    ctx.shiftN += 1;
     ctx.state.closedShifts.push({
-      shiftId: makeId(KIND.shift, ctx.shiftN),
+      shiftId,
       openingCash: OPENING_CASH,
       cashSales,
       supplierPayments: 0,
@@ -234,12 +264,13 @@ export function generateHistory(state: MockState, now: number): void {
   };
   for (let back = HISTORY_DAYS; back >= 1; back--) {
     const day = daysBefore(today, back);
+    const shiftIds = shiftIdsFor(ctx);
     const sales = timesFor(day, ctx.rand).map((at, i) =>
-      makeSale(ctx, day, at, i + 1),
+      makeSale(ctx, day, at, i + 1, shiftIds),
     );
     state.sales.push(...sales);
     state.saleSeq[day.key] = sales.length;
-    closeShifts(ctx, day, sales);
+    closeShifts(ctx, day, sales, shiftIds);
   }
   // Pelunasan Mbak Dewi = rekaman pelunasan seed (Tunai jalur kasir oleh Rina, tanpa shift).
   const rina = state.users.find((u) => u.name === "Rina");

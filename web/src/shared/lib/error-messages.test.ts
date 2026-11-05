@@ -10,7 +10,6 @@ test.each([
   ["NETWORK", "Server tidak tersambung — coba lagi"],
   ["UNAUTHORIZED", "Sesi berakhir — masukkan PIN lagi"],
   ["PIN_INVALID", "PIN salah"],
-  ["PIN_REQUIRED", "Butuh PIN pemilik"],
   ["LOGIN_INVALID", "Nama atau password salah"],
   ["LOCKED_OUT", "Terlalu banyak PIN salah — coba lagi dalam 5 menit"],
   ["SHIFT_CLOSED", "Shift belum dibuka"],
@@ -36,6 +35,13 @@ test.each([
   ["DEBT_ALREADY_PAID", "Utang ini sudah lunas"],
   ["ID_TAKEN", "Data ini milik pengguna lain"],
   ["OPNAME_NOT_HELD", "Barang ini tidak lagi menunggu persetujuan"],
+  // (ruling R2/R12) batal di kasir vs pemilik.
+  [
+    "OUTSIDE_SHIFT",
+    "Pelunasan dari shift sebelumnya — batalkan dari app pemilik",
+  ],
+  ["IN_OPEN_SHIFT", "Masih di shift yang buka — batalkan dari kasir"],
+  ["VOID_TOO_OLD", "Transaksi lebih dari 7 hari — batalkan dari app pemilik"],
 ] as const)("pesanError %s", (code, text) =>
   expect(pesanError(new ApiError({ status: 403, code }))).toBe(text),
 );

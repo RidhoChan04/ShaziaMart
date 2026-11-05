@@ -10,7 +10,7 @@ import type {
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { cartTotal, priceLine } from "@/shared/lib/pricing";
 import { unitCost } from "@/shared/lib/product-rules";
-import type { MockProduct, MockUser } from "./db";
+import type { MockProduct } from "./db";
 
 /** Penolakan 422; handler mengubahnya menjadi problem+json. */
 export type Rejection = {
@@ -248,6 +248,29 @@ export function creditExcess({
     : null;
 }
 
-export const isOwnerPin = (users: readonly MockUser[], pin: unknown): boolean =>
-  typeof pin === "string" &&
-  users.some((u) => u.role === "pemilik" && u.pin === pin);
+const REASON_MAX = 200;
+
+/**
+ * Aturan 7 (ruling R3, K28): limit = batas peringatan. Melewati limit tanpa alasan (atau kosong
+ * setelah trim) → `limit` (409 CREDIT_LIMIT); dengan alasan → `creditOverLimit` dengan
+ * `excess = min(attempted, balance + attempted − creditLimit)` (bagian kasbon ini di atas limit,
+ * agar kasbon berturut-turut tidak menghitung dobel). Tidak melewati limit → alasan diabaikan.
+ */
+export function creditGate(
+  paid: CheckedPayments,
+  rawReason: unknown,
+):
+  | { limit: Pick<CreditLimitProblem, "balance" | "creditLimit" | "attempted"> }
+  | { creditOverLimit: { excess: number; reason: string } | null }
+  | Rejection {
+  const over = creditExcess(paid);
+  if (!over) return { creditOverLimit: null };
+  const reason = typeof rawReason === "string" ? rawReason.trim() : "";
+  if (reason === "") return { limit: over };
+  if (reason.length > REASON_MAX) {
+    return validation("Alasan maksimal 200 karakter");
+  }
+  const { balance, creditLimit, attempted } = over;
+  const excess = Math.min(attempted, balance + attempted - creditLimit);
+  return { creditOverLimit: { excess, reason } };
+}

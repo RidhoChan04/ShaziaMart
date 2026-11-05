@@ -83,6 +83,7 @@ export const getOwnerTodaySummaryResponseHourlyMax = 24;
 
 
 
+
 export const GetOwnerTodaySummaryResponse = zod.object({
   "date": zod.iso.date().describe('Tanggal bisnis hari ini di Asia/Jakarta (YYYY-MM-DD).'),
   "weekdayLastWeek": zod.string().describe('Nama hari Bahasa Indonesia untuk hari yang sama minggu lalu, mis. "Jumat".'),
@@ -146,7 +147,14 @@ export const GetOwnerTodaySummaryResponse = zod.object({
   "finishedAt": zod.int(),
   "totalValue": zod.int()
 }).describe('Sesi opname bertanda selisih besar yang belum ditinjau.')).describe('Sesi opname flagged yang belum ditinjau (reviewOpnameSession); terbaru dulu (finishedAt).'),
-  "opnameReplacedHeld": zod.int().describe('Jumlah barang opname yang dulu ditahan lalu diganti hitungan baru (replacedByName ≠ null),\ndi sesi yang belum ditinjau (reviewedAt null; reviewOpnameSession menghapusnya).\n')
+  "opnameReplacedHeld": zod.int().describe('Jumlah barang opname yang dulu ditahan lalu diganti hitungan baru (replacedByName ≠ null),\ndi sesi yang belum ditinjau (reviewedAt null; reviewOpnameSession menghapusnya).\n'),
+  "exceptions": zod.array(zod.object({
+  "kind": zod.enum(['batal_transaksi', 'batal_pelunasan', 'kasbon_lewat_limit']).describe('Pengecualian kasir (ruling R1/R9): batal_transaksi (penjualan dibatalkan kasir),\nbatal_pelunasan (pelunasan dibatalkan kasir), kasbon_lewat_limit (kasbon melewati limit\ndengan alasan; penjualan yang kemudian dibatalkan tidak ikut).\n'),
+  "count": zod.int().min(1),
+  "total": zod.int(),
+  "from": zod.iso.date(),
+  "to": zod.iso.date()
+}).describe('Butir Perlu perhatian satu jenis: semua kejadian dengan at > reviewedAt (tanpa batas umur).\ntotal = Σ amount; from/to = tanggal Asia/Jakarta kejadian tertua/terbaru.\n')).describe('Pengecualian kasir yang menumpuk sejak terakhir ditinjau (ruling R9), tanpa batas umur;\nhanya jenis dengan count > 0, urutan tetap batal_transaksi, batal_pelunasan,\nkasbon_lewat_limit.\n')
 })
 }).describe('Semua uang integer rupiah. revenue, grossProfit, newCredit, dan avgTicket hanya menghitung\npenjualan berstatus selesai (semua field bertipe omzet hanya menghitung penjualan selesai). avgTicket = round_half_up(revenue / salesCount), 0 bila tidak ada penjualan.\n')
 
@@ -1734,4 +1742,230 @@ export const CancelOwnerCreditPaymentResponse = zod.object({
 }),zod.null()])
 }).describe('Satu baris riwayat pelanggan; pembalik dilipat ke barisnya (cancelled). Kasbon: saleId,\nsaleNumber, dan kasirName dari penjualan (null untuk kasbon seed tanpa struk), payment null;\nbatal kasbon karena batal transaksi memakai data pembatalan penjualannya. Pelunasan: payment\nterisi, saleId/saleNumber/kasirName null.\n')).describe('Terbaru dulu.')
 })).describe('Detail kasbon pelanggan untuk pemilik.')
+
+/**
+ * Penjualan semua status dengan createdAt pada tanggal Asia/Jakarta date (bawaan hari ini),
+ * terbaru dulu; q = sebagian nomor struk (disaring di tanggal itu). date bukan tanggal
+ * YYYY-MM-DD yang sah → 422 VALIDATION. methodLabel = label metode kasir (Tunai, QRIS, Kasbon,
+ * atau Campuran bila lebih dari satu metode). shiftOpen = penjualan milik shift yang sedang
+ * buka (batal hanya dari kasir).
+ * @summary Transaksi satu hari (Lainnya > Transaksi)
+ */
+export const listOwnerSalesQueryQMax = 20;
+
+
+
+export const ListOwnerSalesQueryParams = zod.object({
+  "date": zod.iso.date().optional().describe('Tanggal Asia/Jakarta YYYY-MM-DD; bawaan hari ini.'),
+  "q": zod.string().max(listOwnerSalesQueryQMax).optional().describe('Sebagian nomor struk.')
+})
+
+export const ListOwnerSalesResponseItem = zod.object({
+  "id": zod.string(),
+  "number": zod.string(),
+  "createdAt": zod.int(),
+  "kasirName": zod.string(),
+  "total": zod.int(),
+  "methodLabel": zod.string().describe('Tunai, QRIS, Kasbon, atau Campuran (lebih dari satu metode).'),
+  "status": zod.enum(['selesai', 'dibatalkan']),
+  "shiftOpen": zod.boolean().describe('Penjualan milik shift yang sedang buka → batal hanya dari kasir.')
+})
+export const ListOwnerSalesResponse = zod.array(ListOwnerSalesResponseItem)
+
+/**
+ * Barang, pembayaran, pelanggan, dan (bila dibatalkan) siapa, jam, alasan, jalur, serta
+ * pengembaliannya; kasbon lewat limit membawa kelebihan dan alasannya. Tanpa HPP.
+ * @summary Detail transaksi untuk pemilik
+ */
+export const GetOwnerSaleParams = zod.object({
+  "saleId": zod.string()
+})
+
+
+
+
+
+export const GetOwnerSaleResponse = zod.object({
+  "id": zod.string(),
+  "number": zod.string(),
+  "createdAt": zod.int(),
+  "kasirName": zod.string(),
+  "shiftId": zod.string().describe('Shift kasir tempat penjualan dicatat (menentukan siapa yang boleh membatalkan).'),
+  "items": zod.array(zod.object({
+  "unitId": zod.string(),
+  "productName": zod.string(),
+  "unitName": zod.string(),
+  "isCurah": zod.boolean(),
+  "baseUnit": zod.enum(['pcs', 'gram', 'ml']),
+  "unitSize": zod.int(),
+  "qtyBase": zod.int(),
+  "unitPrice": zod.int(),
+  "subtotal": zod.int(),
+  "wholesale": zod.boolean()
+})),
+  "total": zod.int(),
+  "payments": zod.array(zod.object({
+  "method": zod.enum(['cash', 'qris', 'credit']),
+  "amount": zod.int().min(1)
+})),
+  "cashReceived": zod.int().describe('Uang tunai diterima; 0 bila penjualan tanpa bagian tunai.'),
+  "change": zod.int().describe('Kembalian; 0 bila penjualan tanpa bagian tunai.'),
+  "customerId": zod.string().nullable(),
+  "status": zod.enum(['selesai', 'dibatalkan']),
+  "printStatus": zod.enum(['tercetak', 'tidak_dicetak', 'gagal'])
+}).and(zod.object({
+  "customerName": zod.string().nullable(),
+  "shiftOpen": zod.boolean(),
+  "voided": zod.union([zod.object({
+  "at": zod.int().describe('Jam server saat dibatalkan (epoch ms UTC).'),
+  "byId": zod.string(),
+  "byName": zod.string(),
+  "reason": zod.string(),
+  "channel": zod.enum(['kasir', 'pemilik']),
+  "drawerRefund": zod.int(),
+  "qrisRefundSource": zod.union([zod.literal('laci'),zod.literal('pemilik'),zod.literal(null)]).nullable()
+}).describe('Pembatalan transaksi. drawerRefund = uang yang keluar dari laci shift yang sedang buka saat\ndibatalkan kasir (bagian tunai transaksi shift lama + bagian QRIS Tunai dari laci; 0 untuk\njalur pemilik). qrisRefundSource = cara mengembalikan bagian QRIS (null bila tanpa QRIS;\njalur pemilik selalu pemilik).\n'),zod.null()]),
+  "creditOverLimit": zod.union([zod.object({
+  "excess": zod.int().min(1),
+  "reason": zod.string()
+}).describe('Kasbon melewati limit dengan alasan; excess = bagian kasbon transaksi ini di atas limit.'),zod.null()])
+})).describe('Detail transaksi untuk pemilik (tanpa HPP).')
+
+/**
+ * Pembatalan dari app pemilik tidak pernah mengoreksi laci (jawaban pemilik Q1): cashSales
+ * shift penjualan dan shift yang sedang buka tidak berubah, tanpa ShiftClosure.saleRefunds;
+ * uang dikembalikan pemilik. Urutan pemeriksaan: id tidak dikenal → 404; sudah dibatalkan →
+ * 200 apa adanya tanpa perubahan; reason kosong (setelah trim) atau > 200 karakter → 422
+ * VALIDATION; penjualan dari shift yang masih buka → 409 IN_OPEN_SHIFT (batalkan dari kasir).
+ * Umur transaksi tidak dibatasi. Berhasil: stok kembali, bagian kasbon dibatalkan di buku
+ * (saldo boleh minus — Lebih bayar; pelunasan yang sudah diterima tidak ikut batal).
+ * qrisRefundSource diabaikan (bagian QRIS dicatat pemilik). Tercatat jam server, pembatal (id
+ * + nama), alasan, dan jalur pemilik; bukan butir Perlu perhatian.
+ * @summary Batalkan transaksi dari app pemilik (alasan wajib)
+ */
+export const VoidOwnerSaleParams = zod.object({
+  "saleId": zod.string()
+})
+
+export const voidOwnerSaleBodyReasonMax = 200;
+
+
+
+export const VoidOwnerSaleBody = zod.object({
+  "reason": zod.string().min(1).max(voidOwnerSaleBodyReasonMax).describe('Alasan pembatalan, wajib (1..200 karakter setelah trim); tanpa PIN pemilik.'),
+  "qrisRefundSource": zod.union([zod.literal('laci'),zod.literal('pemilik'),zod.literal(null)]).nullish()
+}).describe('Tanpa PIN pemilik; alasan wajib. qrisRefundSource wajib bila kasir membatalkan transaksi\nyang punya bagian QRIS: laci = dikembalikan tunai dari laci shift yang sedang buka (masuk\nShiftClosure.saleRefunds), pemilik = ditransfer pemilik nanti (di luar laci). Tanpa nilai\nlaci/pemilik → 422 VALIDATION "Pilih cara mengembalikan QRIS". Transaksi tanpa bagian QRIS:\nnilainya diabaikan. qrisRefundSource diabaikan di jalur pemilik (voidOwnerSale): pemilik\ntidak pernah memakai laci.\n')
+
+
+
+
+
+export const VoidOwnerSaleResponse = zod.object({
+  "id": zod.string(),
+  "number": zod.string(),
+  "createdAt": zod.int(),
+  "kasirName": zod.string(),
+  "shiftId": zod.string().describe('Shift kasir tempat penjualan dicatat (menentukan siapa yang boleh membatalkan).'),
+  "items": zod.array(zod.object({
+  "unitId": zod.string(),
+  "productName": zod.string(),
+  "unitName": zod.string(),
+  "isCurah": zod.boolean(),
+  "baseUnit": zod.enum(['pcs', 'gram', 'ml']),
+  "unitSize": zod.int(),
+  "qtyBase": zod.int(),
+  "unitPrice": zod.int(),
+  "subtotal": zod.int(),
+  "wholesale": zod.boolean()
+})),
+  "total": zod.int(),
+  "payments": zod.array(zod.object({
+  "method": zod.enum(['cash', 'qris', 'credit']),
+  "amount": zod.int().min(1)
+})),
+  "cashReceived": zod.int().describe('Uang tunai diterima; 0 bila penjualan tanpa bagian tunai.'),
+  "change": zod.int().describe('Kembalian; 0 bila penjualan tanpa bagian tunai.'),
+  "customerId": zod.string().nullable(),
+  "status": zod.enum(['selesai', 'dibatalkan']),
+  "printStatus": zod.enum(['tercetak', 'tidak_dicetak', 'gagal'])
+}).and(zod.object({
+  "customerName": zod.string().nullable(),
+  "shiftOpen": zod.boolean(),
+  "voided": zod.union([zod.object({
+  "at": zod.int().describe('Jam server saat dibatalkan (epoch ms UTC).'),
+  "byId": zod.string(),
+  "byName": zod.string(),
+  "reason": zod.string(),
+  "channel": zod.enum(['kasir', 'pemilik']),
+  "drawerRefund": zod.int(),
+  "qrisRefundSource": zod.union([zod.literal('laci'),zod.literal('pemilik'),zod.literal(null)]).nullable()
+}).describe('Pembatalan transaksi. drawerRefund = uang yang keluar dari laci shift yang sedang buka saat\ndibatalkan kasir (bagian tunai transaksi shift lama + bagian QRIS Tunai dari laci; 0 untuk\njalur pemilik). qrisRefundSource = cara mengembalikan bagian QRIS (null bila tanpa QRIS;\njalur pemilik selalu pemilik).\n'),zod.null()]),
+  "creditOverLimit": zod.union([zod.object({
+  "excess": zod.int().min(1),
+  "reason": zod.string()
+}).describe('Kasbon melewati limit dengan alasan; excess = bagian kasbon transaksi ini di atas limit.'),zod.null()])
+})).describe('Detail transaksi untuk pemilik (tanpa HPP).')
+
+/**
+ * Kejadian jenis kind dengan at > reviewedAt (semua kejadian bila belum pernah ditinjau),
+ * tanpa batas umur, terbaru dulu. batal_transaksi = penjualan yang dibatalkan kasir (amount =
+ * total transaksi); batal_pelunasan = pelunasan yang dibatalkan kasir (amount = nominal
+ * pelunasan); kasbon_lewat_limit = penjualan kasbon lewat limit yang tidak dibatalkan (amount =
+ * kelebihan limit). Pembatalan oleh pemilik bukan pengecualian. kind tidak dikenal → 422.
+ * @summary Pengecualian kasir satu jenis sejak terakhir ditinjau
+ */
+export const ListOwnerExceptionsQueryParams = zod.object({
+  "kind": zod.enum(['batal_transaksi', 'batal_pelunasan', 'kasbon_lewat_limit'])
+})
+
+export const ListOwnerExceptionsResponse = zod.object({
+  "kind": zod.enum(['batal_transaksi', 'batal_pelunasan', 'kasbon_lewat_limit']).describe('Pengecualian kasir (ruling R1/R9): batal_transaksi (penjualan dibatalkan kasir),\nbatal_pelunasan (pelunasan dibatalkan kasir), kasbon_lewat_limit (kasbon melewati limit\ndengan alasan; penjualan yang kemudian dibatalkan tidak ikut).\n'),
+  "reviewedAt": zod.int().nullable().describe('Terakhir ditinjau (epoch ms UTC); null bila belum pernah.'),
+  "items": zod.array(zod.object({
+  "id": zod.string(),
+  "kind": zod.enum(['batal_transaksi', 'batal_pelunasan', 'kasbon_lewat_limit']).describe('Pengecualian kasir (ruling R1/R9): batal_transaksi (penjualan dibatalkan kasir),\nbatal_pelunasan (pelunasan dibatalkan kasir), kasbon_lewat_limit (kasbon melewati limit\ndengan alasan; penjualan yang kemudian dibatalkan tidak ikut).\n'),
+  "at": zod.int().describe('Jam server kejadian (epoch ms UTC).'),
+  "kasirName": zod.string(),
+  "amount": zod.int(),
+  "reason": zod.string(),
+  "customerName": zod.string().nullable(),
+  "saleId": zod.string().nullable(),
+  "saleNumber": zod.string().nullable(),
+  "paymentId": zod.string().nullable(),
+  "fromClosedShift": zod.boolean(),
+  "refund": zod.int(),
+  "qrisToOwner": zod.int()
+}).describe('Satu kejadian. batal_transaksi: at = jam batal, kasirName = pembatal, amount = total\ntransaksi, saleId/saleNumber terisi; fromClosedShift = transaksi dari shift yang sudah tutup\n(ruling R12); refund = uang yang keluar dari laci shift yang sedang buka saat itu (0 bila\ntidak ada); qrisToOwner = bagian QRIS yang dipilih Transfer oleh pemilik nanti (pemilik\nharus mentransfer). batal_pelunasan: at = jam batal, kasirName = pembatal, amount = nominal\npelunasan, paymentId terisi. kasbon_lewat_limit: at = jam jual, kasirName = kasir, amount =\nkelebihan limit bagian kasbon ini, saleId/saleNumber terisi. customerName = pelanggan (null\nbila tanpa pelanggan). Untuk selain batal_transaksi fromClosedShift false, refund dan\nqrisToOwner 0.\n')).describe('Kejadian dengan at > reviewedAt, terbaru dulu.')
+})
+
+/**
+ * reviewedAt = max(reviewedAt lama, min(upTo, jam server)); idempoten dan tidak pernah
+ * mundur. upTo = jam kejadian terbaru yang dilihat pemilik, sehingga kejadian yang masuk
+ * setelah daftar dimuat tetap muncul. Respons = daftar jenis itu setelah ditinjau.
+ * @summary Tandai pengecualian satu jenis sudah ditinjau
+ */
+export const ReviewOwnerExceptionsBody = zod.object({
+  "kind": zod.enum(['batal_transaksi', 'batal_pelunasan', 'kasbon_lewat_limit']).describe('Pengecualian kasir (ruling R1/R9): batal_transaksi (penjualan dibatalkan kasir),\nbatal_pelunasan (pelunasan dibatalkan kasir), kasbon_lewat_limit (kasbon melewati limit\ndengan alasan; penjualan yang kemudian dibatalkan tidak ikut).\n'),
+  "upTo": zod.int().describe('Jam kejadian terbaru yang sudah dilihat pemilik (epoch ms UTC); dijepit ke jam server.')
+})
+
+export const ReviewOwnerExceptionsResponse = zod.object({
+  "kind": zod.enum(['batal_transaksi', 'batal_pelunasan', 'kasbon_lewat_limit']).describe('Pengecualian kasir (ruling R1/R9): batal_transaksi (penjualan dibatalkan kasir),\nbatal_pelunasan (pelunasan dibatalkan kasir), kasbon_lewat_limit (kasbon melewati limit\ndengan alasan; penjualan yang kemudian dibatalkan tidak ikut).\n'),
+  "reviewedAt": zod.int().nullable().describe('Terakhir ditinjau (epoch ms UTC); null bila belum pernah.'),
+  "items": zod.array(zod.object({
+  "id": zod.string(),
+  "kind": zod.enum(['batal_transaksi', 'batal_pelunasan', 'kasbon_lewat_limit']).describe('Pengecualian kasir (ruling R1/R9): batal_transaksi (penjualan dibatalkan kasir),\nbatal_pelunasan (pelunasan dibatalkan kasir), kasbon_lewat_limit (kasbon melewati limit\ndengan alasan; penjualan yang kemudian dibatalkan tidak ikut).\n'),
+  "at": zod.int().describe('Jam server kejadian (epoch ms UTC).'),
+  "kasirName": zod.string(),
+  "amount": zod.int(),
+  "reason": zod.string(),
+  "customerName": zod.string().nullable(),
+  "saleId": zod.string().nullable(),
+  "saleNumber": zod.string().nullable(),
+  "paymentId": zod.string().nullable(),
+  "fromClosedShift": zod.boolean(),
+  "refund": zod.int(),
+  "qrisToOwner": zod.int()
+}).describe('Satu kejadian. batal_transaksi: at = jam batal, kasirName = pembatal, amount = total\ntransaksi, saleId/saleNumber terisi; fromClosedShift = transaksi dari shift yang sudah tutup\n(ruling R12); refund = uang yang keluar dari laci shift yang sedang buka saat itu (0 bila\ntidak ada); qrisToOwner = bagian QRIS yang dipilih Transfer oleh pemilik nanti (pemilik\nharus mentransfer). batal_pelunasan: at = jam batal, kasirName = pembatal, amount = nominal\npelunasan, paymentId terisi. kasbon_lewat_limit: at = jam jual, kasirName = kasir, amount =\nkelebihan limit bagian kasbon ini, saleId/saleNumber terisi. customerName = pelanggan (null\nbila tanpa pelanggan). Untuk selain batal_transaksi fromClosedShift false, refund dan\nqrisToOwner 0.\n')).describe('Kejadian dengan at > reviewedAt, terbaru dulu.')
+})
 

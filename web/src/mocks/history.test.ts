@@ -68,7 +68,15 @@ describe("riwayat 14 hari", () => {
       expect(s.items.length).toBeLessThanOrEqual(6);
       expect(s.total).toBe(s.items.reduce((a, i) => a + i.subtotal, 0));
       expect(s.costTotal).toBe(saleCost(state.products, s.items));
-      expect(s.voidedAt).toBeNull();
+      expect(s).toMatchObject({
+        voidedAt: null,
+        voidedById: null,
+        voidedByName: null,
+        voidReason: null,
+        voidChannel: null,
+        voidRefund: null,
+        creditOverLimit: null,
+      });
       expect(s.payments.reduce((a, p) => a + p.amount, 0)).toBe(s.total);
       const cash = s.payments.find((p) => p.method === "cash")?.amount ?? 0;
       if (cash > 0) {
@@ -81,6 +89,23 @@ describe("riwayat 14 hari", () => {
     }
     const methods = state.sales.flatMap((s) => s.payments.map((p) => p.method));
     expect(new Set(methods)).toEqual(new Set(["cash", "qris", "credit"]));
+  });
+
+  test("(T2b) setiap penjualan riwayat punya shiftId shift tutup kasirnya yang memuat jamnya; shift tumpang 13.00–13.05 tidak dipakai menebak", () => {
+    const shifts = new Map(state.closedShifts.map((c) => [c.shiftId, c]));
+    expect(shifts.size).toBe(state.closedShifts.length);
+    for (const s of state.sales) {
+      const shift = shifts.get(s.shiftId);
+      expect(shift, s.number).toBeDefined();
+      expect(shift?.kasirName).toBe(s.kasirName);
+      expect(s.createdAt).toBeGreaterThanOrEqual(shift?.openedAt ?? Infinity);
+      expect(s.createdAt).toBeLessThan(shift?.closedAt ?? -Infinity);
+    }
+    // salesCount & cashSales shift = penjualan yang menunjuk shift itu.
+    for (const c of state.closedShifts) {
+      const own = state.sales.filter((s) => s.shiftId === c.shiftId);
+      expect(c.salesCount).toBe(own.length);
+    }
   });
 
   test("kasbon riwayat hanya Mbak Dewi dan lunas semua; pelanggan lain tidak berubah (R5)", () => {

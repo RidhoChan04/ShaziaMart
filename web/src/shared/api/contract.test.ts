@@ -2,13 +2,17 @@ import { expect, expectTypeOf, test } from "vitest";
 import type { z } from "zod";
 import * as creditApi from "./gen/credit/credit";
 import * as ownerApi from "./gen/owner/owner";
+import * as salesApi from "./gen/sales/sales";
 import type {
   Attention,
+  CashierException,
   CostChangeItem,
   CreditLimitProblem,
+  ExceptionAttention,
   ExpiryAttention,
   ImportRowResult,
   KasirCreditPayment,
+  KasirLookupSale,
   OpnameFlag,
   OpnameReason,
   OwnerExpiryList,
@@ -17,10 +21,15 @@ import type {
   OwnerProduct,
   OwnerProductRow,
   OwnerProductUnit,
+  OwnerSale,
+  OwnerSaleRow,
   OwnerTodaySummary,
   PriceChangedProblem,
   Product,
   ProductInput,
+  Sale,
+  SaleRequest,
+  SaleVoid,
   SearchCustomersParams,
   ShiftClosure,
   StockMovement,
@@ -46,10 +55,15 @@ import {
   GetOwnerTodaySummaryResponse,
   OwnerLoginBody,
   RecountOpnameItemBody,
+  ReviewOwnerExceptionsBody,
   SetOwnerCustomerCreditLimitBody,
   UpdateOwnerProductPricesBody,
 } from "./gen/zod/owner/owner";
-import { CreateSaleBody, VoidSaleBody } from "./gen/zod/sales/sales";
+import {
+  CreateSaleBody,
+  LookupSalesQueryParams,
+  VoidSaleBody,
+} from "./gen/zod/sales/sales";
 import {
   CreateStaffExpiryRemovalBody,
   CreateStaffOpnameSessionBody,
@@ -113,8 +127,9 @@ test("creditLimitProblemSchema cocok dengan tipe hasil generate", () => {
   expect(ok.success).toBe(true);
 });
 
-test("ErrorCode 24 nilai termasuk OPNAME_NOT_HELD, OUTSIDE_SHIFT, IN_OPEN_SHIFT", () => {
+test("ErrorCode 24 nilai termasuk OPNAME_NOT_HELD, OUTSIDE_SHIFT, IN_OPEN_SHIFT, VOID_TOO_OLD; tanpa PIN_REQUIRED (ruling R5)", () => {
   expect(Object.values(ErrorCode)).toHaveLength(24);
+  expect(Object.values(ErrorCode)).not.toContain("PIN_REQUIRED");
   expect(Object.values(ErrorCode)).toEqual(
     expect.arrayContaining([
       "PRODUCT_INACTIVE",
@@ -127,6 +142,7 @@ test("ErrorCode 24 nilai termasuk OPNAME_NOT_HELD, OUTSIDE_SHIFT, IN_OPEN_SHIFT"
       "OPNAME_NOT_HELD",
       "OUTSIDE_SHIFT",
       "IN_OPEN_SHIFT",
+      "VOID_TOO_OLD",
     ]),
   );
   expect(ErrorCode.LOGIN_INVALID).toBe("LOGIN_INVALID");
@@ -539,6 +555,7 @@ test("fixture OwnerTodaySummary valid terhadap skema respons dan tipe", () => {
         },
       ],
       opnameReplacedHeld: 0,
+      exceptions: [],
     },
   } satisfies OwnerTodaySummary;
   expect(GetOwnerTodaySummaryResponse.safeParse(summary).success).toBe(true);
@@ -583,9 +600,45 @@ test("409 dikunci oleh code: PRICE_CHANGED lolos skema harga, CREDIT_LIMIT tidak
   expect(creditLimitProblemSchema.safeParse(price).success).toBe(false);
 });
 
-test("VoidRequest: ownerPin opsional (tanpa PIN → 403 PIN_REQUIRED), alasan wajib", () => {
-  expect(VoidSaleBody.safeParse({ reason: "salah input" }).success).toBe(true);
-  expect(VoidSaleBody.safeParse({ ownerPin: "999999" }).success).toBe(false);
+test("VoidRequest (ruling R4/R5, koreksi mockup M1): alasan 1..200 wajib, qrisRefundSource laci/pemilik/null, tanpa ownerPin", () => {
+  const parse = (b: unknown) => VoidSaleBody.safeParse(b).success;
+  expect(parse({ reason: "salah input" })).toBe(true);
+  expect(parse({ reason: "x", qrisRefundSource: "laci" })).toBe(true);
+  expect(parse({ reason: "x", qrisRefundSource: "pemilik" })).toBe(true);
+  expect(parse({ reason: "x", qrisRefundSource: null })).toBe(true);
+  expect(parse({ reason: "x", qrisRefundSource: "transfer" })).toBe(false);
+  expect(parse({ reason: "" })).toBe(false);
+  expect(parse({ reason: "x".repeat(201) })).toBe(false);
+  expect(parse({ ownerPin: "999999" })).toBe(false);
+  expect(Object.keys(VoidSaleBody.shape)).toEqual([
+    "reason",
+    "qrisRefundSource",
+  ]);
+});
+
+test("SaleRequest (ruling R3/R5): creditLimitReason 1..200 opsional, tanpa ownerPin", () => {
+  const body = {
+    saleId: "s1",
+    items: [{ unitId: "u1", qtyBase: 1, expectedUnitPrice: 1000 }],
+    payments: [{ method: "credit", amount: 1000 }],
+    customerId: "c1",
+    print: false,
+  };
+  const parse = (b: unknown) => CreateSaleBody.safeParse(b).success;
+  expect(parse(body)).toBe(true);
+  expect(parse({ ...body, creditLimitReason: "hajatan" })).toBe(true);
+  expect(parse({ ...body, creditLimitReason: "" })).toBe(false);
+  expect(parse({ ...body, creditLimitReason: "x".repeat(201) })).toBe(false);
+  expect(Object.keys(CreateSaleBody.shape)).not.toContain("ownerPin");
+  expectTypeOf<keyof SaleRequest>().toEqualTypeOf<
+    | "saleId"
+    | "items"
+    | "payments"
+    | "cashReceived"
+    | "customerId"
+    | "print"
+    | "creditLimitReason"
+  >();
 });
 
 test("ProductUnit.unitSize minimal 1", () => {
@@ -723,4 +776,126 @@ test("KasirCreditPayment hanya key allowlist; ShiftClosure memuat pelunasan & pe
   >();
   expectTypeOf<ShiftClosure["creditPayments"]>().toEqualTypeOf<number>();
   expectTypeOf<ShiftClosure["saleRefunds"]>().toEqualTypeOf<number>();
+});
+
+/** Operasi F3c-1 kasir tanpa PIN, transaksi pemilik, dan pengecualian (ruling R4/R9/R12, J0). */
+const SALE_OPS = {
+  sales: [
+    "createSale",
+    "listShiftSales",
+    "lookupSales",
+    "printSale",
+    "voidSale",
+  ],
+  owner: [
+    "listOwnerSales",
+    "getOwnerSale",
+    "voidOwnerSale",
+    "listOwnerExceptions",
+    "reviewOwnerExceptions",
+  ],
+} as const;
+
+test("operasi penjualan & pengecualian ada; listTodaySales sudah tidak ada (jawaban pemilik J0)", () => {
+  const modules: Record<string, Record<string, unknown>> = {
+    sales: salesApi,
+    owner: ownerApi,
+  };
+  for (const [tag, ids] of Object.entries(SALE_OPS)) {
+    for (const id of ids) {
+      expect({ id, type: typeof modules[tag]?.[id] }).toEqual({
+        id,
+        type: "function",
+      });
+    }
+  }
+  expect(salesApi).not.toHaveProperty("listTodaySales");
+});
+
+test("Sale kasir hanya key allowlist + shiftId; KasirLookupSale = Sale + customerName", () => {
+  type SaleKey =
+    | "id"
+    | "number"
+    | "createdAt"
+    | "kasirName"
+    | "shiftId"
+    | "items"
+    | "total"
+    | "payments"
+    | "cashReceived"
+    | "change"
+    | "customerId"
+    | "status"
+    | "printStatus";
+  expectTypeOf<keyof Sale>().toEqualTypeOf<SaleKey>();
+  expectTypeOf<Required<Sale>>().toEqualTypeOf<Sale>();
+  expectTypeOf<keyof KasirLookupSale>().toEqualTypeOf<
+    SaleKey | "customerName"
+  >();
+  expectTypeOf<KasirLookupSale["customerName"]>().toEqualTypeOf<
+    string | null
+  >();
+});
+
+test("lookupSales: q 1..20 digit/tanda hubung", () => {
+  const parse = (q: unknown) => LookupSalesQueryParams.safeParse({ q }).success;
+  expect(parse("0145")).toBe(true);
+  expect(parse("20261104-0145")).toBe(true);
+  expect(parse("")).toBe(false);
+  expect(parse("abc")).toBe(false);
+  expect(parse("1".repeat(21))).toBe(false);
+});
+
+test("pengecualian & transaksi pemilik: bentuk key lengkap", () => {
+  expectTypeOf<Attention["exceptions"]>().toEqualTypeOf<ExceptionAttention[]>();
+  expectTypeOf<keyof ExceptionAttention>().toEqualTypeOf<
+    "kind" | "count" | "total" | "from" | "to"
+  >();
+  expectTypeOf<keyof CashierException>().toEqualTypeOf<
+    | "id"
+    | "kind"
+    | "at"
+    | "kasirName"
+    | "amount"
+    | "reason"
+    | "customerName"
+    | "saleId"
+    | "saleNumber"
+    | "paymentId"
+    | "fromClosedShift"
+    | "refund"
+    | "qrisToOwner"
+  >();
+  expectTypeOf<Required<CashierException>>().toEqualTypeOf<CashierException>();
+  expectTypeOf<keyof SaleVoid>().toEqualTypeOf<
+    | "at"
+    | "byId"
+    | "byName"
+    | "reason"
+    | "channel"
+    | "drawerRefund"
+    | "qrisRefundSource"
+  >();
+  expectTypeOf<keyof OwnerSaleRow>().toEqualTypeOf<
+    | "id"
+    | "number"
+    | "createdAt"
+    | "kasirName"
+    | "total"
+    | "methodLabel"
+    | "status"
+    | "shiftOpen"
+  >();
+  expectTypeOf<OwnerSale["voided"]>().toEqualTypeOf<SaleVoid | null>();
+  expectTypeOf<OwnerSale["creditOverLimit"]>().toEqualTypeOf<{
+    excess: number;
+    reason: string;
+  } | null>();
+  expect(
+    ReviewOwnerExceptionsBody.safeParse({ kind: "batal_transaksi", upTo: 1 })
+      .success,
+  ).toBe(true);
+  expect(
+    ReviewOwnerExceptionsBody.safeParse({ kind: "lain", upTo: 1 }).success,
+  ).toBe(false);
 });

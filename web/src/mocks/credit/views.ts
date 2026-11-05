@@ -87,7 +87,7 @@ export function ownerCustomerList(
 
 /**
  * Riwayat pelanggan (K9), terbaru dulu: kasbon dan pelunasan, pembalik dilipat ke barisnya.
- * Batal kasbon karena batal jual: sementara tanpa nama & alasan (T2b mengisi dari `voided*`).
+ * Batal kasbon karena batal jual memakai data batal penjualannya (`voided*`, ruling R4).
  */
 function historyOf(
   state: Readonly<MockState>,
@@ -114,9 +114,9 @@ function historyOf(
         cancelled: voided
           ? {
               at: sale?.voidedAt ?? voided.at,
-              byName: "",
-              reason: "",
-              channel: "kasir",
+              byName: sale?.voidedByName ?? "",
+              reason: sale?.voidReason ?? "",
+              channel: sale?.voidChannel ?? "kasir",
             }
           : null,
       };

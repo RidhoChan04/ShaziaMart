@@ -7,6 +7,7 @@ import type {
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { newId } from "@/shared/lib/id";
 import { mockDb } from "../db";
+import { exceptionAttention } from "../exceptions";
 import { appendCredit } from "../ledger";
 import { setScenario } from "../scenarios";
 import {
@@ -14,6 +15,7 @@ import {
   cashSale,
   customerBalance,
   customerId,
+  deepKeys,
   json,
   login,
   loginWithShift,
@@ -32,6 +34,25 @@ const GULA = "Gula Pasir";
 
 const stockOf = (name: string) =>
   mockDb.get().stock[unitOf(name).productId] ?? Number.NaN;
+const stored = (id: unknown) => mockDb.get().sales.find((s) => s.id === id);
+const shift = () => mockDb.get().shift;
+/** Gula curah per nominal = total persis. */
+const gulaSale = (
+  payments: { method: string; amount: number }[],
+  extra: Record<string, unknown> = {},
+) => ({
+  saleId: newId(),
+  items: [
+    saleItem(
+      GULA,
+      { amount: payments.reduce((a, p) => a + p.amount, 0) },
+      18000,
+    ),
+  ],
+  payments,
+  print: false,
+  ...extra,
+});
 
 describe("createSale", () => {
   test("penjualan tunai: total server, kembalian, stok berkurang", async () => {
@@ -290,34 +311,6 @@ describe("createSale", () => {
     expect(mockDb.get().shift).toMatchObject({ cashSales: 20000 });
   });
 
-  test("kasbon melebihi limit → 409 CREDIT_LIMIT; ownerPin salah → 401; ownerPin 999999 → 201 & saldo naik", async () => {
-    await loginWithShift();
-    const body = {
-      ...cashSale(),
-      payments: [{ method: "credit", amount: 36000 }],
-      customerId: customerId("Pak Joko"),
-    };
-    const blocked = await post("/api/sales", body);
-    expect(blocked.status).toBe(409);
-    expect(await json<CreditLimitProblem>(blocked)).toMatchObject({
-      code: "CREDIT_LIMIT",
-      balance: 290000,
-      creditLimit: 300000,
-      attempted: 36000,
-    });
-    for (const ownerPin of ["000000", "123456"]) {
-      const wrong = await post("/api/sales", { ...body, ownerPin });
-      expect(wrong.status).toBe(401);
-      expect((await json<Problem>(wrong)).code).toBe("PIN_INVALID");
-    }
-    expect(customerBalance("Pak Joko")).toBe(290000);
-    expect(placedSales()).toHaveLength(0);
-    const ok = await post("/api/sales", { ...body, ownerPin: "999999" });
-    expect(ok.status).toBe(201);
-    expect(await json<Sale>(ok)).toMatchObject({ cashReceived: 0, change: 0 });
-    expect(customerBalance("Pak Joko")).toBe(326000);
-  });
-
   test("pelanggan di atas limit tetap boleh belanja tanpa kasbon → 201", async () => {
     await loginWithShift();
     mockDb.update((s) => {
@@ -481,41 +474,119 @@ describe("createSale", () => {
   });
 });
 
+describe("kasbon lewat limit dengan alasan (ruling R3)", () => {
+  const jokoBody = () => ({
+    ...cashSale(),
+    payments: [{ method: "credit", amount: 36_000 }],
+    customerId: customerId("Pak Joko"),
+  });
+
+  test("kasbon Pak Joko lewat limit tanpa alasan → 409 CREDIT_LIMIT {balance, creditLimit, attempted}; dengan alasan → 201, creditOverLimit {excess, reason}; replay saleId → 200", async () => {
+    await loginWithShift();
+    const body = jokoBody();
+    for (const extra of [{}, { creditLimitReason: "   " }]) {
+      const blocked = await post("/api/sales", { ...body, ...extra });
+      expect(blocked.status).toBe(409);
+      expect(await json<CreditLimitProblem>(blocked)).toMatchObject({
+        code: "CREDIT_LIMIT",
+        balance: 290_000,
+        creditLimit: 300_000,
+        attempted: 36_000,
+      });
+    }
+    expect(customerBalance("Pak Joko")).toBe(290_000);
+    const ok = await post("/api/sales", {
+      ...body,
+      creditLimitReason: " beli beras hajatan ",
+    });
+    expect(ok.status).toBe(201);
+    const keys = deepKeys(await ok.json());
+    expect(keys).not.toContain("creditOverLimit");
+    expect(stored(body.saleId)).toMatchObject({
+      creditOverLimit: { excess: 26_000, reason: "beli beras hajatan" },
+      shiftId: shift()?.id,
+    });
+    expect(customerBalance("Pak Joko")).toBe(326_000);
+    const replay = await post("/api/sales", {
+      ...body,
+      creditLimitReason: "lain",
+    });
+    expect(replay.status).toBe(200);
+    expect(stored(body.saleId)?.creditOverLimit?.reason).toBe(
+      "beli beras hajatan",
+    );
+    expect(customerBalance("Pak Joko")).toBe(326_000);
+  });
+
+  test("(cek ulang) alasan terkirim padahal tidak melewati limit → diabaikan, creditOverLimit null", async () => {
+    await loginWithShift();
+    const body = {
+      ...cashSale(),
+      payments: [{ method: "credit", amount: 36_000 }],
+      customerId: customerId("Bu Sari"),
+      creditLimitReason: "tidak perlu",
+    };
+    expect((await post("/api/sales", body)).status).toBe(201);
+    expect(stored(body.saleId)?.creditOverLimit).toBeNull();
+  });
+
+  test("(cek ulang) kasbon lewat limit dua kali (limit 500.000, saldo 490.000: +20.000 lalu +20.000) → excess 10.000 lalu 20.000; butir 'lewat Rp30.000'", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(Date.UTC(2026, 10, 5, 3)); // Kamis 5 Nov 10.00 WIB
+    await loginWithShift();
+    const sari = customerId("Bu Sari");
+    mockDb.update((s) => {
+      appendCredit(s, {
+        customerId: sari,
+        amount: 370_000,
+        at: Date.now(),
+        saleId: null,
+        paymentId: null,
+      });
+    });
+    expect(customerBalance("Bu Sari")).toBe(490_000);
+    const ids: string[] = [];
+    for (const _ of [1, 2]) {
+      const body = gulaSale([{ method: "credit", amount: 20_000 }], {
+        customerId: sari,
+        creditLimitReason: "langganan",
+      });
+      expect((await post("/api/sales", body)).status).toBe(201);
+      ids.push(body.saleId);
+    }
+    expect(ids.map((id) => stored(id)?.creditOverLimit?.excess)).toEqual([
+      10_000, 20_000,
+    ]);
+    expect(exceptionAttention(mockDb.get())).toEqual([
+      {
+        kind: "kasbon_lewat_limit",
+        count: 2,
+        total: 30_000,
+        from: "2026-11-05",
+        to: "2026-11-05",
+      },
+    ]);
+  });
+});
+
 describe("voidSale", () => {
-  test("void: tanpa PIN 403, PIN salah 401, benar → dibatalkan & stok kembali", async () => {
+  test("void (ruling R4/R5, tanpa PIN): alasan kosong 422, benar → dibatalkan & stok kembali", async () => {
     await loginWithShift();
     const before = stockOf(BIMOLI);
     const sale = await json<Sale>(await post("/api/sales", cashSale(2)));
     expect(stockOf(BIMOLI)).toBe(before - 2);
 
-    const noPin = await voidSale(sale.id, { reason: "salah input" });
-    expect(noPin.status).toBe(403);
-    expect((await json<Problem>(noPin)).code).toBe("PIN_REQUIRED");
-    const wrong = await voidSale(sale.id, {
-      ownerPin: "000000",
-      reason: "salah input",
-    });
-    expect(wrong.status).toBe(401);
-    expect((await json<Problem>(wrong)).code).toBe("PIN_INVALID");
-    const noReason = await voidSale(sale.id, {
-      ownerPin: "999999",
-      reason: " ",
-    });
+    const noReason = await voidSale(sale.id, { reason: " " });
     expect(noReason.status).toBe(422);
+    expect(stockOf(BIMOLI)).toBe(before - 2);
 
-    const ok = await voidSale(sale.id, {
-      ownerPin: "999999",
-      reason: "salah input",
-    });
+    const ok = await voidSale(sale.id, { reason: "salah input" });
     expect(ok.status).toBe(200);
     expect((await json<Sale>(ok)).status).toBe("dibatalkan");
     expect(stockOf(BIMOLI)).toBe(before);
     expect(mockDb.get().shift).toMatchObject({ cashSales: 0, salesCount: 0 });
 
-    const again = await voidSale(sale.id, {
-      ownerPin: "999999",
-      reason: "lagi",
-    });
+    const again = await voidSale(sale.id, { reason: "lagi" });
     expect(again.status).toBe(200);
     expect((await json<Sale>(again)).status).toBe("dibatalkan");
     expect(stockOf(BIMOLI)).toBe(before);
@@ -542,7 +613,7 @@ describe("voidSale", () => {
     expect(mockDb.get().shift).toMatchObject({ cashSales: 0, salesCount: 0 });
   });
 
-  test("void penjualan shift lalu tidak mengubah kas shift sekarang", async () => {
+  test("(ruling R12) void penjualan shift lalu: kas jual shift sekarang tetap, tunainya keluar lewat saleRefunds shift sekarang", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(Date.UTC(2026, 9, 20, 1));
     await loginWithShift();
@@ -555,6 +626,9 @@ describe("voidSale", () => {
     expect(res.status).toBe(200);
     expect(stockOf(BIMOLI)).toBe(before + 1);
     expect(mockDb.get().shift).toMatchObject({ cashSales: 0, salesCount: 0 });
+    expect(mockDb.get().shift?.saleRefunds.map((r) => r.amount)).toEqual([
+      36000,
+    ]);
   });
 
   test("void tanpa sesi → 401; saleId tak dikenal → 404", async () => {
@@ -567,7 +641,7 @@ describe("voidSale", () => {
   });
 });
 
-describe("printSale & listTodaySales", () => {
+describe("printSale & listShiftSales", () => {
   test("cetak ulang menyimpan printStatus sesuai skenario", async () => {
     await loginWithShift();
     const sale = await json<Sale>(await post("/api/sales", cashSale()));
@@ -583,24 +657,24 @@ describe("printSale & listTodaySales", () => {
     expect((await post("/api/sales/x/print", {})).status).toBe(404);
   });
 
-  test("penjualan hari ini (Asia/Jakarta), terbaru dulu", async () => {
+  test("(jawaban pemilik J0) penjualan shift yang sedang buka: 23.59 & 00.00 di shift yang sama keduanya tampil, terbaru dulu", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(Date.UTC(2026, 9, 16, 16, 59)); // 16 Okt 23.59 WIB
     await loginWithShift();
-    await post("/api/sales", cashSale());
+    const before = await json<Sale>(await post("/api/sales", cashSale()));
     vi.setSystemTime(Date.UTC(2026, 9, 16, 17, 0)); // 17 Okt 00.00 WIB
     const first = await json<Sale>(await post("/api/sales", cashSale()));
     vi.setSystemTime(Date.UTC(2026, 9, 16, 18, 0));
     const second = await json<Sale>(await post("/api/sales", cashSale()));
     expect(first.number).toBe("20261017-0001");
-    const res = await fetch("/api/sales/today");
+    const res = await fetch("/api/sales/shift");
     expect(res.status).toBe(200);
-    const today = await json<Sale[]>(res);
-    expect(today.map((s) => s.id)).toEqual([second.id, first.id]);
+    const rows = await json<Sale[]>(res);
+    expect(rows.map((s) => s.id)).toEqual([second.id, first.id, before.id]);
   });
 
-  test("listTodaySales tanpa sesi → 401", async () => {
-    expect((await fetch("/api/sales/today")).status).toBe(401);
+  test("listShiftSales tanpa sesi → 401", async () => {
+    expect((await fetch("/api/sales/shift")).status).toBe(401);
   });
 });
 

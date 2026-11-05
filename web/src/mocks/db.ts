@@ -4,6 +4,7 @@ import type {
   CreditPaymentMethod,
   Customer,
   DebtPayment,
+  ExceptionKind,
   KasirSettings,
   OpnameItemState,
   OpnameReason,
@@ -24,6 +25,7 @@ import type {
   Supplier,
   User,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
+import { isoDaysBetween, jakartaIsoDate } from "@/shared/lib/business-day";
 import { mockPhotos } from "./photos";
 import { createSeedState } from "./seed-data";
 
@@ -54,7 +56,10 @@ export type MockCreditCash = {
   paymentId: string;
   kind: "pelunasan" | "batal_pelunasan";
 };
-/** (ruling R12) Tunai transaksi shift lama yang dibatalkan kasir di shift ini; keluar laci, > 0. */
+/**
+ * (ruling R12, koreksi mockup M1) Uang laci shift ini yang dikembalikan untuk transaksi yang
+ * dibatalkan kasir (bagian tunai transaksi shift lama + bagian QRIS `laci`); keluar laci, > 0.
+ */
 export type MockSaleRefund = {
   id: string;
   at: number;
@@ -68,8 +73,51 @@ export type MockShift = Shift & {
   creditCash: MockCreditCash[];
   saleRefunds: MockSaleRefund[];
 };
-/** HPP disalin saat penjualan; tidak pernah dikirim ke endpoint kasir. */
-export type MockSale = Sale & { costTotal: number; voidedAt: number | null };
+/**
+ * (ruling R12, koreksi mockup M1, K31) Pengembalian saat batal: `cash` = bagian tunai (`payments`
+ * cash, bukan uang diterima), `qris` = bagian QRIS, `qrisSource` null bila tanpa QRIS, `drawer` =
+ * jumlah baris `saleRefunds` di shift yang buka (0 bila tidak ada; jalur pemilik selalu 0).
+ */
+export type MockVoidRefund = {
+  cash: number;
+  qris: number;
+  qrisSource: "laci" | "pemilik" | null;
+  drawer: number;
+};
+/**
+ * HPP disalin saat penjualan; tidak pernah dikirim ke endpoint kasir, begitu juga data batal
+ * (`voided*`, `voidRefund`) dan kasbon lewat limit (ruling R3/R4) — hanya untuk pemilik.
+ */
+export type MockSale = Sale & {
+  costTotal: number;
+  voidedAt: number | null;
+  voidedById: string | null;
+  voidedByName: string | null;
+  voidReason: string | null;
+  voidChannel: "kasir" | "pemilik" | null;
+  voidRefund: MockVoidRefund | null;
+  creditOverLimit: { excess: number; reason: string } | null;
+};
+
+/** (ruling R12, K28) Batas batal transaksi shift lama di kasir, dalam hari kalender WIB. */
+export const VOID_MAX_DAYS = 7;
+
+/**
+ * Jendela batal kasir: penjualan shift yang sedang buka → `shift_ini`; shift lain dengan
+ * `isoDaysBetween(tanggal jual WIB, hari ini) ≤ 7` → `shift_lama`; selain itu `terlalu_lama`.
+ */
+export function kasirVoidWindow(
+  sale: MockSale,
+  shift: MockShift | null,
+  now: number,
+): "shift_ini" | "shift_lama" | "terlalu_lama" {
+  if (shift !== null && sale.shiftId === shift.id) return "shift_ini";
+  const days = isoDaysBetween(
+    jakartaIsoDate(sale.createdAt),
+    jakartaIsoDate(now),
+  );
+  return days <= VOID_MAX_DAYS ? "shift_lama" : "terlalu_lama";
+}
 
 /** `active: false` = satuan nonaktif: tidak dijual kasir, barcodenya tetap terpakai. */
 export type MockUnit = ProductUnit & { active: boolean };
@@ -250,7 +298,7 @@ type LoginFailures = Record<
 >;
 
 export type MockState = {
-  version: 7;
+  version: 8;
   store: { id: string; name: string };
   users: MockUser[];
   session: { userId: string } | null;
@@ -290,6 +338,8 @@ export type MockState = {
   /** Append-only. */
   expiryLog: MockExpiryEvent[];
   stockRules: StockRules;
+  /** (ruling R9) Terakhir ditinjau per jenis pengecualian kasir; null = belum pernah. */
+  exceptionReviews: Record<ExceptionKind, number | null>;
 };
 
 const STORAGE_KEY = "mock.db";
@@ -299,7 +349,7 @@ const isObj = (x: unknown): x is Record<string, unknown> =>
 
 /** Pemeriksaan struktur murah (bukan validasi mendalam). */
 function isState(value: unknown): value is MockState {
-  if (!isObj(value) || value.version !== 7) return false;
+  if (!isObj(value) || value.version !== 8) return false;
   const { store } = value;
   return (
     isObj(store) &&
@@ -332,6 +382,7 @@ function isState(value: unknown): value is MockState {
       "settings",
       "saleSeq",
       "stockRules",
+      "exceptionReviews",
     ].every((k) => isObj(value[k])) &&
     ["session", "ownerSession", "staffSession", "shift"].every(
       (k) => value[k] === null || isObj(value[k]),

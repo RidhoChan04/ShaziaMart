@@ -59,7 +59,6 @@ export const ErrorCode = {
   VALIDATION: 'VALIDATION',
   FORBIDDEN_ORIGIN: 'FORBIDDEN_ORIGIN',
   UNAUTHORIZED: 'UNAUTHORIZED',
-  PIN_REQUIRED: 'PIN_REQUIRED',
   PIN_INVALID: 'PIN_INVALID',
   LOCKED_OUT: 'LOCKED_OUT',
   SHIFT_CLOSED: 'SHIFT_CLOSED',
@@ -78,6 +77,7 @@ export const ErrorCode = {
   OPNAME_NOT_HELD: 'OPNAME_NOT_HELD',
   OUTSIDE_SHIFT: 'OUTSIDE_SHIFT',
   IN_OPEN_SHIFT: 'IN_OPEN_SHIFT',
+  VOID_TOO_OLD: 'VOID_TOO_OLD',
 } as const;
 
 export interface Problem {
@@ -299,6 +299,33 @@ export interface OpnameFlag {
   totalValue: number;
 }
 
+/**
+ * Pengecualian kasir (ruling R1/R9): batal_transaksi (penjualan dibatalkan kasir),
+ * batal_pelunasan (pelunasan dibatalkan kasir), kasbon_lewat_limit (kasbon melewati limit
+ * dengan alasan; penjualan yang kemudian dibatalkan tidak ikut).
+ */
+export type ExceptionKind = typeof ExceptionKind[keyof typeof ExceptionKind];
+
+
+export const ExceptionKind = {
+  batal_transaksi: 'batal_transaksi',
+  batal_pelunasan: 'batal_pelunasan',
+  kasbon_lewat_limit: 'kasbon_lewat_limit',
+} as const;
+
+/**
+ * Butir Perlu perhatian satu jenis: semua kejadian dengan at > reviewedAt (tanpa batas umur).
+ * total = Σ amount; from/to = tanggal Asia/Jakarta kejadian tertua/terbaru.
+ */
+export interface ExceptionAttention {
+  kind: ExceptionKind;
+  /** @minimum 1 */
+  count: number;
+  total: number;
+  from: string;
+  to: string;
+}
+
 export interface Attention {
   /**
      * Jumlah barang dengan stockAlert menipis (0 <= stok < minStock). Aturan penanda diam:
@@ -331,6 +358,12 @@ export interface Attention {
      * di sesi yang belum ditinjau (reviewedAt null; reviewOpnameSession menghapusnya).
      */
   opnameReplacedHeld: number;
+  /**
+     * Pengecualian kasir yang menumpuk sejak terakhir ditinjau (ruling R9), tanpa batas umur;
+     * hanya jenis dengan count > 0, urutan tetap batal_transaksi, batal_pelunasan,
+     * kasbon_lewat_limit.
+     */
+  exceptions: ExceptionAttention[];
 }
 
 /**
@@ -406,9 +439,11 @@ export interface ShiftClosure {
      */
   creditPayments: number;
   /**
-     * Σ bagian tunai transaksi dari shift yang sudah tutup yang dibatalkan kasir di shift ini
-     * (uang keluar dari laci shift ini; shift lama tidak diubah). expectedCash = openingCash +
-     * cashSales − supplierPayments + creditPayments − saleRefunds
+     * Σ uang yang dikembalikan dari laci shift ini untuk transaksi yang dibatalkan kasir: bagian
+     * tunai transaksi shift lama + bagian QRIS yang dikembalikan tunai dari laci (shift ini atau
+     * shift lama). Bagian tunai transaksi shift ini tidak masuk karena cashSales sudah
+     * dikurangi; shift lama tidak diubah. expectedCash = openingCash + cashSales −
+     * supplierPayments + creditPayments − saleRefunds
      */
   saleRefunds: number;
   expectedCash: number;
@@ -978,10 +1013,13 @@ export interface SaleRequest {
   customerId?: string;
   print: boolean;
   /**
-     * Otorisasi pemilik bila server memintanya.
-     * @pattern ^\d{6}$
+     * Alasan kasir bila bagian kasbon membuat saldo pelanggan melewati limit (ruling R3). Tanpa
+     * alasan (atau kosong setelah trim) dan melewati limit → 409 CREDIT_LIMIT; dikirim ulang
+     * dengan saleId yang sama. Diabaikan bila tidak melewati limit.
+     * @minLength 1
+     * @maxLength 200
      */
-  ownerPin?: string;
+  creditLimitReason?: string;
 }
 
 export type SaleItemBaseUnit = typeof SaleItemBaseUnit[keyof typeof SaleItemBaseUnit];
@@ -1028,6 +1066,8 @@ export interface Sale {
   number: string;
   createdAt: number;
   kasirName: string;
+  /** Shift kasir tempat penjualan dicatat (menentukan siapa yang boleh membatalkan). */
+  shiftId: string;
   items: SaleItem[];
   total: number;
   payments: PaymentInput[];
@@ -1045,15 +1085,163 @@ export interface PrintResult {
   printStatus: PrintStatus;
 }
 
+/**
+ * @nullable
+ */
+export type VoidRequestQrisRefundSource = typeof VoidRequestQrisRefundSource[keyof typeof VoidRequestQrisRefundSource] | null;
+
+
+export const VoidRequestQrisRefundSource = {
+  laci: 'laci',
+  pemilik: 'pemilik',
+} as const;
+
+/**
+ * Tanpa PIN pemilik; alasan wajib. qrisRefundSource wajib bila kasir membatalkan transaksi
+ * yang punya bagian QRIS: laci = dikembalikan tunai dari laci shift yang sedang buka (masuk
+ * ShiftClosure.saleRefunds), pemilik = ditransfer pemilik nanti (di luar laci). Tanpa nilai
+ * laci/pemilik → 422 VALIDATION "Pilih cara mengembalikan QRIS". Transaksi tanpa bagian QRIS:
+ * nilainya diabaikan. qrisRefundSource diabaikan di jalur pemilik (voidOwnerSale): pemilik
+ * tidak pernah memakai laci.
+ */
 export interface VoidRequest {
   /**
-     * PIN pemilik; tanpa PIN server menjawab 403 PIN_REQUIRED.
-     * @pattern ^\d{6}$
+     * Alasan pembatalan, wajib (1..200 karakter setelah trim); tanpa PIN pemilik.
+     * @minLength 1
+     * @maxLength 200
      */
-  ownerPin?: string;
-  /** @minLength 1 */
+  reason: string;
+  /** @nullable */
+  qrisRefundSource?: VoidRequestQrisRefundSource;
+}
+
+/**
+ * Penjualan untuk Cari nomor struk di kasir: key Sale ditambah customerName (null bila tanpa
+ * pelanggan); tanpa HPP, laba, atau data pengecualian.
+ */
+export type KasirLookupSale = Sale & ({
+  /** @nullable */
+  customerName: string | null;
+});
+
+/**
+ * Satu kejadian. batal_transaksi: at = jam batal, kasirName = pembatal, amount = total
+ * transaksi, saleId/saleNumber terisi; fromClosedShift = transaksi dari shift yang sudah tutup
+ * (ruling R12); refund = uang yang keluar dari laci shift yang sedang buka saat itu (0 bila
+ * tidak ada); qrisToOwner = bagian QRIS yang dipilih Transfer oleh pemilik nanti (pemilik
+ * harus mentransfer). batal_pelunasan: at = jam batal, kasirName = pembatal, amount = nominal
+ * pelunasan, paymentId terisi. kasbon_lewat_limit: at = jam jual, kasirName = kasir, amount =
+ * kelebihan limit bagian kasbon ini, saleId/saleNumber terisi. customerName = pelanggan (null
+ * bila tanpa pelanggan). Untuk selain batal_transaksi fromClosedShift false, refund dan
+ * qrisToOwner 0.
+ */
+export interface CashierException {
+  id: string;
+  kind: ExceptionKind;
+  /** Jam server kejadian (epoch ms UTC). */
+  at: number;
+  kasirName: string;
+  amount: number;
+  reason: string;
+  /** @nullable */
+  customerName: string | null;
+  /** @nullable */
+  saleId: string | null;
+  /** @nullable */
+  saleNumber: string | null;
+  /** @nullable */
+  paymentId: string | null;
+  fromClosedShift: boolean;
+  refund: number;
+  qrisToOwner: number;
+}
+
+export interface OwnerExceptionList {
+  kind: ExceptionKind;
+  /**
+     * Terakhir ditinjau (epoch ms UTC); null bila belum pernah.
+     * @nullable
+     */
+  reviewedAt: number | null;
+  /** Kejadian dengan at > reviewedAt, terbaru dulu. */
+  items: CashierException[];
+}
+
+export interface ExceptionReviewInput {
+  kind: ExceptionKind;
+  /** Jam kejadian terbaru yang sudah dilihat pemilik (epoch ms UTC); dijepit ke jam server. */
+  upTo: number;
+}
+
+export type SaleVoidChannel = typeof SaleVoidChannel[keyof typeof SaleVoidChannel];
+
+
+export const SaleVoidChannel = {
+  kasir: 'kasir',
+  pemilik: 'pemilik',
+} as const;
+
+/**
+ * @nullable
+ */
+export type SaleVoidQrisRefundSource = typeof SaleVoidQrisRefundSource[keyof typeof SaleVoidQrisRefundSource] | null;
+
+
+export const SaleVoidQrisRefundSource = {
+  laci: 'laci',
+  pemilik: 'pemilik',
+} as const;
+
+/**
+ * Pembatalan transaksi. drawerRefund = uang yang keluar dari laci shift yang sedang buka saat
+ * dibatalkan kasir (bagian tunai transaksi shift lama + bagian QRIS Tunai dari laci; 0 untuk
+ * jalur pemilik). qrisRefundSource = cara mengembalikan bagian QRIS (null bila tanpa QRIS;
+ * jalur pemilik selalu pemilik).
+ */
+export interface SaleVoid {
+  /** Jam server saat dibatalkan (epoch ms UTC). */
+  at: number;
+  byId: string;
+  byName: string;
+  reason: string;
+  channel: SaleVoidChannel;
+  drawerRefund: number;
+  /** @nullable */
+  qrisRefundSource: SaleVoidQrisRefundSource;
+}
+
+/**
+ * Kasbon melewati limit dengan alasan; excess = bagian kasbon transaksi ini di atas limit.
+ */
+export interface CreditOverLimit {
+  /** @minimum 1 */
+  excess: number;
   reason: string;
 }
+
+export interface OwnerSaleRow {
+  id: string;
+  number: string;
+  createdAt: number;
+  kasirName: string;
+  total: number;
+  /** Tunai, QRIS, Kasbon, atau Campuran (lebih dari satu metode). */
+  methodLabel: string;
+  status: SaleStatus;
+  /** Penjualan milik shift yang sedang buka → batal hanya dari kasir. */
+  shiftOpen: boolean;
+}
+
+/**
+ * Detail transaksi untuk pemilik (tanpa HPP).
+ */
+export type OwnerSale = Sale & ({
+  /** @nullable */
+  customerName: string | null;
+  shiftOpen: boolean;
+  voided: SaleVoid | null;
+  creditOverLimit: CreditOverLimit | null;
+});
 
 export interface Customer {
   id: string;
@@ -2299,16 +2487,6 @@ export type PinInvalidResponse = Problem;
 export type LockedOutResponse = Problem;
 
 /**
- * UNAUTHORIZED atau PIN_INVALID
- */
-export type UnauthorizedOrPinInvalidResponse = Problem;
-
-/**
- * PIN pemilik diperlukan (PIN_REQUIRED)
- */
-export type PinRequiredResponse = Problem;
-
-/**
  * Tidak ditemukan (NOT_FOUND)
  */
 export type NotFoundResponse = Problem;
@@ -2352,6 +2530,16 @@ export type SearchCatalogParams = {
 q: string;
 };
 
+export type LookupSalesParams = {
+/**
+ * Sebagian nomor struk (digit dan tanda hubung), mis. 0145 atau 20261104-0145
+ * @minLength 1
+ * @maxLength 20
+ * @pattern ^[0-9-]+$
+ */
+q: string;
+};
+
 export type SearchCustomersParams = {
 /**
  * Nama atau telepon
@@ -2361,6 +2549,22 @@ q?: string;
  * true = hanya pelanggan bersaldo kasbon > 0 (lembar Pelunasan kasbon); disaring sebelum batas 20 hasil, sehingga pelanggan berutang tidak tersembunyi oleh pelanggan lunas.
  */
 owing?: boolean;
+};
+
+export type ListOwnerSalesParams = {
+/**
+ * Tanggal Asia/Jakarta YYYY-MM-DD; bawaan hari ini.
+ */
+date?: string;
+/**
+ * Sebagian nomor struk.
+ * @maxLength 20
+ */
+q?: string;
+};
+
+export type ListOwnerExceptionsParams = {
+kind: ExceptionKind;
 };
 
 export type SearchStaffProductsParams = {

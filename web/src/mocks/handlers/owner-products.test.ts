@@ -846,10 +846,9 @@ describe("barang pemilik", () => {
       print: false,
     });
     const sale = await json<Sale>(res);
-    expect(
-      (await voidSale(sale.id, { ownerPin: "999999", reason: "salah input" }))
-        .status,
-    ).toBe(200);
+    expect((await voidSale(sale.id, { reason: "salah input" })).status).toBe(
+      200,
+    );
 
     const id = productId(INDOMIE);
     const moves = await json<StockMovement[]>(

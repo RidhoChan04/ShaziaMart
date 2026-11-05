@@ -249,7 +249,7 @@ export function createSeedState(now: number = Date.now()): MockState {
   const [rina] = users;
   if (!rina) throw new Error("Seed tanpa kasir");
   const state: MockState = {
-    version: 7,
+    version: 8,
     store: { id: makeId(KIND.store, 1), name: "ShaziaMart" },
     users,
     session: null,
@@ -287,6 +287,11 @@ export function createSeedState(now: number = Date.now()): MockState {
       expirySoonDays: 30,
       opnameItemLimit: 100_000,
       opnameSessionLimit: 250_000,
+    },
+    exceptionReviews: {
+      batal_transaksi: null,
+      batal_pelunasan: null,
+      kasbon_lewat_limit: null,
     },
   };
   generateHistory(state, now);

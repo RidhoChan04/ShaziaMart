@@ -221,3 +221,58 @@ test("tanpa komponen respons yang tidak dipakai", () => {
   for (const name of responses)
     expect(spec, name).toContain(`#/components/responses/${name}"`);
 });
+
+test("(ruling R1/R5) tidak ada ownerPin atau PIN_REQUIRED di kontrak mana pun", () => {
+  expect(spec).not.toContain("ownerPin");
+  expect(spec).not.toContain("PIN_REQUIRED");
+  expect(spec).not.toContain("/api/sales/today");
+});
+
+test("(koreksi mockup M1) VoidRequest: QRIS wajib dipilih di kasir, diabaikan di jalur pemilik", () => {
+  const text = prose(schema("VoidRequest"));
+  expect(text).toContain("Pilih cara mengembalikan QRIS");
+  expect(text).toContain("diabaikan di jalur pemilik");
+});
+
+test("(koreksi mockup M1) ShiftClosure.saleRefunds memuat QRIS yang dikembalikan tunai dari laci", () => {
+  expect(prose(field("ShiftClosure", "saleRefunds"))).toContain(
+    "Σ uang yang dikembalikan dari laci shift ini untuk transaksi yang dibatalkan kasir: bagian tunai transaksi shift lama + bagian QRIS yang dikembalikan tunai dari laci (shift ini atau shift lama)",
+  );
+});
+
+test("(ruling R4/R12) voidSale kasir: urutan cek, batas 7 hari, laci shift buka; pemilik tidak pernah mengoreksi laci", () => {
+  const kasir = prose(op("/api/sales/{saleId}/void", "post"));
+  expect(kasir).toContain("tanpa shift buka → 409 SHIFT_CLOSED");
+  expect(kasir).toContain("409 VOID_TOO_OLD");
+  expect(kasir).toContain(
+    "bagian tunai keluar dari laci shift yang sedang buka",
+  );
+  expect(kasir).not.toContain('"403":');
+  const owner = prose(op("/api/owner/sales/{saleId}/void", "post"));
+  expect(owner).toContain("tidak pernah mengoreksi laci");
+  expect(owner).toContain("409 IN_OPEN_SHIFT");
+  expect(owner).toContain("Umur transaksi tidak dibatasi");
+});
+
+test("(jawaban pemilik J0, ruling R12) daftar penjualan kasir per shift & cari struk ≤ 7 hari", () => {
+  expect(prose(op("/api/sales/shift", "get"))).toContain(
+    "Tanpa shift buka → []",
+  );
+  expect(prose(op("/api/sales/lookup", "get"))).toContain(
+    "isoDaysBetween(tanggal jual, hari ini) ≤ 7",
+  );
+});
+
+test("(ruling R3) kasbon lewat limit: alasan, kelebihan bagian kasbon ini", () => {
+  const create = prose(op("/api/sales", "post"));
+  expect(create).toContain(
+    "tanpa creditLimitReason (atau kosong setelah trim) → 409 CREDIT_LIMIT",
+  );
+  expect(create).toContain("min(attempted, balance + attempted − creditLimit)");
+});
+
+test("(ruling R9) tinjau pengecualian tidak pernah mundur", () => {
+  expect(prose(op("/api/owner/exceptions/review", "post"))).toContain(
+    "reviewedAt = max(reviewedAt lama, min(upTo, jam server))",
+  );
+});

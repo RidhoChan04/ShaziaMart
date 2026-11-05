@@ -17,7 +17,6 @@ const MESSAGES: Record<string, string> = {
   NETWORK: "Server tidak tersambung — coba lagi",
   UNAUTHORIZED: "Sesi berakhir — masukkan PIN lagi",
   PIN_INVALID: "PIN salah",
-  PIN_REQUIRED: "Butuh PIN pemilik",
   LOGIN_INVALID: "Nama atau password salah",
   LOCKED_OUT: "Terlalu banyak PIN salah — coba lagi dalam 5 menit",
   SHIFT_CLOSED: "Shift belum dibuka",
@@ -34,6 +33,9 @@ const MESSAGES: Record<string, string> = {
   DEBT_ALREADY_PAID: "Utang ini sudah lunas",
   ID_TAKEN: ID_TAKEN_MESSAGE,
   OPNAME_NOT_HELD: "Barang ini tidak lagi menunggu persetujuan",
+  OUTSIDE_SHIFT: "Pelunasan dari shift sebelumnya — batalkan dari app pemilik",
+  IN_OPEN_SHIFT: "Masih di shift yang buka — batalkan dari kasir",
+  VOID_TOO_OLD: "Transaksi lebih dari 7 hari — batalkan dari app pemilik",
   INTERNAL: GENERIC,
 };
 

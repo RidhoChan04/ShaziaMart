@@ -53,6 +53,7 @@ function sell(s: MockState, at: number, qtyBase: number): void {
     number: `X${saleSeq}`,
     createdAt: at,
     kasirName: "Rina",
+    shiftId: "shift-x",
     items: [
       {
         unitId: p.units[0]?.id ?? "",
@@ -76,6 +77,12 @@ function sell(s: MockState, at: number, qtyBase: number): void {
     printStatus: "tercetak",
     costTotal: 0,
     voidedAt: null,
+    voidedById: null,
+    voidedByName: null,
+    voidReason: null,
+    voidChannel: null,
+    voidRefund: null,
+    creditOverLimit: null,
   };
   s.sales.push(sale);
   s.stock[p.id] = (s.stock[p.id] ?? 0) - qtyBase;

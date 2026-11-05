@@ -105,7 +105,13 @@ test("deterministik untuk now yang sama", () => {
 
 test("PIN seed dan state awal", () => {
   const s = createSeedState();
-  expect(s.version).toBe(7);
+  expect(s.version).toBe(8);
+  // (ruling R9) belum ada pengecualian yang pernah ditinjau.
+  expect(s.exceptionReviews).toEqual({
+    batal_transaksi: null,
+    batal_pelunasan: null,
+    kasbon_lewat_limit: null,
+  });
   expect(s.users.map((u) => [u.name, u.role, u.pin, u.password])).toEqual([
     ["Rina", "kasir", "123456", undefined],
     ["Budi", "kasir", "654321", undefined],
@@ -174,13 +180,13 @@ test("ID unik di seluruh state", () => {
   expect(new Set(ids).size).toBe(ids.length);
 });
 
-test("state versi lama di localStorage diganti default v7", () => {
+test("state versi lama di localStorage diganti default v8", () => {
   localStorage.setItem(
     "mock.db",
     JSON.stringify({ store: { id: "x", name: "y" } }),
   );
   __resetMockDbCacheForTests();
-  expect(mockDb.get().version).toBe(7);
+  expect(mockDb.get().version).toBe(8);
   expect(mockDb.get().products).toHaveLength(60);
 });
 

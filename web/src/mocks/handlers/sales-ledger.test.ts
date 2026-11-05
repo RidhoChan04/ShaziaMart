@@ -25,9 +25,11 @@ describe("HPP & buku kasbon", () => {
   };
   const costOfStored = (id: string) =>
     mockDb.get().sales.find((s) => s.id === id)?.costTotal;
-  const pinVoid = { ownerPin: "999999", reason: "salah input" };
+  const reasonVoid = { reason: "salah input" };
+  /** (koreksi mockup M1) penjualan berbagian QRIS wajib memilih cara pengembalian. */
+  const qrisVoid = { ...reasonVoid, qrisRefundSource: "pemilik" };
 
-  test("respons createSale/listTodaySales/void tidak memuat costTotal & voidedAt", async () => {
+  test("respons createSale/listShiftSales/void tidak memuat costTotal & voidedAt", async () => {
     await loginWithShift();
     const body = {
       ...cashSale(),
@@ -43,10 +45,10 @@ describe("HPP & buku kasbon", () => {
     const responses = [
       created,
       await post("/api/sales", body),
-      await fetch("/api/sales/today"),
-      await voidSale(id, pinVoid),
-      await voidSale(id, pinVoid),
-      await fetch("/api/sales/today"),
+      await fetch("/api/sales/shift"),
+      await voidSale(id, reasonVoid),
+      await voidSale(id, reasonVoid),
+      await fetch("/api/sales/shift"),
     ];
     for (const res of responses) {
       const keys = await keysOf(res);
@@ -81,7 +83,7 @@ describe("HPP & buku kasbon", () => {
       null,
     );
     vi.setSystemTime(Date.UTC(2026, 9, 23, 4));
-    const voided = await voidSale(sale.id, pinVoid);
+    const voided = await voidSale(sale.id, qrisVoid);
     expect(await keysOf(voided)).not.toContain("voidedAt");
     const stored = mockDb.get().sales.find((s) => s.id === sale.id);
     expect(stored).toMatchObject({
@@ -91,7 +93,7 @@ describe("HPP & buku kasbon", () => {
     });
     // Batal kedua tidak menggeser waktu batal.
     vi.setSystemTime(Date.UTC(2026, 9, 23, 5));
-    await voidSale(sale.id, pinVoid);
+    await voidSale(sale.id, qrisVoid);
     expect(mockDb.get().sales.find((s) => s.id === sale.id)?.voidedAt).toBe(
       Date.UTC(2026, 9, 23, 4),
     );
@@ -129,13 +131,13 @@ describe("HPP & buku kasbon", () => {
       ...cashSale(),
       payments: [{ method: "credit", amount: 36000 }],
       customerId: joko,
-      ownerPin: "999999",
+      creditLimitReason: "langganan lama",
     });
     invariant();
     vi.setSystemTime(Date.UTC(2026, 9, 23, 4));
-    await voidSale(mixed.id, pinVoid);
-    await voidSale(cashOnly.id, pinVoid);
-    await voidSale(mixed.id, pinVoid);
+    await voidSale(mixed.id, reasonVoid);
+    await voidSale(cashOnly.id, reasonVoid);
+    await voidSale(mixed.id, reasonVoid);
     invariant();
     const added = mockDb
       .get()
