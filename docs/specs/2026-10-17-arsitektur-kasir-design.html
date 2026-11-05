@@ -170,6 +170,7 @@
   <tr><td>Penjualan</td><td>Immutable setelah tersimpan. Batal/retur = baris pembalik + mutasi stok kebalikan. <code>sale_items</code> menyalin harga jual dan HPP saat itu.</td></tr>
   <tr><td>HPP</td><td>Rata-rata tertimbang, diperbarui pada setiap barang masuk.</td></tr>
   <tr><td>Kasbon</td><td><code>credit_ledger</code> append-only; saldo = jumlah baris.</td></tr>
+  <tr><td>Uang seharusnya (tutup shift)</td><td>modal awal + penjualan tunai − uang keluar ke supplier + pelunasan kasbon tunai − pengembalian transaksi (bagian tunai transaksi shift lama + bagian QRIS yang dikembalikan tunai dari laci, dibatalkan kasir di shift ini). Shift lama tidak pernah diubah (ruling R12, koreksi mockup M1).</td></tr>
   <tr><td>ID</td><td>UUIDv7 untuk semua entitas; nomor struk manusiawi per hari, mis. <code>20261017-0042</code>.</td></tr>
   <tr><td>Barcode</td><td>Bukan ID. Disimpan per satuan barang (satu barang bisa punya banyak barcode: pcs, pak, dus), unik per toko, bisa diganti tanpa memutus riwayat.</td></tr>
   <tr><td>Barang tanpa barcode</td><td>Tiga cara masuk keranjang: tombol cepat + cari nama; kode toko pendek otomatis (mis. <code>1001</code>) yang diketik di kolom scan; atau barcode buatan toko EAN-13 berawalan <code>20</code> (rentang internal GS1) dengan check digit, untuk barang yang dikemas ulang. Cetak label stiker setelah MVP.</td></tr>
@@ -186,7 +187,7 @@
 3. Server, SATU transaksi DB:
      cek shift terbuka → hitung ulang harga &amp; total dari katalog
      → simpan sale + items + payments → stock_movements (+ credit_ledger bila kasbon)
-     → update product_stock → outbox_events → activity_log (bila ada override PIN)
+     → update product_stock → outbox_events → activity_log (bila kasbon lewat limit dengan alasan)
    COMMIT (synchronous=FULL)
 4. Setelah commit       → bila print=true: kirim struk ke printer
 5. Respons              → {sale, print_status: tercetak | tidak_dicetak | gagal}</code></pre>
@@ -201,14 +202,15 @@
 <div class="table-wrap"><table>
   <tr><th>Kondisi</th><th>Perilaku</th></tr>
   <tr><td>Listrik padam saat bayar</td><td>Transaksi DB atomik; keranjang pulih dari localStorage; <code>sale_id</code> sama mencegah dobel.</td></tr>
-  <tr><td>Kasbon melebihi limit</td><td>Ditolak (<code>CREDIT_LIMIT</code>), kecuali PIN pemilik; override dicatat.</td></tr>
+  <tr><td>Kasbon melebihi limit</td><td>Tanpa alasan ditolak (<code>CREDIT_LIMIT</code>); dengan alasan kasir (<code>creditLimitReason</code>) tersimpan — kelebihan &amp; alasan disalin ke penjualan (<code>creditOverLimit</code>) dan menjadi butir Perlu perhatian (ruling R3).</td></tr>
+  <tr><td>Batal transaksi di kasir</td><td>Tanpa PIN pemilik, alasan wajib. Transaksi shift lain lebih dari 7 hari kalender WIB → <code>VOID_TOO_OLD</code> (batal dari app pemilik); transaksi shift yang masih buka dari app pemilik → <code>IN_OPEN_SHIFT</code>; pelunasan shift sebelumnya dari kasir → <code>OUTSIDE_SHIFT</code> (ruling R2, R4, R12).</td></tr>
   <tr><td>Printer offline / kertas habis</td><td>Pesan ke kasir, struk ke antrean cetak ulang.</td></tr>
   <tr><td>Service crash</td><td>Windows service recovery me-restart; frontend menampilkan banner "Server tidak tersambung" dan mencoba ulang.</td></tr>
   <tr><td>Jam PC mundur</td><td>Dibandingkan dengan transaksi terakhir; peringatan ke kasir dan pemilik.</td></tr>
   <tr><td>Internet/tunnel mati</td><td>Kasir tidak terpengaruh; dashboard hanya tidak bisa diakses dari luar.</td></tr>
   <tr><td>Edit harga bersamaan dengan transaksi</td><td>Penulis tunggal SQLite menserialisasi; harga saat commit yang berlaku, plus <code>409</code> di atas.</td></tr>
 </table></div>
-<p>Semua error API memakai <code>application/problem+json</code> (RFC 9457) dengan kode stabil (<code>SHIFT_CLOSED</code>, <code>PRICE_CHANGED</code>, <code>CREDIT_LIMIT</code>, <code>PIN_REQUIRED</code>, …). Frontend memetakan kode ke pesan Bahasa Indonesia.</p>
+<p>Semua error API memakai <code>application/problem+json</code> (RFC 9457) dengan kode stabil (<code>SHIFT_CLOSED</code>, <code>PRICE_CHANGED</code>, <code>CREDIT_LIMIT</code>, <code>OUTSIDE_SHIFT</code>, <code>IN_OPEN_SHIFT</code>, <code>VOID_TOO_OLD</code>, …). Frontend memetakan kode ke pesan Bahasa Indonesia.</p>
 
 <h2 id="hardware">8. Struk, scanner, laci</h2>
 <ul>
