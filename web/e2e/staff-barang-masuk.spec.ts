@@ -34,7 +34,9 @@ test("login staf, kerangka, dan layar tanpa gulir horizontal serta pelanggaran a
   await expectNoA11yViolations(page);
 
   await loginStaff(page);
-  await expect(page.getByRole("heading", { name: "Stok" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Stok", exact: true }),
+  ).toBeVisible();
   await expect(page.getByText("Catat nota supplier")).toBeVisible();
   await expectNoHorizontalScroll(page);
   await expectNoA11yViolations(page);
