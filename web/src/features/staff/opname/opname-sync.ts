@@ -69,7 +69,14 @@ function rejectionErrors(error: unknown): OpnameError[] {
   return [{ productId: null, message: pesanError(error) }];
 }
 
-/** Satu POST dengan id draf; diterima (201/200 replay) → draf dihapus; ditolak → tetap di HP. */
+/** Masih draf antre yang tadi dikirim? Dibuka lagi/diubah pengguna selama request → bukan. */
+const unchanged = (d: OpnameDraft | undefined, sent: OpnameDraft) =>
+  d?.status === "queued" && d.updatedAt === sent.updatedAt;
+
+/**
+ * Satu POST dengan id draf; diterima (201/200 replay) → draf dihapus; ditolak → tetap di HP
+ * sebagai `rejected`. Versi yang diubah pengguna selama request tidak disentuh.
+ */
 async function sendOne(
   store: OpnameDraftStore,
   draft: OpnameDraft,
@@ -84,10 +91,14 @@ async function sendOne(
     const stop = error instanceof ApiError ? stopFor(error) : null;
     if (stop) return stop;
     const errors = rejectionErrors(error);
-    await store.update(draft.id, (d) => ({ ...d, status: "rejected", errors }));
+    await store.update(draft.id, (d) =>
+      unchanged(d, draft) ? { ...d, status: "rejected", errors } : d,
+    );
     return "rejected";
   }
-  await store.remove(draft.id);
+  if (unchanged(await store.get(draft.id), draft)) {
+    await store.remove(draft.id);
+  }
   return "sent";
 }
 

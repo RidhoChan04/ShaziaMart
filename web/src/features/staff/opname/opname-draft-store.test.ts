@@ -75,6 +75,28 @@ test.each([
   ["jam hitung hilang", { counts: { "p-sarimi": { qtyBase: 10 } } }],
   ["barang tanpa satuan", { products: [{ id: "p", name: "X" }] }],
   ["galat tanpa pesan", { errors: [{ productId: null }] }],
+  ["jumlah NaN", { counts: { "p-sarimi": { qtyBase: NaN, countedAt: 1 } } }],
+  [
+    "jam hitung Infinity",
+    { counts: { "p-sarimi": { qtyBase: 10, countedAt: Infinity } } },
+  ],
+  [
+    "jumlah pecahan",
+    { counts: { "p-sarimi": { qtyBase: 1.5, countedAt: 1 } } },
+  ],
+  ["createdAt NaN", { createdAt: NaN }],
+  ["updatedAt -Infinity", { updatedAt: -Infinity }],
+  [
+    "isi satuan NaN",
+    {
+      products: [
+        {
+          ...opnameDraft("x").products[0],
+          units: [{ id: "u", name: "pcs", unitSize: NaN, barcodes: [] }],
+        },
+      ],
+    },
+  ],
 ])("rekaman rusak (%s) → draf ditolak 'rusak'", async (_, patch) => {
   const store = memoryOpnameStore();
   await store.put({
@@ -85,6 +107,21 @@ test.each([
     status: "rejected",
     errors: [{ productId: null, message: CORRUPT_DRAFT }],
   });
+});
+
+test("rekaman rusak dengan jam NaN → createdAt/updatedAt 0 agar urutan daftar tetap stabil", async () => {
+  const store = memoryOpnameStore();
+  await store.put({
+    ...opnameDraft("rusak"),
+    createdAt: NaN,
+    updatedAt: Infinity,
+  });
+  await store.put(opnameDraft("baik", { createdAt: 1 }));
+  expect(await store.get("rusak")).toMatchObject({
+    createdAt: 0,
+    updatedAt: 0,
+  });
+  expect(ids(await store.list())).toEqual(["rusak", "baik"]);
 });
 
 test("lingkup rusak → ditampilkan sebagai 'Semua barang'", async () => {

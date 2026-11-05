@@ -6,7 +6,8 @@ type Rec = Record<string, unknown>;
 
 const isRec = (v: unknown): v is Rec => typeof v === "object" && v !== null;
 const isStr = (v: unknown): v is string => typeof v === "string";
-const isNum = (v: unknown): v is number => typeof v === "number";
+/** Jumlah, isi satuan, dan jam epoch ms: bilangan bulat aman (NaN/Infinity/pecahan = rusak). */
+const isInt = (v: unknown): v is number => Number.isSafeInteger(v);
 const strOrNull = (v: unknown) => v === null || isStr(v);
 const oneOf = (v: unknown, values: readonly string[]) =>
   isStr(v) && values.includes(v);
@@ -20,7 +21,7 @@ const isUnit = (u: unknown) =>
   isRec(u) &&
   isStr(u.id) &&
   isStr(u.name) &&
-  isNum(u.unitSize) &&
+  isInt(u.unitSize) &&
   Array.isArray(u.barcodes) &&
   u.barcodes.every(isStr);
 
@@ -36,7 +37,7 @@ const isProduct = (p: unknown) =>
   p.units.every(isUnit);
 
 const isCount = (c: unknown) =>
-  isRec(c) && isNum(c.qtyBase) && isNum(c.countedAt);
+  isRec(c) && isInt(c.qtyBase) && isInt(c.countedAt);
 
 const isError = (e: unknown) =>
   isRec(e) && strOrNull(e.productId) && isStr(e.message);
@@ -47,8 +48,8 @@ function isIntactOpnameDraft(r: unknown): r is OpnameDraft {
     isRec(r) &&
     isStr(r.id) &&
     isStr(r.userId) &&
-    isNum(r.createdAt) &&
-    isNum(r.updatedAt) &&
+    isInt(r.createdAt) &&
+    isInt(r.updatedAt) &&
     oneOf(r.status, ["counting", "queued", "rejected"]) &&
     isScope(r.scope) &&
     Array.isArray(r.products) &&
@@ -72,10 +73,14 @@ export function readOpnameDraft(raw: unknown): OpnameRead | null {
   const identity = draftIdentity(raw);
   if (identity === null) return null;
   const scope = (raw as { scope?: unknown }).scope;
+  // Jam NaN/Infinity membuat urutan daftar tidak stabil.
+  const createdAt = isInt(identity.createdAt) ? identity.createdAt : 0;
   return {
     intact: false,
     draft: {
       ...identity,
+      createdAt,
+      updatedAt: isInt(identity.updatedAt) ? identity.updatedAt : createdAt,
       status: "rejected",
       scope: isScope(scope) ? scope : { kind: "semua", category: null },
       products: [],

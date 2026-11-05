@@ -162,24 +162,23 @@ export function useDraftSync(userId: string | null): {
     }
     setSyncing(true);
     try {
+      // Sesi segar dibaca di awal tiap bagian: putaran nota bisa lama, tab lain bisa berganti pengguna.
       const opts = {
         signal: own.controller.signal,
         currentUserId: sessionUserId(client),
-      };
-      const receipts = await syncDrafts(store, userId, realSyncApi, {
-        ...opts,
         freshUserId: freshSessionUserId(client),
-      });
+      };
+      const receipts = await syncDrafts(store, userId, realSyncApi, opts);
       if (receipts.sent.length > 0) {
         void client.invalidateQueries({
           queryKey: getListStaffReceiptsQueryKey(),
         });
       }
-      if (receipts.stopped) {
+      // Sesi/jaringan toko bermasalah → opname juga tidak bisa; "offline" bisa hanya endpoint nota.
+      if (receipts.stopped === "unauthorized" || receipts.stopped === "lan") {
         setSyncFailed(false);
         return receipts;
       }
-      // Sesi segar sudah dibaca di awal putaran ini; cache tetap dicek sebelum tiap request.
       const opname = await syncOpnameDrafts(
         opnameStore,
         userId,
@@ -198,7 +197,7 @@ export function useDraftSync(userId: string | null): {
       return {
         sent: [...receipts.sent, ...opname.sent],
         rejected: [...receipts.rejected, ...opname.rejected],
-        stopped: opname.stopped,
+        stopped: opname.stopped ?? receipts.stopped,
       };
     } catch (error) {
       setSyncFailed(true);

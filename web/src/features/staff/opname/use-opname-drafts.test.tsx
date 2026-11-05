@@ -1,5 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
+import { HttpResponse, http } from "msw";
 import { afterEach, describe, expect, test, vi } from "vitest";
+import { problem } from "@/mocks/handlers/respond";
 import { server } from "@/mocks/node";
 import {
   getListStaffOpnameCategoriesQueryKey,
@@ -13,6 +15,7 @@ import {
   opnameServer,
   receiptServer,
   renderSync,
+  serveSession,
   signIn,
   wrapperFor,
 } from "../drafts/sync-hook-kit";
@@ -21,6 +24,7 @@ import { opnameDraft, opnameStoreWith } from "./opname-fixtures";
 import { useOpnameDrafts } from "./use-opname-drafts";
 
 const ids = (drafts: OpnameDraft[]) => drafts.map((d) => d.id);
+const RECEIPTS = "/api/staff/receipts";
 
 /** Urutan POST yang masuk ke server palsu (path). */
 function capturePostPaths() {
@@ -114,17 +118,58 @@ describe("useDraftSync: draf opname ikut mesin sinkron yang sama", () => {
     expect(await opname.list()).toEqual([]);
   });
 
-  test("nota berhenti (offline) → opname tidak dicoba di putaran itu; draf tetap antre", async () => {
-    const receipts = receiptServer();
-    receipts.online = false;
+  test("endpoint nota 500 terus (berhenti 'offline') → opname tetap dikirim; laporan digabung", async () => {
+    server.use(http.post(RECEIPTS, () => problem(500, "INTERNAL")));
     const opnames = opnameServer();
     const store = await storeWith(draft("r1"));
     const opname = await opnameStoreWith(opnameDraft("o1"));
     const { hook } = renderSync(store, "u-rina", opname);
-    await waitFor(() => expect(receipts.posts).toEqual(["r1"]));
+    await waitFor(() => expect(opnames.posts).toEqual(["o1"]));
+    await waitFor(() => expect(hook.result.current.sync.syncing).toBe(false));
+    expect(await opname.list()).toEqual([]);
+    expect((await store.get("r1"))?.status).toBe("queued");
+
+    await opname.put(opnameDraft("o2"));
+    expect(await act(() => hook.result.current.sync.syncNow())).toEqual({
+      sent: ["o2"],
+      rejected: [],
+      stopped: "offline",
+    });
+  });
+
+  test("nota berhenti 'lan' → opname tidak dicoba di putaran itu; draf tetap antre", async () => {
+    let receiptPosts = 0;
+    server.use(
+      http.post(RECEIPTS, () => {
+        receiptPosts += 1;
+        return problem(403, "STAFF_LAN_ONLY");
+      }),
+    );
+    const opnames = opnameServer();
+    const opname = await opnameStoreWith(opnameDraft("o1"));
+    const { hook } = renderSync(await storeWith(draft("r1")), "u-rina", opname);
+    await waitFor(() => expect(receiptPosts).toBe(1));
     await waitFor(() => expect(hook.result.current.sync.syncing).toBe(false));
     expect(opnames.posts).toEqual([]);
-    expect((await opname.get("o1"))?.status).toBe("queued");
+    expect(await opname.get("o1")).toEqual(opnameDraft("o1"));
+  });
+
+  test("tab lain: Budi masuk saat nota Rina dikirim (cookie Budi, cache masih Rina) → sesi segar dicek lagi, opname Rina tidak dikirim", async () => {
+    server.use(
+      http.post(RECEIPTS, async ({ request }) => {
+        const { id } = (await request.json()) as { id: string };
+        serveSession("u-budi");
+        return HttpResponse.json({ id }, { status: 201 });
+      }),
+    );
+    const opnames = opnameServer();
+    const store = await storeWith(draft("r1"));
+    const opname = await opnameStoreWith(opnameDraft("o1"));
+    const { hook } = renderSync(store, "u-rina", opname);
+    await waitFor(async () => expect(await store.list()).toEqual([]));
+    await waitFor(() => expect(hook.result.current.sync.syncing).toBe(false));
+    expect(opnames.posts).toEqual([]);
+    expect(await opname.get("o1")).toEqual(opnameDraft("o1"));
   });
 
   test("interval kirim ulang aktif bila hanya ada draf opname queued", async () => {

@@ -131,6 +131,38 @@ describe("syncOpnameDrafts: kirim draf antre", () => {
     },
   );
 
+  test.each([
+    ["diterima", () => Promise.resolve({ id: "d1" } as StaffOpnameSession)],
+    ["ditolak 422", () => Promise.reject(opnameProblem([]))],
+  ])(
+    "%s, tapi draf diubah pengguna selama request (dibuka lagi) → versi baru tidak dihapus/ditimpa",
+    async (_, respond) => {
+      const store = await opnameStoreWith(opnameDraft("d1"));
+      const newer = opnameDraft("d1", {
+        status: "counting",
+        updatedAt: 2,
+        counts: { "p-sarimi": { qtyBase: 12, countedAt: 1_010 } },
+      });
+      const { api } = fakeOpnameApi(async () => {
+        await store.put(newer);
+        return respond();
+      });
+      await syncOpnameDrafts(store, "u-rina", api);
+      expect(await store.get("d1")).toEqual(newer);
+    },
+  );
+
+  test("diantre ulang dengan isi baru selama request (updatedAt berubah) → tidak dihapus", async () => {
+    const store = await opnameStoreWith(opnameDraft("d1"));
+    const newer = opnameDraft("d1", { updatedAt: 2 });
+    const { api } = fakeOpnameApi(async (input) => {
+      await store.put(newer);
+      return { id: input.id } as StaffOpnameSession;
+    });
+    await syncOpnameDrafts(store, "u-rina", api);
+    expect(await store.get("d1")).toEqual(newer);
+  });
+
   test("rekaman rusak tidak pernah dikirim; tampil 'rusak' tanpa data ditimpa", async () => {
     const store = await opnameStoreWith();
     await store.put({ ...opnameDraft("rusak"), counts: null } as never);
