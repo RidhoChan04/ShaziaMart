@@ -9,16 +9,22 @@ import { server } from "@/mocks/node";
 import type { Session } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { getGetStaffSessionQueryKey } from "@/shared/api/gen/staff/staff";
 import { createTestQueryClient } from "@/test/render-app";
+import {
+  memoryOpnameStore,
+  type OpnameDraftStore,
+} from "../opname/opname-draft-store";
+import {
+  OpnameStoreContext,
+  useOpnameDrafts,
+} from "../opname/use-opname-drafts";
 import type { DraftStore } from "./draft-store";
 import { DraftStoreContext, useDraftSync, useDrafts } from "./use-drafts";
 
-const RECEIPTS = "/api/staff/receipts";
-
-/** Server nota palsu: `online` false → gagal jaringan; tiap POST dicatat. */
-export function receiptServer() {
+/** Server POST palsu: `online` false → gagal jaringan; tiap POST (id) dicatat. */
+function postServer(path: string) {
   const state = { online: true, posts: [] as string[] };
   server.use(
-    http.post(RECEIPTS, async ({ request }) => {
+    http.post(path, async ({ request }) => {
       const { id } = (await request.json()) as { id: string };
       state.posts.push(id);
       if (!state.online) return HttpResponse.error();
@@ -27,6 +33,12 @@ export function receiptServer() {
   );
   return state;
 }
+
+/** Server nota palsu. */
+export const receiptServer = () => postServer("/api/staff/receipts");
+
+/** Server opname palsu (kirim hitungan). */
+export const opnameServer = () => postServer("/api/staff/opname-sessions");
 
 const sessionOf = (userId: string | null): Session | null =>
   userId === null
@@ -49,16 +61,20 @@ export function signIn(client: QueryClient, userId: string | null) {
   serveSession(userId);
 }
 
+/** Dua penyimpan di memori (jsdom tanpa IndexedDB): draf nota dan draf opname. */
 export function wrapperFor(
   store: DraftStore,
   userId: string | null = "u-rina",
+  opnameStore: OpnameDraftStore = memoryOpnameStore(),
 ) {
   const client = createTestQueryClient();
   signIn(client, userId);
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={client}>
       <DraftStoreContext.Provider value={store}>
-        {children}
+        <OpnameStoreContext.Provider value={opnameStore}>
+          {children}
+        </OpnameStoreContext.Provider>
       </DraftStoreContext.Provider>
     </QueryClientProvider>
   );
@@ -68,20 +84,22 @@ export function wrapperFor(
 export function renderSync(
   store: DraftStore,
   userId: string | null = "u-rina",
+  opnameStore: OpnameDraftStore = memoryOpnameStore(),
 ) {
-  const { client, wrapper } = wrapperFor(store, userId);
+  const { client, wrapper } = wrapperFor(store, userId, opnameStore);
   const hook = renderHook(
     ({ id }: { id: string | null }) => ({
       sync: useDraftSync(id),
       list: useDrafts(id ?? ""),
+      opname: useOpnameDrafts(id ?? ""),
     }),
     { wrapper, initialProps: { id: userId } },
   );
   return { client, hook };
 }
 
-/** Penyimpan yang selalu gagal (mis. IndexedDB diblokir/penuh). */
-export function brokenStore(): DraftStore {
+/** Penyimpan yang selalu gagal (mis. IndexedDB diblokir/penuh); nota maupun opname. */
+export function brokenStore(): DraftStore & OpnameDraftStore {
   const fail = () => Promise.reject(new Error("QuotaExceededError"));
   return { list: fail, get: fail, put: fail, remove: fail, update: fail };
 }

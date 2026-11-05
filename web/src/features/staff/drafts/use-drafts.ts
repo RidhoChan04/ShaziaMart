@@ -16,10 +16,18 @@ import { ApiError } from "@/shared/api/fetcher";
 import type { Session } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import {
   getGetStaffSessionQueryKey,
+  getListStaffOpnameCategoriesQueryKey,
+  getListStaffOpnameSessionsQueryKey,
   getListStaffReceiptsQueryKey,
   getStaffSession,
 } from "@/shared/api/gen/staff/staff";
 import { useServerHealth } from "@/shared/hooks/use-server-health";
+import { realOpnameSyncApi, syncOpnameDrafts } from "../opname/opname-sync";
+import {
+  reloadOpnameDrafts,
+  useOpnameDrafts,
+  useOpnameStore,
+} from "../opname/use-opname-drafts";
 import { type DraftStore, indexedDbDraftStore } from "./draft-store";
 import type { ReceiptDraft } from "./draft-types";
 import { realSyncApi, syncDrafts } from "./sync";
@@ -119,9 +127,10 @@ const freshSessionUserId = (client: QueryClient) => async () => {
 };
 
 /**
- * Kirim draf antre: saat login (mount), event `online`, server kembali tersambung, dan tiap
- * 30 dtk selama masih ada draf antre. Pengguna berganti → sync pengguna lama dihentikan.
- * `storageError` = penyimpanan HP gagal (sync tidak bisa jalan); tampilkan peringatan.
+ * Kirim draf antre (nota lalu opname, K18): saat login (mount), event `online`, server kembali
+ * tersambung, dan tiap 30 dtk selama masih ada draf nota atau opname antre. Pengguna
+ * berganti → sync pengguna lama dihentikan. `storageError` = penyimpanan HP gagal (sync tidak
+ * bisa jalan); tampilkan peringatan.
  */
 export function useDraftSync(userId: string | null): {
   syncNow: () => Promise<SyncReport>;
@@ -129,9 +138,12 @@ export function useDraftSync(userId: string | null): {
   storageError: boolean;
 } {
   const store = useDraftStore();
+  const opnameStore = useOpnameStore();
   const client = useQueryClient();
   const { online, checking } = useServerHealth();
   const { drafts, storageError: listFailed } = useDrafts(userId ?? "");
+  const { drafts: opnameDrafts, storageError: opnameListFailed } =
+    useOpnameDrafts(userId ?? "");
   const [syncing, setSyncing] = useState(false);
   const [syncFailed, setSyncFailed] = useState(false);
   // Pengendali milik satu pengguna; syncNow lama (pengguna lain) tidak memakainya.
@@ -150,26 +162,53 @@ export function useDraftSync(userId: string | null): {
     }
     setSyncing(true);
     try {
-      const report = await syncDrafts(store, userId, realSyncApi, {
+      const opts = {
         signal: own.controller.signal,
         currentUserId: sessionUserId(client),
+      };
+      const receipts = await syncDrafts(store, userId, realSyncApi, {
+        ...opts,
         freshUserId: freshSessionUserId(client),
       });
-      setSyncFailed(false);
-      if (report.sent.length > 0) {
+      if (receipts.sent.length > 0) {
         void client.invalidateQueries({
           queryKey: getListStaffReceiptsQueryKey(),
         });
       }
-      return report;
+      if (receipts.stopped) {
+        setSyncFailed(false);
+        return receipts;
+      }
+      // Sesi segar sudah dibaca di awal putaran ini; cache tetap dicek sebelum tiap request.
+      const opname = await syncOpnameDrafts(
+        opnameStore,
+        userId,
+        realOpnameSyncApi,
+        opts,
+      );
+      setSyncFailed(false);
+      if (opname.sent.length > 0) {
+        void client.invalidateQueries({
+          queryKey: getListStaffOpnameSessionsQueryKey(),
+        });
+        void client.invalidateQueries({
+          queryKey: getListStaffOpnameCategoriesQueryKey(),
+        });
+      }
+      return {
+        sent: [...receipts.sent, ...opname.sent],
+        rejected: [...receipts.rejected, ...opname.rejected],
+        stopped: opname.stopped,
+      };
     } catch (error) {
       setSyncFailed(true);
       throw error;
     } finally {
       reloadDrafts(client, userId);
+      reloadOpnameDrafts(client, userId);
       setSyncing(false);
     }
-  }, [client, store, userId]);
+  }, [client, store, opnameStore, userId]);
 
   // Pemicu otomatis: galat sudah tampil lewat storageError; dicoba lagi di pemicu berikutnya.
   const trigger = useEffectEvent(() => {
@@ -198,12 +237,18 @@ export function useDraftSync(userId: string | null): {
     wasOnline.current = online;
   }, [online, checking]);
 
-  const hasQueued = drafts.some((d) => d.status === "queued");
+  const hasQueued =
+    drafts.some((d) => d.status === "queued") ||
+    opnameDrafts.some((d) => d.status === "queued");
   useEffect(() => {
     if (!hasQueued) return;
     const timer = setInterval(() => trigger(), SYNC_INTERVAL_MS);
     return () => clearInterval(timer);
   }, [hasQueued]);
 
-  return { syncNow, syncing, storageError: listFailed || syncFailed };
+  return {
+    syncNow,
+    syncing,
+    storageError: listFailed || opnameListFailed || syncFailed,
+  };
 }

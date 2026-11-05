@@ -21,6 +21,8 @@ import {
 } from "../drafts/draft-store";
 import type { ReceiptDraft, ReceiptForm } from "../drafts/draft-types";
 import { DraftStoreContext } from "../drafts/use-drafts";
+import { memoryOpnameStore } from "../opname/opname-draft-store";
+import { OpnameStoreContext } from "../opname/use-opname-drafts";
 
 export const DRAFT_ID = "draf-uji";
 /** 2 Nov 2026 12.00 WIB. */
@@ -97,7 +99,7 @@ export async function storeWithDraft(
   return store;
 }
 
-/** Render app di halaman form dengan penyimpan draf di memori. */
+/** Render app di halaman form dengan penyimpan draf nota & opname di memori (jsdom tanpa IndexedDB). */
 export function renderForm(
   store: DraftStore = memoryDraftStore(),
   path = `/staff/masuk/baru?draf=${DRAFT_ID}`,
@@ -108,7 +110,9 @@ export function renderForm(
   });
   const utils = render(
     <DraftStoreContext.Provider value={store}>
-      <AppProviders router={router} queryClient={queryClient} />
+      <OpnameStoreContext.Provider value={memoryOpnameStore()}>
+        <AppProviders router={router} queryClient={queryClient} />
+      </OpnameStoreContext.Provider>
     </DraftStoreContext.Provider>,
   );
   return { ...utils, router, store, queryClient };
