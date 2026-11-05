@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { mockDb } from "@/mocks/db";
@@ -198,6 +198,18 @@ test("mulai kategori → draf counting berisi salinan daftar barang, lalu layar 
   });
   expect(draft?.products).toHaveLength(miInstan().length);
   expect(router.state.location.search).toEqual({ draf: draft?.id });
+});
+
+test("M6: dua ketukan dalam satu frame → satu draf saja", async () => {
+  const { opname, router } = renderOpname("/staff/opname");
+  await screen.findByRole("region", { name: CATEGORIES });
+  const row = categoryRow("Mi Instan");
+  fireEvent.click(row);
+  fireEvent.click(row);
+  await waitFor(() =>
+    expect(router.state.location.pathname).toBe("/staff/opname/hitung"),
+  );
+  expect(await opname.list()).toHaveLength(1);
 });
 
 test("mulai lingkup yang punya draf counting → membuka draf itu, tidak membuat baru", async () => {

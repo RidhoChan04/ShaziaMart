@@ -1,7 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import { Check, TriangleAlert } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import type {
   OpnameReasonInput,
@@ -128,6 +128,7 @@ export function OpnameResultPage() {
   const [choices, setChoices] = useState<Record<string, ReasonChoice>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [failure, setFailure] = useState<string | null>(null);
+  const backRef = useRef<HTMLButtonElement>(null);
   const toList = () => void navigate({ to: "/staff/opname" });
 
   const session = query.data;
@@ -183,6 +184,8 @@ export function OpnameResultPage() {
         queryKey: getListStaffOpnameSessionsQueryKey(),
       });
       toast.success("Hasil opname tersimpan");
+      // Tombol Simpan (yang terfokus) hilang; fokus ke Kembali yang menggantikannya, bukan body.
+      setTimeout(() => backRef.current?.focus(), 0);
     } catch (error) {
       const found = failureOf(error, new Set(awaiting.map((i) => i.productId)));
       setErrors(found.perItem);
@@ -254,7 +257,12 @@ export function OpnameResultPage() {
           />
         )}
         {done && (
-          <Button variant="outline" className="mt-4 min-h-12" onClick={toList}>
+          <Button
+            ref={backRef}
+            variant="outline"
+            className="mt-4 min-h-12"
+            onClick={toList}
+          >
             Kembali
           </Button>
         )}

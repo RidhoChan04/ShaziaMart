@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useRef, useState } from "react";
 import type {
   OpnameScope,
   StaffOpnameCategory,
@@ -68,6 +68,8 @@ export function OpnamePage() {
   const sessions = useListStaffOpnameSessions();
   const [notice, setNotice] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
+  // State baru terbaca setelah render; dua ketukan dalam satu frame tidak boleh membuat dua draf (M6).
+  const startingNow = useRef(false);
   const offline = !online && !checking;
   const now = Date.now();
 
@@ -75,12 +77,14 @@ export function OpnamePage() {
     navigate({ to: "/staff/opname/hitung", search: { draf: id } });
 
   const start = async (scope: OpnameScope) => {
+    if (startingNow.current) return;
     setNotice(null);
     // Lingkup yang sudah punya draf dibuka dari HP, tanpa server (boleh offline).
     if (!countingDraftFor(scope, userId, drafts) && offline) {
       setNotice(OFFLINE_START);
       return;
     }
+    startingNow.current = true;
     setStarting(true);
     try {
       await openDraft(
@@ -89,6 +93,7 @@ export function OpnamePage() {
     } catch (error) {
       setNotice(pesanError(error));
     } finally {
+      startingNow.current = false;
       setStarting(false);
     }
   };

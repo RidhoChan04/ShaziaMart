@@ -8,6 +8,7 @@ import { createAppRouter } from "@/app/router";
 import { mockDb } from "@/mocks/db";
 import { get, json, staffLogin } from "@/mocks/handlers/test-helpers";
 import { server } from "@/mocks/node";
+import { staffExpiryList } from "@/mocks/stock/expiry";
 import { applySampleStock } from "@/mocks/stock/sample";
 import type {
   StaffLowStockItem,
@@ -108,6 +109,21 @@ test("Segera kedaluwarsa: 3 teratas dengan tanda dan Lihat semua", async () => {
   expect(within(rows[1] as HTMLElement).getByText("2 hari lagi")).toBeVisible();
   await user.click(sec.getByRole("link", { name: "Lihat semua" }));
   expect(router.state.location.pathname).toBe("/staff/kedaluwarsa");
+});
+
+test("M1: tanda hari di beranda memakai 'today' dari server", async () => {
+  server.use(
+    http.get("/api/staff/expiry", () =>
+      HttpResponse.json({
+        ...staffExpiryList(mockDb.get(), Date.now()),
+        today: "2026-11-03",
+      }),
+    ),
+  );
+  renderBeranda();
+  const sec = await sectionOf("Segera kedaluwarsa (4)");
+  const rows = sec.getAllByRole("listitem");
+  expect(within(rows[1] as HTMLElement).getByText("1 hari lagi")).toBeVisible();
 });
 
 test("Stok menipis: batas dan tanda Menipis, tanpa angka sisa; Lihat semua", async () => {

@@ -12,6 +12,7 @@ import { mockDb } from "@/mocks/db";
 import { staffLogin } from "@/mocks/handlers/test-helpers";
 import { server } from "@/mocks/node";
 import { setScenario } from "@/mocks/scenarios";
+import { staffExpiryList } from "@/mocks/stock/expiry";
 import { applySampleStock } from "@/mocks/stock/sample";
 import { getGetHealthQueryKey } from "@/shared/api/gen/system/system";
 import { renderApp } from "@/test/render-app";
@@ -61,6 +62,25 @@ test("grup 'Sudah lewat' sebelum '≤ 30 hari'; baris ±3 bungkus · ED 31 Okt 2
   ).toBeVisible();
   // Judul besar kerangka tetap satu-satunya h1.
   expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+});
+
+test("M1: teks hari memakai 'today' dari server, bukan tanggal HP", async () => {
+  server.use(
+    http.get("/api/staff/expiry", () =>
+      HttpResponse.json({
+        ...staffExpiryList(mockDb.get(), Date.now()),
+        today: "2026-11-03",
+      }),
+    ),
+  );
+  renderApp("/staff/kedaluwarsa");
+  await screen.findByText("Sari Roti Tawar");
+  expect(
+    within(rowOf("Sari Roti Tawar")).getByText("Lewat 3 hari"),
+  ).toBeVisible();
+  expect(
+    within(rowOf("Sari Roti Sobek Coklat")).getByText("1 hari lagi"),
+  ).toBeVisible();
 });
 
 test("⋯ → lembar pilihan dengan kepala supplier; Batal mengembalikan fokus ke tombol ⋯", async () => {

@@ -46,6 +46,7 @@ export function ConfirmDialog({
   danger,
   onConfirm,
   onClose,
+  onCloseAutoFocus,
 }: {
   open: boolean;
   title: string;
@@ -54,10 +55,16 @@ export function ConfirmDialog({
   danger?: boolean;
   onConfirm: () => void;
   onClose: () => void;
+  /** Dialog tanpa Trigger Radix: pemanggil menentukan ke mana fokus kembali. */
+  onCloseAutoFocus: (e: Event) => void;
 }) {
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent role="alertdialog" showCloseButton={false}>
+      <DialogContent
+        role="alertdialog"
+        showCloseButton={false}
+        onCloseAutoFocus={onCloseAutoFocus}
+      >
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{body}</DialogDescription>
@@ -236,17 +243,21 @@ export function ScanRow({
   );
 }
 
-/** `Selesai menghitung` (bila boleh diedit) dan `Buang hitungan`. */
+/** `Selesai menghitung` (bila boleh diedit) dan `Buang hitungan`; ref agar fokus bisa dikembalikan. */
 export function BottomActions({
   readOnly,
   busy,
   canFinish,
+  finishRef,
+  discardRef,
   onFinish,
   onDiscard,
 }: {
   readOnly: boolean;
   busy: boolean;
   canFinish: boolean;
+  finishRef: RefObject<HTMLButtonElement | null>;
+  discardRef: RefObject<HTMLButtonElement | null>;
   onFinish: () => void;
   onDiscard: () => void;
 }) {
@@ -254,6 +265,7 @@ export function BottomActions({
     <div className="mt-6 grid gap-2">
       {!readOnly && (
         <Button
+          ref={finishRef}
           size="lg"
           variant="outline"
           disabled={busy || !canFinish}
@@ -263,6 +275,7 @@ export function BottomActions({
         </Button>
       )}
       <Button
+        ref={discardRef}
         variant="ghost"
         className="text-danger"
         disabled={busy}

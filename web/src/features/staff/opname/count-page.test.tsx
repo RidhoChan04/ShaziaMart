@@ -296,6 +296,42 @@ test("Selesai menghitung dengan sisa → dialog; 'Lanjut menghitung' menutup; ko
   expect(await store.get("draf-uji")).toBeUndefined();
 });
 
+test("I1: 'Lanjut menghitung' / Esc di dialog → fokus kembali ke Scan barcode", async () => {
+  const user = userEvent.setup();
+  await open({
+    counts: { [idOf(INDOMIE)]: { qtyBase: 125, countedAt: T("10.00") } },
+  });
+  await press(user, "Selesai menghitung");
+  await user.click(
+    within(await screen.findByRole("alertdialog")).getByRole("button", {
+      name: "Lanjut menghitung",
+    }),
+  );
+  await waitFor(() => expect(scanButton()).toHaveFocus());
+
+  await press(user, "Buang hitungan");
+  await screen.findByRole("alertdialog");
+  await user.keyboard("{Escape}");
+  await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+  await waitFor(() => expect(scanButton()).toHaveFocus());
+});
+
+test("I1: tanpa kamera → fokus kembali ke 'Selesai menghitung'", async () => {
+  const user = userEvent.setup();
+  await open(
+    { counts: { [idOf(INDOMIE)]: { qtyBase: 125, countedAt: T("10.00") } } },
+    false,
+  );
+  await press(user, "Selesai menghitung");
+  await screen.findByRole("alertdialog");
+  await user.keyboard("{Escape}");
+  await waitFor(() =>
+    expect(
+      screen.getByRole("button", { name: "Selesai menghitung" }),
+    ).toHaveFocus(),
+  );
+});
+
 test("semua barang sudah dihitung → Selesai menghitung tanpa dialog", async () => {
   const user = userEvent.setup();
   const counts = Object.fromEntries(

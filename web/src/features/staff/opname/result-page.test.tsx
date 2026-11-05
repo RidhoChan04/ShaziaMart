@@ -190,6 +190,10 @@ test("simpan: receiptId hanya untuk salah input, toast, tanda per barang", async
     screen.queryByRole("button", { name: "Simpan hasil opname" }),
   ).toBeNull();
   expect(screen.getByText("Mi Instan · selesai 10.30")).toBeVisible();
+  // I1: tombol Simpan hilang; fokus pindah ke Kembali, bukan body.
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "Kembali" })).toHaveFocus(),
+  );
 });
 
 test("jam diperkirakan tampil bila jam HP melenceng", async () => {

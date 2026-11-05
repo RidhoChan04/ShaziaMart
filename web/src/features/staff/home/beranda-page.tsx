@@ -7,7 +7,7 @@ import {
   useListStaffLowStock,
   useListStaffOpnameCategories,
 } from "@/shared/api/gen/staff/staff";
-import { formatIsoDayMonth, jakartaIsoDate } from "@/shared/lib/business-day";
+import { formatIsoDayMonth } from "@/shared/lib/business-day";
 import { cn } from "@/shared/lib/cn";
 import { formatQty } from "@/shared/lib/quantity";
 import { expiryWhenText, scopeLabel } from "@/shared/lib/stock-rules";
@@ -98,7 +98,8 @@ export function StaffBerandaPage() {
   const unsentCount = unsent.length + unsentOpname.length;
   const lots = expiry.data?.lots ?? [];
   const lowItems = low.data ?? [];
-  const today = jakartaIsoDate(Date.now());
+  // M1: hari ini menurut server, sama dengan dasar tahapnya (jam HP bisa melenceng).
+  const today = expiry.data?.today ?? "";
   const suggested = categories.data?.suggested ?? null;
   return (
     <div className="max-w-md">

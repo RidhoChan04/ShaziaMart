@@ -52,12 +52,20 @@ function CountScreen({ draftId }: { draftId: string }) {
   const [finishing, setFinishing] = useState(false);
   const scanRef = useRef<HTMLButtonElement>(null);
   const searchRef = useRef<HTMLButtonElement>(null);
+  const finishRef = useRef<HTMLButtonElement>(null);
+  const discardRef = useRef<HTMLButtonElement>(null);
 
   const draft = edited ?? drafts.find((d) => d.id === draftId);
   const toTab = () => void navigate({ to: "/staff/opname" });
   // Fokus kembali ke tombol Scan barcode (atau Cari bila kamera tidak ada) setelah scanner/lembar/simpan.
   const focusScan = () =>
     setTimeout(() => (scanRef.current ?? searchRef.current)?.focus(), 0);
+  // Dialog konfirmasi ditutup (batal/Esc): Scan barcode, atau Selesai menghitung bila tanpa kamera,
+  // atau Buang hitungan pada draf antre (hanya tombol itu yang ada).
+  const restoreFocus = (e: Event) => {
+    e.preventDefault();
+    (scanRef.current ?? finishRef.current ?? discardRef.current)?.focus();
+  };
 
   if (!draft) {
     return loaded ? (
@@ -223,6 +231,8 @@ function CountScreen({ draftId }: { draftId: string }) {
         readOnly={readOnly}
         busy={finishing}
         canFinish={countedNow > 0}
+        finishRef={finishRef}
+        discardRef={discardRef}
         onFinish={() =>
           total > countedNow ? setConfirm("selesai") : void finish()
         }
@@ -258,6 +268,7 @@ function CountScreen({ draftId }: { draftId: string }) {
         confirm="Selesai menghitung"
         onConfirm={() => void finish()}
         onClose={() => setConfirm(null)}
+        onCloseAutoFocus={restoreFocus}
       />
       <ConfirmDialog
         open={confirm === "buang"}
@@ -267,6 +278,7 @@ function CountScreen({ draftId }: { draftId: string }) {
         danger
         onConfirm={() => void discard()}
         onClose={() => setConfirm(null)}
+        onCloseAutoFocus={restoreFocus}
       />
     </div>
   );
