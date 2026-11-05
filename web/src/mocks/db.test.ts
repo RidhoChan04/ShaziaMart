@@ -1,11 +1,13 @@
 import { describe, expect, test, vi } from "vitest";
 import {
   __resetMockDbCacheForTests,
+  customerNameOf,
   kasirVoidWindow,
   type MockSale,
   type MockShift,
   type MockState,
   mockDb,
+  saleVoidOf,
   VOID_MAX_DAYS,
 } from "./db";
 import { rng } from "./seed";
@@ -291,6 +293,72 @@ test("event storage key lain tidak membuang cache", () => {
   );
   window.dispatchEvent(new StorageEvent("storage", { key: "mock.skenario" }));
   expect(mockDb.get().store.name).toBe("ShaziaMart");
+});
+
+describe("(fix 1) saleVoidOf & customerNameOf", () => {
+  const base = createSeedState(Date.UTC(2026, 10, 5, 3));
+  const [sale] = base.sales;
+  if (!sale) throw new Error("seed tanpa penjualan");
+
+  test("penjualan aktif → null; batal lengkap → SaleVoid dari rekaman", () => {
+    expect(saleVoidOf(sale)).toBeNull();
+    const voided: MockSale = {
+      ...sale,
+      status: "dibatalkan",
+      voidedAt: 5,
+      voidedById: "u1",
+      voidedByName: "Rina",
+      voidReason: "salah",
+      voidChannel: "kasir",
+      voidRefund: { cash: 1, qris: 2, qrisSource: "laci", drawer: 3 },
+    };
+    expect(saleVoidOf(voided)).toEqual({
+      at: 5,
+      byId: "u1",
+      byName: "Rina",
+      reason: "salah",
+      channel: "kasir",
+      drawerRefund: 3,
+      qrisRefundSource: "laci",
+    });
+  });
+
+  test.each([
+    "voidedById",
+    "voidedByName",
+    "voidReason",
+    "voidChannel",
+    "voidRefund",
+  ] as const)(
+    "batal tanpa %s → melempar (invarian, bukan nilai karangan)",
+    (key) => {
+      const broken: MockSale = {
+        ...sale,
+        status: "dibatalkan",
+        voidedAt: 5,
+        voidedById: "u1",
+        voidedByName: "Rina",
+        voidReason: "salah",
+        voidChannel: "kasir",
+        voidRefund: { cash: 0, qris: 0, qrisSource: null, drawer: 0 },
+        [key]: null,
+      };
+      expect(() => saleVoidOf(broken)).toThrow(/tidak lengkap/);
+    },
+  );
+
+  test("status dibatalkan tanpa voidedAt → melempar", () => {
+    expect(() => saleVoidOf({ ...sale, status: "dibatalkan" })).toThrow(
+      /tidak lengkap/,
+    );
+  });
+
+  test("customerNameOf: nama atau null", () => {
+    const sari = base.customers.find((c) => c.name === "Bu Sari");
+    expect(customerNameOf(base, sari?.id ?? "")).toBe("Bu Sari");
+    expect(customerNameOf(base, null)).toBeNull();
+    expect(customerNameOf(base, "tidak-ada")).toBeNull();
+  });
 });
 
 describe("kasirVoidWindow (ruling R12, K28: hari kalender WIB)", () => {

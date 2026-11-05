@@ -1,7 +1,7 @@
 import { type KeyboardEvent, useRef, useState } from "react";
 
 // Sama dengan detektor scan: digit berjarak < 30 ms datang dari scanner, bukan tangan.
-const SCAN_GAP_MS = 30;
+export const SCAN_GAP_MS = 30;
 
 /**
  * Menolak rentetan scanner keyboard-wedge di kolom angka. Digit pertama rentetan

@@ -1,9 +1,15 @@
-/** Pesan saat rentetan scanner masuk ke kolom angka (lihat `useScanGuard`). */
-export function ScannedAlert({ show }: { show: boolean }) {
+/** Pesan saat rentetan scanner masuk ke kolom (lihat `useScanGuard`); bawaan untuk kolom angka. */
+export function ScannedAlert({
+  show,
+  text = "Itu barcode, bukan angka",
+}: {
+  show: boolean;
+  text?: string;
+}) {
   if (!show) return null;
   return (
     <p role="alert" className="text-sm font-medium text-danger">
-      Itu barcode, bukan angka
+      {text}
     </p>
   );
 }

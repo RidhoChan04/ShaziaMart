@@ -20,6 +20,7 @@ import type {
   ReceiptPayment,
   ReceiptStatus,
   Sale,
+  SaleVoid,
   Shift,
   ShiftClosure,
   Supplier,
@@ -106,6 +107,52 @@ export const VOID_MAX_DAYS = 7;
  * Jendela batal kasir: penjualan shift yang sedang buka → `shift_ini`; shift lain dengan
  * `isoDaysBetween(tanggal jual WIB, hari ini) ≤ 7` → `shift_lama`; selain itu `terlalu_lama`.
  */
+/**
+ * Data batal sebuah penjualan untuk pemilik & pengecualian: null bila tidak dibatalkan. Penjualan
+ * berstatus batal wajib punya jam, pembatal, alasan, jalur, dan pengembaliannya (`voidSaleAs`
+ * selalu mengisi semuanya); rekaman yang tidak lengkap dilempar, tidak diberi nilai karangan.
+ */
+export function saleVoidOf(sale: MockSale): SaleVoid | null {
+  if (sale.status !== "dibatalkan" && sale.voidedAt === null) return null;
+  const {
+    voidedAt,
+    voidedById,
+    voidedByName,
+    voidReason,
+    voidChannel,
+    voidRefund,
+  } = sale;
+  if (
+    sale.status !== "dibatalkan" ||
+    voidedAt === null ||
+    voidedById === null ||
+    voidedByName === null ||
+    voidReason === null ||
+    voidChannel === null ||
+    voidRefund === null
+  ) {
+    throw new Error(`Rekaman batal penjualan ${sale.id} tidak lengkap`);
+  }
+  return {
+    at: voidedAt,
+    byId: voidedById,
+    byName: voidedByName,
+    reason: voidReason,
+    channel: voidChannel,
+    drawerRefund: voidRefund.drawer,
+    qrisRefundSource: voidRefund.qrisSource,
+  };
+}
+
+/** Nama pelanggan, atau null bila tanpa pelanggan / tidak dikenal. */
+export const customerNameOf = (
+  state: Readonly<Pick<MockState, "customers">>,
+  customerId: string | null,
+): string | null =>
+  customerId === null
+    ? null
+    : (state.customers.find((c) => c.id === customerId)?.name ?? null);
+
 export function kasirVoidWindow(
   sale: MockSale,
   shift: MockShift | null,

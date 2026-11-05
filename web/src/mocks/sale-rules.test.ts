@@ -153,6 +153,16 @@ describe("creditGate (ruling R3: limit = batas peringatan, alasan wajib)", () =>
     });
   });
 
+  test("(fix 1) alasan > 200 karakter ditolak walau dalam limit (kontrak maxLength tanpa syarat)", () => {
+    expect(creditGate(paid(480_000, 20_000), "x".repeat(201))).toEqual({
+      code: "VALIDATION",
+      detail: "Alasan maksimal 200 karakter",
+    });
+    expect(creditGate(paid(480_000, 20_000), ` ${"x".repeat(200)} `)).toEqual({
+      creditOverLimit: null,
+    });
+  });
+
   test("alasan > 200 karakter saat lewat limit → 422", () => {
     expect(creditGate(paid(490_000, 20_000), "x".repeat(201))).toEqual({
       code: "VALIDATION",

@@ -8,6 +8,7 @@ import type {
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { jakartaDateKey } from "@/shared/lib/business-day";
 import {
+  customerNameOf,
   kasirVoidWindow,
   type MockSale,
   type MockState,
@@ -248,8 +249,7 @@ export const salesHandlers = [
         .map(
           (s): KasirLookupSale => ({
             ...toPublicSale(s),
-            customerName:
-              state.customers.find((c) => c.id === s.customerId)?.name ?? null,
+            customerName: customerNameOf(state, s.customerId),
           }),
         );
       return HttpResponse.json(rows);

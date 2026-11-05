@@ -1,7 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
 import type { Sale } from "@/shared/api/gen/shaziaMartAPI.schemas";
-import { humanTyping } from "@/test/typing";
+import { humanTyping, scannerTyping } from "@/test/typing";
 import { VoidSaleDialog } from "./void-sale-dialog";
 
 const sale = (over: Partial<Sale> = {}): Sale => ({
@@ -65,6 +65,21 @@ test("(koreksi mockup M1) transaksi QRIS: radio 'Tunai dari laci' terpilih bawaa
   );
 });
 
+test("(fix 1) burst scanner + Enter saat fokus di radio QRIS → tidak membatalkan", async () => {
+  const { user, onSubmit } = setup();
+  await user.type(screen.getByRole("textbox", { name: "Alasan" }), "salah");
+  await user.click(
+    screen.getByRole("radio", { name: "Transfer oleh pemilik nanti" }),
+  );
+  expect(
+    screen.getByRole("radio", { name: "Transfer oleh pemilik nanti" }),
+  ).toHaveFocus();
+  await scannerTyping().keyboard("8991002101234{Enter}");
+  expect(onSubmit).not.toHaveBeenCalled();
+  await user.click(confirm());
+  expect(onSubmit).toHaveBeenCalledExactlyOnceWith("salah", "pemilik");
+});
+
 test("pilih 'Transfer oleh pemilik nanti' → 'pemilik'", async () => {
   const { user, onSubmit } = setup();
   await user.click(
@@ -122,6 +137,16 @@ test("(cek ulang M1) fromClosedShift true, tunai 30.000 + QRIS 20.000 + kasbon 1
   expect(ui.queryByText("Campuran · Rp60.000")).toBeNull();
   await user.type(ui.getByRole("textbox", { name: "Alasan" }), "rusak{Enter}");
   expect(onSubmit).toHaveBeenCalledExactlyOnceWith("rusak", "laci");
+});
+
+test("(fix 1) fromClosedShift tanpa bagian tunai (QRIS-saja) → tanpa deskripsi kosong", () => {
+  setup({ fromClosedShift: true });
+  const d = dialog();
+  expect(d).not.toHaveAttribute("aria-describedby");
+  expect(
+    within(d).getByRole("group", { name: "Kembalikan QRIS Rp36.000" }),
+  ).toBeVisible();
+  expect(within(d).queryByText(/dikembalikan dari laci/)).toBeNull();
 });
 
 test("pending: radio nonaktif; galat tampil; sale null → tertutup", () => {

@@ -10,6 +10,7 @@ import type {
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { cartTotal, priceLine } from "@/shared/lib/pricing";
 import { unitCost } from "@/shared/lib/product-rules";
+import { cleanReason } from "@/shared/lib/reason-rules";
 import type { MockProduct } from "./db";
 
 /** Penolakan 422; handler mengubahnya menjadi problem+json. */
@@ -248,8 +249,6 @@ export function creditExcess({
     : null;
 }
 
-const REASON_MAX = 200;
-
 /**
  * Aturan 7 (ruling R3, K28): limit = batas peringatan. Melewati limit tanpa alasan (atau kosong
  * setelah trim) → `limit` (409 CREDIT_LIMIT); dengan alasan → `creditOverLimit` dengan
@@ -263,13 +262,15 @@ export function creditGate(
   | { limit: Pick<CreditLimitProblem, "balance" | "creditLimit" | "attempted"> }
   | { creditOverLimit: { excess: number; reason: string } | null }
   | Rejection {
-  const over = creditExcess(paid);
-  if (!over) return { creditOverLimit: null };
-  const reason = typeof rawReason === "string" ? rawReason.trim() : "";
-  if (reason === "") return { limit: over };
-  if (reason.length > REASON_MAX) {
+  // Kontrak: maxLength 200 berlaku tanpa syarat, juga bila tidak melewati limit.
+  const blank = typeof rawReason !== "string" || rawReason.trim() === "";
+  const reason = cleanReason(rawReason);
+  if (!blank && reason === null) {
     return validation("Alasan maksimal 200 karakter");
   }
+  const over = creditExcess(paid);
+  if (!over) return { creditOverLimit: null };
+  if (reason === null) return { limit: over };
   const { balance, creditLimit, attempted } = over;
   const excess = Math.min(attempted, balance + attempted - creditLimit);
   return { creditOverLimit: { excess, reason } };

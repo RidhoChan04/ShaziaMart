@@ -5,12 +5,21 @@ import type {
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { isIsoDate, jakartaIsoDate } from "@/shared/lib/business-day";
 import { saleMethodLabel } from "@/shared/lib/payment-labels";
-import { type MockSale, type MockState, mockDb, updateWith } from "../db";
+import {
+  customerNameOf,
+  type MockSale,
+  type MockState,
+  mockDb,
+  saleVoidOf,
+  updateWith,
+} from "../db";
 import { withScenario } from "../scenarios";
 import { invalid, problem, readJson, requireOwnerSession } from "./respond";
 import { toPublicSale, voidSaleAs } from "./sales-void";
 
 const BASE = "/api/owner/sales";
+/** Kontrak listOwnerSales: q maksimal 20 karakter. */
+const OWNER_Q_MAX = 20;
 
 const notFound = (): Response =>
   problem(404, "NOT_FOUND", "Penjualan tidak ditemukan");
@@ -25,21 +34,9 @@ export function toOwnerSale(
 ): OwnerSale {
   return {
     ...toPublicSale(s),
-    customerName:
-      state.customers.find((c) => c.id === s.customerId)?.name ?? null,
+    customerName: customerNameOf(state, s.customerId),
     shiftOpen: shiftOpen(state, s),
-    voided:
-      s.voidedAt === null
-        ? null
-        : {
-            at: s.voidedAt,
-            byId: s.voidedById ?? "",
-            byName: s.voidedByName ?? "",
-            reason: s.voidReason ?? "",
-            channel: s.voidChannel ?? "kasir",
-            drawerRefund: s.voidRefund?.drawer ?? 0,
-            qrisRefundSource: s.voidRefund?.qrisSource ?? null,
-          },
+    voided: saleVoidOf(s),
     creditOverLimit: s.creditOverLimit,
   };
 }
@@ -56,6 +53,7 @@ export const ownerSaleHandlers = [
       const date = params.get("date") ?? jakartaIsoDate(Date.now());
       if (!isIsoDate(date)) return invalid("Tanggal tidak valid");
       const q = params.get("q")?.trim() ?? "";
+      if (q.length > OWNER_Q_MAX) return invalid("Nomor struk tidak valid");
       // Dibalik dulu agar penjualan dengan jam sama tetap terbaru dulu.
       const rows = [...state.sales]
         .reverse()

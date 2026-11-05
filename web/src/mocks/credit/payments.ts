@@ -5,6 +5,7 @@ import type {
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { repaymentProblem } from "@/shared/lib/credit-rules";
 import { newId } from "@/shared/lib/id";
+import { cleanReason } from "@/shared/lib/reason-rules";
 import type { MockCreditPayment, MockShift, MockState, MockUser } from "../db";
 import { problem } from "../handlers/respond";
 import { appendCredit, balanceOf } from "../ledger";
@@ -16,7 +17,6 @@ const METHODS: Record<CreditPaymentChannel, readonly CreditPaymentMethod[]> = {
   pemilik: ["transfer", "titip"],
 };
 const ID_MAX = 64;
-const REASON_MAX = 200;
 
 const invalid = (detail: string): Response =>
   problem(422, "VALIDATION", detail);
@@ -185,12 +185,8 @@ export function recordPayment(
 }
 
 /** Alasan batal 1..200 karakter setelah trim; null = tidak valid. */
-function readReason(input: unknown): string | null {
-  const reason = isObj(input) ? input.reason : undefined;
-  if (typeof reason !== "string") return null;
-  const trimmed = reason.trim();
-  return trimmed.length >= 1 && trimmed.length <= REASON_MAX ? trimmed : null;
-}
+const readReason = (input: unknown): string | null =>
+  cleanReason(isObj(input) ? input.reason : undefined);
 
 /**
  * Batalkan pelunasan (K5, ruling R2), idempoten. Kasir: 404 (juga jalur pemilik) → sudah batal →

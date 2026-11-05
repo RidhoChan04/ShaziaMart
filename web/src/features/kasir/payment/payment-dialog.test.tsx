@@ -146,6 +146,9 @@ test("(ruling R3) kasbon Pak Joko 36.000 → CREDIT_LIMIT → dialog 'Kasbon mel
   // (koreksi mockup M5) teks peringatan disertai ikon.
   const warning = ui.getByText("Melebihi limit — perlu alasan");
   expect(warning.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+  // (fix 1) kontras ≥ 4,5:1: warna tinta warning, bukan text-warning (#b26b00, 4,2:1).
+  expect(warning).toHaveClass("text-warning-ink");
+  expect(warning).not.toHaveClass("text-warning");
   await user.click(selesai());
 
   const dialog = await screen.findByRole("dialog", {

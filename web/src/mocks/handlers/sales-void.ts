@@ -1,5 +1,6 @@
 import type { Sale } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { newId } from "@/shared/lib/id";
+import { cleanReason } from "@/shared/lib/reason-rules";
 import {
   kasirVoidWindow,
   type MockSale,
@@ -11,8 +12,6 @@ import { appendCredit } from "../ledger";
 import { productOfUnit } from "../products/views";
 import { invalid, problem } from "./respond";
 
-const REASON_MAX = 200;
-
 const isObj = (x: unknown): x is Record<string, unknown> =>
   typeof x === "object" && x !== null && !Array.isArray(x);
 
@@ -20,12 +19,8 @@ const amountOf = (sale: Sale, method: "cash" | "qris" | "credit"): number =>
   sale.payments.find((p) => p.method === method)?.amount ?? 0;
 
 /** Alasan 1..200 karakter setelah trim; null = tidak valid. */
-function readReason(input: unknown): string | null {
-  const reason = isObj(input) ? input.reason : undefined;
-  if (typeof reason !== "string") return null;
-  const trimmed = reason.trim();
-  return trimmed.length >= 1 && trimmed.length <= REASON_MAX ? trimmed : null;
-}
+const readReason = (input: unknown): string | null =>
+  cleanReason(isObj(input) ? input.reason : undefined);
 
 /** (K31) `laci` / `pemilik`; nilai lain (termasuk tanpa nilai) = null. */
 function readQrisSource(input: unknown): "laci" | "pemilik" | null {

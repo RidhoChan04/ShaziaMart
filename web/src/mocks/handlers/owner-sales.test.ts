@@ -89,6 +89,13 @@ describe("listOwnerSales & getOwnerSale", () => {
     const found = await list("?date=2026-11-04&q=0003");
     expect(found.map((r) => r.number)).toEqual(["20261104-0003"]);
     expect(await list("?date=2026-11-04&q=20261105")).toEqual([]);
+    // (fix 1) kontrak: q maksimal 20 karakter.
+    const longQ = await get(`/api/owner/sales?q=${"1".repeat(21)}`);
+    expect(longQ.status).toBe(422);
+    expect((await json<Problem>(longQ)).code).toBe("VALIDATION");
+    expect((await get(`/api/owner/sales?q=${"1".repeat(20)}`)).status).toBe(
+      200,
+    );
     for (const bad of ["2026-13-01", "kemarin", "2026-11-31"]) {
       const res = await get(`/api/owner/sales?date=${bad}`);
       expect(res.status, bad).toBe(422);
@@ -124,6 +131,21 @@ describe("listOwnerSales & getOwnerSale", () => {
     expect(body).toMatchObject({ voided: null, status: "selesai" });
     expect(body).not.toHaveProperty("costTotal");
   });
+});
+
+test("(fix 1) rekaman batal tanpa pembatal/jalur tidak dilabeli diam-diam: detail → 500, bukan channel 'kasir'", async () => {
+  await loginWithShift();
+  const sale = await sell();
+  mockDb.update((s) => {
+    const x = s.sales.find((y) => y.id === sale.id);
+    if (x) {
+      x.status = "dibatalkan";
+      x.voidedAt = NOW;
+    }
+  });
+  await ownerLogin();
+  const res = await get(`/api/owner/sales/${sale.id}`);
+  expect(res.status).toBe(500);
 });
 
 describe("voidOwnerSale (jawaban pemilik Q1: laci tidak pernah dikoreksi)", () => {

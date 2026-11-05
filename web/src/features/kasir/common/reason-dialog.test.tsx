@@ -91,14 +91,41 @@ test("pending: tidak bisa ditutup atau dikirim ulang; galat tampil sebagai alert
 test("(cek ulang) ketikan scanner (< 30 ms) + Enter di isian → ScannedAlert, isian kosong, onSubmit TIDAK dipanggil", async () => {
   const { onSubmit } = setup();
   await scannerTyping().type(reason(), "8991002101234{Enter}");
+  // (fix 1) isian bebas: teks khusus alasan, bukan "bukan angka".
   expect(screen.getByRole("alert")).toHaveTextContent(
-    "Itu barcode, bukan angka",
+    "Itu hasil scan barcode, bukan alasan",
   );
   expect(reason()).toHaveValue("");
   expect(onSubmit).not.toHaveBeenCalled();
   await humanTyping().type(reason(), "salah scan{Enter}");
   expect(screen.queryByRole("alert")).toBeNull();
   expect(onSubmit).toHaveBeenCalledExactlyOnceWith("salah scan");
+});
+
+test("(fix 1) burst scanner + Enter saat fokus di tombol konfirmasi atau di children → tidak mengirim", async () => {
+  const { user, onSubmit } = setup({
+    children: (
+      <input type="radio" name="r" aria-label="pilihan" defaultChecked />
+    ),
+  });
+  await user.type(reason(), "salah input");
+  await user.click(screen.getByRole("radio", { name: "pilihan" }));
+  await scannerTyping().keyboard("8991002101234{Enter}");
+  confirm().focus();
+  await scannerTyping().keyboard("8991002101234{Enter}");
+  expect(onSubmit).not.toHaveBeenCalled();
+  // Enter tangan di isian tetap mengirim.
+  await humanTyping().type(reason(), "{Enter}");
+  expect(onSubmit).toHaveBeenCalledExactlyOnceWith("salah input");
+});
+
+test("(fix 1) tanpa keterangan → tanpa deskripsi kosong yang terbaca", () => {
+  setup({ description: "" });
+  const dialog = screen.getByRole("dialog", {
+    name: "Batalkan 20261105-0144?",
+  });
+  expect(dialog).not.toHaveAttribute("aria-describedby");
+  expect(dialog.querySelector('[data-slot="dialog-description"]')).toBeNull();
 });
 
 test("children tampil di antara keterangan dan isian Alasan; isian tetap mendapat fokus pertama", () => {

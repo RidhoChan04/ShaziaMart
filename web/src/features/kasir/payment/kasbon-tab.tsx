@@ -21,7 +21,7 @@ export function KasbonFields({
         <p className="text-sm tabular-nums">
           {`Saldo setelah kasbon ${formatRupiah(after)}`}
           {after > customer.creditLimit && (
-            <span className="flex items-center gap-1.5 font-medium text-warning">
+            <span className="flex items-center gap-1.5 font-medium text-warning-ink">
               <TriangleAlert aria-hidden="true" className="size-4 shrink-0" />
               Melebihi limit — perlu alasan
             </span>

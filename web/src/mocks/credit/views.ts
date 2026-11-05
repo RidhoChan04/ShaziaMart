@@ -8,7 +8,13 @@ import type {
   OwnerCustomerRow,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { creditAge, creditAgeDays } from "@/shared/lib/credit-rules";
-import type { MockCreditPayment, MockState } from "../db";
+import {
+  customerNameOf,
+  type MockCreditPayment,
+  type MockSale,
+  type MockState,
+  saleVoidOf,
+} from "../db";
 import { oldestUnpaidAt } from "../ledger";
 
 /** Proyeksi pelunasan untuk kasir: hanya key allowlist kontrak (tanpa jalur, pencatat id, data batal). */
@@ -19,8 +25,7 @@ export function toKasirPayment(
   return {
     id: p.id,
     customerId: p.customerId,
-    customerName:
-      state.customers.find((c) => c.id === p.customerId)?.name ?? "",
+    customerName: customerNameOf(state, p.customerId) ?? "",
     amount: p.amount,
     // Jalur kasir hanya tunai/qris (recordPayment); rekaman jalur pemilik tidak pernah sampai sini.
     method: p.method === "qris" ? "qris" : "tunai",
@@ -86,6 +91,23 @@ export function ownerCustomerList(
 }
 
 /**
+ * Batal kasbon (entri −kredit ber-`saleId`) = batal penjualannya; data batal wajib lengkap
+ * (`saleVoidOf` melempar bila tidak). Tanpa rekaman penjualan (data lama) tidak ada pelaku/alasan.
+ */
+function kasbonCancel(
+  sale: MockSale | undefined,
+  at: number,
+): CreditHistoryEntry["cancelled"] {
+  const v = sale ? saleVoidOf(sale) : null;
+  if (v === null) {
+    throw new Error(
+      `Batal kasbon tanpa rekaman batal penjualan ${sale?.id ?? ""} (${at})`,
+    );
+  }
+  return { at: v.at, byName: v.byName, reason: v.reason, channel: v.channel };
+}
+
+/**
  * Riwayat pelanggan (K9), terbaru dulu: kasbon dan pelunasan, pembalik dilipat ke barisnya.
  * Batal kasbon karena batal jual memakai data batal penjualannya (`voided*`, ruling R4).
  */
@@ -111,14 +133,7 @@ function historyOf(
         saleNumber: sale?.number ?? null,
         kasirName: sale?.kasirName ?? null,
         payment: null,
-        cancelled: voided
-          ? {
-              at: sale?.voidedAt ?? voided.at,
-              byName: sale?.voidedByName ?? "",
-              reason: sale?.voidReason ?? "",
-              channel: sale?.voidChannel ?? "kasir",
-            }
-          : null,
+        cancelled: voided ? kasbonCancel(sale, voided.at) : null,
       };
     });
   const payments = state.creditPayments

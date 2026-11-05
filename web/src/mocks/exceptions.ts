@@ -4,7 +4,12 @@ import type {
   ExceptionKind,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { jakartaIsoDate } from "@/shared/lib/business-day";
-import type { MockSale, MockState } from "./db";
+import {
+  customerNameOf,
+  type MockSale,
+  type MockState,
+  saleVoidOf,
+} from "./db";
 
 /** (K29) Urutan tetap butir Perlu perhatian. */
 export const EXCEPTION_KINDS: readonly ExceptionKind[] = [
@@ -12,12 +17,6 @@ export const EXCEPTION_KINDS: readonly ExceptionKind[] = [
   "batal_pelunasan",
   "kasbon_lewat_limit",
 ];
-
-const customerName = (
-  state: Readonly<MockState>,
-  id: string | null,
-): string | null =>
-  id === null ? null : (state.customers.find((c) => c.id === id)?.name ?? null);
 
 /** Penjualan dari shift yang sudah tutup saat dibatalkan (ruling R12). */
 const fromClosedShift = (state: Readonly<MockState>, s: MockSale): boolean =>
@@ -33,33 +32,40 @@ function saleBased(
   const base = {
     id: s.id,
     kind,
-    customerName: customerName(state, s.customerId),
+    customerName: customerNameOf(state, s.customerId),
     saleId: s.id,
     saleNumber: s.number,
     paymentId: null,
   };
   if (kind === "kasbon_lewat_limit") {
+    const over = s.creditOverLimit;
+    if (over === null)
+      throw new Error(`Penjualan ${s.id} tanpa kasbon lewat limit`);
     return {
       ...base,
       at: s.createdAt,
       kasirName: s.kasirName,
-      amount: s.creditOverLimit?.excess ?? 0,
-      reason: s.creditOverLimit?.reason ?? "",
+      amount: over.excess,
+      reason: over.reason,
       fromClosedShift: false,
       refund: 0,
       qrisToOwner: 0,
     };
   }
+  const voided = saleVoidOf(s);
   const r = s.voidRefund;
+  if (voided === null || r === null) {
+    throw new Error(`Penjualan ${s.id} belum dibatalkan`);
+  }
   return {
     ...base,
-    at: s.voidedAt ?? s.createdAt,
-    kasirName: s.voidedByName ?? "",
+    at: voided.at,
+    kasirName: voided.byName,
     amount: s.total,
-    reason: s.voidReason ?? "",
+    reason: voided.reason,
     fromClosedShift: fromClosedShift(state, s),
-    refund: r?.drawer ?? 0,
-    qrisToOwner: r?.qrisSource === "pemilik" ? r.qris : 0,
+    refund: r.drawer,
+    qrisToOwner: r.qrisSource === "pemilik" ? r.qris : 0,
   };
 }
 
@@ -87,7 +93,7 @@ function eventsOf(
             kasirName: p.cancelledByName ?? "",
             amount: p.amount,
             reason: p.cancelReason ?? "",
-            customerName: customerName(state, p.customerId),
+            customerName: customerNameOf(state, p.customerId),
             saleId: null,
             saleNumber: null,
             paymentId: p.id,

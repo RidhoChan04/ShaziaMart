@@ -1,5 +1,6 @@
 import { type ReactNode, type RefObject, useId, useRef, useState } from "react";
-import { useScanGuard } from "@/shared/hooks/use-scan-guard";
+import { SCAN_GAP_MS, useScanGuard } from "@/shared/hooks/use-scan-guard";
+import { REASON_MAX } from "@/shared/lib/reason-rules";
 import { Button } from "@/shared/ui/button";
 import {
   Dialog,
@@ -12,11 +13,10 @@ import {
 import { Input } from "@/shared/ui/input";
 import { ScannedAlert } from "./scanned-alert";
 
-const REASON_MAX = 200;
-
 type Props = {
   open: boolean;
   title: string;
+  /** Kalimat ringkas di bawah judul; kosong = tanpa deskripsi (tidak dibacakan kosong). */
   description: string;
   confirmLabel: string;
   pending: boolean;
@@ -45,12 +45,25 @@ function ReasonForm({
   const [reason, setReason] = useState("");
   // Rentetan scanner + Enter di isian yang terfokus tidak boleh menjadi alasan (lalu terkirim).
   const guard = useScanGuard(setReason);
+  // Enter penutup rentetan scanner di elemen mana pun (radio, tombol) tidak boleh mengirim.
+  const lastDigitAt = useRef(Number.NEGATIVE_INFINITY);
   const trimmed = reason.trim();
   const ready = trimmed !== "" && !pending;
 
   return (
     <form
       className="grid gap-3"
+      onKeyDownCapture={(e) => {
+        const now = performance.now();
+        if (/^\d$/.test(e.key)) {
+          lastDigitAt.current = now;
+        } else if (
+          e.key === "Enter" &&
+          now - lastDigitAt.current < SCAN_GAP_MS
+        ) {
+          e.preventDefault();
+        }
+      }}
       onSubmit={(e) => {
         e.preventDefault();
         if (ready) onSubmit(trimmed);
@@ -72,7 +85,10 @@ function ReasonForm({
           guard.reset();
         }}
       />
-      <ScannedAlert show={guard.scanned} />
+      <ScannedAlert
+        show={guard.scanned}
+        text="Itu hasil scan barcode, bukan alasan"
+      />
       {error && !guard.scanned && (
         <p role="alert" className="text-sm font-medium text-danger">
           {error}
@@ -116,6 +132,7 @@ export function ReasonDialog({ open, title, description, ...form }: Props) {
       <DialogContent
         className="sm:max-w-[400px]"
         showCloseButton={!form.pending}
+        {...(description === "" ? { "aria-describedby": undefined } : {})}
         onOpenAutoFocus={(e) => {
           // Isian Alasan, bukan pilihan pertama di `children`.
           e.preventDefault();
@@ -124,9 +141,11 @@ export function ReasonDialog({ open, title, description, ...form }: Props) {
       >
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
-          <DialogDescription className="text-text tabular-nums">
-            {description}
-          </DialogDescription>
+          {description !== "" && (
+            <DialogDescription className="text-text tabular-nums">
+              {description}
+            </DialogDescription>
+          )}
         </DialogHeader>
         {open && <ReasonForm {...form} inputRef={inputRef} />}
       </DialogContent>

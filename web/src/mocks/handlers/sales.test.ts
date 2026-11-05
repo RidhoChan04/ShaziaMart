@@ -518,6 +518,24 @@ describe("kasbon lewat limit dengan alasan (ruling R3)", () => {
     expect(customerBalance("Pak Joko")).toBe(326_000);
   });
 
+  test("(fix 1) creditLimitReason > 200 karakter → 422 walau tidak melewati limit; tidak ada penjualan", async () => {
+    await loginWithShift();
+    for (const customer of ["Bu Sari", "Pak Joko"]) {
+      const res = await post("/api/sales", {
+        ...cashSale(),
+        payments: [{ method: "credit", amount: 36_000 }],
+        customerId: customerId(customer),
+        creditLimitReason: "x".repeat(201),
+      });
+      expect(res.status).toBe(422);
+      expect(await json<Problem>(res)).toMatchObject({
+        code: "VALIDATION",
+        detail: "Alasan maksimal 200 karakter",
+      });
+    }
+    expect(placedSales()).toHaveLength(0);
+  });
+
   test("(cek ulang) alasan terkirim padahal tidak melewati limit → diabaikan, creditOverLimit null", async () => {
     await loginWithShift();
     const body = {
@@ -607,7 +625,7 @@ describe("voidSale", () => {
       }),
     );
     expect(customerBalance("Bu Sari")).toBe(136000);
-    const res = await voidSale(sale.id, { ownerPin: "999999", reason: "x" });
+    const res = await voidSale(sale.id, { reason: "x" });
     expect(res.status).toBe(200);
     expect(customerBalance("Bu Sari")).toBe(120000);
     expect(mockDb.get().shift).toMatchObject({ cashSales: 0, salesCount: 0 });
@@ -622,7 +640,7 @@ describe("voidSale", () => {
     vi.setSystemTime(Date.UTC(2026, 9, 20, 6));
     await loginWithShift();
     const before = stockOf(BIMOLI);
-    const res = await voidSale(sale.id, { ownerPin: "999999", reason: "x" });
+    const res = await voidSale(sale.id, { reason: "x" });
     expect(res.status).toBe(200);
     expect(stockOf(BIMOLI)).toBe(before + 1);
     expect(mockDb.get().shift).toMatchObject({ cashSales: 0, salesCount: 0 });
@@ -632,11 +650,9 @@ describe("voidSale", () => {
   });
 
   test("void tanpa sesi → 401; saleId tak dikenal → 404", async () => {
-    expect(
-      (await voidSale("x", { ownerPin: "999999", reason: "x" })).status,
-    ).toBe(401);
+    expect((await voidSale("x", { reason: "x" })).status).toBe(401);
     await loginWithShift();
-    const res = await voidSale("x", { ownerPin: "999999", reason: "x" });
+    const res = await voidSale("x", { reason: "x" });
     expect(res.status).toBe(404);
   });
 });
