@@ -52,7 +52,7 @@ const staffOpnameRoute = createRoute({
 const staffKedaluwarsaRoute = createRoute({
   getParentRoute: () => staffRoute,
   path: "kedaluwarsa",
-  component: lazyRouteComponent(loadStaff, "StaffPlaceholderPage"),
+  component: lazyRouteComponent(loadStaff, "ExpiryPage"),
 });
 
 const staffLainnyaRoute = createRoute({

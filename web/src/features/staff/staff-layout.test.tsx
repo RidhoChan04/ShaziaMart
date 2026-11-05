@@ -12,7 +12,7 @@ const title = (name: string) =>
 const nav = () =>
   screen.getByRole("navigation", { name: "Navigasi orang toko" });
 
-test("tab Opname & Kedaluwarsa → 'Segera hadir'; Lainnya → 'Masuk sebagai Rina' → Keluar → layar login", async () => {
+test("tab Opname → 'Segera hadir'; Kedaluwarsa → daftar kedaluwarsa; Lainnya → 'Masuk sebagai Rina' → Keluar → layar login", async () => {
   await staffLogin("Rina");
   // Sesi kasir di PC harus tetap utuh saat orang toko keluar.
   expect((await login("123456")).status).toBe(200);
@@ -26,7 +26,10 @@ test("tab Opname & Kedaluwarsa → 'Segera hadir'; Lainnya → 'Masuk sebagai Ri
 
   await user.click(within(nav()).getByRole("link", { name: "Kedaluwarsa" }));
   expect(await title("Kedaluwarsa")).toBeInTheDocument();
-  expect(screen.getByText("Segera hadir")).toBeInTheDocument();
+  expect(
+    await screen.findByText("Tidak ada barang yang mendekati kedaluwarsa"),
+  ).toBeInTheDocument();
+  expect(screen.queryByText("Segera hadir")).toBeNull();
 
   await user.click(within(nav()).getByRole("link", { name: "Masuk" }));
   expect(await title("Barang masuk")).toBeInTheDocument();
