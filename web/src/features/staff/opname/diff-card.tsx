@@ -26,7 +26,7 @@ const STATUS: Partial<
   ditahan: {
     label: "Menunggu persetujuan pemilik",
     icon: <Clock aria-hidden="true" className="size-4" />,
-    className: "text-warning",
+    className: "text-warning-ink",
   },
   disetujui: {
     label: "Disetujui pemilik",

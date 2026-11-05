@@ -100,7 +100,7 @@ function SaveBar({
   return (
     <div className="mt-4 grid gap-2">
       {missing > 0 && (
-        <p className="flex items-center gap-1.5 text-[14px] font-semibold text-warning">
+        <p className="flex items-center gap-1.5 text-[14px] font-semibold text-warning-ink">
           <TriangleAlert aria-hidden="true" className="size-4" />
           {missing} barang belum diberi alasan
         </p>
