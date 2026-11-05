@@ -44,6 +44,27 @@ Aturan ini berlaku untuk semua kode di repo. Tujuannya satu: kode yang mudah dib
 - Interaksi: umpan balik muncul saat tombol **ditekan** (bukan dilepas); animasi hanya `transform` dan `opacity`; hormati `prefers-reduced-motion`; sheet/popover muncul dari arah pemicunya; label tombol spesifik ("Simpan harga", bukan "OK").
 - Kasir: tanpa tombol F; pintasan hanya `Enter`, `Esc`, `↑`, `↓`, `Delete`.
 
+### Daftar periksa UI pemilik (dan app HP orang toko)
+
+Disarikan dari spec §12b, §12d, §12e dan kode yang ada (`features/owner/owner-layout.tsx`, `page-header.tsx`, `common/sub-page-header.tsx`, `common/fit-amount.tsx`, `home/`, `products/detail/section.tsx`, `products/status-badge.tsx`). Setiap layar dan mockup baru dicocokkan butir per butir sebelum ditunjukkan; mockup dimulai dari `docs/specs/assets/_kerangka-pemilik.html`.
+
+1. **Tab bar:** kapsul kaca mengambang (`glass`, `TabNav`), 5 tab ikon lucide + label — Beranda `House`, Barang `Package`, Laporan `ChartColumn`, Kasbon `NotebookPen`, Lainnya `Ellipsis`; tab aktif latar `primary-soft` + teks `primary`. Laptop (≥ 1024 px) = sidebar kaca.
+2. **Header tab:** tanggal bisnis kecil (13 px, muted) → judul besar 32 px tebal → pil status "Toko online"/"Toko offline" (titik + teks) di kanan.
+3. **Sub-halaman:** tombol kembali berbentuk pil putih 44 px (`‹ {label induk}`), lalu judul 28 px; tanpa tab bar ganda.
+4. **Saat digulir:** judul besar pindah ke bar judul kaca kecil di atas (52 px, 17 px semibold, hanya < 1024 px).
+5. **Kartu:** latar halaman `#f2f2f7`; kartu putih terpisah tanpa garis tepi, sudut ±20 px (`rounded-lg`); pemisah baris setipis rambut; angka kunci = kartu 2×2 terpisah, bukan satu kartu bersekat. Kaca hanya untuk navigasi/bar judul, tidak untuk kartu.
+6. **Judul bagian:** 20 px tebal di atas kartu (`Section`), teks kecil opsional di kanan judul.
+7. **Grafik:** gaya Health — batang membulat, sumbu nilai di kanan dengan 3 garis bantu samar, label di nilai tertinggi, kalimat ringkas di atas grafik, legenda bila > 1 seri, nilai berjalan sedikit lebih terang. Kontrak a11y seperti Beranda: grup fokus berlabel, pembacaan langsung saat disentuh/geser/panah, tabel sr-only. Palet dicek validator dataviz.
+8. **Warna:** hijau `primary` hanya untuk penekanan (angka utama, data berjalan, tab aktif); merah/oranye hanya untuk status dan **selalu ikon + teks** (`StatusBadge`: `danger-soft`/`danger-ink`, `warning-soft`/`warning-ink`). Kontras teks ≥ 4,5:1, elemen UI ≥ 3:1.
+9. **Uang:** angka lengkap (`formatRupiah`, mis. Rp7.912.300) dengan `FitAmount` (huruf mengecil bertahap bila panjang, tidak pernah "…"); format singkat ("12,3 jt", "880 rb") hanya untuk label grafik.
+10. **Teks:** Bahasa Indonesia baku seperti app sekarang — tanpa "nggak", "gak", "kejual", "ketahan"; huruf kalimat ("Laba kotor"), bukan HURUF BESAR; pembanding memakai pola Beranda ("▲ 8% dari 1–5 Okt").
+11. **Tanpa catatan developer di UI:** tanpa rujukan PRD/spec, cara kerja server, tanda "→", atau penjelasan untuk pembangun.
+12. **Baris daftar:** gaya Settings — ikon dalam kotak 30 px (opsional), judul + satu baris keterangan kecil, keterangan/nilai di kanan sebelum `›`; angka dan satuannya tidak dipisah baris; tinggi baris rata (≥ 56 px untuk dua baris).
+13. **Target sentuh ≥ 44 px** (tombol, ‹ › periode, baris); fokus selalu terlihat.
+14. **Jarak aman bawah:** isi terakhir tidak tertutup tab bar (`pb-[calc(7rem+env(safe-area-inset-bottom))]` di kerangka).
+15. **Lebar 360 px:** tidak ada potongan atau gulir samping; cek juga 1280 px.
+16. **Mockup:** angka contoh ditandai ("angka contoh") di judul mockup, bukan di dalam layar HP.
+
 ## Performa
 
 - `/kasir` dan `/owner` dimuat terpisah (lazy route); jangan mengimpor kode owner dari kasir atau sebaliknya.
