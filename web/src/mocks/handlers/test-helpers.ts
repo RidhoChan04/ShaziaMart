@@ -62,6 +62,10 @@ export const FORBIDDEN_STAFF_KEYS: readonly string[] = [
   "stock",
   "grossProfit",
   "openingCash",
+  "value",
+  "totalValue",
+  "lossValue",
+  "gainValue",
 ];
 
 /** Semua key objek di nilai JSON, rekursif (termasuk di dalam array). */

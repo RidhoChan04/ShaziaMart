@@ -177,11 +177,15 @@ export function applyEdit(
         state.stockEntries.push({
           id: newId(now),
           productId: p.id,
-          receiptId: r.id,
           at: now,
-          kind: "koreksi_masuk",
+          effectiveAt: now,
           qtyBase: step.delta,
           actorName: actor.name,
+          kind: "koreksi_masuk",
+          receiptId: r.id,
+          lineId: l.lineId,
+          opnameId: null,
+          reason: null,
         });
       }
     }
@@ -222,11 +226,15 @@ export function applyCancel(
     state.stockEntries.push({
       id: newId(now),
       productId: p.id,
-      receiptId: r.id,
       at: now,
-      kind: "batal_masuk",
+      effectiveAt: now,
       qtyBase: -qtyBase,
       actorName: actor.name,
+      kind: "batal_masuk",
+      receiptId: r.id,
+      lineId: l.lineId,
+      opnameId: null,
+      reason: null,
     });
   }
   const changes = correctCash(state, r, -laciPaid(r), now);

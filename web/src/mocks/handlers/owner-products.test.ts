@@ -778,6 +778,64 @@ describe("barang pemilik", () => {
     expect((await del(`/api/owner/products/${newId()}`)).status).toBe(404);
   });
 
+  test("K27: entri opname/stok awal/keluar kedaluwarsa tampil di mutasi dengan alasannya dan waktu dicatat (bukan waktu efektif)", async () => {
+    const id = productId(INDOMIE);
+    const at = Date.UTC(2026, 10, 5, 3, 30);
+    const entry = {
+      productId: id,
+      actorName: "Rina",
+      receiptId: null,
+      lineId: null,
+      opnameId: "sesi-1",
+    };
+    mockDb.update((s) => {
+      s.stockEntries.push(
+        {
+          ...entry,
+          id: "e1",
+          at,
+          effectiveAt: at - 1_800_000,
+          kind: "opname",
+          qtyBase: -2,
+          reason: "rusak",
+        },
+        {
+          ...entry,
+          id: "e2",
+          at: at + 1,
+          effectiveAt: at + 1,
+          kind: "keluar_kedaluwarsa",
+          qtyBase: -3,
+          receiptId: "r1",
+          lineId: "l1",
+          opnameId: null,
+          reason: null,
+        },
+      );
+    });
+    const moves = await json<StockMovement[]>(
+      await fetch(`/api/owner/products/${id}/movements`),
+    );
+    expect(moves.filter((m) => m.id === "e1" || m.id === "e2")).toEqual([
+      {
+        id: "e2",
+        at: at + 1,
+        kind: "keluar_kedaluwarsa",
+        qtyBase: -3,
+        kasirName: "Rina",
+        reason: null,
+      },
+      {
+        id: "e1",
+        at,
+        kind: "opname",
+        qtyBase: -2,
+        kasirName: "Rina",
+        reason: "rusak",
+      },
+    ]);
+  });
+
   test("mutasi: Rina jual 2 Indomie lalu batal → movements[0] {kind:'batal', qtyBase:2, kasirName:'Rina', reason:null}, [1] {kind:'jual', qtyBase:-2}; recentMovements ≤ 5", async () => {
     await loginWithShift();
     const res = await post("/api/sales", {

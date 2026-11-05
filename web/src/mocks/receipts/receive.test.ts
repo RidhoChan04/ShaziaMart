@@ -226,6 +226,20 @@ describe("applyReceipt", () => {
       ["pcs", 1, 50_000],
     ]);
     expect(state.stockEntries.map((e) => e.qtyBase)).toEqual([80, 20]);
+    // K7: entri barang masuk berlaku saat dicatat; dikunci ke baris notanya (K9).
+    expect(state.stockEntries[1]).toEqual({
+      id: expect.any(String),
+      productId: indomie.id,
+      receiptId: r.id,
+      lineId: "l2",
+      opnameId: null,
+      reason: null,
+      at: NOW,
+      effectiveAt: NOW,
+      kind: "masuk",
+      qtyBase: 20,
+      actorName: rina.name,
+    });
     // Transfer: tanpa uang keluar laci.
     expect(state.shift).toBeNull();
   });

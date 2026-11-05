@@ -104,11 +104,15 @@ function applyLine(
   state.stockEntries.push({
     id: newId(now),
     productId: p.id,
-    receiptId,
     at: now,
-    kind: "masuk",
+    effectiveAt: now,
     qtyBase: qtyIn,
     actorName: user.name,
+    kind: "masuk",
+    receiptId,
+    lineId: l.lineId,
+    opnameId: null,
+    reason: null,
   });
   return {
     lineId: l.lineId,

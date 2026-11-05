@@ -105,7 +105,7 @@ test("deterministik untuk now yang sama", () => {
 
 test("PIN seed dan state awal", () => {
   const s = createSeedState();
-  expect(s.version).toBe(5);
+  expect(s.version).toBe(6);
   expect(s.users.map((u) => [u.name, u.role, u.pin, u.password])).toEqual([
     ["Rina", "kasir", "123456", undefined],
     ["Budi", "kasir", "654321", undefined],
@@ -126,6 +126,16 @@ test("PIN seed dan state awal", () => {
     [],
     [],
     [],
+  ]);
+  // Tanpa sesi opname & log kedaluwarsa seed; batas stok tetap (J8).
+  expect([s.opnameSessions, s.expiryLog, s.stockRules]).toEqual([
+    [],
+    [],
+    {
+      expirySoonDays: 30,
+      opnameItemLimit: 100_000,
+      opnameSessionLimit: 250_000,
+    },
   ]);
 });
 
@@ -163,13 +173,13 @@ test("ID unik di seluruh state", () => {
   expect(new Set(ids).size).toBe(ids.length);
 });
 
-test("state versi lama di localStorage diganti default v5", () => {
+test("state versi lama di localStorage diganti default v6", () => {
   localStorage.setItem(
     "mock.db",
     JSON.stringify({ store: { id: "x", name: "y" } }),
   );
   __resetMockDbCacheForTests();
-  expect(mockDb.get().version).toBe(5);
+  expect(mockDb.get().version).toBe(6);
   expect(mockDb.get().products).toHaveLength(60);
 });
 

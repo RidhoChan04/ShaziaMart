@@ -3,6 +3,9 @@ import type {
   Customer,
   DebtPayment,
   KasirSettings,
+  OpnameItemState,
+  OpnameReason,
+  OpnameScope,
   PriceHistoryEntry,
   Product,
   ProductCost,
@@ -90,15 +93,90 @@ export type MockReceipt = {
   cancelledAt: number | null;
 };
 export type MockAuditEntry = ReceiptAuditEntry & { receiptId: string };
-/** Mutasi stok dari barang masuk; `qtyBase` bertanda (batal/koreksi turun = negatif). */
+/**
+ * Ledger stok append-only selain penjualan; `qtyBase` bertanda (batal/koreksi turun/keluar = negatif).
+ * `effectiveAt` = jam mutasi itu berlaku untuk stok pada jam t (K7): `at`, kecuali opname/stok awal
+ * yang memakai jam hitungnya. Barang masuk & keluar kedaluwarsa dikunci ke baris nota (K9).
+ */
 export type MockStockEntry = {
   id: string;
   productId: string;
-  receiptId: string;
   at: number;
-  kind: "masuk" | "koreksi_masuk" | "batal_masuk";
+  effectiveAt: number;
   qtyBase: number;
   actorName: string;
+  kind:
+    | "masuk"
+    | "koreksi_masuk"
+    | "batal_masuk"
+    | "opname"
+    | "stok_awal"
+    | "keluar_kedaluwarsa";
+  receiptId: string | null;
+  lineId: string | null;
+  opnameId: string | null;
+  reason: OpnameReason | null;
+};
+
+/** Satu barang di sesi opname; `value` (rupiah selisih) hanya untuk pemilik. */
+export type MockOpnameItem = {
+  productId: string;
+  productName: string;
+  unitName: string;
+  unitSize: number;
+  isCurah: boolean;
+  countedQtyBase: number;
+  countedAt: number;
+  clockEstimated: boolean;
+  systemQtyBase: number;
+  diffQtyBase: number;
+  value: number | null;
+  state: OpnameItemState;
+  reason: OpnameReason | null;
+  receiptRefId: string | null;
+  resolvedByName: string | null;
+  resolvedAt: number | null;
+  replacedBySessionId: string | null;
+  recount: {
+    countedQtyBase: number;
+    countedAt: number;
+    systemQtyBase: number;
+    diffQtyBase: number;
+    value: number | null;
+  } | null;
+};
+export type MockOpnameSession = {
+  id: string;
+  scope: OpnameScope;
+  createdById: string;
+  createdByName: string;
+  submittedAt: number;
+  finishedAt: number | null;
+  status: "menunggu_alasan" | "selesai";
+  flagged: boolean;
+  reviewedByName: string | null;
+  reviewedAt: number | null;
+  items: MockOpnameItem[];
+};
+/** Log kedaluwarsa; `lossValue` = nilai saat kejadian (K28), hanya untuk `keluar`. */
+export type MockExpiryEvent = {
+  id: string;
+  at: number;
+  actorName: string;
+  kind: "keluar" | "ubah_ed";
+  productId: string;
+  receiptId: string;
+  lineId: string;
+  qtyBase: number | null;
+  fromDate: string | null;
+  toDate: string | null;
+  lossValue: number | null;
+};
+/** Batas tetap di server (J8); layar pengaturannya di F3c. */
+export type StockRules = {
+  expirySoonDays: number;
+  opnameItemLimit: number;
+  opnameSessionLimit: number;
 };
 
 type LoginFailures = Record<
@@ -107,7 +185,7 @@ type LoginFailures = Record<
 >;
 
 export type MockState = {
-  version: 5;
+  version: 6;
   store: { id: string; name: string };
   users: MockUser[];
   session: { userId: string } | null;
@@ -141,6 +219,11 @@ export type MockState = {
   receipts: MockReceipt[];
   receiptAudit: MockAuditEntry[];
   stockEntries: MockStockEntry[];
+  /** Status, alasan, dan keputusan pemilik per barang berubah; daftar sesinya append. */
+  opnameSessions: MockOpnameSession[];
+  /** Append-only. */
+  expiryLog: MockExpiryEvent[];
+  stockRules: StockRules;
 };
 
 const STORAGE_KEY = "mock.db";
@@ -150,7 +233,7 @@ const isObj = (x: unknown): x is Record<string, unknown> =>
 
 /** Pemeriksaan struktur murah (bukan validasi mendalam). */
 function isState(value: unknown): value is MockState {
-  if (!isObj(value) || value.version !== 5) return false;
+  if (!isObj(value) || value.version !== 6) return false;
   const { store } = value;
   return (
     isObj(store) &&
@@ -169,6 +252,8 @@ function isState(value: unknown): value is MockState {
       "receipts",
       "receiptAudit",
       "stockEntries",
+      "opnameSessions",
+      "expiryLog",
     ].every((k) => Array.isArray(value[k])) &&
     [
       "pinFailures",
@@ -179,6 +264,7 @@ function isState(value: unknown): value is MockState {
       "costAlerts",
       "settings",
       "saleSeq",
+      "stockRules",
     ].every((k) => isObj(value[k])) &&
     ["session", "ownerSession", "staffSession", "shift"].every(
       (k) => value[k] === null || isObj(value[k]),

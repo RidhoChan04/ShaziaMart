@@ -246,7 +246,7 @@ export function createSeedState(now: number = Date.now()): MockState {
     id: makeId(KIND.user, i + 1),
   }));
   const state: MockState = {
-    version: 5,
+    version: 6,
     store: { id: makeId(KIND.store, 1), name: "ShaziaMart" },
     users,
     session: null,
@@ -278,6 +278,13 @@ export function createSeedState(now: number = Date.now()): MockState {
     receipts: [],
     receiptAudit: [],
     stockEntries: [],
+    opnameSessions: [],
+    expiryLog: [],
+    stockRules: {
+      expirySoonDays: 30,
+      opnameItemLimit: 100_000,
+      opnameSessionLimit: 250_000,
+    },
   };
   generateHistory(state, now);
   return state;
