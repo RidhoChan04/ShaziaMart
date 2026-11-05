@@ -4,6 +4,7 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { mockDb } from "@/mocks/db";
 import { ownerLogin } from "@/mocks/handlers/test-helpers";
 import { applySampleStock } from "@/mocks/stock/sample";
+import { getGetOwnerTodaySummaryQueryKey } from "@/shared/api/gen/owner/owner";
 import { renderApp } from "@/test/render-app";
 
 /** Senin 2 Nov 2026 10.00 WIB. */
@@ -82,6 +83,27 @@ test("keluarkan seperti staf: log memuat nama pemilik dan nilai Rp", async () =>
   expect(log).toHaveTextContent("Rp30.000");
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   expect(rowOf("Sari Roti Tawar")).toHaveTextContent("±1 bungkus");
+});
+
+test("setelah keluarkan, ringkasan hari ini dimuat ulang (butir perhatian & Lainnya)", async () => {
+  const user = userEvent.setup();
+  const { queryClient } = renderApp("/owner/lainnya/kedaluwarsa");
+  await screen.findByText("Sari Roti Tawar");
+  const spy = vi.spyOn(queryClient, "invalidateQueries");
+  await user.click(
+    within(rowOf("Sari Roti Tawar")).getByRole("button", { name: "Pilihan" }),
+  );
+  await user.click(
+    await screen.findByRole("button", { name: /Keluarkan dari stok/ }),
+  );
+  const dialog = await screen.findByRole("dialog", {
+    name: "Keluarkan dari stok",
+  });
+  await user.click(within(dialog).getByRole("button", { name: "Keluarkan 3" }));
+  await screen.findByText("3 Sari Roti Tawar dikeluarkan");
+  expect(spy).toHaveBeenCalledWith({
+    queryKey: getGetOwnerTodaySummaryQueryKey(),
+  });
 });
 
 test("ubah tanggal ED seperti staf: toast dan log ubah ED tanpa Rp", async () => {

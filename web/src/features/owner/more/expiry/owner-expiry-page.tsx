@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   getGetOwnerExpiryQueryKey,
+  getGetOwnerTodaySummaryQueryKey,
   useCreateOwnerExpiryRemoval,
   useGetOwnerExpiry,
   usePutOwnerLineExpiry,
@@ -106,8 +107,12 @@ export function OwnerExpiryPage() {
   // Setelah berhasil, baris bisa pindah/hilang; fokus lalu jatuh ke wadah halaman.
   const needsFocus = useRef(false);
 
+  // Ringkasan hari ini ikut disegarkan: butir perhatian Beranda dan angka Lainnya bergantung padanya.
   const refresh = () =>
-    client.invalidateQueries({ queryKey: getGetOwnerExpiryQueryKey() });
+    Promise.all([
+      client.invalidateQueries({ queryKey: getGetOwnerExpiryQueryKey() }),
+      client.invalidateQueries({ queryKey: getGetOwnerTodaySummaryQueryKey() }),
+    ]);
   const removal = useCreateOwnerExpiryRemoval();
   const fixDate = usePutOwnerLineExpiry();
 
