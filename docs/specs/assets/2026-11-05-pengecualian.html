@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pengecualian kasir v1 (angka contoh)</title>
+<style>
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+/* ===== Token (salinan styles.css + :root[data-app="owner"]) ===== */
+:root{
+  --primary:#1f7a4d;--primary-fg:#fff;--primary-deep:#155c3b;--primary-soft:#e6f2ea;
+  --bg:#f2f2f7;--surface:#fff;--text:#1c2421;--muted:#6e6e73;--border:#e5e5ea;
+  --danger:#b42318;--danger-soft:#fde8e6;--danger-ink:#9b1c12;
+  --warning:#b26b00;--warning-soft:#fff0d9;--warning-ink:#8a4b00;
+  --chart-1:#1f7a4d;--chart-1-now:#2e9a62;--chart-2:#d1d1d6;
+  --glass:rgb(255 255 255 / .72);--radius-lg:20px;--radius-md:8px;
+}
+/* ===== Halaman galeri (di luar HP) ===== */
+body{margin:0;padding:24px;background:#e9ece9;font-family:Inter,system-ui,sans-serif;color:#1c2421}
+.g-title{margin:0 0 4px;font-size:20px}.g-sub{margin:0 0 18px;color:#5e6b65;font-size:14px;max-width:980px}
+.g-row{display:flex;gap:40px;flex-wrap:wrap;justify-content:center;align-items:flex-start}
+.g-col{display:flex;flex-direction:column;align-items:center;gap:10px}
+.g-col>h3{margin:14px 0 0;font-size:15px}.g-col>p{margin:0;max-width:340px;text-align:center;font-size:13px;opacity:.8}
+/* ===== HP 360 px ===== */
+.k-phone{width:360px;height:740px;border-radius:44px;overflow:hidden;position:relative;background:var(--bg);color:var(--text);
+  box-shadow:0 0 0 10px #1d1d1f,0 24px 60px rgba(0,0,0,.28);font-family:Inter,-apple-system,system-ui,sans-serif;
+  font-size:16px;letter-spacing:-.01em;line-height:1.3}
+.k-phone *{box-sizing:border-box}
+.k-num{font-variant-numeric:tabular-nums}
+svg.k-i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none;display:block}
+/* Header tab (PageHeader): px-4 pt-4 pb-3 */
+.k-header{padding:16px 16px 12px}
+.k-date{font-size:13px;font-weight:600;color:var(--muted)}
+.k-titlerow{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.k-h1{margin:0;font-size:32px;line-height:1.25;font-weight:700;letter-spacing:-.025em}
+.k-status{display:inline-flex;align-items:center;gap:6px;border-radius:99px;padding:4px 10px;font-size:13px;font-weight:600;background:var(--primary-soft);color:var(--primary);flex:none}
+.k-status::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--primary)}
+.k-status.off{background:rgb(180 35 24 / .1);color:var(--danger)}.k-status.off::before{background:var(--danger)}
+/* Isi (main): px-4 pt-1, ruang bawah 7rem untuk tab bar */
+.k-main{padding:4px 16px 112px}
+.k-stack{display:grid;gap:12px}
+.k-stack>*{min-width:0}
+/* Sub-halaman (SubPageHeader) */
+.k-subheader{padding:12px 0 12px}
+.k-back{display:inline-flex;height:44px;align-items:center;gap:2px;border-radius:99px;background:var(--surface);padding:0 16px 0 10px;font-size:15px;font-weight:600;color:var(--primary);box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.k-eyebrow{margin:12px 0 0;font-size:13px;font-weight:600;color:var(--muted)}
+.k-h1sub{margin:12px 0 0;font-size:28px;line-height:1.2;font-weight:700;letter-spacing:-.025em}
+/* Bar judul kaca saat digulir (CompactTitle) */
+.k-compact{position:absolute;top:0;left:0;right:0;height:52px;z-index:20;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:600}
+/* Kaca: hanya tab bar, sidebar, bar judul */
+.k-glass{background:var(--glass);backdrop-filter:blur(22px) saturate(180%);-webkit-backdrop-filter:blur(22px) saturate(180%);border:.5px solid rgb(255 255 255 / .7);box-shadow:0 1px 12px rgb(0 0 0 / .06)}
+/* Tab bar (TabNav): fixed 12px dari tepi, rounded-full p-1, tab min-h-12 */
+.k-tabbar{position:absolute;left:12px;right:12px;bottom:12px;z-index:30;border-radius:99px;padding:4px}
+.k-tabbar ul{display:flex;gap:4px;margin:0;padding:0;list-style:none}
+.k-tabbar li{flex:1}
+.k-tab{display:flex;min-height:48px;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:0 4px;border-radius:99px;font-size:12px;color:var(--text)}
+.k-tab.on{background:var(--primary-soft);color:var(--primary);font-weight:600}
+/* Kartu */
+.k-card{background:var(--surface);border-radius:var(--radius-lg);overflow:hidden}
+.k-pad{padding:14px 16px}
+/* Angka kunci 2×2 (KpiTiles): kartu terpisah, gap 8 */
+.k-tiles{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.k-tile{background:var(--surface);border-radius:var(--radius-lg);padding:12px 14px;min-width:0}
+.k-tile dt{font-size:13px;font-weight:600;color:var(--muted)}
+.k-tile dd{margin:0;font-weight:700;font-size:21px;white-space:nowrap}
+.k-tile dd.fit-19{font-size:19px}.k-tile dd.fit-17{font-size:17px}
+/* Pita omzet C4 */
+.k-band{background:linear-gradient(155deg,var(--primary),var(--primary-deep));color:var(--primary-fg);padding:16px 16px 14px}
+.k-band .lbl{font-size:13px;font-weight:600}
+.k-band .big{margin-top:2px;font-size:34px;line-height:1.25;font-weight:700;letter-spacing:-.03em;white-space:nowrap}
+.k-band .pill{display:inline-flex;margin-top:8px;border-radius:99px;background:rgb(255 255 255 / .12);padding:4px 10px;font-size:13px;font-weight:600}
+.k-chartsec{padding:14px 16px 16px}
+.k-chartsec h2{margin:0 0 4px;font-size:13px;font-weight:600;color:var(--muted)}
+.k-lead{margin:0 0 6px;font-size:13px;color:var(--muted)}.k-lead b{color:var(--text)}
+.k-legend{display:flex;gap:14px;margin-top:8px;font-size:12px;color:var(--muted)}
+.k-legend span{display:inline-flex;align-items:center;gap:6px}.k-legend i{width:10px;height:10px;border-radius:3px;display:inline-block}
+/* Section + RowList */
+.k-section-h{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:0 4px;margin-bottom:8px}
+.k-section-h h2{margin:0;font-size:20px;font-weight:700;letter-spacing:-.02em}
+.k-section-h span{font-size:15px;font-weight:600;color:var(--muted)}
+.k-section-h a{font-size:15px;font-weight:500;color:var(--primary)}
+.k-rows{list-style:none;margin:0;padding:0}
+.k-rows li+li{border-top:.5px solid var(--border)}
+.k-rows.inset li+li{border-top:0;position:relative}
+.k-rows.inset li+li::before{content:"";position:absolute;top:0;left:58px;right:0;border-top:.5px solid var(--border)}
+.k-rowl{display:flex;min-height:56px;align-items:center;gap:12px;padding:8px 16px;font-size:17px}
+.k-rowl.sm{font-size:16px}
+.k-rowl .t{flex:1;min-width:0}
+.k-rowl .t small{display:block;font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.k-rowl .r{flex:none;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap;font-size:15px}
+.k-rowl .v{flex:none;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;font-size:15px}
+.k-rowl .chev{width:16px;height:16px;color:var(--muted)}
+.k-box{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;flex:none;background:var(--primary);color:var(--primary-fg)}
+.k-box svg.k-i{width:18px;height:18px}
+/* StatusBadge: ikon + teks, selalu */
+.k-badge{display:inline-flex;align-items:center;gap:4px;border-radius:99px;padding:2px 8px;font-size:12px;font-weight:600;white-space:nowrap}
+.k-badge svg.k-i{width:12px;height:12px;stroke-width:2.4}
+.k-badge.warn{background:var(--warning-soft);color:var(--warning-ink)}
+.k-badge.bad{background:var(--danger-soft);color:var(--danger-ink)}
+.k-badge.neutral{background:var(--border);color:var(--text)}
+/* Tombol */
+.k-btn{display:inline-flex;height:44px;align-items:center;justify-content:center;gap:8px;border-radius:12px;padding:0 16px;font-size:16px;font-weight:600;background:var(--primary);color:var(--primary-fg)}
+.k-btn.outline{background:var(--surface);color:var(--text);border:1px solid var(--border)}
+/* Segmented control (bila perlu) */
+.k-seg{display:flex;background:#e3e3e8;border-radius:9px;padding:2px}
+.k-seg span{flex:1;display:grid;place-items:center;min-height:32px;font-size:13px;font-weight:600;border-radius:7px;color:#3a3a3c}
+.k-seg span.on{background:var(--surface);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+</style>
+<style>
+.x-tot .lbl{font-size:13px;font-weight:600;color:var(--muted)}
+.x-tot .big{font-size:30px;font-weight:700;letter-spacing:-.025em;margin-top:2px;white-space:nowrap}
+.x-tot .meta{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:13px;color:var(--muted);margin-top:4px}
+.x-search{display:flex;align-items:center;gap:8px;height:44px;border-radius:12px;background:#e3e3e8;padding:0 12px;color:var(--muted);font-size:16px}
+.x-search.on{color:var(--text)}
+.x-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.x-btns .k-btn{width:100%}
+.k-btn.bad{background:var(--danger)}
+.k-btn.full{width:100%;height:48px;font-size:17px}
+.x-strike{text-decoration:line-through;color:var(--muted)}
+.x-dim{position:absolute;inset:0;background:rgba(0,0,0,.36);z-index:40}
+.x-sheet{position:absolute;left:0;right:0;bottom:0;z-index:41;background:var(--surface);border-radius:20px 20px 0 0;padding:16px 16px 28px;display:grid;gap:12px}
+.x-dlg{position:absolute;left:16px;right:16px;top:50%;transform:translateY(-50%);z-index:41;background:var(--surface);border-radius:20px;padding:18px 16px 16px;display:grid;gap:12px}
+.x-sheet h2,.x-dlg h2{margin:0;font-size:20px;font-weight:700;letter-spacing:-.02em}
+.x-dlg p{margin:0;font-size:15px;line-height:1.35}
+.x-kv{background:var(--bg);border-radius:var(--radius-lg);padding:12px;display:grid;gap:6px;font-size:15px}
+.x-kv div{display:flex;justify-content:space-between;gap:12px}.x-kv span:first-child{color:var(--muted)}.x-kv b{font-variant-numeric:tabular-nums}
+.x-leg{font-size:15px;font-weight:600;margin-bottom:6px}
+.x-choice{display:flex;gap:8px}.x-choice span{flex:1;min-height:44px;display:grid;place-items:center;border-radius:8px;background:var(--bg);font-size:15px;font-weight:600}
+.x-choice span.on{background:var(--primary);color:#fff}
+.x-field{display:flex;align-items:center;height:52px;border-radius:12px;border:2px solid var(--primary);padding:0 12px;font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
+.x-field i{font-style:normal;color:var(--muted);font-weight:500;margin-right:8px}
+.x-field.plain{border:1px solid var(--border);font-size:16px;font-weight:500;height:48px}
+.x-field.err{border-color:var(--danger)}
+.x-chip{display:inline-flex;align-items:center;min-height:44px;padding:0 14px;border-radius:99px;background:var(--bg);font-size:14px;font-weight:600;color:var(--primary)}
+.x-help{font-size:13px;color:var(--muted);margin:6px 0 0}
+.x-errt{display:flex;gap:6px;align-items:center;margin:6px 0 0;font-size:13px;font-weight:600;color:var(--danger-ink)}
+.x-errt svg.k-i{width:16px;height:16px}
+.x-btnrow{display:flex;gap:8px}.x-btnrow .k-btn{flex:1}.x-btnrow.col .k-btn{flex:none;width:100%}
+.x-per{display:flex;align-items:center;background:var(--surface);border-radius:14px;height:48px}
+.x-per .pb{width:48px;height:48px;display:grid;place-items:center;color:var(--primary)}
+.x-per .pb.off{color:#c7c7cc}
+.x-per span.l{flex:1;text-align:center;font-weight:600}
+.k-tile small{display:block;font-size:12px;color:var(--muted);font-weight:500;white-space:nowrap}
+.k-tile dt{white-space:nowrap}
+.x-rank{width:16px;text-align:center;font-weight:700;font-size:14px;color:var(--muted);flex:none}
+.x-note{font-size:13px;color:var(--muted);margin:8px 4px 0}
+.x-ev{padding:12px 16px}
+.x-ev+.x-ev{border-top:.5px solid var(--border)}
+.x-ev .h{display:flex;justify-content:space-between;gap:8px;font-size:16px}
+.x-ev .h b{font-weight:600}.x-ev .h .v{font-weight:600;white-space:nowrap;font-variant-numeric:tabular-nums}
+.x-ev small{display:block;font-size:13px;color:var(--muted);margin-top:2px}
+.x-duty{margin-top:8px;padding:8px 10px;border-radius:12px;background:var(--bg);font-size:13px}
+.x-sl{display:flex;overflow:hidden;align-items:center;gap:6px;margin-top:2px;font-size:13px;color:var(--muted);white-space:nowrap}
+.x-wrap{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:2px;font-size:13px;color:var(--muted)}
+.x-chsp{width:16px;flex:none}
+.x-rt{flex:none;text-align:right;display:grid;justify-items:end;gap:2px}
+.x-rt small{font-size:13px;color:var(--muted)}
+.x-att .t{font-size:16px}
+.x-toast{position:absolute;left:50%;transform:translateX(-50%);bottom:84px;z-index:50;background:#1c2421;color:#fff;border-radius:99px;padding:10px 16px;font-size:14px;font-weight:600;white-space:nowrap}
+.x-box2{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;flex:none;color:#fff}
+.x-box2 svg.k-i{width:18px;height:18px}
+.x-box2.w{background:var(--warning)}.x-box2.d{background:var(--danger)}
+.x-empty{padding:18px 16px;font-size:16px;color:var(--muted);text-align:center}
+
+.x-hr{flex:1;min-width:0;display:grid;gap:1px}
+.x-hr .l1{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.x-hr .l1 .ti{font-size:16px;min-width:0}
+.x-hr .l1 .v{font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.x-hr .l2{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;color:var(--muted)}
+.x-btnrow.col{flex-direction:column}
+.x-pay{padding:12px 16px;font-size:16px;display:flex;justify-content:space-between;gap:12px}
+.x-pay+.x-pay{border-top:.5px solid var(--border)}
+.x-pay span:last-child{font-weight:600;font-variant-numeric:tabular-nums}
+.x-pay span:first-child{color:var(--muted)}
+.x-card2{padding:14px 16px;display:grid;gap:6px}
+.x-card2 .why{font-size:15px}
+</style>
+</head><body>
+<h1 class="g-title">Pengecualian kasir v1 (angka contoh)</h1>
+<p class="g-sub">Dibangun di atas _kerangka-pemilik.html. 1 Beranda, 2–4 halaman tinjau, 5 Lainnya, 6–10 Transaksi dan batal transaksi dari app pemilik.</p>
+<div class="g-row">
+<div class="g-col"><div class="k-phone"><div class="k-compact k-glass">Beranda</div><main class="k-main" style="padding-top:64px"><div class="k-stack">
+  <section><div class="k-section-h"><h2>Perlu perhatian</h2></div><div class="k-card"><ul class="k-rows inset">
+    <li><span class="k-rowl x-att"><span class="x-box2 w"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/></svg></span><span class="t">3 transaksi dibatalkan kasir<small>2–5 Nov · Rp187.000</small></span><svg class="k-i chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></li>
+    <li><span class="k-rowl x-att"><span class="x-box2 w"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11"/></svg></span><span class="t">1 pelunasan dibatalkan kasir<small>5 Nov · Rp100.000</small></span><svg class="k-i chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></li>
+    <li><span class="k-rowl x-att"><span class="x-box2 w"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"/><path d="M2 6h4"/><path d="M2 10h4"/><path d="M2 14h4"/><path d="M2 18h4"/><path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/></svg></span><span class="t">2 kasbon lewat limit<small>28 Okt–5 Nov · lewat Rp150.000</small></span><svg class="k-i chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></li>
+    <li><span class="k-rowl x-att"><span class="x-box2 d"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span><span class="t">Stok minus<small>3 barang</small></span><svg class="k-i chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></li>
+    <li><span class="k-rowl x-att"><span class="x-box2 w"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"/><path d="M2 6h4"/><path d="M2 10h4"/><path d="M2 14h4"/><path d="M2 18h4"/><path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/></svg></span><span class="t">Kasbon &gt; 30 hari<small>1 pelanggan · Rp343.500</small></span><svg class="k-i chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></li>
+  </ul></div></section></div></main><nav class="k-tabbar k-glass" aria-label="Navigasi utama"><ul><li><span class="k-tab on"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Beranda</span></li><li><span class="k-tab"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><polyline points="3.29 7 12 12 20.71 7"/><path d="m7.5 4.27 9 5.15"/></svg>Barang</span></li><li><span class="k-tab"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>Laporan</span></li><li><span class="k-tab"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"/><path d="M2 6h4"/><path d="M2 10h4"/><path d="M2 14h4"/><path d="M2 18h4"/><path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/></svg>Kasbon</span></li><li><span class="k-tab"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>Lainnya</span></li></ul></nav></div><h3>1 · Beranda, Perlu perhatian</h3><p>Tiga butir baru, masing-masing menumpuk sejak terakhir ditinjau dan menampilkan rentang tanggalnya. Mengetuk butir membuka halaman tinjau.</p></div>
+<div class="g-col"><div class="k-phone"><main class="k-main"><div class="k-subheader"><span class="k-back"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>Beranda</span><p class="k-eyebrow">Sejak ditinjau 30 Okt 2026 08.10</p><h1 class="k-h1sub" style="margin-top:2px">Transaksi dibatalkan kasir</h1></div><div class="k-stack">
+  <div class="k-card"><ul class="k-rows">
+    <li><span class="k-rowl sm"><span class="x-hr"><span class="l1"><span class="ti">20261105-0145 · Rina</span><span class="v">Rp52.000</span></span><span class="l2"><span>Salah scan barang</span><span>Hari ini 13.40</span></span></span></span></li>
+    <li><span class="k-rowl sm"><span class="x-hr"><span class="l1"><span class="ti">20261104-0139 · Dedi</span><span class="v">Rp85.500</span></span><span class="l2"><span>Pelanggan batal beli</span><span>Kemarin 17.40</span></span></span></span></li>
+    <li><span class="k-rowl sm"><span class="x-hr"><span class="l1"><span class="ti">20261102-0071 · Rina</span><span class="v">Rp49.500</span></span><span class="l2"><span>Uang pelanggan kurang</span><span>2 Nov 10.15</span></span></span></span></li>
+  </ul></div>
+  <span class="k-btn full">Tandai sudah ditinjau</span></div></main><nav class="k-tabbar k-glass" aria-label="Navigasi utama"><ul><li><span class="k-tab on"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Beranda</span></li><li><span class="k-tab"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><polyline points="3.29 7 12 12 20.71 7"/><path d="m7.5 4.27 9 5.15"/></svg>Barang</span></li><li><span class="k-tab"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>Laporan</span></li><li><span class="k-tab"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"/><path d="M2 6h4"/><path d="M2 10h4"/><path d="M2 14h4"/><path d="M2 18h4"/><path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/></svg>Kasbon</span></li><li><span class="k-tab"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>Lainnya</span></li></ul></nav></div><h3>2 · Tinjau transaksi dibatalkan</h3><p>Daftar semua kejadian sejak terakhir ditinjau, terbaru di atas. Tanda sudah ditinjau mengosongkan butir di Beranda.</p></div>
+<div class="g-col"><div class="k-phone"><main class="k-main"><div class="k-subheader"><span class="k-back"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>Beranda</span><p class="k-eyebrow">Belum pernah ditinjau</p><h1 class="k-h1sub" style="margin-top:2px">Kasbon lewat limit</h1></div><div class="k-stack">
+  <div class="k-card"><ul class="k-rows">
+    <li><span class="k-rowl sm"><span class="x-hr"><span class="l1"><span class="ti">Pak Joko · Dedi</span><span class="v">Rp100.000</span></span><span class="l2"><span>Beli beras untuk hajatan</span><span>Kemarin 11.20</span></span></span></span></li>
+    <li><span class="k-rowl sm"><span class="x-hr"><span class="l1"><span class="ti">Mbak Dewi · Rina</span><span class="v">Rp50.000</span></span><span class="l2"><span>Pelanggan lama, besok gajian</span><span>28 Okt 15.05</span></span></span></span></li>
+  </ul></div>
+  <span class="k-btn full">Tandai sudah ditinjau</span></div></main><nav class="k-tabbar k-glass" aria-label="Navigasi utama"><ul><li><span class="k-tab on"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Beranda</span></li><li><span class="k-tab"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><polyline points="3.29 7 12 12 20.71 7"/><path d="m7.5 4.27 9 5.15"/></svg>Barang</span></li><li><span class="k-tab"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>Laporan</span></li><li><span class="k-tab"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"/><path d="M2 6h4"/><path d="M2 10h4"/><path d="M2 14h4"/><path d="M2 18h4"/><path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/></svg>Kasbon</span></li><li><span class="k-tab"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>Lainnya</span></li></ul></nav></div><h3>3 · Tinjau kasbon lewat limit</h3><p>Nominal di kanan = jumlah yang melewati limit. Halaman untuk pelunasan yang dibatalkan memakai bentuk yang sama.</p></div>
+<div class="g-col"><div class="k-phone"><div class="x-toast">Ditandai sudah ditinjau</div><main class="k-main"><div class="k-subheader"><span class="k-back"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>Beranda</span><p class="k-eyebrow">Sejak ditinjau 5 Nov 2026 14.30</p><h1 class="k-h1sub" style="margin-top:2px">Transaksi dibatalkan kasir</h1></div><div class="k-stack">
+  <div class="k-card"><div class="x-empty">Tidak ada yang perlu ditinjau</div></div></div></main><nav class="k-tabbar k-glass" aria-label="Navigasi utama"><ul><li><span class="k-tab on"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Beranda</span></li><li><span class="k-tab"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><polyline points="3.29 7 12 12 20.71 7"/><path d="m7.5 4.27 9 5.15"/></svg>Barang</span></li><li><span class="k-tab"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>Laporan</span></li><li><span class="k-tab"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"/><path d="M2 6h4"/><path d="M2 10h4"/><path d="M2 14h4"/><path d="M2 18h4"/><path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/></svg>Kasbon</span></li><li><span class="k-tab"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>Lainnya</span></li></ul></nav></div><h3>4 · Setelah ditandai</h3><p>Pesan singkat muncul, daftar kosong, dan butir hilang dari Beranda sampai ada kejadian baru.</p></div>
+<div class="g-col"><div class="k-phone"><header class="k-header"><div class="k-date">Kamis, 5 Nov</div><div class="k-titlerow"><h1 class="k-h1">Lainnya</h1><span class="k-status">Toko online</span></div></header><main class="k-main"><div class="k-stack">
+  <div class="k-card"><ul class="k-rows inset">
+    <li><span class="k-rowl"><span class="k-box"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="M16 16h6"/><path d="M19 13v6"/><path d="M21 10V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l2-1.14"/><path d="m7.5 4.27 9 5.15"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" x2="12" y1="22" y2="12"/></svg></span><span class="t">Barang masuk</span><svg class="k-i chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></li>
+    <li><span class="k-rowl"><span class="k-box"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="M11 15h2a2 2 0 1 0 0-4h-3c-.6 0-1.1.2-1.4.6L3 16"/><path d="m7 21 1.6-1.4c.3-.4.8-.6 1.4-.6h4c1.1 0 2.1-.4 2.8-1.2l4.6-4.4a2 2 0 0 0-2.75-2.91l-4.2 3.9"/><path d="m2 16 6 6"/><circle cx="16" cy="9" r="2.9"/><circle cx="6" cy="5" r="3"/></svg></span><span class="t">Utang supplier</span><span class="r">Rp4.215.000</span><svg class="k-i chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></li>
+    <li><span class="k-rowl"><span class="k-box"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 17.5v-11"/></svg></span><span class="t">Transaksi</span><svg class="k-i chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></li>
+    <li><span class="k-rowl"><span class="k-box"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="M5 22h14"/><path d="M5 2h14"/><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"/><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"/></svg></span><span class="t">Kedaluwarsa</span><svg class="k-i chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></li>
+  </ul></div>
+  <span class="k-btn outline" style="width:100%"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/></svg>Keluar</span></div></main><nav class="k-tabbar k-glass" aria-label="Navigasi utama"><ul><li><span class="k-tab"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Beranda</span></li><li><span class="k-tab"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><polyline points="3.29 7 12 12 20.71 7"/><path d="m7.5 4.27 9 5.15"/></svg>Barang</span></li><li><span class="k-tab"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>Laporan</span></li><li><span class="k-tab"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"/><path d="M2 6h4"/><path d="M2 10h4"/><path d="M2 14h4"/><path d="M2 18h4"/><path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/></svg>Kasbon</span></li><li><span class="k-tab on"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>Lainnya</span></li></ul></nav></div><h3>5 · Lainnya</h3><p>Baris baru Transaksi di antara Utang supplier dan Kedaluwarsa.</p></div>
+<div class="g-col"><div class="k-phone"><main class="k-main"><div class="k-subheader"><span class="k-back"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>Lainnya</span><p class="k-eyebrow">Kamis, 5 Nov 2026</p><h1 class="k-h1sub" style="margin-top:2px">Transaksi</h1></div><div class="k-stack">
+  <div class="x-per"><span class="pb" aria-label="Hari sebelumnya"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></span><span class="l">Kamis, 5 Nov 2026</span><span class="pb off" aria-label="Hari berikutnya"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></div>
+  <div class="x-search"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.34-4.34"/></svg>Cari nomor struk</div>
+  <div class="k-card"><ul class="k-rows">
+    <li><span class="k-rowl sm"><span class="x-hr"><span class="l1"><span class="ti">20261105-0145 · 13.05</span><span class="v">Rp52.000</span></span><span class="l2"><span>Tunai · Rina</span><span></span></span></span><svg class="k-i chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></li>
+    <li><span class="k-rowl sm"><span class="x-hr"><span class="l1"><span class="ti">20261105-0144 · 12.58</span><span class="v">Rp36.000</span></span><span class="l2"><span>QRIS · Rina</span><span></span></span></span><svg class="k-i chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></li>
+    <li><span class="k-rowl sm"><span class="x-hr"><span class="l1"><span class="ti x-strike">20261105-0143 · 12.40</span><span class="v x-strike">Rp91.000</span></span><span class="l2"><span>Tunai · Rina</span><span><span class="k-badge neutral"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11"/></svg>Dibatalkan</span></span></span></span><svg class="k-i chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></li>
+    <li><span class="k-rowl sm"><span class="x-hr"><span class="l1"><span class="ti">20261105-0142 · 11.52</span><span class="v">Rp18.500</span></span><span class="l2"><span>Kasbon · Rina</span><span></span></span></span><svg class="k-i chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></li>
+  </ul></div></div></main><nav class="k-tabbar k-glass" aria-label="Navigasi utama"><ul><li><span class="k-tab"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Beranda</span></li><li><span class="k-tab"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><polyline points="3.29 7 12 12 20.71 7"/><path d="m7.5 4.27 9 5.15"/></svg>Barang</span></li><li><span class="k-tab"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>Laporan</span></li><li><span class="k-tab"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"/><path d="M2 6h4"/><path d="M2 10h4"/><path d="M2 14h4"/><path d="M2 18h4"/><path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/></svg>Kasbon</span></li><li><span class="k-tab on"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>Lainnya</span></li></ul></nav></div><h3>6 · Transaksi (per hari)</h3><p>Daftar transaksi satu hari, ganti hari dengan panah, atau cari nomor struk. Transaksi yang dibatalkan dicoret dan bertanda Dibatalkan.</p></div>
+<div class="g-col"><div class="k-phone"><main class="k-main"><div class="k-subheader"><span class="k-back"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>Transaksi</span><p class="k-eyebrow">Rab, 4 Nov 17.40 · Dedi</p><h1 class="k-h1sub" style="margin-top:2px">20261104-0139</h1></div><div class="k-stack"><section><div class="k-section-h"><h2>Barang</h2></div><div class="k-card"><ul class="k-rows">
+  <li><span class="k-rowl sm"><span class="t">Minyak Bimoli 2 L<small>2 pcs</small></span><span class="v">Rp76.000</span></span></li><li><span class="k-rowl sm"><span class="t">Gula Pasir curah<small>1,5 kg</small></span><span class="v">Rp24.000</span></span></li><li><span class="k-rowl sm"><span class="t">Indomie Goreng<small>5 pcs</small></span><span class="v">Rp16.000</span></span></li></ul></div></section><section><div class="k-section-h"><h2>Pembayaran</h2></div><div class="k-card"><div class="x-pay"><span>Tunai</span><span>Rp100.000</span></div><div class="x-pay"><span>Kasbon Mbak Dewi</span><span>Rp16.000</span></div></div></section>
+  <span class="k-btn full bad">Batalkan transaksi</span></div></main><nav class="k-tabbar k-glass" aria-label="Navigasi utama"><ul><li><span class="k-tab"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Beranda</span></li><li><span class="k-tab"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><polyline points="3.29 7 12 12 20.71 7"/><path d="m7.5 4.27 9 5.15"/></svg>Barang</span></li><li><span class="k-tab"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>Laporan</span></li><li><span class="k-tab"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"/><path d="M2 6h4"/><path d="M2 10h4"/><path d="M2 14h4"/><path d="M2 18h4"/><path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/></svg>Kasbon</span></li><li><span class="k-tab on"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>Lainnya</span></li></ul></nav></div><h3>7 · Detail transaksi (shift sudah tutup)</h3><p>Tombol Batalkan transaksi hanya untuk transaksi dari shift yang sudah ditutup.</p></div>
+<div class="g-col"><div class="k-phone"><main class="k-main"><div class="k-subheader"><span class="k-back"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>Transaksi</span><p class="k-eyebrow">Rab, 4 Nov 17.40 · Dedi</p><h1 class="k-h1sub" style="margin-top:2px">20261104-0139</h1></div></main><div class="x-dim"></div>
+  <div class="x-dlg"><h2>Batalkan 20261104-0139?</h2>
+  <p>Stok dikembalikan dan kasbon dibatalkan. Uang dikembalikan pemilik; laci kasir tidak berubah.</p>
+  <div><div class="x-leg">Alasan</div><div class="x-field plain">Barang salah dimasukkan</div></div>
+  <div class="x-btnrow col"><span class="k-btn bad">Batalkan transaksi</span><span class="k-btn outline">Kembali</span></div></div></div><h3>8 · Konfirmasi batal transaksi</h3><p>Alasan wajib. Tercatat: nama pembatal, jam, dan alasan.</p></div>
+<div class="g-col"><div class="k-phone"><main class="k-main"><div class="k-subheader"><span class="k-back"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>Transaksi</span><p class="k-eyebrow">Hari ini 13.05 · Rina</p><h1 class="k-h1sub" style="margin-top:2px">20261105-0145</h1></div><div class="k-stack"><section><div class="k-section-h"><h2>Barang</h2></div><div class="k-card"><ul class="k-rows">
+  <li><span class="k-rowl sm"><span class="t">Minyak Bimoli 2 L<small>2 pcs</small></span><span class="v">Rp76.000</span></span></li><li><span class="k-rowl sm"><span class="t">Gula Pasir curah<small>1,5 kg</small></span><span class="v">Rp24.000</span></span></li><li><span class="k-rowl sm"><span class="t">Indomie Goreng<small>5 pcs</small></span><span class="v">Rp16.000</span></span></li></ul></div></section><section><div class="k-section-h"><h2>Pembayaran</h2></div><div class="k-card"><div class="x-pay"><span>Tunai</span><span>Rp100.000</span></div><div class="x-pay"><span>Kasbon Mbak Dewi</span><span>Rp16.000</span></div></div></section>
+  <p class="x-lead" style="color:var(--text)">Masih di shift yang buka — batalkan dari kasir</p></div></main><nav class="k-tabbar k-glass" aria-label="Navigasi utama"><ul><li><span class="k-tab"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Beranda</span></li><li><span class="k-tab"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><polyline points="3.29 7 12 12 20.71 7"/><path d="m7.5 4.27 9 5.15"/></svg>Barang</span></li><li><span class="k-tab"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>Laporan</span></li><li><span class="k-tab"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"/><path d="M2 6h4"/><path d="M2 10h4"/><path d="M2 14h4"/><path d="M2 18h4"/><path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/></svg>Kasbon</span></li><li><span class="k-tab on"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>Lainnya</span></li></ul></nav></div><h3>9 · Detail transaksi (shift masih buka)</h3><p>Tombol batal tidak ada; transaksi shift yang sedang buka dibatalkan dari kasir.</p></div>
+<div class="g-col"><div class="k-phone"><main class="k-main"><div class="k-subheader"><span class="k-back"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>Transaksi</span><p class="k-eyebrow">Rab, 4 Nov 17.40 · Dedi</p><h1 class="k-h1sub" style="margin-top:2px">20261104-0139</h1></div><div class="k-stack">
+  <div class="k-card x-card2"><div><span class="k-badge neutral"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11"/></svg>Dibatalkan</span></div><div class="why">Barang salah dimasukkan · Pemilik · Hari ini 14.30</div></div>
+  <section><div class="k-section-h"><h2>Barang</h2></div><div class="k-card"><ul class="k-rows">
+  <li><span class="k-rowl sm"><span class="t">Minyak Bimoli 2 L<small>2 pcs</small></span><span class="v">Rp76.000</span></span></li><li><span class="k-rowl sm"><span class="t">Gula Pasir curah<small>1,5 kg</small></span><span class="v">Rp24.000</span></span></li><li><span class="k-rowl sm"><span class="t">Indomie Goreng<small>5 pcs</small></span><span class="v">Rp16.000</span></span></li></ul></div></section><section><div class="k-section-h"><h2>Pembayaran</h2></div><div class="k-card"><div class="x-pay"><span>Tunai</span><span>Rp100.000</span></div><div class="x-pay"><span>Kasbon Mbak Dewi</span><span>Rp16.000</span></div></div></section></div></main><nav class="k-tabbar k-glass" aria-label="Navigasi utama"><ul><li><span class="k-tab"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Beranda</span></li><li><span class="k-tab"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><polyline points="3.29 7 12 12 20.71 7"/><path d="m7.5 4.27 9 5.15"/></svg>Barang</span></li><li><span class="k-tab"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>Laporan</span></li><li><span class="k-tab"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"/><path d="M2 6h4"/><path d="M2 10h4"/><path d="M2 14h4"/><path d="M2 18h4"/><path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/></svg>Kasbon</span></li><li><span class="k-tab on"><svg class="k-i " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>Lainnya</span></li></ul></nav></div><h3>10 · Detail transaksi dibatalkan</h3><p>Kartu Dibatalkan menampilkan alasan, siapa yang membatalkan, dan kapan.</p></div>
+</div></body></html>

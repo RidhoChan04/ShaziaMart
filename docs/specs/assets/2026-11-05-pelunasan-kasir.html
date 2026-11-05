@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pelunasan kasbon dan batal tanpa PIN, layar kasir v2 (angka contoh)</title>
+<style>
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
+body{margin:0;padding:24px;background:#e9ece9;font-family:Inter,system-ui,sans-serif;color:#1c2421;font-size:14px}
+.g-title{margin:0 0 4px;font-size:20px}.g-sub{margin:0 0 18px;color:#5e6b65;font-size:14px;max-width:1000px}
+.g-row{display:flex;gap:32px;flex-wrap:wrap;justify-content:center;align-items:flex-start}
+.g-col{display:flex;flex-direction:column;align-items:center;gap:10px}
+.g-col>h3{margin:10px 0 0;font-size:15px}.g-col>p{margin:0;max-width:520px;text-align:center;font-size:13px;opacity:.8}
+.scr{width:560px;background:rgba(28,36,33,.45);padding:22px;border-radius:12px;box-sizing:border-box}
+.scr.tall{height:800px;padding:0;position:relative;display:flex;justify-content:flex-end;overflow:hidden}
+.sheet{width:512px;height:100%;background:#fff;box-sizing:border-box;display:flex;flex-direction:column;overflow:hidden}
+.sh-h{padding:16px 16px 12px}.sh-h b{display:block;font-size:18px}.sh-h span{color:#5e6b65;font-size:14px}
+.sh-b{padding:0 16px 16px;display:grid;gap:8px;align-content:start;overflow:hidden}
+.dlg{background:#fff;border-radius:12px;overflow:hidden}
+.dh{display:flex;justify-content:space-between;align-items:baseline;padding:14px 18px;border-bottom:1px solid #eef1ef;gap:12px}
+.dh b{font-size:18px}.dh span{color:#5e6b65}
+.bd{padding:12px 18px 16px;display:grid;gap:10px}
+.lbl{color:#5e6b65;font-size:11px;margin-bottom:4px;letter-spacing:.02em}
+.inp{border:2px solid #1f7a4d;border-radius:8px;padding:8px 12px;font-size:22px;font-weight:700;font-variant-numeric:tabular-nums}
+.inp.plain{border:1px solid #e3e7e4;font-size:15px;font-weight:500;padding:10px 12px;color:#1c2421}
+.inp.focus{border:2px solid #1f7a4d;font-size:15px;font-weight:500;padding:9px 11px}
+.inp.err{border-color:#b42318}
+.cust{border:1px solid #1f7a4d;background:#e6f2ea;border-radius:8px;padding:9px 12px}
+.cust b{display:block;font-weight:600}.cust span{color:#5e6b65;font-size:13px}
+.tabs{display:flex;gap:6px}.tabs span{border:1px solid #e3e7e4;border-radius:6px;padding:8px 16px}
+.tabs span.on{background:#1f7a4d;color:#fff;border-color:#1f7a4d;font-weight:600}
+.q{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center}
+.q span{border:1px solid #e3e7e4;border-radius:6px;padding:9px;font-variant-numeric:tabular-nums}
+.q span.on{background:#e6f2ea;border-color:#1f7a4d;color:#1f7a4d;font-weight:600}
+.chg{display:flex;justify-content:space-between;align-items:center;background:#f0f8f3;border-radius:8px;padding:12px 14px}
+.chg span{font-weight:600;color:#1f7a4d}.chg b{font-size:32px;font-weight:800;color:#1f7a4d;font-variant-numeric:tabular-nums}
+.row{display:flex;justify-content:space-between;font-variant-numeric:tabular-nums}.row span{color:#5e6b65}
+.foot{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.foot .acts{display:flex;gap:8px;align-items:center}
+.btn{background:#1f7a4d;color:#fff;border-radius:8px;padding:12px 24px;font-weight:700;font-size:14px;white-space:nowrap}
+.btn.out{background:#fff;color:#1c2421;border:1px solid #e3e7e4;font-weight:600}
+.btn.sm{padding:8px 12px;font-size:14px;font-weight:600}
+.btn.danger{background:#b42318}
+.btn.off{opacity:.5}
+.box{display:inline-flex;align-items:center;gap:8px;color:#5e6b65}.box i{width:18px;height:18px;border:1.5px solid #8a948f;border-radius:4px;display:inline-block;box-sizing:border-box}
+.box i.ck{background:#1f7a4d;border-color:#1f7a4d;position:relative}
+.box i.ck::after{content:"";position:absolute;left:5px;top:1px;width:4px;height:9px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg)}
+.errt{color:#b42318;font-size:13px;font-weight:500;display:flex;gap:6px;align-items:center}
+.warnt{color:#b26b00;font-size:14px;font-weight:500}
+.qris{display:grid;justify-items:center;gap:6px;text-align:center}
+.qris .img{width:180px;height:180px;border-radius:8px;background:repeating-conic-gradient(#1c2421 0 25%,#fff 0 50%) 0 0/15px 15px;border:6px solid #fff;outline:1px solid #e3e7e4;box-sizing:border-box}
+.hdr{width:560px;background:#fff;border-radius:10px;display:flex;align-items:center;gap:8px;padding:10px 12px;border:1px solid #e3e7e4;box-sizing:border-box}
+.hdr .who{font-weight:500;margin-right:auto;white-space:nowrap}
+.hdr span.b{border:1px solid #e3e7e4;border-radius:8px;padding:8px 10px;font-weight:500;white-space:nowrap}
+.hdr span.b.new{border-color:#1f7a4d;color:#1f7a4d;font-weight:600;background:#e6f2ea}
+.rw{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid #e3e7e4;border-radius:6px;padding:12px}
+.rw .l{min-width:0;flex:1;display:grid;gap:2px}
+.rw .l1{display:flex;justify-content:space-between;gap:8px;font-weight:500}
+.rw .l2{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:14px;color:#5e6b65}
+.rw .acts{display:flex;gap:8px;flex:none}
+.mut{color:#5e6b65;font-weight:400}.num{font-variant-numeric:tabular-nums}.strike{text-decoration:line-through}
+.badge{font-size:11px;font-weight:600;background:#eef1ef;color:#1c2421;border-radius:99px;padding:2px 8px;white-space:nowrap}
+.sec{margin-top:8px;padding-top:12px;border-top:1px solid #e3e7e4;display:grid;gap:8px}
+.sec b{font-size:15px}.sec small{color:#5e6b65;font-size:13px}
+.p{margin:0;font-size:14px;line-height:1.4}
+.struk{width:240px;background:#fff;padding:14px 12px;font-family:ui-monospace,Consolas,monospace;font-size:12px;line-height:1.5;box-shadow:0 4px 14px rgba(0,0,0,.15)}
+.struk .c{text-align:center}.struk .r{display:flex;justify-content:space-between}.struk hr{border:0;border-top:1px dashed #999;margin:6px 0}
+.chk{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:#1f7a4d;color:#fff;font-size:14px;margin-right:8px;vertical-align:1px}
+</style></head><body>
+<h1 class="g-title">Pelunasan kasbon dan batal tanpa PIN — layar kasir, gaya sekarang v2 (angka contoh)</h1>
+<p class="g-sub">Mengikuti jendela bayar yang sudah ada. 1 tombol di header, 2–5 lembar Pelunasan kasbon, 6–8 Riwayat shift ini, 9–11 batal dengan alasan, 12–13 kasbon melewati limit, 14 struk, 15 tutup shift.</p>
+<div class="g-row">
+<div class="g-col"><div class="hdr"><span class="who">Rina · Shift 08.00</span><span class="b new">Pelunasan kasbon</span><span class="b">Riwayat</span><span class="b">Kunci</span><span class="b">Tutup shift</span></div><h3>1 · Header kasir</h3><p>Tombol Pelunasan kasbon di depan Riwayat, hanya saat shift terbuka. Keranjang boleh berisi: pelunasan terpisah dari transaksi jualan.</p></div>
+<div class="g-col"><div class="scr"><div class="dlg"><div class="dh"><b>Pelunasan kasbon</b><span>Esc untuk menutup</span></div><div class="bd"><div><div class="lbl">PELANGGAN</div><div class="cust"><b>Mbak Dewi · 0812-3456-7890</b><span>Sisa kasbon Rp298.000 · Limit Rp500.000</span></div></div>
+    <div><div class="lbl">NOMINAL PELUNASAN</div><div class="inp">Rp100.000</div><div class="q" style="margin-top:6px"><span>Lunas semua</span></div></div>
+    <div class="tabs"><span class="on">Tunai</span><span>QRIS</span></div>
+    <div><div class="lbl">UANG DITERIMA</div><div class="inp">Rp150.000</div><div class="q" style="margin-top:6px"><span>Uang pas</span><span class="on">150.000</span><span>200.000</span><span>500.000</span></div></div>
+    <div class="chg"><span>KEMBALIAN</span><b>Rp50.000</b></div>
+    <div class="row"><span>Sisa kasbon setelah ini</span><b>Rp198.000</b></div>
+    <div class="foot"><span class="box"><i class="ck"></i>Cetak struk</span><div class="acts"><span class="btn out">Batal</span><span class="btn">Simpan pelunasan</span></div></div></div></div></div><h3>2 · Tunai</h3><p>Pemilih pelanggan hanya menampilkan pelanggan yang punya sisa kasbon. Nominal maksimal sisa kasbon; uang diterima boleh lebih, selisihnya jadi kembalian. Kotak Cetak struk mengikuti pengaturan struk otomatis toko.</p></div>
+<div class="g-col"><div class="scr"><div class="dlg"><div class="dh"><b>Pelunasan kasbon</b><span>Esc untuk menutup</span></div><div class="bd"><div><div class="lbl">PELANGGAN</div><div class="cust"><b>Mbak Dewi · 0812-3456-7890</b><span>Sisa kasbon Rp298.000 · Limit Rp500.000</span></div></div>
+    <div><div class="lbl">NOMINAL PELUNASAN</div><div class="inp">Rp298.000</div><div class="q" style="margin-top:6px"><span>Lunas semua</span></div></div>
+    <div class="tabs"><span>Tunai</span><span class="on">QRIS</span></div>
+    <div class="qris"><div class="img"></div><b style="font-size:22px;font-variant-numeric:tabular-nums">Rp298.000</b><span style="color:#5e6b65;font-size:14px">Klik Sudah masuk setelah notifikasi pembayaran diterima.</span></div>
+    <div class="row"><span>Sisa kasbon setelah ini</span><b>Rp0 · lunas</b></div>
+    <div class="foot"><span class="box"><i class="ck"></i>Cetak struk</span><div class="acts"><span class="btn out">Batal</span><span class="btn">Sudah masuk</span></div></div></div></div></div><h3>3 · QRIS</h3><p>Sama dengan tab QRIS pada jendela bayar: satu tombol Sudah masuk setelah notifikasi pembayaran diterima. QRIS tidak masuk laci.</p></div>
+<div class="g-col"><div class="scr"><div class="dlg"><div class="dh"><b>Pelunasan kasbon</b><span>Esc untuk menutup</span></div><div class="bd"><div><div class="lbl">PELANGGAN</div><div class="cust"><b>Mbak Dewi · 0812-3456-7890</b><span>Sisa kasbon Rp298.000 · Limit Rp500.000</span></div></div>
+    <div><div class="lbl">NOMINAL PELUNASAN</div><div class="inp err">Rp350.000</div><p class="errt" style="margin:6px 0 0">⚠ Melebihi sisa kasbon Rp298.000</p></div>
+    <div class="tabs"><span class="on">Tunai</span><span>QRIS</span></div>
+    <div><div class="lbl">UANG DITERIMA</div><div class="inp">Rp50.000</div></div>
+    <p style="margin:0;border-radius:8px;background:rgba(180,35,24,.1);padding:12px 14px;font-size:20px;font-weight:700;color:#b42318">KURANG Rp300.000</p>
+    <div class="foot"><span class="box"><i class="ck"></i>Cetak struk</span><div class="acts"><span class="btn out">Batal</span><span class="btn off">Simpan pelunasan</span></div></div></div></div></div><h3>4 · Galat</h3><p>Nominal di atas sisa ditolak dengan pesan; uang diterima kurang menampilkan KURANG seperti tab Tunai. Gambar ini memadukan dua galat sekaligus.</p></div>
+<div class="g-col"><div class="scr"><div class="dlg"><div class="dh"><b><span class="chk" style="margin-right:8px">✓</span>Pelunasan tersimpan</b><span></span></div><div class="bd">
+    <div class="chg"><span>KEMBALIAN</span><b>Rp50.000</b></div>
+    <div class="row"><span>Sisa kasbon</span><b>Rp198.000</b></div>
+    <div class="foot" style="justify-content:flex-end"><span class="btn">Tutup</span></div></div></div></div><h3>5 · Pelunasan tersimpan</h3><p>Hasil setelah Simpan pelunasan atau Sudah masuk. Kembalian hanya tampil untuk Tunai bila ada. Enter menutup.</p></div>
+<div class="g-col"><div class="scr tall"><div class="sheet"><div class="sh-h"><b>Riwayat shift ini</b><span>Cetak ulang struk atau batalkan transaksi.</span></div><div class="sh-b"><div class="rw"><div class="l"><div class="l1"><span>Pelunasan · Mbak Dewi</span><span class="num">Rp100.000</span></div>
+  <div class="l2"><span class="num">Tunai 13.20 · sisa Rp198.000</span></div></div>
+  <div class="acts"><span class="btn out sm">Cetak ulang</span><span class="btn out sm">Batalkan</span></div></div><div class="rw"><div class="l"><div class="l1"><span class="num">20261105-0145 · <span class="mut">13.05</span></span></div>
+  <div class="l2"><span><span>Tunai</span> <span class="num" style="color:#1c2421">Rp52.000</span></span></div></div>
+  <div class="acts"><span class="btn out sm">Cetak ulang</span><span class="btn out sm">Batalkan</span></div></div><div class="rw"><div class="l"><div class="l1"><span class="num">20261105-0144 · <span class="mut">12.58</span></span></div>
+  <div class="l2"><span><span>QRIS</span> <span class="num" style="color:#1c2421">Rp36.000</span></span></div></div>
+  <div class="acts"><span class="btn out sm">Cetak ulang</span><span class="btn out sm">Batalkan</span></div></div><div class="rw"><div class="l"><div class="l1"><span>Pelunasan · Bu Tini</span><span class="num strike">Rp20.000</span></div>
+  <div class="l2"><span class="num">QRIS 12.50 · sisa Rp105.000</span><span class="badge">Dibatalkan</span></div></div>
+  <div class="acts"><span class="btn out sm off">Cetak ulang</span><span class="btn out sm" style="visibility:hidden">Batalkan</span></div></div>
+  <div class="sec"><b>Transaksi shift sebelumnya</b><div class="inp plain" style="color:#5e6b65">Cari nomor struk</div><small>Maksimal 7 hari ke belakang</small></div></div></div></div><h3>6 · Riwayat shift ini</h3><p>Isinya transaksi dan pelunasan dari shift yang sedang buka, terbaru di atas. Pelunasan yang sudah dibatalkan tidak punya tombol Batalkan. Bagian bawah dipakai untuk mencari transaksi dari shift yang sudah tutup.</p></div>
+<div class="g-col"><div class="scr tall"><div class="sheet"><div class="sh-h"><b>Riwayat shift ini</b><span>Cetak ulang struk atau batalkan transaksi.</span></div><div class="sh-b"><div class="rw"><div class="l"><div class="l1"><span>Pelunasan · Mbak Dewi</span><span class="num">Rp100.000</span></div>
+  <div class="l2"><span class="num">Tunai 13.20 · sisa Rp198.000</span></div></div>
+  <div class="acts"><span class="btn out sm">Cetak ulang</span><span class="btn out sm">Batalkan</span></div></div><div class="rw"><div class="l"><div class="l1"><span class="num">20261105-0145 · <span class="mut">13.05</span></span></div>
+  <div class="l2"><span><span>Tunai</span> <span class="num" style="color:#1c2421">Rp52.000</span></span></div></div>
+  <div class="acts"><span class="btn out sm">Cetak ulang</span><span class="btn out sm">Batalkan</span></div></div>
+  <div class="sec"><b>Transaksi shift sebelumnya</b><div class="inp focus" style="">0145</div><small>Maksimal 7 hari ke belakang</small><div class="rw"><div class="l"><div class="l1"><span class="num">20261104-0145 · <span class="mut">4 Nov 17.40</span></span><span class="num">Rp85.000</span></div>
+  <div class="l2"><span>Campuran · Dedi</span></div></div>
+  <div class="acts"><span class="btn out sm">Batalkan</span></div></div><div class="rw"><div class="l"><div class="l1"><span class="num">20261103-0145 · <span class="mut">3 Nov 11.20</span></span><span class="num strike">Rp40.500</span></div>
+  <div class="l2"><span>QRIS · Rina</span><span class="badge">Dibatalkan</span></div></div>
+  <div class="acts"><span class="btn out sm" style="visibility:hidden">Batalkan</span></div></div></div></div></div></div><h3>7 · Cari struk lama</h3><p>Pencarian cocok sebagian pada nomor, maksimal 7 hari ke belakang. Tunai transaksi lama keluar dari laci shift yang sedang buka.</p></div>
+<div class="g-col"><div class="scr tall"><div class="sheet"><div class="sh-h"><b>Riwayat shift ini</b><span>Cetak ulang struk atau batalkan transaksi.</span></div><div class="sh-b"><div class="rw"><div class="l"><div class="l1"><span>Pelunasan · Mbak Dewi</span><span class="num">Rp100.000</span></div>
+  <div class="l2"><span class="num">Tunai 13.20 · sisa Rp198.000</span></div></div>
+  <div class="acts"><span class="btn out sm">Cetak ulang</span><span class="btn out sm">Batalkan</span></div></div>
+  <div class="sec"><b>Transaksi shift sebelumnya</b><div class="inp focus" style="">0999</div><small>Maksimal 7 hari ke belakang</small><p class="p" style="color:#5e6b65">Tidak ada transaksi dengan nomor itu dalam 7 hari</p></div></div></div></div><h3>8 · Cari struk lama, tanpa hasil</h3><p>Pesan bila tidak ada nomor yang cocok dalam 7 hari.</p></div>
+<div class="g-col"><div class="scr"><div class="dlg"><div class="dh"><b>Batalkan pelunasan Rp100.000?</b><span></span></div><div class="bd"><p class="p">Kasbon Mbak Dewi bertambah lagi Rp100.000 dan uang Rp100.000 dikeluarkan dari laci.</p><div><div class="lbl">Alasan</div><div class="inp focus">Salah memasukkan nominal</div></div><div class="foot" style="justify-content:flex-end"><div class="acts"><span class="btn out">Kembali</span><span class="btn danger">Batalkan pelunasan</span></div></div></div></div></div><h3>9 · Batalkan pelunasan</h3><p>Alasan wajib, tanpa PIN pemilik. Pelunasan tunai mengurangi uang seharusnya di shift yang sedang buka. Tercatat: siapa, jam, nominal, alasan.</p></div>
+<div class="g-col"><div class="scr"><div class="dlg"><div class="dh"><b>Batalkan 20261105-0144?</b><span></span></div><div class="bd"><p class="p num">QRIS · Rp36.000</p><div><div class="lbl">PENGEMBALIAN QRIS Rp36.000</div><div class="tabs"><span class="on">Tunai dari laci</span><span>Transfer oleh pemilik nanti</span></div></div><div><div class="lbl">Alasan</div><div class="inp focus">Pelanggan batal beli</div></div><div class="foot" style="justify-content:flex-end"><div class="acts"><span class="btn out">Kembali</span><span class="btn danger">Batalkan transaksi</span></div></div></div></div></div><h3>10 · Batalkan transaksi (shift ini)</h3><p>Alasan wajib, tanpa PIN pemilik. Bagian QRIS dikembalikan tunai dari laci (bawaan, menurunkan uang seharusnya shift ini) atau ditransfer pemilik nanti. Alasan, nama kasir, dan jam tersimpan di rekaman transaksi.</p></div>
+<div class="g-col"><div class="scr"><div class="dlg"><div class="dh"><b>Batalkan 20261104-0145?</b><span></span></div><div class="bd"><p class="p">Tunai Rp60.000 dikembalikan dari laci shift ini.</p><p class="p">QRIS Rp15.000 dikembalikan:</p><div><div class="tabs"><span class="on">Tunai dari laci</span><span>Transfer oleh pemilik nanti</span></div></div><p class="p">Kasbon Mbak Dewi dikurangi Rp10.000.</p><div><div class="lbl">Alasan</div><div class="inp focus">Barang rusak, pelanggan minta kembali</div></div><div class="foot" style="justify-content:flex-end"><div class="acts"><span class="btn out">Kembali</span><span class="btn danger">Batalkan transaksi</span></div></div></div></div></div><h3>11 · Batalkan transaksi lama</h3><p>Untuk transaksi dari shift yang sudah tutup (maksimal 7 hari). Bagian tunai keluar dari laci shift ini; bagian QRIS dikembalikan tunai dari laci (bawaan, ikut menurunkan uang seharusnya) atau ditransfer pemilik nanti; bagian kasbon dikurangi di buku.</p></div>
+<div class="g-col"><div class="scr"><div class="dlg"><div class="dh"><span>TOTAL BELANJA · 4 barang</span><b style="font-size:24px">Rp186.000</b></div><div class="bd">
+    <div class="tabs"><span>Tunai</span><span>QRIS</span><span class="on">Kasbon</span><span>Campuran</span></div>
+    <div><div class="cust"><b>Pak Joko · 0813-5555-0102</b><span>Saldo Rp214.000 · Limit Rp300.000</span></div></div>
+    <p class="p num" style="margin:0">Saldo setelah kasbon Rp400.000<span style="display:flex;gap:6px;align-items:center" class="warnt"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>Melebihi limit — perlu alasan</span></p>
+    <div class="foot"><span class="box"><i class="ck"></i>Cetak struk</span><span class="btn">Selesai</span></div></div></div></div><h3>12 · Jendela bayar, tab Kasbon</h3><p>Melewati limit tidak lagi butuh PIN pemilik; kasir lanjut dengan alasan.</p></div>
+<div class="g-col"><div class="scr"><div class="dlg"><div class="dh"><b>Kasbon melewati limit</b><span></span></div><div class="bd"><p class="p num">Pak Joko: sisa Rp214.000 + kasbon ini Rp186.000 melewati limit Rp300.000 sebesar Rp100.000.</p><div><div class="lbl">Alasan</div><div class="inp focus">Beli beras untuk hajatan</div></div><div class="foot" style="justify-content:flex-end"><div class="acts"><span class="btn out">Kembali</span><span class="btn ">Simpan dengan alasan</span></div></div></div></div></div><h3>13 · Kasbon melewati limit</h3><p>Muncul saat Selesai ditekan. Tercatat: pelanggan, nominal yang melewati limit, kasir, alasan; menjadi butir Perlu perhatian di app pemilik.</p></div>
+<div class="g-col"><div class="struk"><div class="c"><b>SHAZIAMART</b><br>Jl. Contoh No. 1</div><hr><div class="c"><b>PELUNASAN KASBON</b></div><div>05/11/2026 13.20 · Kasir: Rina</div><div>Pelanggan: Mbak Dewi</div><hr>
+  <div class="r"><span>Sisa sebelum</span><span>298.000</span></div><div class="r"><span>Dibayar (Tunai)</span><span>100.000</span></div><div class="r"><b>Sisa kasbon</b><b>198.000</b></div><hr>
+  <div class="r"><span>Uang diterima</span><span>150.000</span></div><div class="r"><span>Kembalian</span><span>50.000</span></div><hr><div class="c">Terima kasih</div></div><h3>14 · Struk pelunasan</h3><p>Tercetak bila kotak Cetak struk dicentang. Footer struk dari pengaturan toko yang sama.</p></div>
+<div class="g-col"><div class="scr" style="width:460px"><div class="dlg"><div class="dh"><b>Tutup shift</b><span>Shift sudah ditutup.</span></div><div class="bd" style="font-size:16px">
+    <div class="row"><span>Pelunasan kasbon</span><b>+Rp100.000</b></div>
+    <div class="row"><span>Bayar supplier</span><b>-Rp1.442.000</b></div>
+    <div class="row"><span>Pengembalian transaksi</span><b>-Rp111.000</b></div>
+    <div class="row"><span>Uang seharusnya</span><b>Rp1.097.000</b></div>
+    <div class="row"><span>Uang fisik</span><b>Rp1.097.000</b></div>
+    <div class="row"><span>Selisih</span><b>Rp0</b></div>
+    <div class="foot" style="justify-content:flex-end"><span class="btn">Selesai</span></div></div></div></div><h3>15 · Ringkasan tutup shift</h3><p>Baris Pelunasan kasbon (hanya tunai) di atas Bayar supplier; satu baris Pengembalian transaksi di bawahnya (uang yang keluar dari laci shift ini untuk transaksi yang dibatalkan: tunai transaksi shift sebelumnya + QRIS yang dikembalikan tunai). Masing-masing tidak tampil bila nol. Hitung buta tidak berubah.</p></div>
+</div></body></html>
