@@ -9,6 +9,7 @@ const budgets = [
   { label: "kasir", prefix: "kasir-", max: 50 * KB },
   { label: "owner", prefix: "owner-", max: 50 * KB },
   { label: "staff", prefix: "staff-", max: 50 * KB },
+  { label: "problem", prefix: "problem-", max: 30 * KB },
 ];
 const OTHER_MAX = 25 * KB;
 // Tiga app terpisah; satu pengguna hanya memuat utama + satu app (K15).
