@@ -11,6 +11,7 @@ import { settingsHandlers } from "./settings";
 import { shiftHandlers } from "./shift";
 import { staffHandlers } from "./staff";
 import { staffExpiryHandlers } from "./staff-expiry";
+import { staffOpnameHandlers } from "./staff-opname";
 import { staffTunnelGuard } from "./staff-realm";
 import { staffReceiptHandlers } from "./staff-receipts";
 import { systemHandlers } from "./system";
@@ -33,4 +34,5 @@ export const handlers = [
   ...staffHandlers,
   ...staffReceiptHandlers,
   ...staffExpiryHandlers,
+  ...staffOpnameHandlers,
 ];

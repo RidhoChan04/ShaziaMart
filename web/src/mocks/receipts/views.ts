@@ -9,8 +9,10 @@ import type { MockReceipt, MockState } from "../db";
 
 export const receiptTotalOf = (r: MockReceipt): number => receiptTotal(r.lines);
 
-const supplierNameOf = (state: Readonly<MockState>, r: MockReceipt): string =>
-  state.suppliers.find((s) => s.id === r.supplierId)?.name ?? "";
+export const supplierNameOf = (
+  state: Readonly<MockState>,
+  r: MockReceipt,
+): string => state.suppliers.find((s) => s.id === r.supplierId)?.name ?? "";
 
 /** Nota untuk pembuatnya: tanpa HPP/harga jual/stok, hanya harga beli yang diketik. */
 export function toStaffReceipt(
