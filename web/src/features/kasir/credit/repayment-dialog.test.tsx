@@ -272,6 +272,12 @@ test("id sudah tersimpan dengan isi lain → 'Pelunasan ini sudah tersimpan sebe
   ).toBeInTheDocument();
   expect(ui.getByText("Sisa kasbon Rp90.000")).toBeInTheDocument();
   expect(saved().filter((p) => p.id === "pel-tetap")).toHaveLength(1);
+  // Status = ikon + teks: ikon disembunyikan dari pembaca layar.
+  const notice = ui.getByRole("status");
+  expect(notice).toHaveTextContent("Pelunasan ini sudah tersimpan sebelumnya");
+  expect(notice.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+  const title = ui.getByRole("heading", { name: "Pelunasan tersimpan" });
+  expect(title.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
 });
 
 test("klik ganda 'Simpan pelunasan' → satu request", async () => {
@@ -357,4 +363,34 @@ test("Esc menutup dan fokus kembali ke kolom scan; Esc diabaikan saat pending", 
   await user.keyboard("{Escape}");
   expect(sheet()).not.toBeNull();
   expect(await ui.findByRole("alert")).toHaveTextContent(OFFLINE);
+});
+
+test("Tutup setelah tersimpan dan tombol Batal mengembalikan fokus ke kolom scan, bukan tombol pemicu", async () => {
+  const { user, ui, scan, trigger, amount, received, save } =
+    await openWithSari();
+  await user.click(ui.getByRole("button", { name: "Batal" }));
+  await waitFor(() => expect(sheet()).toBeNull());
+  await waitFor(() => expect(scan).toHaveFocus());
+  expect(trigger).not.toHaveFocus();
+
+  await user.click(trigger);
+  const ui2 = sheetUi();
+  await user.click(await ui2.findByRole("button", { name: /Bu Sari/ }));
+  await user.type(amount(), "50000");
+  await user.type(received(), "50000");
+  await user.click(save());
+  await user.click(await ui2.findByRole("button", { name: "Tutup" }));
+  await waitFor(() => expect(sheet()).toBeNull());
+  await waitFor(() => expect(scan).toHaveFocus());
+  expect(trigger).not.toHaveFocus();
+});
+
+test("ganti pelanggan mengosongkan nominal dan uang diterima", async () => {
+  const { user, ui, amount, received } = await openWithSari();
+  await user.type(amount(), "50000");
+  await user.type(received(), "70000");
+  await user.click(ui.getByRole("button", { name: "Ganti pelanggan" }));
+  await user.click(await ui.findByRole("button", { name: /Bu Sari/ }));
+  expect(amount()).toHaveValue("");
+  expect(received()).toHaveValue("");
 });

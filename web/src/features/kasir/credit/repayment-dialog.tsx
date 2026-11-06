@@ -1,4 +1,4 @@
-import { TriangleAlert } from "lucide-react";
+import { CircleCheck, TriangleAlert } from "lucide-react";
 import { useState } from "react";
 import { useGetKasirSettings } from "@/shared/api/gen/settings/settings";
 import type {
@@ -20,6 +20,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs";
 import { CustomerPicker } from "../payment/customer-picker";
 import { QrisPanel } from "../payment/qris-tab";
 import { CashFields, ChangeLine, MoneyField } from "../payment/tunai-tab";
+import { focusScanBox } from "../scan/scan-box";
 import {
   type RepaymentDraft,
   repaymentState,
@@ -66,13 +67,23 @@ function Saved({
       }}
     >
       <DialogHeader>
-        <DialogTitle>Pelunasan tersimpan</DialogTitle>
+        <DialogTitle className="flex items-center gap-2">
+          <CircleCheck
+            aria-hidden="true"
+            className="size-5 shrink-0 text-primary"
+          />
+          Pelunasan tersimpan
+        </DialogTitle>
         <DialogDescription className="tabular-nums">
           {`${payment.customerName} · ${formatRupiah(payment.amount)}`}
         </DialogDescription>
       </DialogHeader>
       {notice && (
-        <p role="status" className="text-sm font-medium text-warning">
+        <p
+          role="status"
+          className="flex items-center gap-1.5 text-sm font-medium text-warning-ink"
+        >
+          <TriangleAlert aria-hidden="true" className="size-4 shrink-0" />
           {notice}
         </p>
       )}
@@ -121,8 +132,13 @@ function RepaymentSession({ onClose }: { onClose: () => void }) {
       <DialogContent
         className="max-w-[520px] gap-0 overflow-hidden p-0 sm:max-w-[520px]"
         showCloseButton={!busy && saved === null}
+        onCloseAutoFocus={(e) => {
+          // Fokus kembali ke kolom scan, bukan ke tombol pemicu.
+          e.preventDefault();
+          focusScanBox();
+        }}
         onOpenAutoFocus={(e) => {
-          // Fokus ke kolom cari pelanggan .
+          // Fokus ke kolom cari pelanggan.
           e.preventDefault();
           (e.currentTarget as HTMLElement)
             .querySelector<HTMLElement>("input")
@@ -151,7 +167,9 @@ function RepaymentSession({ onClose }: { onClose: () => void }) {
                 <CustomerPicker
                   mode="pelunasan"
                   value={customer}
-                  onChange={(c) => set({ customer: c, amount: "" })}
+                  onChange={(c) =>
+                    set({ customer: c, amount: "", received: "" })
+                  }
                 />
               </div>
               {customer && (
@@ -231,7 +249,14 @@ function RepaymentSession({ onClose }: { onClose: () => void }) {
                 </p>
               )}
               {repayment.notice && (
-                <p role="status" className="text-sm font-medium text-warning">
+                <p
+                  role="status"
+                  className="flex items-center gap-1.5 text-sm font-medium text-warning-ink"
+                >
+                  <TriangleAlert
+                    aria-hidden="true"
+                    className="size-4 shrink-0"
+                  />
                   {repayment.notice}
                 </p>
               )}

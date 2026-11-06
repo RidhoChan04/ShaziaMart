@@ -69,13 +69,7 @@ export function ShiftActions({
       <Button variant="outline" onClick={() => setRepaying(true)}>
         Pelunasan kasbon
       </Button>
-      <RepaymentDialog
-        open={repaying}
-        onClose={() => {
-          setRepaying(false);
-          focusScanBox();
-        }}
-      />
+      <RepaymentDialog open={repaying} onClose={() => setRepaying(false)} />
       <Button variant="outline" onClick={() => setHistoryOpen(true)}>
         Riwayat
       </Button>
