@@ -1,9 +1,10 @@
-import { screen } from "@testing-library/react";
+import { act, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
 import { renderApp } from "@/test/render-app";
 import { mockDb } from "./db";
 import { getScenario, scenarios } from "./scenarios";
+import { reportPersistSuccess } from "./storage-status";
 
 async function expandPanel(user: ReturnType<typeof userEvent.setup>) {
   const toggle = await screen.findByRole("button", {
@@ -98,4 +99,34 @@ test("DevPanel: Isi contoh stok menambah barang & kiriman ber-ED contoh", async 
   const state = mockDb.get();
   expect(state.products.some((p) => p.name === "Sari Roti Tawar")).toBe(true);
   expect(state.receipts.map((r) => r.id)).toContain("contoh-stok-1");
+});
+
+test("DevPanel: kuota penuh menampilkan peringatan; normal tanpa peringatan", async () => {
+  const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  try {
+    renderApp("/kasir");
+    await screen.findByRole("button", { name: "Panel pengembang" });
+    expect(screen.queryByText(/Penyimpanan data contoh penuh/)).toBeNull();
+    const setItem = vi
+      .spyOn(Storage.prototype, "setItem")
+      .mockImplementation(() => {
+        throw new DOMException("penuh", "QuotaExceededError");
+      });
+    try {
+      act(() => {
+        mockDb.update((s) => {
+          s.store.name = "Z";
+        });
+      });
+    } finally {
+      setItem.mockRestore();
+    }
+    expect(
+      await screen.findByText(/Penyimpanan data contoh penuh/),
+    ).toBeInTheDocument();
+    expect(warn).toHaveBeenCalledTimes(1);
+  } finally {
+    warn.mockRestore();
+    reportPersistSuccess();
+  }
 });

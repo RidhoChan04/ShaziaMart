@@ -10,8 +10,10 @@ import {
   saleVoidOf,
   VOID_MAX_DAYS,
 } from "./db";
+import { mockPhotos } from "./photos";
 import { rng } from "./seed";
 import { createSeedState } from "./seed-data";
+import { persistFailed, reportPersistSuccess } from "./storage-status";
 
 test("mockDb persist dan reset", () => {
   vi.useFakeTimers({ toFake: ["Date"] });
@@ -422,5 +424,67 @@ describe("kasirVoidWindow (ruling R12, K28: hari kalender WIB)", () => {
     expect(kasirVoidWindow(sale(wib(2026, 10, 30, 0)), null, now)).toBe(
       "shift_lama",
     );
+  });
+});
+
+describe("kuota localStorage penuh", () => {
+  const WARNING =
+    'Penyimpanan data contoh penuh — data terbaru tidak tersimpan. Pakai "Reset data" di panel pengembang.';
+  const full = () =>
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("penuh", "QuotaExceededError");
+    });
+
+  test("setItem gagal: peringatan sekali, flag true; berhasil lagi: flag false", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const setItem = full();
+    try {
+      mockDb.update((s) => {
+        s.store.name = "A";
+      });
+      mockDb.update((s) => {
+        s.store.name = "B";
+      });
+      expect(persistFailed()).toBe(true);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith(WARNING);
+      expect(mockDb.get().store.name).toBe("B");
+      setItem.mockRestore();
+      mockDb.update((s) => {
+        s.store.name = "C";
+      });
+      expect(persistFailed()).toBe(false);
+    } finally {
+      setItem.mockRestore();
+      warn.mockRestore();
+      reportPersistSuccess();
+    }
+  });
+
+  test("jalur normal: tanpa peringatan, flag false", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      mockDb.update((s) => {
+        s.store.name = "N";
+      });
+      expect(persistFailed()).toBe(false);
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  test("foto: setItem gagal ikut memberi peringatan", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const setItem = full();
+    try {
+      mockPhotos.save("p1", "u1", new Uint8Array([1]));
+      expect(persistFailed()).toBe(true);
+      expect(warn).toHaveBeenCalledTimes(1);
+    } finally {
+      setItem.mockRestore();
+      warn.mockRestore();
+      reportPersistSuccess();
+    }
   });
 });

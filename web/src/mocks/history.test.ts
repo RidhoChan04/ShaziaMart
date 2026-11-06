@@ -167,8 +167,12 @@ describe("riwayat 63 hari", () => {
     expect(other.old.map((p) => p.id)).toEqual(old.map((p) => p.id));
   });
 
-  test("(K11) ukuran state seed < 4.000.000 karakter JSON (kuota localStorage)", () => {
-    expect(JSON.stringify(createSeedState(NOW)).length).toBeLessThan(4_000_000);
+  test("(K11) ukuran state seed < 4.000.000 karakter JSON di 14 hari bisnis berturut-turut (kuota localStorage)", () => {
+    const sizes = Array.from(
+      { length: 14 },
+      (_, i) => JSON.stringify(createSeedState(NOW + i * DAY_MS)).length,
+    );
+    for (const size of sizes) expect(size).toBeLessThan(4_000_000);
   });
 
   test("(T2b) setiap penjualan riwayat punya shiftId shift tutup kasirnya yang memuat jamnya; shift tumpang 13.00–13.05 tidak dipakai menebak", () => {

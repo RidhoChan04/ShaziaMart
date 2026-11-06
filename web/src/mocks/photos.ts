@@ -1,3 +1,5 @@
+import { reportPersistFailure, reportPersistSuccess } from "./storage-status";
+
 /** K10: foto nota disimpan terpisah dari `mock.db` agar state tidak membengkak. */
 const STORAGE_KEY = "mock.photos";
 
@@ -41,8 +43,9 @@ export const mockPhotos = {
       const all = read();
       all[id] = { ownerId, data: toBase64(bytes) };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+      reportPersistSuccess();
     } catch {
-      // abaikan
+      reportPersistFailure();
     }
   },
   load(id: string): MockPhoto | undefined {

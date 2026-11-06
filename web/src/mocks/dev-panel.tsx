@@ -1,6 +1,13 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "@tanstack/react-router";
-import { type ChangeEvent, useEffect, useId, useState } from "react";
+import { TriangleAlert } from "lucide-react";
+import {
+  type ChangeEvent,
+  useEffect,
+  useId,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { cn } from "@/shared/lib/cn";
 import { mockDb } from "./db";
 import {
@@ -10,6 +17,7 @@ import {
   setScenario,
 } from "./scenarios";
 import { applySampleStock } from "./stock/sample";
+import { persistFailed, subscribePersistStatus } from "./storage-status";
 
 function isScenario(value: string): value is Scenario {
   return (scenarios as readonly string[]).includes(value);
@@ -35,6 +43,10 @@ export function DevPanel() {
   const [scenario, setLocalScenario] = useState<Scenario>(getScenario);
   const [open, setOpen] = useState(false);
   const panelId = useId();
+  const storageFull = useSyncExternalStore(
+    subscribePersistStatus,
+    persistFailed,
+  );
   // App HP (pemilik dan orang toko) punya tab bawah yang tidak boleh tertutup panel.
   const onPhoneApp = useLocation({
     select: (l) =>
@@ -73,6 +85,18 @@ export function DevPanel() {
           : "bottom-3",
       )}
     >
+      {storageFull ? (
+        <p
+          role="status"
+          className="flex max-w-xs items-start gap-1 rounded-md border border-border bg-surface p-2 shadow-md"
+        >
+          <TriangleAlert
+            aria-hidden="true"
+            className="mt-0.5 size-4 shrink-0"
+          />
+          Penyimpanan data contoh penuh. Pakai "Reset data".
+        </p>
+      ) : null}
       {open ? (
         <aside
           id={panelId}

@@ -29,6 +29,7 @@ import type {
 import { isoDaysBetween, jakartaIsoDate } from "@/shared/lib/business-day";
 import { mockPhotos } from "./photos";
 import { createSeedState } from "./seed-data";
+import { reportPersistFailure, reportPersistSuccess } from "./storage-status";
 
 /** `password` hanya untuk pemilik (login aplikasi pemilik); mock saja. */
 export type MockUser = User & { pin: string; password?: string };
@@ -467,8 +468,9 @@ function load(): MockState {
 function persist(state: MockState): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    reportPersistSuccess();
   } catch {
-    // abaikan
+    reportPersistFailure();
   }
 }
 
