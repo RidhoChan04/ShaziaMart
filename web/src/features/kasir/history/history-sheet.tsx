@@ -33,6 +33,7 @@ import { ReasonDialog } from "../common/reason-dialog";
 import { focusScanBox } from "../scan/scan-box";
 import { BADGE as badge, clockLabel } from "./clock";
 import { CreditPaymentRow } from "./credit-payment-row";
+import { OldSaleSearch } from "./old-sale-search";
 import { VoidSaleDialog } from "./void-sale-dialog";
 
 type Entry =
@@ -125,16 +126,20 @@ export function HistorySheet({ open, onClose }: Props) {
   const entries = useMemo<Entry[]>(
     () =>
       [
-        ...(sales.data ?? []).map((sale): Entry => ({
-          kind: "sale",
-          at: sale.createdAt,
-          sale,
-        })),
-        ...(payments.data ?? []).map((payment): Entry => ({
-          kind: "payment",
-          at: payment.createdAt,
-          payment,
-        })),
+        ...(sales.data ?? []).map(
+          (sale): Entry => ({
+            kind: "sale",
+            at: sale.createdAt,
+            sale,
+          }),
+        ),
+        ...(payments.data ?? []).map(
+          (payment): Entry => ({
+            kind: "payment",
+            at: payment.createdAt,
+            payment,
+          }),
+        ),
       ].sort((a, b) => b.at - a.at),
     [sales.data, payments.data],
   );
@@ -194,6 +199,7 @@ export function HistorySheet({ open, onClose }: Props) {
                 ),
               )}
             </ul>
+            <OldSaleSearch />
           </div>
         </SheetContent>
       </Sheet>
