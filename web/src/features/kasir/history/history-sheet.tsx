@@ -1,13 +1,23 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
+import {
+  getListShiftCreditPaymentsQueryKey,
+  getSearchCustomersQueryKey,
+  useCancelCreditPayment,
+  useListShiftCreditPayments,
+  usePrintCreditPayment,
+} from "@/shared/api/gen/credit/credit";
 import {
   getListShiftSalesQueryKey,
   useListShiftSales,
   usePrintSale,
   useVoidSale,
 } from "@/shared/api/gen/sales/sales";
-import type { Sale } from "@/shared/api/gen/shaziaMartAPI.schemas";
+import type {
+  KasirCreditPayment,
+  Sale,
+} from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { pesanError } from "@/shared/lib/error-messages";
 import { formatRupiah } from "@/shared/lib/money";
 import { saleMethodLabel } from "@/shared/lib/payment-labels";
@@ -19,18 +29,23 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/shared/ui/sheet";
+import { ReasonDialog } from "../common/reason-dialog";
 import { focusScanBox } from "../scan/scan-box";
+import { BADGE as badge, clockLabel } from "./clock";
+import { CreditPaymentRow } from "./credit-payment-row";
 import { VoidSaleDialog } from "./void-sale-dialog";
 
-const timeFormat = new Intl.DateTimeFormat("id-ID", {
-  hour: "2-digit",
-  minute: "2-digit",
-  hourCycle: "h23",
-  timeZone: "Asia/Jakarta",
-});
+type Entry =
+  | { kind: "sale"; at: number; sale: Sale }
+  | { kind: "payment"; at: number; payment: KasirCreditPayment };
 
-const badge =
-  "rounded-full bg-danger/10 px-2 py-0.5 text-xs font-medium text-danger";
+/** Pelunasan tunai mengeluarkan uang dari laci saat dibatalkan; QRIS tidak. */
+function cancelNote(p: KasirCreditPayment): string {
+  const debt = `Kasbon ${p.customerName} bertambah lagi ${formatRupiah(p.amount)}`;
+  return p.method === "tunai"
+    ? `${debt} dan uang ${formatRupiah(p.amount)} dikeluarkan dari laci.`
+    : `${debt}.`;
+}
 
 type Props = { open: boolean; onClose: () => void };
 
@@ -71,6 +86,60 @@ export function HistorySheet({ open, onClose }: Props) {
     setVoiding(null);
   };
 
+  const payments = useListShiftCreditPayments({ query: { enabled: open } });
+  const [cancelling, setCancelling] = useState<KasirCreditPayment | null>(null);
+  const refreshPayments = () => {
+    void client.invalidateQueries({
+      queryKey: getListShiftCreditPaymentsQueryKey(),
+    });
+  };
+  const printPayment = usePrintCreditPayment({
+    mutation: {
+      onSuccess: ({ printStatus }) => {
+        if (printStatus === "gagal") toast.error("Struk gagal dicetak");
+        else toast.success("Struk dicetak");
+      },
+      onError: (err) => toast.error(pesanError(err)),
+      onSettled: refreshPayments,
+    },
+  });
+  const cancelPayment = useCancelCreditPayment({
+    mutation: {
+      onSuccess: () => {
+        setCancelling(null);
+        toast.success("Pelunasan dibatalkan");
+        refreshPayments();
+        void client.invalidateQueries({
+          queryKey: getSearchCustomersQueryKey(),
+        });
+      },
+    },
+  });
+  const dismissCancelPayment = () => {
+    if (cancelPayment.isPending) return;
+    cancelPayment.reset();
+    setCancelling(null);
+  };
+
+  // Terbaru dulu; urutan stabil, jadi jam yang sama mempertahankan urutan server.
+  const entries = useMemo<Entry[]>(
+    () =>
+      [
+        ...(sales.data ?? []).map((sale): Entry => ({
+          kind: "sale",
+          at: sale.createdAt,
+          sale,
+        })),
+        ...(payments.data ?? []).map((payment): Entry => ({
+          kind: "payment",
+          at: payment.createdAt,
+          payment,
+        })),
+      ].sort((a, b) => b.at - a.at),
+    [sales.data, payments.data],
+  );
+  const loaded = sales.data !== undefined && payments.data !== undefined;
+
   return (
     <>
       <Sheet open={open} onOpenChange={(next) => !next && onClose()}>
@@ -94,19 +163,36 @@ export function HistorySheet({ open, onClose }: Props) {
                 {pesanError(sales.error)}
               </p>
             )}
-            {sales.data?.length === 0 && (
+            {payments.isError && (
+              <p role="alert" className="text-sm font-medium text-danger">
+                {pesanError(payments.error)}
+              </p>
+            )}
+            {loaded && entries.length === 0 && (
               <p className="text-muted">Belum ada transaksi di shift ini</p>
             )}
             <ul className="flex flex-col gap-2">
-              {sales.data?.map((sale) => (
-                <SaleRow
-                  key={sale.id}
-                  sale={sale}
-                  printing={print.isPending}
-                  onPrint={() => print.mutate({ saleId: sale.id })}
-                  onVoid={() => setVoiding(sale)}
-                />
-              ))}
+              {entries.map((entry) =>
+                entry.kind === "sale" ? (
+                  <SaleRow
+                    key={`s-${entry.sale.id}`}
+                    sale={entry.sale}
+                    printing={print.isPending}
+                    onPrint={() => print.mutate({ saleId: entry.sale.id })}
+                    onVoid={() => setVoiding(entry.sale)}
+                  />
+                ) : (
+                  <CreditPaymentRow
+                    key={`p-${entry.payment.id}`}
+                    payment={entry.payment}
+                    printing={printPayment.isPending}
+                    onPrint={() =>
+                      printPayment.mutate({ paymentId: entry.payment.id })
+                    }
+                    onCancel={() => setCancelling(entry.payment)}
+                  />
+                ),
+              )}
             </ul>
           </div>
         </SheetContent>
@@ -122,6 +208,30 @@ export function HistorySheet({ open, onClose }: Props) {
             voidSale.mutate({
               saleId: voiding.id,
               data: { reason, qrisRefundSource },
+            });
+          }
+        }}
+      />
+      <ReasonDialog
+        open={cancelling !== null}
+        title={
+          cancelling
+            ? `Batalkan pelunasan ${formatRupiah(cancelling.amount)}?`
+            : ""
+        }
+        description={cancelling ? cancelNote(cancelling) : ""}
+        confirmLabel="Batalkan pelunasan"
+        confirmTone="danger"
+        pending={cancelPayment.isPending}
+        error={
+          cancelPayment.isError ? pesanError(cancelPayment.error) : undefined
+        }
+        onCancel={dismissCancelPayment}
+        onSubmit={(reason) => {
+          if (cancelling) {
+            cancelPayment.mutate({
+              paymentId: cancelling.id,
+              data: { reason },
             });
           }
         }}
@@ -148,7 +258,7 @@ function SaleRow({
         <p className="num font-medium">
           {sale.number} ·{" "}
           <span className="font-normal text-muted">
-            {timeFormat.format(sale.createdAt).replace(":", ".")}
+            {clockLabel(sale.createdAt)}
           </span>
         </p>
         <p className="flex flex-wrap items-center gap-2 text-sm">

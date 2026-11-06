@@ -1,11 +1,15 @@
 import { screen, waitFor, within } from "@testing-library/react";
+import { HttpResponse, http } from "msw";
 import { beforeEach, expect, test, vi } from "vitest";
-import { type MockSale, mockDb } from "@/mocks/db";
+import { type MockCreditPayment, type MockSale, mockDb } from "@/mocks/db";
 import { loginWithShift } from "@/mocks/handlers/test-helpers";
+import { server } from "@/mocks/node";
 import { setScenario } from "@/mocks/scenarios";
 import type { Sale } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { renderWithQuery } from "@/test/render-app";
 import { humanTyping } from "@/test/typing";
+import { KasirScreen } from "../screen/kasir-screen";
+import { ShiftActions } from "../shift/shift-actions";
 import { HistorySheet } from "./history-sheet";
 
 /** Shift yang sedang buka (dibuka `loginWithShift`). */
@@ -250,4 +254,227 @@ test("Esc menutup riwayat", async () => {
   await screen.findByText(/20261020-0001/);
   await user.keyboard("{Escape}");
   expect(onClose).toHaveBeenCalled();
+});
+
+// --- Pelunasan kasbon di Riwayat (ruling R2, jawaban pemilik J0) ---
+
+const payTime = Date.now() - 5 * 60_000;
+const payClock = new Intl.DateTimeFormat("id-ID", {
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+  timeZone: "Asia/Jakarta",
+})
+  .format(payTime)
+  .replace(":", ".");
+
+// Toast tes sebelumnya bisa masih ada di sonner (juga berupa listitem): batasi ke lembar Riwayat.
+const sheetItems = () =>
+  within(
+    screen.getByRole("dialog", { name: "Riwayat shift ini" }),
+  ).getAllByRole("listitem");
+const toasted = async (text: string) =>
+  expect((await screen.findAllByText(text)).length).toBeGreaterThan(0);
+
+const payRow = () =>
+  screen.getByText("Pelunasan · Bu Sari").closest("li") as HTMLElement;
+
+function seedPayment(over: Partial<MockCreditPayment> = {}) {
+  const sari = mockDb.get().customers.find((c) => c.name === "Bu Sari");
+  mockDb.update((s) => {
+    s.creditPayments.push({
+      id: "pay-1",
+      customerId: sari?.id ?? "",
+      amount: 50_000,
+      at: payTime,
+      channel: "kasir",
+      method: "tunai",
+      createdById: "u",
+      createdByName: "Rina",
+      shiftId: openShiftId(),
+      cashReceived: 50_000,
+      change: 0,
+      balanceAfter: 70_000,
+      printStatus: "tercetak",
+      cancelledAt: null,
+      cancelledById: null,
+      cancelledByName: null,
+      cancelledChannel: null,
+      cancelReason: null,
+      ...over,
+    });
+  });
+}
+
+test("pelunasan tampil berselang-seling dengan penjualan menurut jam, terbaru dulu", async () => {
+  seedPayment();
+  setup();
+  await screen.findByText("Pelunasan · Bu Sari");
+  const rows = sheetItems().map(
+    (li) => li.textContent?.match(/20261020-000\d|Pelunasan · Bu Sari/)?.[0],
+  );
+  // Penjualan dibuat 8–10 menit lalu; pelunasan 5 menit lalu.
+  expect(rows).toEqual([
+    "Pelunasan · Bu Sari",
+    "20261020-0003",
+    "20261020-0002",
+    "20261020-0001",
+  ]);
+  expect(payRow()).toHaveTextContent(`Tunai ${payClock} · sisa Rp70.000`);
+  expect(within(payRow()).getByText("Rp50.000")).toBeVisible();
+});
+
+test("pelunasan shift lain tidak tampil di Riwayat shift ini", async () => {
+  seedPayment({ shiftId: "shift-lain" });
+  setup();
+  await screen.findByText(/20261020-0003/);
+  expect(screen.queryByText("Pelunasan · Bu Sari")).toBeNull();
+});
+
+test("tanpa pelunasan daftar sama persis seperti sebelumnya", async () => {
+  setup();
+  await screen.findByText(/20261020-0003/);
+  expect(sheetItems()).toHaveLength(3);
+  expect(screen.queryByText(/Pelunasan ·/)).toBeNull();
+});
+
+test("keadaan kosong tidak tampil bila hanya ada pelunasan", async () => {
+  mockDb.update((s) => {
+    s.sales = [];
+  });
+  seedPayment();
+  setup();
+  await screen.findByText("Pelunasan · Bu Sari");
+  expect(screen.queryByText("Belum ada transaksi di shift ini")).toBeNull();
+});
+
+test("Cetak ulang pelunasan → 'Struk dicetak'; printer-gagal → 'Struk gagal dicetak'", async () => {
+  seedPayment();
+  const { user } = setup();
+  await screen.findByText("Pelunasan · Bu Sari");
+  const print = () =>
+    within(payRow()).getByRole("button", {
+      name: `Cetak ulang pelunasan Bu Sari ${payClock}`,
+    });
+  await user.click(print());
+  await toasted("Struk dicetak");
+
+  setScenario("printer-gagal");
+  await user.click(print());
+  await toasted("Struk gagal dicetak");
+});
+
+const cancelBtn = () =>
+  within(payRow()).getByRole("button", {
+    name: `Batalkan pelunasan Bu Sari ${payClock}`,
+  });
+const cancelDialog = () =>
+  screen.findByRole("dialog", { name: "Batalkan pelunasan Rp50.000?" });
+
+test("batal pelunasan Tunai: kalimat laci → alasan → 'Pelunasan dibatalkan', 'Dibatalkan', Cetak ulang nonaktif", async () => {
+  seedPayment();
+  const { user } = setup();
+  await screen.findByText("Pelunasan · Bu Sari");
+  await user.click(cancelBtn());
+  const ui = within(await cancelDialog());
+  expect(
+    ui.getByText(
+      "Kasbon Bu Sari bertambah lagi Rp50.000 dan uang Rp50.000 dikeluarkan dari laci.",
+    ),
+  ).toBeVisible();
+  expect(ui.getByRole("textbox", { name: "Alasan" })).toHaveFocus();
+  await user.type(ui.getByRole("textbox", { name: "Alasan" }), "Salah{Enter}");
+  await toasted("Pelunasan dibatalkan");
+  await waitFor(() =>
+    expect(within(payRow()).getByText("Dibatalkan")).toBeVisible(),
+  );
+  expect(
+    within(payRow()).queryByRole("button", { name: /Batalkan pelunasan/ }),
+  ).toBeNull();
+  expect(
+    within(payRow()).getByRole("button", {
+      name: `Cetak ulang pelunasan Bu Sari ${payClock}`,
+    }),
+  ).toBeDisabled();
+  expect(
+    mockDb.get().creditPayments.find((p) => p.id === "pay-1")?.cancelReason,
+  ).toBe("Salah");
+});
+
+test("batal pelunasan QRIS: tanpa kalimat laci", async () => {
+  seedPayment({ method: "qris", cashReceived: 0 });
+  const { user } = setup();
+  await screen.findByText("Pelunasan · Bu Sari");
+  await user.click(cancelBtn());
+  const ui = within(await cancelDialog());
+  expect(ui.getByText("Kasbon Bu Sari bertambah lagi Rp50.000.")).toBeVisible();
+  expect(ui.queryByText(/dari laci/)).toBeNull();
+});
+
+test("409 OUTSIDE_SHIFT → pesan di dialog, pelunasan tetap aktif", async () => {
+  seedPayment();
+  const { user } = setup();
+  await screen.findByText("Pelunasan · Bu Sari");
+  await user.click(cancelBtn());
+  const ui = within(await cancelDialog());
+  // Shift berganti di sela-sela.
+  mockDb.update((s) => {
+    const p = s.creditPayments.find((x) => x.id === "pay-1");
+    if (p) p.shiftId = "shift-lain";
+  });
+  await user.type(ui.getByRole("textbox", { name: "Alasan" }), "x{Enter}");
+  expect(await ui.findByRole("alert")).toHaveTextContent(
+    "Pelunasan dari shift sebelumnya — batalkan dari app pemilik",
+  );
+  expect(
+    mockDb.get().creditPayments.find((p) => p.id === "pay-1")?.cancelledAt,
+  ).toBeNull();
+});
+
+test("respons batal hilang lalu diulang → tetap satu baris laci", async () => {
+  seedPayment();
+  const { user } = setup();
+  await screen.findByText("Pelunasan · Bu Sari");
+  await user.click(cancelBtn());
+  const ui = within(await cancelDialog());
+  server.use(
+    http.post(
+      "/api/credit-payments/:paymentId/cancel",
+      async ({ request }) => {
+        // Server memproses, tetapi jawabannya hilang di jalan.
+        await fetch(request.url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: await request.text(),
+        });
+        return HttpResponse.error();
+      },
+      { once: true },
+    ),
+  );
+  await user.type(ui.getByRole("textbox", { name: "Alasan" }), "Salah{Enter}");
+  await ui.findByRole("alert");
+  await user.click(ui.getByRole("button", { name: "Batalkan pelunasan" }));
+  await toasted("Pelunasan dibatalkan");
+  const rows = mockDb
+    .get()
+    .shift?.creditCash.filter((c) => c.kind === "batal_pelunasan");
+  expect(rows).toHaveLength(1);
+});
+
+test("menutup Riwayat mengembalikan fokus ke kolom scan", async () => {
+  const user = humanTyping();
+  renderWithQuery(
+    <>
+      <ShiftActions onClosed={() => {}} />
+      <KasirScreen />
+    </>,
+  );
+  const scan = screen.getByRole("combobox", {
+    name: "Scan barcode / ketik nama atau kode",
+  });
+  await user.click(screen.getByRole("button", { name: "Riwayat" }));
+  await screen.findByRole("dialog", { name: "Riwayat shift ini" });
+  await user.keyboard("{Escape}");
+  await waitFor(() => expect(scan).toHaveFocus());
 });
