@@ -8,6 +8,8 @@ export const pillClass =
   "inline-flex h-11 items-center gap-0.5 rounded-full bg-surface pr-4 pl-2.5 text-[15px] font-semibold text-primary shadow-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary";
 
 type BackFallback =
+  | "/owner"
+  | "/owner/lainnya/transaksi"
   | "/owner/barang"
   | "/owner/kasbon"
   | "/owner/lainnya"

@@ -8,6 +8,7 @@ import {
   LogOut,
   type LucideIcon,
   PackagePlus,
+  ReceiptText,
 } from "lucide-react";
 import {
   getGetOwnerTodaySummaryQueryKey,
@@ -91,6 +92,19 @@ export function LainnyaPage() {
                   />
                 </span>
               )}
+              <ChevronRight
+                aria-hidden="true"
+                className="size-4 shrink-0 text-muted"
+              />
+            </Link>
+          </li>
+          <li>
+            <Link
+              to="/owner/lainnya/transaksi"
+              className={`${rowClass} hover:bg-bg`}
+            >
+              <RowIcon icon={ReceiptText} />
+              <span className="min-w-0 flex-1">Transaksi</span>
               <ChevronRight
                 aria-hidden="true"
                 className="size-4 shrink-0 text-muted"

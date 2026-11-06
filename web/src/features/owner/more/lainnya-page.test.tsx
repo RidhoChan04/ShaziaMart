@@ -68,3 +68,17 @@ test("tanpa barang ditahan: 'Hasil opname' tanpa angka", async () => {
   const link = await screen.findByRole("link", { name: /Hasil opname/ });
   expect(link).not.toHaveTextContent("menunggu");
 });
+
+test("baris 'Transaksi' di antara Utang supplier dan Kedaluwarsa menaut ke daftar transaksi pemilik", async () => {
+  renderApp("/owner/lainnya");
+  const link = await screen.findByRole("link", { name: "Transaksi" });
+  expect(link).toHaveAttribute("href", "/owner/lainnya/transaksi");
+  const order = screen
+    .getAllByRole("link")
+    .map(
+      (a) =>
+        /Utang supplier|Transaksi|Kedaluwarsa/.exec(a.textContent ?? "")?.[0],
+    )
+    .filter(Boolean);
+  expect(order).toEqual(["Utang supplier", "Transaksi", "Kedaluwarsa"]);
+});

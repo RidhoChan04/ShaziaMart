@@ -138,6 +138,32 @@ const ownerOpnameDetailRoute = createRoute({
   component: lazyRouteComponent(loadOwner, "OpnameDetailPage"),
 });
 
+const ownerPengecualianRoute = createRoute({
+  getParentRoute: () => ownerRoute,
+  path: "pengecualian/$kind",
+  component: lazyRouteComponent(loadOwner, "ExceptionsPage"),
+});
+
+const ownerTransaksiRoute = createRoute({
+  getParentRoute: () => ownerRoute,
+  path: "lainnya/transaksi",
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { tanggal?: string; q?: string } => ({
+    ...(typeof search.tanggal === "string" && search.tanggal
+      ? { tanggal: search.tanggal }
+      : {}),
+    ...(typeof search.q === "string" && search.q ? { q: search.q } : {}),
+  }),
+  component: lazyRouteComponent(loadOwner, "SalesPage"),
+});
+
+const ownerTransaksiDetailRoute = createRoute({
+  getParentRoute: () => ownerRoute,
+  path: "lainnya/transaksi/$saleId",
+  component: lazyRouteComponent(loadOwner, "SaleDetailPage"),
+});
+
 /** Pohon rute app pemilik (`/owner`). */
 export const ownerTree = ownerRoute.addChildren([
   ownerIndexRoute,
@@ -157,4 +183,7 @@ export const ownerTree = ownerRoute.addChildren([
   ownerKedaluwarsaRoute,
   ownerOpnameRoute,
   ownerOpnameDetailRoute,
+  ownerPengecualianRoute,
+  ownerTransaksiRoute,
+  ownerTransaksiDetailRoute,
 ]);

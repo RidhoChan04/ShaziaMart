@@ -4,11 +4,14 @@ import {
   CircleCheck,
   ClipboardCheck,
   ClipboardX,
+  FileX,
+  Gauge,
   HandCoins,
   Hourglass,
   type LucideIcon,
   NotebookPen,
   PackageX,
+  ReceiptText,
   Tag,
   TriangleAlert,
   Wallet,
@@ -29,6 +32,9 @@ const ICONS: Record<AttentionItem["icon"], LucideIcon> = {
   expiry: Hourglass,
   "opname-flag": ClipboardX,
   "opname-held": ClipboardCheck,
+  "exception-void": FileX,
+  "exception-repay": ReceiptText,
+  "exception-limit": Gauge,
 };
 
 export function AttentionList({ attention }: { attention: Attention }) {

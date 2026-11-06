@@ -3,7 +3,12 @@ import type {
   Attention,
   HourBucket,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
-import { attentionItems, comparisonText, hourWindow } from "./home-model";
+import {
+  attentionItems,
+  comparisonText,
+  exceptionRange,
+  hourWindow,
+} from "./home-model";
 
 describe("comparisonText", () => {
   test.each([
@@ -613,6 +618,126 @@ describe("attentionItems: urutan K19 lengkap (kedaluwarsa + opname)", () => {
       "opname-held",
       "low-stock",
       "expiry-soon",
+    ]);
+  });
+});
+
+describe("exceptionRange", () => {
+  test.each([
+    ["sehari", "2026-11-05", "2026-11-05", "5 Nov"],
+    ["satu bulan", "2026-11-02", "2026-11-05", "2–5 Nov"],
+    ["lintas bulan", "2026-10-28", "2026-11-05", "28 Okt–5 Nov"],
+    ["lintas tahun", "2025-12-30", "2026-01-02", "30 Des 2025–2 Jan 2026"],
+  ] as const)("%s", (_name, from, to, text) => {
+    expect(exceptionRange(from, to)).toBe(text);
+  });
+});
+
+describe("attentionItems: pengecualian kasir (ruling R9)", () => {
+  const empty: Attention = {
+    lowStockCount: 0,
+    negativeStockCount: 0,
+    cashDifferences: [],
+    overdueCredit: { count: 0, total: 0 },
+    costChanges: [],
+    stockOuts: [],
+    supplierDebts: {
+      overdueCount: 0,
+      overdueTotal: 0,
+      dueSoonCount: 0,
+      dueSoonTotal: 0,
+    },
+    awaitingPriceCount: 0,
+    expiry: { expiredCount: 0, soonCount: 0, soonDays: 30 },
+    opnameHeldCount: 0,
+    opnameFlags: [],
+    opnameReplacedHeld: 0,
+    exceptions: [],
+  };
+  const three: Attention["exceptions"] = [
+    {
+      kind: "batal_transaksi",
+      count: 3,
+      total: 187000,
+      from: "2026-11-02",
+      to: "2026-11-05",
+    },
+    {
+      kind: "batal_pelunasan",
+      count: 1,
+      total: 100000,
+      from: "2026-11-05",
+      to: "2026-11-05",
+    },
+    {
+      kind: "kasbon_lewat_limit",
+      count: 2,
+      total: 150000,
+      from: "2026-10-28",
+      to: "2026-11-05",
+    },
+  ];
+
+  test("tiga butir urutan K29, teks, ikon, nada, dan tautan ke halaman tinjau", () => {
+    expect(attentionItems({ ...empty, exceptions: three })).toEqual([
+      {
+        key: "exception-batal_transaksi",
+        title: "3 transaksi dibatalkan kasir",
+        detail: "2–5 Nov · Rp187.000",
+        tone: "warning",
+        icon: "exception-void",
+        link: {
+          to: "/owner/pengecualian/$kind",
+          params: { kind: "batal_transaksi" },
+        },
+      },
+      {
+        key: "exception-batal_pelunasan",
+        title: "1 pelunasan dibatalkan kasir",
+        detail: "5 Nov · Rp100.000",
+        tone: "warning",
+        icon: "exception-repay",
+        link: {
+          to: "/owner/pengecualian/$kind",
+          params: { kind: "batal_pelunasan" },
+        },
+      },
+      {
+        key: "exception-kasbon_lewat_limit",
+        title: "2 kasbon lewat limit",
+        detail: "28 Okt–5 Nov · lewat Rp150.000",
+        tone: "warning",
+        icon: "exception-limit",
+        link: {
+          to: "/owner/pengecualian/$kind",
+          params: { kind: "kasbon_lewat_limit" },
+        },
+      },
+    ]);
+  });
+
+  test("posisi: sesudah Selisih kas, sebelum Kasbon > 30 hari; butir lama tidak berubah", () => {
+    const a: Attention = {
+      ...empty,
+      negativeStockCount: 3,
+      cashDifferences: [
+        { shiftId: "s1", kasirName: "Rina", closedAt: 1, difference: -5000 },
+      ],
+      overdueCredit: { count: 1, total: 343500 },
+      exceptions: three,
+    };
+    expect(attentionItems(a).map((i) => i.key)).toEqual([
+      "negative-stock",
+      "cash-s1",
+      "exception-batal_transaksi",
+      "exception-batal_pelunasan",
+      "exception-kasbon_lewat_limit",
+      "overdue-credit",
+    ]);
+    expect(attentionItems({ ...a, exceptions: [] }).map((i) => i.key)).toEqual([
+      "negative-stock",
+      "cash-s1",
+      "overdue-credit",
     ]);
   });
 });

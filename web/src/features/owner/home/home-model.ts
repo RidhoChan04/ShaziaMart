@@ -1,9 +1,12 @@
 import type {
   Attention,
   CostChangeItem,
+  ExceptionAttention,
+  ExceptionKind,
   HourBucket,
   OpnameFlag,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
+import { formatIsoDate, formatIsoDayMonth } from "@/shared/lib/business-day";
 import { formatRupiah } from "@/shared/lib/money";
 import { roundHalfUp } from "@/shared/lib/quantity";
 import { scopeLabel } from "@/shared/lib/stock-rules";
@@ -62,6 +65,7 @@ export type AttentionLink =
       params: { sessionId: string };
     }
   | { to: "/owner/barang"; search: { menunggu: true } }
+  | { to: "/owner/pengecualian/$kind"; params: { kind: ExceptionKind } }
   | {
       to: "/owner/barang/$productId";
       params: { productId: string };
@@ -83,7 +87,10 @@ export type AttentionItem = {
     | "price"
     | "expiry"
     | "opname-flag"
-    | "opname-held";
+    | "opname-held"
+    | "exception-void"
+    | "exception-repay"
+    | "exception-limit";
   link: AttentionLink;
 };
 
@@ -191,7 +198,57 @@ function opnameHeldItems(count: number): AttentionItem[] {
   ];
 }
 
-/** Urutan: stok minus, kedaluwarsa, selisih opname besar, opname tertahan diganti, utang lewat, perubahan modal, barang baru menunggu harga, opname menunggu persetujuan, stok menipis, segera kedaluwarsa, utang segera, barang habis, selisih kas, kasbon > 30 hari. */
+/** `5 Nov` / `2–5 Nov` / `28 Okt–5 Nov`; beda tahun memakai tahun di kedua ujung. */
+export function exceptionRange(from: string, to: string): string {
+  if (from === to) return formatIsoDayMonth(from);
+  if (from.slice(0, 4) !== to.slice(0, 4)) {
+    return `${formatIsoDate(from)}–${formatIsoDate(to)}`;
+  }
+  if (from.slice(0, 7) === to.slice(0, 7)) {
+    return `${Number(from.slice(8))}–${formatIsoDayMonth(to)}`;
+  }
+  return `${formatIsoDayMonth(from)}–${formatIsoDayMonth(to)}`;
+}
+
+const EXCEPTION_COPY: Record<
+  ExceptionKind,
+  {
+    icon: "exception-void" | "exception-repay" | "exception-limit";
+    title: (n: number) => string;
+    amount: (rupiah: string) => string;
+  }
+> = {
+  batal_transaksi: {
+    icon: "exception-void",
+    title: (n) => `${n} transaksi dibatalkan kasir`,
+    amount: (r) => r,
+  },
+  batal_pelunasan: {
+    icon: "exception-repay",
+    title: (n) => `${n} pelunasan dibatalkan kasir`,
+    amount: (r) => r,
+  },
+  kasbon_lewat_limit: {
+    icon: "exception-limit",
+    title: (n) => `${n} kasbon lewat limit`,
+    amount: (r) => `lewat ${r}`,
+  },
+};
+
+/** Butir pengecualian kasir (ruling R9): menumpuk sejak terakhir ditinjau, dengan rentang tanggalnya. */
+function exceptionItem(e: ExceptionAttention): AttentionItem {
+  const copy = EXCEPTION_COPY[e.kind];
+  return {
+    key: `exception-${e.kind}`,
+    title: copy.title(e.count),
+    detail: `${exceptionRange(e.from, e.to)} · ${copy.amount(formatRupiah(e.total))}`,
+    tone: "warning",
+    icon: copy.icon,
+    link: { to: "/owner/pengecualian/$kind", params: { kind: e.kind } },
+  };
+}
+
+/** Urutan: stok minus, kedaluwarsa, selisih opname besar, opname tertahan diganti, utang lewat, perubahan modal, barang baru menunggu harga, opname menunggu persetujuan, stok menipis, segera kedaluwarsa, utang segera, barang habis, selisih kas, pengecualian kasir (batal transaksi, batal pelunasan, kasbon lewat limit), kasbon > 30 hari. */
 export function attentionItems(a: Attention): AttentionItem[] {
   const items: AttentionItem[] = [];
   if (a.negativeStockCount > 0) {
@@ -266,6 +323,7 @@ export function attentionItems(a: Attention): AttentionItem[] {
       link: { to: "/owner/lainnya" },
     });
   }
+  items.push(...a.exceptions.map(exceptionItem));
   if (a.overdueCredit.count > 0) {
     items.push({
       key: "overdue-credit",
