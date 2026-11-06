@@ -465,16 +465,88 @@ function load(): MockState {
   return createSeedState();
 }
 
+/**
+ * JSON per nilai key state. Nilai di dalam state cache tidak pernah diubah di tempat (lihat
+ * `current`), jadi koleksi yang tidak disentuh `update` tidak perlu diserialisasi ulang.
+ */
+const keyJson = new WeakMap<object, string>();
+
+/** Sama persis dengan `JSON.stringify(state)`, tetapi memakai ulang JSON koleksi yang sama. */
+function stateJson(state: MockState): string {
+  const parts: string[] = [];
+  for (const [key, value] of Object.entries(state)) {
+    const cacheable = typeof value === "object" && value !== null;
+    let json = cacheable ? keyJson.get(value) : undefined;
+    if (json === undefined) {
+      json = JSON.stringify(value) as string | undefined;
+      // JSON.stringify melewatkan key bernilai undefined.
+      if (json === undefined) continue;
+      if (cacheable) keyJson.set(value, json);
+    }
+    parts.push(`${JSON.stringify(key)}:${json}`);
+  }
+  return `{${parts.join(",")}}`;
+}
+
 function persist(state: MockState): void {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    localStorage.setItem(STORAGE_KEY, stateJson(state));
     reportPersistSuccess();
   } catch {
     reportPersistFailure();
   }
 }
 
+/**
+ * `current` tidak pernah diubah di tempat: `update` membangun objek baru yang berbagi koleksi
+ * yang tidak disentuh dengan state sebelumnya. Karena itu salinan bisa dibuat per key saat key itu
+ * pertama kali dibaca — menyalin seluruh state (riwayat 63 hari, ±3 juta karakter) di setiap
+ * `get`/`update` adalah biaya utama tiap request MSW.
+ */
 let current: MockState | null = null;
+
+/**
+ * Objek dengan key yang sama seperti `snap`; nilai tiap key = `structuredClone(snap[key])`, dibuat
+ * saat pertama dibaca lalu menjadi properti biasa. Menulis key menggantinya tanpa menyalin.
+ */
+function lazyCopy(snap: MockState): MockState {
+  const copy = {} as MockState;
+  const settle = (key: string, value: unknown) =>
+    Object.defineProperty(copy, key, {
+      value,
+      writable: true,
+      enumerable: true,
+      configurable: true,
+    });
+  for (const key of Object.keys(snap) as (keyof MockState)[]) {
+    Object.defineProperty(copy, key, {
+      enumerable: true,
+      configurable: true,
+      get: () => {
+        const value = structuredClone(snap[key]);
+        settle(key, value);
+        return value;
+      },
+      set: (value: unknown) => settle(key, value),
+    });
+  }
+  return copy;
+}
+
+/** Key `draft` yang tidak pernah disentuh `fn` dipakai bersama dengan `base` (tanpa salinan). */
+function settleDraft(draft: MockState, base: MockState): MockState {
+  for (const key of Object.keys(base) as (keyof MockState)[]) {
+    if (Object.getOwnPropertyDescriptor(draft, key)?.get) {
+      Object.defineProperty(draft, key, {
+        value: base[key],
+        writable: true,
+        enumerable: true,
+        configurable: true,
+      });
+    }
+  }
+  return draft;
+}
 
 // Tab lain (mis. kasir dan pemilik) menulis state yang sama: muat ulang saat berubah.
 if (typeof window !== "undefined") {
@@ -487,11 +559,14 @@ export const mockDb = {
   /** Salinan: mengubahnya tidak memengaruhi cache; ubah lewat `update`. */
   get(): Readonly<MockState> {
     current ??= load();
-    return structuredClone(current);
+    return lazyCopy(current);
   },
   update(fn: (s: MockState) => void): void {
-    const next = structuredClone(mockDb.get());
-    fn(next);
+    current ??= load();
+    const base = current;
+    const draft = lazyCopy(base);
+    fn(draft);
+    const next = settleDraft(draft, base);
     persist(next);
     current = next;
   },

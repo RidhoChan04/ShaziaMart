@@ -63,6 +63,52 @@ test("mockDb.get mengembalikan salinan — mutasi tidak bocor", () => {
   expect(mockDb.get().store.name).toBe("ShaziaMart");
 });
 
+test("mockDb.get adalah snapshot — update sesudahnya tidak mengubahnya", () => {
+  mockDb.reset();
+  const before = mockDb.get();
+  mockDb.update((s) => {
+    s.store.name = "X";
+    s.categories.push("Baru");
+  });
+  // Key dibaca setelah update: tetap isi saat `get` dipanggil.
+  expect(before.store.name).toBe("ShaziaMart");
+  expect(before.categories).not.toContain("Baru");
+  expect(mockDb.get().store.name).toBe("X");
+  expect(mockDb.get().categories).toContain("Baru");
+});
+
+test("update yang melempar tidak mengubah state maupun localStorage", () => {
+  mockDb.reset();
+  const stored = localStorage.getItem("mock.db");
+  expect(() =>
+    mockDb.update((s) => {
+      s.store.name = "X";
+      s.sales.length = 0;
+      throw new Error("gagal");
+    }),
+  ).toThrow("gagal");
+  expect(mockDb.get().store.name).toBe("ShaziaMart");
+  expect(mockDb.get().sales.length).toBeGreaterThan(0);
+  expect(localStorage.getItem("mock.db")).toBe(stored);
+});
+
+test("isi localStorage sama persis dengan JSON.stringify state setelah beberapa update", () => {
+  mockDb.reset();
+  mockDb.update((s) => {
+    s.store.name = "X";
+  });
+  mockDb.update((s) => {
+    s.sales = s.sales.slice(1);
+    s.shift = null;
+  });
+  mockDb.update((s) => {
+    s.categories.push("Baru");
+  });
+  const raw = localStorage.getItem("mock.db");
+  expect(raw).toBe(JSON.stringify(mockDb.get()));
+  expect(JSON.parse(raw ?? "{}")).toEqual(mockDb.get());
+});
+
 test("state v3 di localStorage → reseed v9", () => {
   const {
     categories: _c,
