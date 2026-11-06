@@ -3,8 +3,24 @@ import {
   formatAngka,
   formatRupiah,
   formatRupiahShort,
+  formatSignedRupiah,
   parseRupiah,
 } from "./money";
+
+test.each([
+  [38000, "+Rp38.000"],
+  [-412000, "−Rp412.000"],
+  [0, "Rp0"],
+  [1, "+Rp1"],
+  [-1250000, "−Rp1.250.000"],
+])("formatSignedRupiah(%i) = %s", (n, s) =>
+  expect(formatSignedRupiah(n)).toBe(s),
+);
+
+test("formatSignedRupiah memakai minus U+2212 dan menolak pecahan", () => {
+  expect(formatSignedRupiah(-5).codePointAt(0)).toBe(0x2212);
+  expect(() => formatSignedRupiah(0.5)).toThrow(RangeError);
+});
 
 test.each([
   [0, "Rp0"],

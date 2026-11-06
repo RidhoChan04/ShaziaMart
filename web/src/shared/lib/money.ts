@@ -51,3 +51,10 @@ export function formatRupiahShort(n: number): string {
     return `${sign}Rp${formatTenths(thousandTenths)} rb`;
   return `${sign}Rp${formatTenths(roundHalfUp(abs, 100000))} jt`;
 }
+
+/** Uang bertanda laporan: `+Rp38.000`, `−Rp412.000` (minus U+2212), `Rp0`. */
+export function formatSignedRupiah(n: number): string {
+  assertSafeInteger(n);
+  if (n === 0) return "Rp0";
+  return `${n > 0 ? "+" : "−"}Rp${groupThousands(String(Math.abs(n)))}`;
+}

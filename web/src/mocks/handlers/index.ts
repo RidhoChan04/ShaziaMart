@@ -10,6 +10,7 @@ import { ownerExpiryHandlers } from "./owner-expiry";
 import { ownerOpnameHandlers } from "./owner-opname";
 import { ownerProductHandlers } from "./owner-products";
 import { ownerReceiptHandlers } from "./owner-receipts";
+import { ownerReportHandlers } from "./owner-reports";
 import { ownerSaleHandlers } from "./owner-sales";
 import { salesHandlers } from "./sales";
 import { settingsHandlers } from "./settings";
@@ -41,6 +42,7 @@ export const handlers = [
   ...ownerDebtHandlers,
   ...ownerExpiryHandlers,
   ...ownerOpnameHandlers,
+  ...ownerReportHandlers,
   ...staffHandlers,
   ...staffReceiptHandlers,
   ...staffExpiryHandlers,
