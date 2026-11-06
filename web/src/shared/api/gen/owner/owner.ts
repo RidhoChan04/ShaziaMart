@@ -53,17 +53,24 @@ import type {
   ExceptionReviewInput,
   ExpiryDateInput,
   ExpiryRemovalInput,
+  GetOwnerOpnameProductReportParams,
+  GetOwnerOpnameReportParams,
+  GetOwnerSalesReportParams,
+  GetOwnerStockReportParams,
   IdTakenResponse,
   ImportCheck,
   ImportRequest,
   ImportResult,
   ListOwnerExceptionsParams,
+  ListOwnerProductSalesParams,
   ListOwnerSalesParams,
   LockedOutResponse,
   LoginInvalidResponse,
   NotFoundResponse,
   OpnameNotHeldResponse,
+  OpnameProductReport,
   OpnameRecountInput,
+  OpnameReport,
   OwnerCreditPaymentInput,
   OwnerCustomer,
   OwnerCustomerList,
@@ -85,9 +92,12 @@ import type {
   Problem,
   ProductHasSalesResponse,
   ProductInput,
+  ProductSales,
   ProductStatusInput,
   ProductValidationFailedResponse,
+  SalesReport,
   StockMovement,
+  StockReport,
   SupplierDebt,
   SupplierDebtList,
   UnauthorizedResponse,
@@ -3880,3 +3890,604 @@ export const useReviewOwnerExceptions = <TError = ErrorType<UnauthorizedResponse
       > => {
       return useMutation(getReviewOwnerExceptionsMutationOptions(options), queryClient);
     }
+    export const getGetOwnerSalesReportUrl = (params: GetOwnerSalesReportParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/owner/reports/sales?${stringifiedParams}` : `/api/owner/reports/sales`
+}
+
+/**
+ * Omzet, laba kotor, transaksi, rata-rata per struk, kasbon baru, grafik, 3 barang teratas,
+ * per kategori, dan per kasir untuk satu periode (K12/K16), kalender Asia/Jakarta (hari mulai
+ * 00.00 WIB; minggu = Senin–Minggu; bulan = tanggal 1 sampai akhir bulan; tanggal = rentang
+ * bebas). Urutan pemeriksaan (pesan sama dengan checkRange di shared/lib/report-period.ts):
+ * period tidak dikenal → 422 VALIDATION "Periode tidak valid"; from/to bukan tanggal sah →
+ * "Tanggal tidak valid"; to < from → "Tanggal akhir sebelum tanggal awal"; from > hari ini →
+ * "Tanggal di masa depan"; period hari/minggu/bulan dengan rentang yang tidak sama dengan
+ * periode yang memuat from → "Periode tidak cocok"; period tanggal lebih dari 92 hari
+ * (kedua ujung ikut) → "Rentang maksimal 92 hari". Lolos pemeriksaan: to > hari ini dijepit
+ * ke hari ini dan running = true (running = rentang memuat hari ini); range = rentang sesudah
+ * dijepit.
+ *
+ * Pembanding previous dihitung dari range (sesudah dijepit): hari → hari yang sama minggu
+ * lalu; minggu → 7 hari sebelumnya; bulan penuh → bulan sebelumnya penuh; bulan sebagian
+ * (berjalan) → tanggal 1 sampai tanggal sejajar bulan sebelumnya, dijepit ke akhir bulan itu
+ * bila bulan itu lebih pendek (1–30 Mar vs 1–28 Feb); tanggal → rentang tepat sebelumnya
+ * sepanjang sama. Bila running dan previous sama panjang dengan range (hari terakhir
+ * pembanding sejajar dengan hari ini), previousTotals berhenti di akhir menit sekarang pada
+ * hari terakhir pembanding (menit berjalan ikut); bila previous lebih pendek (tanggal sejajar
+ * dijepit), hari terakhir pembanding dihitung penuh. (jawaban pemilik Q7)
+ *
+ * Status penjualan dibaca sekarang (K14): penjualan yang kemudian dibatalkan keluar dari
+ * current, series, topProducts, dan categories, tetapi dihitung di kasir[].voidedCount. HPP =
+ * yang disalin per baris saat penjualan (HPP sekarang tidak dipakai). Hari ini (period hari,
+ * from = to = hari ini): current sama dengan getOwnerTodaySummary (revenue, grossProfit,
+ * salesCount, avgTicket, newCredit) dan previousTotals.revenue = lastWeekRevenue.
+ *
+ * series: period hari → kind jam, 24 bucket berkunci "0".."23" (jam Asia/Jakarta); period
+ * lain → kind hari, satu bucket per tanggal from..to permintaan (sebelum dijepit), berkunci
+ * YYYY-MM-DD. Bucket yang belum terjadi (jam yang mulai sesudah sekarang, tanggal sesudah hari
+ * ini) bernilai null. topProducts = 3 teratas listOwnerProductSales urut omzet. categories urut
+ * omzet terbesar lalu nama, category null terakhir. kasir urut omzet terbesar lalu nama
+ * (kasir yang hanya punya transaksi dibatalkan tetap ada).
+ * @summary Laporan penjualan satu periode dengan pembanding sepanjang rentang yang sama
+ */
+export const getOwnerSalesReport = async (params: GetOwnerSalesReportParams, options?: Parameters<typeof customFetch>[1]): Promise<SalesReport> => {
+
+  return customFetch<SalesReport>(getGetOwnerSalesReportUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetOwnerSalesReportQueryKey = (params?: GetOwnerSalesReportParams,) => {
+    return [
+    `/api/owner/reports/sales`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetOwnerSalesReportQueryOptions = <TData = Awaited<ReturnType<typeof getOwnerSalesReport>>, TError = ErrorType<UnauthorizedResponse | ValidationFailedResponse>>(params: GetOwnerSalesReportParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerSalesReport>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetOwnerSalesReportQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOwnerSalesReport>>> = ({ signal }) => getOwnerSalesReport(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getOwnerSalesReport>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetOwnerSalesReportQueryResult = NonNullable<Awaited<ReturnType<typeof getOwnerSalesReport>>>
+export type GetOwnerSalesReportQueryError = ErrorType<UnauthorizedResponse | ValidationFailedResponse>
+
+
+export function useGetOwnerSalesReport<TData = Awaited<ReturnType<typeof getOwnerSalesReport>>, TError = ErrorType<UnauthorizedResponse | ValidationFailedResponse>>(
+ params: GetOwnerSalesReportParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerSalesReport>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getOwnerSalesReport>>,
+          TError,
+          Awaited<ReturnType<typeof getOwnerSalesReport>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetOwnerSalesReport<TData = Awaited<ReturnType<typeof getOwnerSalesReport>>, TError = ErrorType<UnauthorizedResponse | ValidationFailedResponse>>(
+ params: GetOwnerSalesReportParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerSalesReport>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getOwnerSalesReport>>,
+          TError,
+          Awaited<ReturnType<typeof getOwnerSalesReport>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetOwnerSalesReport<TData = Awaited<ReturnType<typeof getOwnerSalesReport>>, TError = ErrorType<UnauthorizedResponse | ValidationFailedResponse>>(
+ params: GetOwnerSalesReportParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerSalesReport>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Laporan penjualan satu periode dengan pembanding sepanjang rentang yang sama
+ */
+
+export function useGetOwnerSalesReport<TData = Awaited<ReturnType<typeof getOwnerSalesReport>>, TError = ErrorType<UnauthorizedResponse | ValidationFailedResponse>>(
+ params: GetOwnerSalesReportParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerSalesReport>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetOwnerSalesReportQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+export const getListOwnerProductSalesUrl = (params: ListOwnerProductSalesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/owner/reports/products?${stringifiedParams}` : `/api/owner/reports/products`
+}
+
+/**
+ * Periode, pemeriksaan, dan jepit sama dengan getOwnerSalesReport; hanya penjualan berstatus
+ * selesai di range. Satu baris per barang (semua satuan dijumlah dalam satuan dasar). Urutan
+ * ditentukan server (K15): omzet = revenue terbesar; jumlah = qtyBase ÷ unitSize eceran
+ * terbesar, seri → omzet lebih besar; laba = grossProfit terbesar, null terakhir, seri → omzet
+ * lebih besar; seri terakhir → nama barang. sort tidak dikenal → 422 VALIDATION.
+ * @summary Semua barang terjual di satu periode (Paling laku > Lihat semua)
+ */
+export const listOwnerProductSales = async (params: ListOwnerProductSalesParams, options?: Parameters<typeof customFetch>[1]): Promise<ProductSales[]> => {
+
+  return customFetch<ProductSales[]>(getListOwnerProductSalesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListOwnerProductSalesQueryKey = (params?: ListOwnerProductSalesParams,) => {
+    return [
+    `/api/owner/reports/products`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListOwnerProductSalesQueryOptions = <TData = Awaited<ReturnType<typeof listOwnerProductSales>>, TError = ErrorType<UnauthorizedResponse | ValidationFailedResponse>>(params: ListOwnerProductSalesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOwnerProductSales>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListOwnerProductSalesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listOwnerProductSales>>> = ({ signal }) => listOwnerProductSales(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listOwnerProductSales>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListOwnerProductSalesQueryResult = NonNullable<Awaited<ReturnType<typeof listOwnerProductSales>>>
+export type ListOwnerProductSalesQueryError = ErrorType<UnauthorizedResponse | ValidationFailedResponse>
+
+
+export function useListOwnerProductSales<TData = Awaited<ReturnType<typeof listOwnerProductSales>>, TError = ErrorType<UnauthorizedResponse | ValidationFailedResponse>>(
+ params: ListOwnerProductSalesParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOwnerProductSales>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listOwnerProductSales>>,
+          TError,
+          Awaited<ReturnType<typeof listOwnerProductSales>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListOwnerProductSales<TData = Awaited<ReturnType<typeof listOwnerProductSales>>, TError = ErrorType<UnauthorizedResponse | ValidationFailedResponse>>(
+ params: ListOwnerProductSalesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOwnerProductSales>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listOwnerProductSales>>,
+          TError,
+          Awaited<ReturnType<typeof listOwnerProductSales>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListOwnerProductSales<TData = Awaited<ReturnType<typeof listOwnerProductSales>>, TError = ErrorType<UnauthorizedResponse | ValidationFailedResponse>>(
+ params: ListOwnerProductSalesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOwnerProductSales>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Semua barang terjual di satu periode (Paling laku > Lihat semua)
+ */
+
+export function useListOwnerProductSales<TData = Awaited<ReturnType<typeof listOwnerProductSales>>, TError = ErrorType<UnauthorizedResponse | ValidationFailedResponse>>(
+ params: ListOwnerProductSalesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOwnerProductSales>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListOwnerProductSalesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+export const getGetOwnerStockReportUrl = (params?: GetOwnerStockReportParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/owner/reports/stock?${stringifiedParams}` : `/api/owner/reports/stock`
+}
+
+/**
+ * Posisi hari ini (Asia/Jakarta), tanpa periode. Urutan angka uang ditentukan server, bukan
+ * di layar (label pemilik): unsold.items menurut sort (default: modal) — modal = heldValue
+ * terbesar, null terakhir; lama = days terbesar, seri → heldValue terbesar (null terakhir);
+ * seri terakhir → nama barang. thinMargin.items urut marginPermille naik (rugi dulu), lalu
+ * nama. Batas dari state server (reportRules; pengaturannya di F3c-2). sort tidak dikenal →
+ * 422 VALIDATION.
+ * @summary Tidak terjual ≥ 30 hari dan untung tipis (posisi sekarang)
+ */
+export const getOwnerStockReport = async (params?: GetOwnerStockReportParams, options?: Parameters<typeof customFetch>[1]): Promise<StockReport> => {
+
+  return customFetch<StockReport>(getGetOwnerStockReportUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetOwnerStockReportQueryKey = (params?: GetOwnerStockReportParams,) => {
+    return [
+    `/api/owner/reports/stock`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetOwnerStockReportQueryOptions = <TData = Awaited<ReturnType<typeof getOwnerStockReport>>, TError = ErrorType<UnauthorizedResponse | ValidationFailedResponse>>(params?: GetOwnerStockReportParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerStockReport>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetOwnerStockReportQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOwnerStockReport>>> = ({ signal }) => getOwnerStockReport(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getOwnerStockReport>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetOwnerStockReportQueryResult = NonNullable<Awaited<ReturnType<typeof getOwnerStockReport>>>
+export type GetOwnerStockReportQueryError = ErrorType<UnauthorizedResponse | ValidationFailedResponse>
+
+
+export function useGetOwnerStockReport<TData = Awaited<ReturnType<typeof getOwnerStockReport>>, TError = ErrorType<UnauthorizedResponse | ValidationFailedResponse>>(
+ params: undefined |  GetOwnerStockReportParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerStockReport>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getOwnerStockReport>>,
+          TError,
+          Awaited<ReturnType<typeof getOwnerStockReport>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetOwnerStockReport<TData = Awaited<ReturnType<typeof getOwnerStockReport>>, TError = ErrorType<UnauthorizedResponse | ValidationFailedResponse>>(
+ params?: GetOwnerStockReportParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerStockReport>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getOwnerStockReport>>,
+          TError,
+          Awaited<ReturnType<typeof getOwnerStockReport>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetOwnerStockReport<TData = Awaited<ReturnType<typeof getOwnerStockReport>>, TError = ErrorType<UnauthorizedResponse | ValidationFailedResponse>>(
+ params?: GetOwnerStockReportParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerStockReport>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Tidak terjual ≥ 30 hari dan untung tipis (posisi sekarang)
+ */
+
+export function useGetOwnerStockReport<TData = Awaited<ReturnType<typeof getOwnerStockReport>>, TError = ErrorType<UnauthorizedResponse | ValidationFailedResponse>>(
+ params?: GetOwnerStockReportParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerStockReport>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetOwnerStockReportQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+export const getGetOwnerOpnameReportUrl = (params: GetOwnerOpnameReportParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/owner/reports/opname?${stringifiedParams}` : `/api/owner/reports/opname`
+}
+
+/**
+ * from/to diperiksa seperti period tanggal di getOwnerSalesReport (pesan checkRange,
+ * maksimal 92 hari); to > hari ini dijepit ke hari ini; range = rentang sesudah dijepit.
+ * Hitungan final (K19) = state cocok, disesuaikan, disetujui, dihitung_ulang (memakai hasil
+ * hitung ulang) dengan jam hitung di range; ditahan, menunggu_alasan, dan diganti tidak ikut;
+ * stok_awal hanya patokan. Selisih yang sudah diberi alasan tetap dihitung. Hitungan tanpa HPP
+ * tidak dijumlah (unknownValueCount). items hanya barang yang punya selisih, urut lossValue
+ * terbesar (null terakhir), seri → gainValue terbesar, lalu nama.
+ * @summary Selisih opname per barang di satu rentang (pengaman 4)
+ */
+export const getOwnerOpnameReport = async (params: GetOwnerOpnameReportParams, options?: Parameters<typeof customFetch>[1]): Promise<OpnameReport> => {
+
+  return customFetch<OpnameReport>(getGetOwnerOpnameReportUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetOwnerOpnameReportQueryKey = (params?: GetOwnerOpnameReportParams,) => {
+    return [
+    `/api/owner/reports/opname`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetOwnerOpnameReportQueryOptions = <TData = Awaited<ReturnType<typeof getOwnerOpnameReport>>, TError = ErrorType<UnauthorizedResponse | ValidationFailedResponse>>(params: GetOwnerOpnameReportParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerOpnameReport>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetOwnerOpnameReportQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOwnerOpnameReport>>> = ({ signal }) => getOwnerOpnameReport(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getOwnerOpnameReport>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetOwnerOpnameReportQueryResult = NonNullable<Awaited<ReturnType<typeof getOwnerOpnameReport>>>
+export type GetOwnerOpnameReportQueryError = ErrorType<UnauthorizedResponse | ValidationFailedResponse>
+
+
+export function useGetOwnerOpnameReport<TData = Awaited<ReturnType<typeof getOwnerOpnameReport>>, TError = ErrorType<UnauthorizedResponse | ValidationFailedResponse>>(
+ params: GetOwnerOpnameReportParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerOpnameReport>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getOwnerOpnameReport>>,
+          TError,
+          Awaited<ReturnType<typeof getOwnerOpnameReport>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetOwnerOpnameReport<TData = Awaited<ReturnType<typeof getOwnerOpnameReport>>, TError = ErrorType<UnauthorizedResponse | ValidationFailedResponse>>(
+ params: GetOwnerOpnameReportParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerOpnameReport>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getOwnerOpnameReport>>,
+          TError,
+          Awaited<ReturnType<typeof getOwnerOpnameReport>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetOwnerOpnameReport<TData = Awaited<ReturnType<typeof getOwnerOpnameReport>>, TError = ErrorType<UnauthorizedResponse | ValidationFailedResponse>>(
+ params: GetOwnerOpnameReportParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerOpnameReport>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Selisih opname per barang di satu rentang (pengaman 4)
+ */
+
+export function useGetOwnerOpnameReport<TData = Awaited<ReturnType<typeof getOwnerOpnameReport>>, TError = ErrorType<UnauthorizedResponse | ValidationFailedResponse>>(
+ params: GetOwnerOpnameReportParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerOpnameReport>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetOwnerOpnameReportQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+export const getGetOwnerOpnameProductReportUrl = (productId: string,
+    params: GetOwnerOpnameProductReportParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/owner/reports/opname/${productId}?${stringifiedParams}` : `/api/owner/reports/opname/${productId}`
+}
+
+/**
+ * Rentang & hitungan final sama dengan getOwnerOpnameReport. counts = semua hitungan final
+ * barang ini di range, terbaru dulu, masing-masing dengan yang bertugas di antara hitungan
+ * sebelumnya (final atau stok_awal, boleh sebelum range) dan hitungan ini (K20): kasir yang
+ * shift-nya tumpang dengan jeda itu dan orang toko yang punya catatan barang itu (nota barang
+ * masuk aktif, keluarkan kedaluwarsa, sesi opname lain), digabung per nama, urut nama.
+ * Petunjuk, bukan bukti. 404 bila barang tidak dikenal atau tidak punya hitungan final di
+ * range.
+ * @summary Detail selisih opname satu barang dengan yang bertugas
+ */
+export const getOwnerOpnameProductReport = async (productId: string,
+    params: GetOwnerOpnameProductReportParams, options?: Parameters<typeof customFetch>[1]): Promise<OpnameProductReport> => {
+
+  return customFetch<OpnameProductReport>(getGetOwnerOpnameProductReportUrl(productId,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetOwnerOpnameProductReportQueryKey = (productId: string,
+    params?: GetOwnerOpnameProductReportParams,) => {
+    return [
+    `/api/owner/reports/opname/${productId}`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetOwnerOpnameProductReportQueryOptions = <TData = Awaited<ReturnType<typeof getOwnerOpnameProductReport>>, TError = ErrorType<UnauthorizedResponse | NotFoundResponse | ValidationFailedResponse>>(productId: string,
+    params: GetOwnerOpnameProductReportParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerOpnameProductReport>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetOwnerOpnameProductReportQueryKey(productId,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOwnerOpnameProductReport>>> = ({ signal }) => getOwnerOpnameProductReport(productId,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: productId !== null && productId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getOwnerOpnameProductReport>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetOwnerOpnameProductReportQueryResult = NonNullable<Awaited<ReturnType<typeof getOwnerOpnameProductReport>>>
+export type GetOwnerOpnameProductReportQueryError = ErrorType<UnauthorizedResponse | NotFoundResponse | ValidationFailedResponse>
+
+
+export function useGetOwnerOpnameProductReport<TData = Awaited<ReturnType<typeof getOwnerOpnameProductReport>>, TError = ErrorType<UnauthorizedResponse | NotFoundResponse | ValidationFailedResponse>>(
+ productId: string,
+    params: GetOwnerOpnameProductReportParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerOpnameProductReport>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getOwnerOpnameProductReport>>,
+          TError,
+          Awaited<ReturnType<typeof getOwnerOpnameProductReport>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetOwnerOpnameProductReport<TData = Awaited<ReturnType<typeof getOwnerOpnameProductReport>>, TError = ErrorType<UnauthorizedResponse | NotFoundResponse | ValidationFailedResponse>>(
+ productId: string,
+    params: GetOwnerOpnameProductReportParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerOpnameProductReport>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getOwnerOpnameProductReport>>,
+          TError,
+          Awaited<ReturnType<typeof getOwnerOpnameProductReport>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetOwnerOpnameProductReport<TData = Awaited<ReturnType<typeof getOwnerOpnameProductReport>>, TError = ErrorType<UnauthorizedResponse | NotFoundResponse | ValidationFailedResponse>>(
+ productId: string,
+    params: GetOwnerOpnameProductReportParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerOpnameProductReport>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Detail selisih opname satu barang dengan yang bertugas
+ */
+
+export function useGetOwnerOpnameProductReport<TData = Awaited<ReturnType<typeof getOwnerOpnameProductReport>>, TError = ErrorType<UnauthorizedResponse | NotFoundResponse | ValidationFailedResponse>>(
+ productId: string,
+    params: GetOwnerOpnameProductReportParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOwnerOpnameProductReport>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetOwnerOpnameProductReportQueryOptions(productId,params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+

@@ -276,3 +276,94 @@ test("(ruling R9) tinjau pengecualian tidak pernah mundur", () => {
     "reviewedAt = max(reviewedAt lama, min(upTo, jam server))",
   );
 });
+
+/** Endpoint laporan pemilik; true = punya 404 (detail opname). */
+const REPORT_OPS: readonly [string, boolean][] = [
+  ["/api/owner/reports/sales", false],
+  ["/api/owner/reports/products", false],
+  ["/api/owner/reports/stock", false],
+  ["/api/owner/reports/opname", false],
+  ["/api/owner/reports/opname/{productId}", true],
+];
+
+test("laporan pemilik: tag owner, ownerCookieAuth, 401, 422; 404 hanya detail opname", () => {
+  for (const [path, notFound] of REPORT_OPS) {
+    const text = op(path, "get");
+    expect(text, path).toContain("tags: [owner]");
+    expect(text, path).toContain("- ownerCookieAuth: []");
+    expect(text, path).toMatch(
+      /"401":\n\s+\$ref: "#\/components\/responses\/Unauthorized"/,
+    );
+    expect(text, path).toMatch(
+      /"422":\n\s+\$ref: "#\/components\/responses\/ValidationFailed"/,
+    );
+    expect(text.includes('"404":'), path).toBe(notFound);
+  }
+});
+
+test("(pra-cek) endpoint ekspor laporan tidak ada di F3c-1", () => {
+  expect(spec).not.toMatch(/\/api\/owner\/reports\/export/);
+  expect(spec).not.toMatch(/operationId: \w*[Ee]xport/);
+});
+
+test("(K12) laporan penjualan: pesan 422 checkRange, jepit hari ini, pembanding", () => {
+  const sales = prose(op("/api/owner/reports/sales", "get"));
+  for (const rule of [
+    'period tidak dikenal → 422 VALIDATION "Periode tidak valid"',
+    'from/to bukan tanggal sah → "Tanggal tidak valid"',
+    'to < from → "Tanggal akhir sebelum tanggal awal"',
+    'from > hari ini → "Tanggal di masa depan"',
+    'rentang yang tidak sama dengan periode yang memuat from → "Periode tidak cocok"',
+    'lebih dari 92 hari (kedua ujung ikut) → "Rentang maksimal 92 hari"',
+    "to > hari ini dijepit ke hari ini dan running = true",
+    "hari → hari yang sama minggu lalu",
+    "bulan penuh → bulan sebelumnya penuh",
+    "tanggal → rentang tepat sebelumnya sepanjang sama",
+  ])
+    expect(sales).toContain(rule);
+});
+
+test("(jawaban pemilik Q7) potongan menit hanya bila hari terakhir pembanding sejajar", () => {
+  const sales = prose(op("/api/owner/reports/sales", "get"));
+  expect(sales).toContain(
+    "bulan sebagian (berjalan) → tanggal 1 sampai tanggal sejajar bulan sebelumnya, dijepit ke akhir bulan itu bila bulan itu lebih pendek (1–30 Mar vs 1–28 Feb)",
+  );
+  expect(sales).toContain(
+    "Bila running dan previous sama panjang dengan range (hari terakhir pembanding sejajar dengan hari ini), previousTotals berhenti di akhir menit sekarang pada hari terakhir pembanding (menit berjalan ikut); bila previous lebih pendek (tanggal sejajar dijepit), hari terakhir pembanding dihitung penuh.",
+  );
+  expect(sales).toContain(
+    "current sama dengan getOwnerTodaySummary (revenue, grossProfit, salesCount, avgTicket, newCredit) dan previousTotals.revenue = lastWeekRevenue",
+  );
+});
+
+test("(K14) status sekarang: dibatalkan keluar dari omzet, masuk voidedCount", () => {
+  expect(prose(op("/api/owner/reports/sales", "get"))).toContain(
+    "Status penjualan dibaca sekarang (K14)",
+  );
+  expect(prose(field("KasirSales", "voidedCount"))).toContain(
+    "dibuat di rentang dan kini berstatus dibatalkan",
+  );
+});
+
+test("(jawaban pemilik Q5) marginPermille bertanda, null bila omzet 0", () => {
+  expect(prose(field("SalesTotals", "marginPermille"))).toContain(
+    "tanda(grossProfit) × round_half_up(|grossProfit| × 1000 / revenue); null bila revenue 0",
+  );
+});
+
+test("(K15) urutan barang dari server; laba null terakhir; jumlah dalam satuan eceran", () => {
+  const products = prose(op("/api/owner/reports/products", "get"));
+  expect(products).toContain(
+    "jumlah = qtyBase ÷ unitSize eceran terbesar, seri → omzet lebih besar",
+  );
+  expect(products).toContain("laba = grossProfit terbesar, null terakhir");
+  expect(prose(field("ProductSales", "grossProfit"))).toContain(
+    "null bila ada baris tanpa HPP",
+  );
+});
+
+test("(label pemilik) urutan laporan stok di server, bawaan modal", () => {
+  const stock = prose(op("/api/owner/reports/stock", "get"));
+  expect(stock).toContain("Urutan angka uang ditentukan server");
+  expect(stock).toContain("default: modal");
+});

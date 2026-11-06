@@ -1698,6 +1698,189 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "422":
           $ref: "#/components/responses/ValidationFailed"
+  /api/owner/reports/sales:
+    get:
+      tags: [owner]
+      operationId: getOwnerSalesReport
+      summary: Laporan penjualan satu periode dengan pembanding sepanjang rentang yang sama
+      description: |
+        Omzet, laba kotor, transaksi, rata-rata per struk, kasbon baru, grafik, 3 barang teratas,
+        per kategori, dan per kasir untuk satu periode (K12/K16), kalender Asia/Jakarta (hari mulai
+        00.00 WIB; minggu = Senin–Minggu; bulan = tanggal 1 sampai akhir bulan; tanggal = rentang
+        bebas). Urutan pemeriksaan (pesan sama dengan checkRange di shared/lib/report-period.ts):
+        period tidak dikenal → 422 VALIDATION "Periode tidak valid"; from/to bukan tanggal sah →
+        "Tanggal tidak valid"; to < from → "Tanggal akhir sebelum tanggal awal"; from > hari ini →
+        "Tanggal di masa depan"; period hari/minggu/bulan dengan rentang yang tidak sama dengan
+        periode yang memuat from → "Periode tidak cocok"; period tanggal lebih dari 92 hari
+        (kedua ujung ikut) → "Rentang maksimal 92 hari". Lolos pemeriksaan: to > hari ini dijepit
+        ke hari ini dan running = true (running = rentang memuat hari ini); range = rentang sesudah
+        dijepit.
+
+        Pembanding previous dihitung dari range (sesudah dijepit): hari → hari yang sama minggu
+        lalu; minggu → 7 hari sebelumnya; bulan penuh → bulan sebelumnya penuh; bulan sebagian
+        (berjalan) → tanggal 1 sampai tanggal sejajar bulan sebelumnya, dijepit ke akhir bulan itu
+        bila bulan itu lebih pendek (1–30 Mar vs 1–28 Feb); tanggal → rentang tepat sebelumnya
+        sepanjang sama. Bila running dan previous sama panjang dengan range (hari terakhir
+        pembanding sejajar dengan hari ini), previousTotals berhenti di akhir menit sekarang pada
+        hari terakhir pembanding (menit berjalan ikut); bila previous lebih pendek (tanggal sejajar
+        dijepit), hari terakhir pembanding dihitung penuh. (jawaban pemilik Q7)
+
+        Status penjualan dibaca sekarang (K14): penjualan yang kemudian dibatalkan keluar dari
+        current, series, topProducts, dan categories, tetapi dihitung di kasir[].voidedCount. HPP =
+        yang disalin per baris saat penjualan (HPP sekarang tidak dipakai). Hari ini (period hari,
+        from = to = hari ini): current sama dengan getOwnerTodaySummary (revenue, grossProfit,
+        salesCount, avgTicket, newCredit) dan previousTotals.revenue = lastWeekRevenue.
+
+        series: period hari → kind jam, 24 bucket berkunci "0".."23" (jam Asia/Jakarta); period
+        lain → kind hari, satu bucket per tanggal from..to permintaan (sebelum dijepit), berkunci
+        YYYY-MM-DD. Bucket yang belum terjadi (jam yang mulai sesudah sekarang, tanggal sesudah hari
+        ini) bernilai null. topProducts = 3 teratas listOwnerProductSales urut omzet. categories urut
+        omzet terbesar lalu nama, category null terakhir. kasir urut omzet terbesar lalu nama
+        (kasir yang hanya punya transaksi dibatalkan tetap ada).
+      security:
+        - ownerCookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ReportPeriodQuery"
+        - $ref: "#/components/parameters/ReportFrom"
+        - $ref: "#/components/parameters/ReportTo"
+      responses:
+        "200":
+          description: Laporan penjualan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SalesReport"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+  /api/owner/reports/products:
+    get:
+      tags: [owner]
+      operationId: listOwnerProductSales
+      summary: Semua barang terjual di satu periode (Paling laku > Lihat semua)
+      description: |
+        Periode, pemeriksaan, dan jepit sama dengan getOwnerSalesReport; hanya penjualan berstatus
+        selesai di range. Satu baris per barang (semua satuan dijumlah dalam satuan dasar). Urutan
+        ditentukan server (K15): omzet = revenue terbesar; jumlah = qtyBase ÷ unitSize eceran
+        terbesar, seri → omzet lebih besar; laba = grossProfit terbesar, null terakhir, seri → omzet
+        lebih besar; seri terakhir → nama barang. sort tidak dikenal → 422 VALIDATION.
+      security:
+        - ownerCookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ReportPeriodQuery"
+        - $ref: "#/components/parameters/ReportFrom"
+        - $ref: "#/components/parameters/ReportTo"
+        - name: sort
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/ProductSalesSort"
+      responses:
+        "200":
+          description: Barang terjual, terurut
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProductSales"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+  /api/owner/reports/stock:
+    get:
+      tags: [owner]
+      operationId: getOwnerStockReport
+      summary: Tidak terjual ≥ 30 hari dan untung tipis (posisi sekarang)
+      description: |
+        Posisi hari ini (Asia/Jakarta), tanpa periode. Urutan angka uang ditentukan server, bukan
+        di layar (label pemilik): unsold.items menurut sort (default: modal) — modal = heldValue
+        terbesar, null terakhir; lama = days terbesar, seri → heldValue terbesar (null terakhir);
+        seri terakhir → nama barang. thinMargin.items urut marginPermille naik (rugi dulu), lalu
+        nama. Batas dari state server (reportRules; pengaturannya di F3c-2). sort tidak dikenal →
+        422 VALIDATION.
+      security:
+        - ownerCookieAuth: []
+      parameters:
+        - name: sort
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/StockReportSort"
+      responses:
+        "200":
+          description: Laporan stok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StockReport"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+  /api/owner/reports/opname:
+    get:
+      tags: [owner]
+      operationId: getOwnerOpnameReport
+      summary: Selisih opname per barang di satu rentang (pengaman 4)
+      description: |
+        from/to diperiksa seperti period tanggal di getOwnerSalesReport (pesan checkRange,
+        maksimal 92 hari); to > hari ini dijepit ke hari ini; range = rentang sesudah dijepit.
+        Hitungan final (K19) = state cocok, disesuaikan, disetujui, dihitung_ulang (memakai hasil
+        hitung ulang) dengan jam hitung di range; ditahan, menunggu_alasan, dan diganti tidak ikut;
+        stok_awal hanya patokan. Selisih yang sudah diberi alasan tetap dihitung. Hitungan tanpa HPP
+        tidak dijumlah (unknownValueCount). items hanya barang yang punya selisih, urut lossValue
+        terbesar (null terakhir), seri → gainValue terbesar, lalu nama.
+      security:
+        - ownerCookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ReportFrom"
+        - $ref: "#/components/parameters/ReportTo"
+      responses:
+        "200":
+          description: Selisih opname
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpnameReport"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+  /api/owner/reports/opname/{productId}:
+    get:
+      tags: [owner]
+      operationId: getOwnerOpnameProductReport
+      summary: Detail selisih opname satu barang dengan yang bertugas
+      description: |
+        Rentang & hitungan final sama dengan getOwnerOpnameReport. counts = semua hitungan final
+        barang ini di range, terbaru dulu, masing-masing dengan yang bertugas di antara hitungan
+        sebelumnya (final atau stok_awal, boleh sebelum range) dan hitungan ini (K20): kasir yang
+        shift-nya tumpang dengan jeda itu dan orang toko yang punya catatan barang itu (nota barang
+        masuk aktif, keluarkan kedaluwarsa, sesi opname lain), digabung per nama, urut nama.
+        Petunjuk, bukan bukti. 404 bila barang tidak dikenal atau tidak punya hitungan final di
+        range.
+      security:
+        - ownerCookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ProductId"
+        - $ref: "#/components/parameters/ReportFrom"
+        - $ref: "#/components/parameters/ReportTo"
+      responses:
+        "200":
+          description: Detail selisih satu barang
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpnameProductReport"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
   /api/staff/users:
     get:
       tags: [staff]
@@ -2398,6 +2581,28 @@ components:
       required: true
       schema:
         type: string
+    ReportPeriodQuery:
+      name: period
+      in: query
+      required: true
+      schema:
+        $ref: "#/components/schemas/ReportPeriod"
+    ReportFrom:
+      name: from
+      in: query
+      required: true
+      description: Tanggal awal Asia/Jakarta YYYY-MM-DD (ikut).
+      schema:
+        type: string
+        format: date
+    ReportTo:
+      name: to
+      in: query
+      required: true
+      description: Tanggal akhir Asia/Jakarta YYYY-MM-DD (ikut); sesudah hari ini dijepit ke hari ini.
+      schema:
+        type: string
+        format: date
   securitySchemes:
     cookieAuth:
       type: apiKey
@@ -5263,3 +5468,422 @@ components:
           format: int64
         totalValue:
           type: integer
+    ReportPeriod:
+      type: string
+      description: |
+        Periode laporan (K12), kalender Asia/Jakarta: hari; minggu = Senin–Minggu; bulan = tanggal 1
+        sampai akhir bulan; tanggal = rentang bebas maksimal 92 hari.
+      enum: [hari, minggu, bulan, tanggal]
+    ReportRange:
+      type: object
+      description: Rentang tanggal Asia/Jakarta YYYY-MM-DD; kedua ujung ikut.
+      required: [from, to]
+      properties:
+        from:
+          type: string
+          format: date
+        to:
+          type: string
+          format: date
+    ProductSalesSort:
+      type: string
+      description: Urutan listOwnerProductSales (K15); bawaan omzet.
+      enum: [omzet, jumlah, laba]
+    StockReportSort:
+      type: string
+      description: Urutan StockReport.unsold.items; bawaan modal.
+      enum: [modal, lama]
+    SalesTotals:
+      type: object
+      description: |
+        Aturan sama dengan OwnerTodaySummary: hanya penjualan berstatus selesai (sekarang). Uang
+        integer rupiah.
+      required: [revenue, grossProfit, salesCount, avgTicket, newCredit, marginPermille]
+      properties:
+        revenue:
+          type: integer
+          description: Σ total penjualan selesai.
+        grossProfit:
+          type: integer
+          description: revenue − Σ HPP yang disalin saat penjualan (HPP kosong dihitung 0); boleh negatif.
+        salesCount:
+          type: integer
+        avgTicket:
+          type: integer
+          description: round_half_up(revenue / salesCount); 0 bila salesCount 0.
+        newCredit:
+          type: integer
+          description: Σ bagian kasbon (metode pembayaran credit).
+        marginPermille:
+          type: integer
+          nullable: true
+          description: |
+            (jawaban pemilik Q5) Margin laba kotor dalam permil bulat bertanda (164 = 16,4%):
+            tanda(grossProfit) × round_half_up(|grossProfit| × 1000 / revenue); null bila revenue 0.
+    ReportBucket:
+      type: object
+      required: [key, revenue, grossProfit]
+      properties:
+        key:
+          type: string
+          description: 'Jam "0".."23" (kind jam) atau tanggal YYYY-MM-DD (kind hari).'
+        revenue:
+          type: integer
+          nullable: true
+          description: Omzet penjualan selesai di bucket ini; null bila bucket belum terjadi.
+        grossProfit:
+          type: integer
+          nullable: true
+          description: Laba kotor bucket ini (HPP kosong = 0, boleh negatif); null bila bucket belum terjadi.
+    ReportSeries:
+      type: object
+      required: [kind, buckets]
+      properties:
+        kind:
+          type: string
+          enum: [jam, hari]
+        buckets:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReportBucket"
+    ProductSales:
+      type: object
+      description: Penjualan selesai satu barang di rentang; semua satuan dijumlah dalam satuan dasar.
+      required: [productId, productName, unitName, unitSize, isCurah, qtyBase, revenue, grossProfit]
+      properties:
+        productId:
+          type: string
+          nullable: true
+          description: |
+            null bila barangnya sudah tidak ada; barisnya dikelompokkan menurut nama barang di struk
+            dengan satuan terkecil di struk.
+        productName:
+          type: string
+        unitName:
+          type: string
+          description: Satuan eceran (satuan pertama barang).
+        unitSize:
+          type: integer
+          minimum: 1
+          description: Isi satuan eceran dalam satuan dasar.
+        isCurah:
+          type: boolean
+        qtyBase:
+          type: integer
+          description: Σ qtyBase baris (2 dus isi 40 + 5 pcs = 85; curah 1,5 kg = 1500).
+        revenue:
+          type: integer
+          description: Σ subtotal baris.
+        grossProfit:
+          type: integer
+          nullable: true
+          description: revenue − Σ HPP baris yang disalin saat penjualan; null bila ada baris tanpa HPP.
+    CategorySales:
+      type: object
+      required: [category, revenue, grossProfit, productCount]
+      properties:
+        category:
+          type: string
+          nullable: true
+          description: Kategori barang sekarang; null = tanpa kategori atau barang sudah tidak ada.
+        revenue:
+          type: integer
+        grossProfit:
+          type: integer
+          description: revenue − Σ HPP baris (HPP kosong = 0), sama dengan aturan SalesTotals.
+        productCount:
+          type: integer
+          description: Jumlah barang berbeda yang terjual di kategori ini.
+    KasirSales:
+      type: object
+      required: [kasirName, revenue, salesCount, voidedCount]
+      properties:
+        kasirName:
+          type: string
+          description: Nama kasir saat penjualan.
+        revenue:
+          type: integer
+          description: Omzet penjualan selesai kasir ini.
+        salesCount:
+          type: integer
+          description: Jumlah penjualan selesai kasir ini.
+        voidedCount:
+          type: integer
+          description: |
+            (K14) Penjualan kasir ini yang dibuat di rentang dan kini berstatus dibatalkan (kapan pun
+            dibatalkan, oleh siapa pun).
+    SalesReport:
+      type: object
+      required: [period, range, previous, running, current, previousTotals, series, topProducts, categories, kasir]
+      properties:
+        period:
+          $ref: "#/components/schemas/ReportPeriod"
+        range:
+          description: Rentang sesudah dijepit ke hari ini.
+          allOf:
+            - $ref: "#/components/schemas/ReportRange"
+        previous:
+          description: Rentang pembanding (K12, jawaban pemilik Q7).
+          allOf:
+            - $ref: "#/components/schemas/ReportRange"
+        running:
+          type: boolean
+          description: Rentang memuat hari ini (periode berjalan).
+        current:
+          $ref: "#/components/schemas/SalesTotals"
+        previousTotals:
+          description: Total pembanding; dipotong di akhir menit sekarang hanya bila hari terakhirnya sejajar (Q7).
+          allOf:
+            - $ref: "#/components/schemas/SalesTotals"
+        series:
+          $ref: "#/components/schemas/ReportSeries"
+        topProducts:
+          type: array
+          maxItems: 3
+          items:
+            $ref: "#/components/schemas/ProductSales"
+        categories:
+          type: array
+          items:
+            $ref: "#/components/schemas/CategorySales"
+        kasir:
+          type: array
+          items:
+            $ref: "#/components/schemas/KasirSales"
+    UnsoldItem:
+      type: object
+      description: |
+        (K17) Barang tidak terjual: patokan = terakhir terjual (penjualan selesai), atau stok
+        pertama (entri stok positif pertama, bila tidak ada awal katalog) bila belum pernah.
+      required: [productId, productName, unitName, unitSize, isCurah, stockQtyBase, lastSoldAt, sinceDate, days, heldValue]
+      properties:
+        productId:
+          type: string
+        productName:
+          type: string
+        unitName:
+          type: string
+          description: Satuan eceran.
+        unitSize:
+          type: integer
+          minimum: 1
+        isCurah:
+          type: boolean
+        stockQtyBase:
+          type: integer
+        lastSoldAt:
+          type: integer
+          format: int64
+          nullable: true
+          description: Jam penjualan selesai terakhir; null = belum pernah terjual.
+        sinceDate:
+          type: string
+          format: date
+          description: Tanggal patokan Asia/Jakarta.
+        days:
+          type: integer
+          description: isoDaysBetween(sinceDate, hari ini).
+        heldValue:
+          type: integer
+          nullable: true
+          description: Modal tertahan = round_half_up(stok × HPP); null bila HPP belum ada.
+    ThinMarginItem:
+      type: object
+      description: |
+        (K18) Barang aktif ber-HPP dengan harga eceran > 0 yang margin eceran-nya di bawah batas:
+        (price − unitCost) × 1000 < thresholdPermille × price.
+      required: [productId, productName, unitName, price, unitCost, marginPermille]
+      properties:
+        productId:
+          type: string
+        productName:
+          type: string
+        unitName:
+          type: string
+          description: Satuan eceran.
+        price:
+          type: integer
+          description: Harga eceran.
+        unitCost:
+          type: integer
+          description: HPP per satuan eceran.
+        marginPermille:
+          type: integer
+          description: Margin bertanda dalam permil bulat; negatif = rugi (koreksi mockup M3).
+    StockReport:
+      type: object
+      required: [today, unsold, thinMargin]
+      properties:
+        today:
+          type: string
+          format: date
+        unsold:
+          type: object
+          description: |
+            Barang dengan days ≥ minDays; tidak ikut stok ≤ 0, status nonaktif atau menunggu_harga,
+            dan barang baru (stok pertama < minDays hari). heldValue = Σ heldValue yang tidak null;
+            noCostCount = barang tanpa HPP (tidak dijumlah).
+          required: [minDays, count, heldValue, noCostCount, items]
+          properties:
+            minDays:
+              type: integer
+            count:
+              type: integer
+            heldValue:
+              type: integer
+            noCostCount:
+              type: integer
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/UnsoldItem"
+        thinMargin:
+          type: object
+          description: Tidak masuk Perlu perhatian (P10).
+          required: [thresholdPermille, count, items]
+          properties:
+            thresholdPermille:
+              type: integer
+            count:
+              type: integer
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/ThinMarginItem"
+    DutyEntry:
+      type: object
+      description: Satu orang yang bertugas di jeda hitungan (K20).
+      required: [name, shifts, records]
+      properties:
+        name:
+          type: string
+        shifts:
+          type: integer
+          description: Shift kasir yang tumpang dengan jeda.
+        records:
+          type: integer
+          description: Catatan barang ini di jeda (nota barang masuk aktif, keluarkan kedaluwarsa, sesi opname lain).
+    OpnameCountRow:
+      type: object
+      required: [sessionId, countedAt, counterName, diffQtyBase, value, reason, state, previousCountedAt, duty]
+      properties:
+        sessionId:
+          type: string
+        countedAt:
+          type: integer
+          format: int64
+        counterName:
+          type: string
+        diffQtyBase:
+          type: integer
+          description: Selisih final (hasil hitung ulang bila dihitung_ulang); 0 = cocok.
+        value:
+          type: integer
+          nullable: true
+          description: Nilai rupiah |diffQtyBase|; null bila HPP belum ada.
+        reason:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/OpnameReason"
+        state:
+          $ref: "#/components/schemas/OpnameItemState"
+        previousCountedAt:
+          type: integer
+          format: int64
+          nullable: true
+          description: Hitungan sebelumnya (awal jeda); null = hitungan pertama.
+        duty:
+          type: array
+          description: Yang bertugas di jeda; kosong untuk hitungan pertama. Urut nama.
+          items:
+            $ref: "#/components/schemas/DutyEntry"
+    OpnameReportItem:
+      type: object
+      required: [productId, productName, unitName, unitSize, isCurah, countTotal, shortCount, overCount, repeated, shortQtyBase, overQtyBase, lossValue, gainValue]
+      properties:
+        productId:
+          type: string
+        productName:
+          type: string
+        unitName:
+          type: string
+          description: Satuan eceran.
+        unitSize:
+          type: integer
+          minimum: 1
+        isCurah:
+          type: boolean
+        countTotal:
+          type: integer
+          description: Hitungan final barang ini di rentang (termasuk cocok).
+        shortCount:
+          type: integer
+        overCount:
+          type: integer
+        repeated:
+          type: boolean
+          description: Kurang di ≥ 2 hitungan final berturut-turut.
+        shortQtyBase:
+          type: integer
+          description: Σ |selisih| hitungan kurang (positif).
+        overQtyBase:
+          type: integer
+          description: Σ selisih hitungan lebih.
+        lossValue:
+          type: integer
+          nullable: true
+          description: Σ nilai hitungan kurang yang ber-HPP (positif); 0 bila tidak ada hitungan kurang; null bila semua hitungan kurangnya tanpa HPP.
+        gainValue:
+          type: integer
+          nullable: true
+          description: Σ nilai hitungan lebih yang ber-HPP; 0 bila tidak ada hitungan lebih; null bila semua hitungan lebihnya tanpa HPP.
+    OpnameReport:
+      type: object
+      description: Kartu kotor (kurang dan lebih tidak saling mengurangi).
+      required: [range, lossValue, lossCount, gainValue, gainCount, unknownValueCount, items]
+      properties:
+        range:
+          $ref: "#/components/schemas/ReportRange"
+        lossValue:
+          type: integer
+          description: Σ nilai hitungan kurang yang ber-HPP (positif).
+        lossCount:
+          type: integer
+          description: Barang berbeda yang punya hitungan kurang.
+        gainValue:
+          type: integer
+        gainCount:
+          type: integer
+        unknownValueCount:
+          type: integer
+          description: Hitungan selisih tanpa HPP (tidak dijumlah).
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OpnameReportItem"
+    OpnameProductReport:
+      allOf:
+        - $ref: "#/components/schemas/OpnameReportItem"
+        - type: object
+          required: [range, dutyOnShort, counts]
+          properties:
+            range:
+              $ref: "#/components/schemas/ReportRange"
+            dutyOnShort:
+              type: array
+              description: |
+                Per nama: di berapa jeda hitungan kurang orang itu bertugas (intervals dari shortCount),
+                urut nama.
+              items:
+                type: object
+                required: [name, intervals]
+                properties:
+                  name:
+                    type: string
+                  intervals:
+                    type: integer
+            counts:
+              type: array
+              description: Hitungan final di rentang, terbaru dulu.
+              items:
+                $ref: "#/components/schemas/OpnameCountRow"

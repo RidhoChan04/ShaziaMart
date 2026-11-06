@@ -1,20 +1,28 @@
 import { expect, expectTypeOf, test } from "vitest";
 import type { z } from "zod";
+import spec from "../../../../api/openapi.yaml?raw";
 import * as creditApi from "./gen/credit/credit";
 import * as ownerApi from "./gen/owner/owner";
 import * as salesApi from "./gen/sales/sales";
 import type {
   Attention,
   CashierException,
+  CategorySales,
   CostChangeItem,
   CreditLimitProblem,
+  DutyEntry,
   ExceptionAttention,
   ExpiryAttention,
   ImportRowResult,
   KasirCreditPayment,
   KasirLookupSale,
+  KasirSales,
+  OpnameCountRow,
   OpnameFlag,
+  OpnameProductReport,
   OpnameReason,
+  OpnameReport,
+  OpnameReportItem,
   OwnerExpiryList,
   OwnerOpnameItem,
   OwnerOpnameSession,
@@ -27,19 +35,31 @@ import type {
   PriceChangedProblem,
   Product,
   ProductInput,
+  ProductSales,
+  ProductSalesSort,
+  ReportBucket,
+  ReportRange,
+  ReportSeries,
   Sale,
   SaleRequest,
+  SalesReport,
+  SalesTotals,
   SaleVoid,
   SearchCustomersParams,
   ShiftClosure,
   StockMovement,
   StockOutItem,
+  StockReport,
+  StockReportSort,
   SupplierDebtAttention,
+  ThinMarginItem,
+  UnsoldItem,
 } from "./gen/shaziaMartAPI.schemas";
 import {
   ErrorCode,
   PriceSource,
   ProductStatus,
+  ReportPeriod,
 } from "./gen/shaziaMartAPI.schemas";
 import * as staffApi from "./gen/staff/staff";
 import { LookupCatalogResponse } from "./gen/zod/catalog/catalog";
@@ -52,7 +72,12 @@ import {
   CheckOwnerProductImportBody,
   CreateOwnerCreditPaymentBody,
   CreateOwnerProductBody,
+  GetOwnerOpnameReportQueryParams,
+  GetOwnerSalesReportQueryParams,
+  GetOwnerSalesReportResponse,
+  GetOwnerStockReportQueryParams,
   GetOwnerTodaySummaryResponse,
+  ListOwnerProductSalesQueryParams,
   OwnerLoginBody,
   RecountOpnameItemBody,
   ReviewOwnerExceptionsBody,
@@ -898,4 +923,286 @@ test("pengecualian & transaksi pemilik: bentuk key lengkap", () => {
   expect(
     ReviewOwnerExceptionsBody.safeParse({ kind: "lain", upTo: 1 }).success,
   ).toBe(false);
+});
+
+const REPORT_OPS = [
+  "getOwnerSalesReport",
+  "listOwnerProductSales",
+  "getOwnerStockReport",
+  "getOwnerOpnameReport",
+  "getOwnerOpnameProductReport",
+] as const;
+
+test("operasi laporan pemilik ada di klien owner saja; tanpa endpoint ekspor (F3c-2)", () => {
+  for (const id of REPORT_OPS) {
+    expect({
+      id,
+      type: typeof (ownerApi as Record<string, unknown>)[id],
+    }).toEqual({ id, type: "function" });
+    for (const other of [salesApi, creditApi, staffApi])
+      expect(other).not.toHaveProperty(id);
+  }
+  expect(Object.keys(ownerApi).filter((k) => /export|ekspor/i.test(k))).toEqual(
+    [],
+  );
+});
+
+test("query laporan: period enum, from/to tanggal wajib; sort per laporan", () => {
+  const ok = { period: "bulan", from: "2026-11-01", to: "2026-11-30" };
+  const sales = (q: unknown) =>
+    GetOwnerSalesReportQueryParams.safeParse(q).success;
+  expect(sales(ok)).toBe(true);
+  expect(sales({ ...ok, period: "tahun" })).toBe(false);
+  expect(sales({ period: "hari", from: "2026-11-05" })).toBe(false);
+  expect(sales({ ...ok, from: "5 Nov" })).toBe(false);
+  expect(Object.values(ReportPeriod)).toEqual([
+    "hari",
+    "minggu",
+    "bulan",
+    "tanggal",
+  ]);
+  const products = (q: unknown) =>
+    ListOwnerProductSalesQueryParams.safeParse(q).success;
+  expect(products(ok)).toBe(true);
+  for (const sort of ["omzet", "jumlah", "laba"])
+    expect(products({ ...ok, sort })).toBe(true);
+  expect(products({ ...ok, sort: "modal" })).toBe(false);
+  const stock = (q: unknown) =>
+    GetOwnerStockReportQueryParams.safeParse(q).success;
+  expect(stock({})).toBe(true);
+  expect(stock({ sort: "modal" })).toBe(true);
+  expect(stock({ sort: "lama" })).toBe(true);
+  expect(stock({ sort: "omzet" })).toBe(false);
+  const opname = (q: unknown) =>
+    GetOwnerOpnameReportQueryParams.safeParse(q).success;
+  expect(opname({ from: "2026-11-01", to: "2026-11-05" })).toBe(true);
+  expect(opname({ from: "2026-11-01" })).toBe(false);
+  expectTypeOf<ProductSalesSort>().toEqualTypeOf<"omzet" | "jumlah" | "laba">();
+  expectTypeOf<StockReportSort>().toEqualTypeOf<"modal" | "lama">();
+});
+
+test("bentuk laporan penjualan: key lengkap, semua wajib, nullable sesuai kontrak", () => {
+  expectTypeOf<keyof SalesReport>().toEqualTypeOf<
+    | "period"
+    | "range"
+    | "previous"
+    | "running"
+    | "current"
+    | "previousTotals"
+    | "series"
+    | "topProducts"
+    | "categories"
+    | "kasir"
+  >();
+  expectTypeOf<Required<SalesReport>>().toEqualTypeOf<SalesReport>();
+  expectTypeOf<SalesReport["range"]>().toEqualTypeOf<ReportRange>();
+  expectTypeOf<keyof ReportRange>().toEqualTypeOf<"from" | "to">();
+  expectTypeOf<keyof SalesTotals>().toEqualTypeOf<
+    | "revenue"
+    | "grossProfit"
+    | "salesCount"
+    | "avgTicket"
+    | "newCredit"
+    | "marginPermille"
+  >();
+  expectTypeOf<SalesTotals["marginPermille"]>().toEqualTypeOf<number | null>();
+  expectTypeOf<keyof ReportBucket>().toEqualTypeOf<
+    "key" | "revenue" | "grossProfit"
+  >();
+  expectTypeOf<ReportBucket["revenue"]>().toEqualTypeOf<number | null>();
+  expectTypeOf<ReportSeries["kind"]>().toEqualTypeOf<"jam" | "hari">();
+  expectTypeOf<keyof ProductSales>().toEqualTypeOf<
+    | "productId"
+    | "productName"
+    | "unitName"
+    | "unitSize"
+    | "isCurah"
+    | "qtyBase"
+    | "revenue"
+    | "grossProfit"
+  >();
+  expectTypeOf<ProductSales["productId"]>().toEqualTypeOf<string | null>();
+  expectTypeOf<ProductSales["grossProfit"]>().toEqualTypeOf<number | null>();
+  expectTypeOf<keyof CategorySales>().toEqualTypeOf<
+    "category" | "revenue" | "grossProfit" | "productCount"
+  >();
+  expectTypeOf<CategorySales["category"]>().toEqualTypeOf<string | null>();
+  expectTypeOf<keyof KasirSales>().toEqualTypeOf<
+    "kasirName" | "revenue" | "salesCount" | "voidedCount"
+  >();
+});
+
+test("bentuk laporan stok & opname: key lengkap dan semua wajib", () => {
+  expectTypeOf<keyof StockReport>().toEqualTypeOf<
+    "today" | "unsold" | "thinMargin"
+  >();
+  expectTypeOf<keyof StockReport["unsold"]>().toEqualTypeOf<
+    "minDays" | "count" | "heldValue" | "noCostCount" | "items"
+  >();
+  expectTypeOf<StockReport["unsold"]["items"]>().toEqualTypeOf<UnsoldItem[]>();
+  expectTypeOf<keyof StockReport["thinMargin"]>().toEqualTypeOf<
+    "thresholdPermille" | "count" | "items"
+  >();
+  expectTypeOf<keyof UnsoldItem>().toEqualTypeOf<
+    | "productId"
+    | "productName"
+    | "unitName"
+    | "unitSize"
+    | "isCurah"
+    | "stockQtyBase"
+    | "lastSoldAt"
+    | "sinceDate"
+    | "days"
+    | "heldValue"
+  >();
+  expectTypeOf<Required<UnsoldItem>>().toEqualTypeOf<UnsoldItem>();
+  expectTypeOf<keyof ThinMarginItem>().toEqualTypeOf<
+    | "productId"
+    | "productName"
+    | "unitName"
+    | "price"
+    | "unitCost"
+    | "marginPermille"
+  >();
+  expectTypeOf<keyof DutyEntry>().toEqualTypeOf<
+    "name" | "shifts" | "records"
+  >();
+  expectTypeOf<keyof OpnameCountRow>().toEqualTypeOf<
+    | "sessionId"
+    | "countedAt"
+    | "counterName"
+    | "diffQtyBase"
+    | "value"
+    | "reason"
+    | "state"
+    | "previousCountedAt"
+    | "duty"
+  >();
+  expectTypeOf<OpnameCountRow["reason"]>().toEqualTypeOf<OpnameReason | null>();
+  expectTypeOf<Required<OpnameCountRow>>().toEqualTypeOf<OpnameCountRow>();
+  type ItemKey =
+    | "productId"
+    | "productName"
+    | "unitName"
+    | "unitSize"
+    | "isCurah"
+    | "countTotal"
+    | "shortCount"
+    | "overCount"
+    | "repeated"
+    | "shortQtyBase"
+    | "overQtyBase"
+    | "lossValue"
+    | "gainValue";
+  expectTypeOf<keyof OpnameReportItem>().toEqualTypeOf<ItemKey>();
+  expectTypeOf<Required<OpnameReportItem>>().toEqualTypeOf<OpnameReportItem>();
+  expectTypeOf<keyof OpnameReport>().toEqualTypeOf<
+    | "range"
+    | "lossValue"
+    | "lossCount"
+    | "gainValue"
+    | "gainCount"
+    | "unknownValueCount"
+    | "items"
+  >();
+  expectTypeOf<keyof OpnameProductReport>().toEqualTypeOf<
+    ItemKey | "range" | "dutyOnShort" | "counts"
+  >();
+  expectTypeOf<OpnameProductReport["dutyOnShort"]>().toEqualTypeOf<
+    { name: string; intervals: number }[]
+  >();
+});
+
+test("fixture SalesReport valid; topProducts maksimal 3", () => {
+  const totals = {
+    revenue: 48_215_500,
+    grossProfit: 7_912_300,
+    salesCount: 1284,
+    avgTicket: 37_551,
+    newCredit: 1_185_000,
+    marginPermille: 164,
+  };
+  const product = {
+    productId: "p1",
+    productName: "Minyak Goreng Bimoli 2 L",
+    unitName: "pcs",
+    unitSize: 1,
+    isCurah: false,
+    qtyBase: 310,
+    revenue: 11_904_000,
+    grossProfit: null,
+  };
+  const report = {
+    period: "bulan",
+    range: { from: "2026-11-01", to: "2026-11-05" },
+    previous: { from: "2026-10-01", to: "2026-10-05" },
+    running: true,
+    current: totals,
+    previousTotals: { ...totals, marginPermille: null },
+    series: {
+      kind: "hari",
+      buckets: [
+        { key: "2026-11-05", revenue: 1000, grossProfit: -50 },
+        { key: "2026-11-06", revenue: null, grossProfit: null },
+      ],
+    },
+    topProducts: [product, product, product],
+    categories: [
+      { category: null, revenue: 1000, grossProfit: 100, productCount: 1 },
+    ],
+    kasir: [
+      { kasirName: "Rina", revenue: 1000, salesCount: 1, voidedCount: 2 },
+    ],
+  } satisfies SalesReport;
+  expect(GetOwnerSalesReportResponse.safeParse(report).success).toBe(true);
+  expect(
+    GetOwnerSalesReportResponse.safeParse({
+      ...report,
+      topProducts: [product, product, product, product],
+    }).success,
+  ).toBe(false);
+  expect(
+    GetOwnerSalesReportResponse.safeParse({ ...report, period: "tahun" })
+      .success,
+  ).toBe(false);
+});
+
+const REPORT_SCHEMAS = [
+  "SalesReport",
+  "SalesTotals",
+  "ReportBucket",
+  "ReportSeries",
+  "ProductSales",
+  "CategorySales",
+  "KasirSales",
+  "StockReport",
+  "UnsoldItem",
+  "ThinMarginItem",
+  "DutyEntry",
+  "OpnameCountRow",
+  "OpnameReportItem",
+  "OpnameReport",
+  "OpnameProductReport",
+];
+
+test("tidak ada path non-/api/owner yang merujuk skema laporan (HPP & laba hanya untuk pemilik)", () => {
+  const lines = spec.split(/\r?\n/);
+  const end = lines.indexOf("components:");
+  let path = "";
+  const offenders: string[] = [];
+  for (const line of lines.slice(0, end)) {
+    const head = /^ {2}(\/\S+):$/.exec(line)?.[1];
+    if (head !== undefined) path = head;
+    const ref = /#\/components\/schemas\/(\w+)"/.exec(line)?.[1];
+    if (
+      ref !== undefined &&
+      REPORT_SCHEMAS.includes(ref) &&
+      !path.startsWith("/api/owner/")
+    )
+      offenders.push(`${path} -> ${ref}`);
+  }
+  expect(offenders).toEqual([]);
+  // Skema laporan memang dirujuk endpoint laporan pemilik.
+  for (const name of ["SalesReport", "ProductSales", "StockReport"])
+    expect(spec).toContain(`#/components/schemas/${name}"`);
 });

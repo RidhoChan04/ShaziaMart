@@ -2436,6 +2436,351 @@ export interface StaffLowStockItem {
 }
 
 /**
+ * Periode laporan (K12), kalender Asia/Jakarta: hari; minggu = Senin–Minggu; bulan = tanggal 1
+ * sampai akhir bulan; tanggal = rentang bebas maksimal 92 hari.
+ */
+export type ReportPeriod = typeof ReportPeriod[keyof typeof ReportPeriod];
+
+
+export const ReportPeriod = {
+  hari: 'hari',
+  minggu: 'minggu',
+  bulan: 'bulan',
+  tanggal: 'tanggal',
+} as const;
+
+/**
+ * Rentang tanggal Asia/Jakarta YYYY-MM-DD; kedua ujung ikut.
+ */
+export interface ReportRange {
+  from: string;
+  to: string;
+}
+
+/**
+ * Urutan listOwnerProductSales (K15); bawaan omzet.
+ */
+export type ProductSalesSort = typeof ProductSalesSort[keyof typeof ProductSalesSort];
+
+
+export const ProductSalesSort = {
+  omzet: 'omzet',
+  jumlah: 'jumlah',
+  laba: 'laba',
+} as const;
+
+/**
+ * Urutan StockReport.unsold.items; bawaan modal.
+ */
+export type StockReportSort = typeof StockReportSort[keyof typeof StockReportSort];
+
+
+export const StockReportSort = {
+  modal: 'modal',
+  lama: 'lama',
+} as const;
+
+/**
+ * Aturan sama dengan OwnerTodaySummary: hanya penjualan berstatus selesai (sekarang). Uang
+ * integer rupiah.
+ */
+export interface SalesTotals {
+  /** Σ total penjualan selesai. */
+  revenue: number;
+  /** revenue − Σ HPP yang disalin saat penjualan (HPP kosong dihitung 0); boleh negatif. */
+  grossProfit: number;
+  salesCount: number;
+  /** round_half_up(revenue / salesCount); 0 bila salesCount 0. */
+  avgTicket: number;
+  /** Σ bagian kasbon (metode pembayaran credit). */
+  newCredit: number;
+  /**
+     * (jawaban pemilik Q5) Margin laba kotor dalam permil bulat bertanda (164 = 16,4%):
+     * tanda(grossProfit) × round_half_up(|grossProfit| × 1000 / revenue); null bila revenue 0.
+     * @nullable
+     */
+  marginPermille: number | null;
+}
+
+export interface ReportBucket {
+  /** Jam "0".."23" (kind jam) atau tanggal YYYY-MM-DD (kind hari). */
+  key: string;
+  /**
+     * Omzet penjualan selesai di bucket ini; null bila bucket belum terjadi.
+     * @nullable
+     */
+  revenue: number | null;
+  /**
+     * Laba kotor bucket ini (HPP kosong = 0, boleh negatif); null bila bucket belum terjadi.
+     * @nullable
+     */
+  grossProfit: number | null;
+}
+
+export type ReportSeriesKind = typeof ReportSeriesKind[keyof typeof ReportSeriesKind];
+
+
+export const ReportSeriesKind = {
+  jam: 'jam',
+  hari: 'hari',
+} as const;
+
+export interface ReportSeries {
+  kind: ReportSeriesKind;
+  buckets: ReportBucket[];
+}
+
+/**
+ * Penjualan selesai satu barang di rentang; semua satuan dijumlah dalam satuan dasar.
+ */
+export interface ProductSales {
+  /**
+     * null bila barangnya sudah tidak ada; barisnya dikelompokkan menurut nama barang di struk
+     * dengan satuan terkecil di struk.
+     * @nullable
+     */
+  productId: string | null;
+  productName: string;
+  /** Satuan eceran (satuan pertama barang). */
+  unitName: string;
+  /**
+     * Isi satuan eceran dalam satuan dasar.
+     * @minimum 1
+     */
+  unitSize: number;
+  isCurah: boolean;
+  /** Σ qtyBase baris (2 dus isi 40 + 5 pcs = 85; curah 1,5 kg = 1500). */
+  qtyBase: number;
+  /** Σ subtotal baris. */
+  revenue: number;
+  /**
+     * revenue − Σ HPP baris yang disalin saat penjualan; null bila ada baris tanpa HPP.
+     * @nullable
+     */
+  grossProfit: number | null;
+}
+
+export interface CategorySales {
+  /**
+     * Kategori barang sekarang; null = tanpa kategori atau barang sudah tidak ada.
+     * @nullable
+     */
+  category: string | null;
+  revenue: number;
+  /** revenue − Σ HPP baris (HPP kosong = 0), sama dengan aturan SalesTotals. */
+  grossProfit: number;
+  /** Jumlah barang berbeda yang terjual di kategori ini. */
+  productCount: number;
+}
+
+export interface KasirSales {
+  /** Nama kasir saat penjualan. */
+  kasirName: string;
+  /** Omzet penjualan selesai kasir ini. */
+  revenue: number;
+  /** Jumlah penjualan selesai kasir ini. */
+  salesCount: number;
+  /**
+     * (K14) Penjualan kasir ini yang dibuat di rentang dan kini berstatus dibatalkan (kapan pun
+     * dibatalkan, oleh siapa pun).
+     */
+  voidedCount: number;
+}
+
+export interface SalesReport {
+  period: ReportPeriod;
+  /** Rentang sesudah dijepit ke hari ini. */
+  range: ReportRange;
+  /** Rentang pembanding (K12, jawaban pemilik Q7). */
+  previous: ReportRange;
+  /** Rentang memuat hari ini (periode berjalan). */
+  running: boolean;
+  current: SalesTotals;
+  /** Total pembanding; dipotong di akhir menit sekarang hanya bila hari terakhirnya sejajar (Q7). */
+  previousTotals: SalesTotals;
+  series: ReportSeries;
+  /** @maxItems 3 */
+  topProducts: ProductSales[];
+  categories: CategorySales[];
+  kasir: KasirSales[];
+}
+
+/**
+ * (K17) Barang tidak terjual: patokan = terakhir terjual (penjualan selesai), atau stok
+ * pertama (entri stok positif pertama, bila tidak ada awal katalog) bila belum pernah.
+ */
+export interface UnsoldItem {
+  productId: string;
+  productName: string;
+  /** Satuan eceran. */
+  unitName: string;
+  /** @minimum 1 */
+  unitSize: number;
+  isCurah: boolean;
+  stockQtyBase: number;
+  /**
+     * Jam penjualan selesai terakhir; null = belum pernah terjual.
+     * @nullable
+     */
+  lastSoldAt: number | null;
+  /** Tanggal patokan Asia/Jakarta. */
+  sinceDate: string;
+  /** isoDaysBetween(sinceDate, hari ini). */
+  days: number;
+  /**
+     * Modal tertahan = round_half_up(stok × HPP); null bila HPP belum ada.
+     * @nullable
+     */
+  heldValue: number | null;
+}
+
+/**
+ * (K18) Barang aktif ber-HPP dengan harga eceran > 0 yang margin eceran-nya di bawah batas:
+ * (price − unitCost) × 1000 < thresholdPermille × price.
+ */
+export interface ThinMarginItem {
+  productId: string;
+  productName: string;
+  /** Satuan eceran. */
+  unitName: string;
+  /** Harga eceran. */
+  price: number;
+  /** HPP per satuan eceran. */
+  unitCost: number;
+  /** Margin bertanda dalam permil bulat; negatif = rugi (koreksi mockup M3). */
+  marginPermille: number;
+}
+
+/**
+ * Barang dengan days ≥ minDays; tidak ikut stok ≤ 0, status nonaktif atau menunggu_harga,
+ * dan barang baru (stok pertama < minDays hari). heldValue = Σ heldValue yang tidak null;
+ * noCostCount = barang tanpa HPP (tidak dijumlah).
+ */
+export type StockReportUnsold = {
+  minDays: number;
+  count: number;
+  heldValue: number;
+  noCostCount: number;
+  items: UnsoldItem[];
+};
+
+/**
+ * Tidak masuk Perlu perhatian (P10).
+ */
+export type StockReportThinMargin = {
+  thresholdPermille: number;
+  count: number;
+  items: ThinMarginItem[];
+};
+
+export interface StockReport {
+  today: string;
+  /**
+     * Barang dengan days ≥ minDays; tidak ikut stok ≤ 0, status nonaktif atau menunggu_harga,
+     * dan barang baru (stok pertama < minDays hari). heldValue = Σ heldValue yang tidak null;
+     * noCostCount = barang tanpa HPP (tidak dijumlah).
+     */
+  unsold: StockReportUnsold;
+  /** Tidak masuk Perlu perhatian (P10). */
+  thinMargin: StockReportThinMargin;
+}
+
+/**
+ * Satu orang yang bertugas di jeda hitungan (K20).
+ */
+export interface DutyEntry {
+  name: string;
+  /** Shift kasir yang tumpang dengan jeda. */
+  shifts: number;
+  /** Catatan barang ini di jeda (nota barang masuk aktif, keluarkan kedaluwarsa, sesi opname lain). */
+  records: number;
+}
+
+export interface OpnameCountRow {
+  sessionId: string;
+  countedAt: number;
+  counterName: string;
+  /** Selisih final (hasil hitung ulang bila dihitung_ulang); 0 = cocok. */
+  diffQtyBase: number;
+  /**
+     * Nilai rupiah |diffQtyBase|; null bila HPP belum ada.
+     * @nullable
+     */
+  value: number | null;
+  reason: OpnameReason | null;
+  state: OpnameItemState;
+  /**
+     * Hitungan sebelumnya (awal jeda); null = hitungan pertama.
+     * @nullable
+     */
+  previousCountedAt: number | null;
+  /** Yang bertugas di jeda; kosong untuk hitungan pertama. Urut nama. */
+  duty: DutyEntry[];
+}
+
+export interface OpnameReportItem {
+  productId: string;
+  productName: string;
+  /** Satuan eceran. */
+  unitName: string;
+  /** @minimum 1 */
+  unitSize: number;
+  isCurah: boolean;
+  /** Hitungan final barang ini di rentang (termasuk cocok). */
+  countTotal: number;
+  shortCount: number;
+  overCount: number;
+  /** Kurang di ≥ 2 hitungan final berturut-turut. */
+  repeated: boolean;
+  /** Σ |selisih| hitungan kurang (positif). */
+  shortQtyBase: number;
+  /** Σ selisih hitungan lebih. */
+  overQtyBase: number;
+  /**
+     * Σ nilai hitungan kurang yang ber-HPP (positif); 0 bila tidak ada hitungan kurang; null bila semua hitungan kurangnya tanpa HPP.
+     * @nullable
+     */
+  lossValue: number | null;
+  /**
+     * Σ nilai hitungan lebih yang ber-HPP; 0 bila tidak ada hitungan lebih; null bila semua hitungan lebihnya tanpa HPP.
+     * @nullable
+     */
+  gainValue: number | null;
+}
+
+/**
+ * Kartu kotor (kurang dan lebih tidak saling mengurangi).
+ */
+export interface OpnameReport {
+  range: ReportRange;
+  /** Σ nilai hitungan kurang yang ber-HPP (positif). */
+  lossValue: number;
+  /** Barang berbeda yang punya hitungan kurang. */
+  lossCount: number;
+  gainValue: number;
+  gainCount: number;
+  /** Hitungan selisih tanpa HPP (tidak dijumlah). */
+  unknownValueCount: number;
+  items: OpnameReportItem[];
+}
+
+export type OpnameProductReportDutyOnShortItem = {
+  name: string;
+  intervals: number;
+};
+
+export type OpnameProductReport = OpnameReportItem & {
+  range: ReportRange;
+  /**
+     * Per nama: di berapa jeda hitungan kurang orang itu bertugas (intervals dari shortCount),
+     * urut nama.
+     */
+  dutyOnShort: OpnameProductReportDutyOnShortItem[];
+  /** Hitungan final di rentang, terbaru dulu. */
+  counts: OpnameCountRow[];
+};
+
+/**
  * Bukan dari Wi-Fi toko (STAFF_LAN_ONLY): header Cf-Connecting-Ip/Cf-Ray → 403 STAFF_LAN_ONLY;
  * backend menolak semua yang bukan LAN (gagal-tertutup)
  */
@@ -2516,6 +2861,18 @@ export type ProductValidationFailedResponse = ProductValidationProblem;
  */
 export type ProductHasSalesResponse = Problem;
 
+export type ReportPeriodQueryParameter = ReportPeriod;
+
+/**
+ * Tanggal awal Asia/Jakarta YYYY-MM-DD (ikut).
+ */
+export type ReportFromParameter = string;
+
+/**
+ * Tanggal akhir Asia/Jakarta YYYY-MM-DD (ikut); sesudah hari ini dijepit ke hari ini.
+ */
+export type ReportToParameter = string;
+
 export type LookupCatalogParams = {
 /**
  * Barcode atau kode toko (persis)
@@ -2565,6 +2922,65 @@ q?: string;
 
 export type ListOwnerExceptionsParams = {
 kind: ExceptionKind;
+};
+
+export type GetOwnerSalesReportParams = {
+/**
+ * Periode laporan (K12), kalender Asia/Jakarta: hari; minggu = Senin–Minggu; bulan = tanggal 1
+ * sampai akhir bulan; tanggal = rentang bebas maksimal 92 hari.
+ */
+period: ReportPeriodQueryParameter;
+/**
+ * Tanggal awal Asia/Jakarta YYYY-MM-DD (ikut).
+ */
+from: ReportFromParameter;
+/**
+ * Tanggal akhir Asia/Jakarta YYYY-MM-DD (ikut); sesudah hari ini dijepit ke hari ini.
+ */
+to: ReportToParameter;
+};
+
+export type ListOwnerProductSalesParams = {
+/**
+ * Periode laporan (K12), kalender Asia/Jakarta: hari; minggu = Senin–Minggu; bulan = tanggal 1
+ * sampai akhir bulan; tanggal = rentang bebas maksimal 92 hari.
+ */
+period: ReportPeriodQueryParameter;
+/**
+ * Tanggal awal Asia/Jakarta YYYY-MM-DD (ikut).
+ */
+from: ReportFromParameter;
+/**
+ * Tanggal akhir Asia/Jakarta YYYY-MM-DD (ikut); sesudah hari ini dijepit ke hari ini.
+ */
+to: ReportToParameter;
+sort?: ProductSalesSort;
+};
+
+export type GetOwnerStockReportParams = {
+sort?: StockReportSort;
+};
+
+export type GetOwnerOpnameReportParams = {
+/**
+ * Tanggal awal Asia/Jakarta YYYY-MM-DD (ikut).
+ */
+from: ReportFromParameter;
+/**
+ * Tanggal akhir Asia/Jakarta YYYY-MM-DD (ikut); sesudah hari ini dijepit ke hari ini.
+ */
+to: ReportToParameter;
+};
+
+export type GetOwnerOpnameProductReportParams = {
+/**
+ * Tanggal awal Asia/Jakarta YYYY-MM-DD (ikut).
+ */
+from: ReportFromParameter;
+/**
+ * Tanggal akhir Asia/Jakarta YYYY-MM-DD (ikut); sesudah hari ini dijepit ke hari ini.
+ */
+to: ReportToParameter;
 };
 
 export type SearchStaffProductsParams = {

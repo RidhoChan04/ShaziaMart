@@ -1969,3 +1969,296 @@ export const ReviewOwnerExceptionsResponse = zod.object({
 }).describe('Satu kejadian. batal_transaksi: at = jam batal, kasirName = pembatal, amount = total\ntransaksi, saleId/saleNumber terisi; fromClosedShift = transaksi dari shift yang sudah tutup\n(ruling R12); refund = uang yang keluar dari laci shift yang sedang buka saat itu (0 bila\ntidak ada); qrisToOwner = bagian QRIS yang dipilih Transfer oleh pemilik nanti (pemilik\nharus mentransfer). batal_pelunasan: at = jam batal, kasirName = pembatal, amount = nominal\npelunasan, paymentId terisi. kasbon_lewat_limit: at = jam jual, kasirName = kasir, amount =\nkelebihan limit bagian kasbon ini, saleId/saleNumber terisi. customerName = pelanggan (null\nbila tanpa pelanggan). Untuk selain batal_transaksi fromClosedShift false, refund dan\nqrisToOwner 0.\n')).describe('Kejadian dengan at > reviewedAt, terbaru dulu.')
 })
 
+/**
+ * Omzet, laba kotor, transaksi, rata-rata per struk, kasbon baru, grafik, 3 barang teratas,
+ * per kategori, dan per kasir untuk satu periode (K12/K16), kalender Asia/Jakarta (hari mulai
+ * 00.00 WIB; minggu = Senin–Minggu; bulan = tanggal 1 sampai akhir bulan; tanggal = rentang
+ * bebas). Urutan pemeriksaan (pesan sama dengan checkRange di shared/lib/report-period.ts):
+ * period tidak dikenal → 422 VALIDATION "Periode tidak valid"; from/to bukan tanggal sah →
+ * "Tanggal tidak valid"; to < from → "Tanggal akhir sebelum tanggal awal"; from > hari ini →
+ * "Tanggal di masa depan"; period hari/minggu/bulan dengan rentang yang tidak sama dengan
+ * periode yang memuat from → "Periode tidak cocok"; period tanggal lebih dari 92 hari
+ * (kedua ujung ikut) → "Rentang maksimal 92 hari". Lolos pemeriksaan: to > hari ini dijepit
+ * ke hari ini dan running = true (running = rentang memuat hari ini); range = rentang sesudah
+ * dijepit.
+ *
+ * Pembanding previous dihitung dari range (sesudah dijepit): hari → hari yang sama minggu
+ * lalu; minggu → 7 hari sebelumnya; bulan penuh → bulan sebelumnya penuh; bulan sebagian
+ * (berjalan) → tanggal 1 sampai tanggal sejajar bulan sebelumnya, dijepit ke akhir bulan itu
+ * bila bulan itu lebih pendek (1–30 Mar vs 1–28 Feb); tanggal → rentang tepat sebelumnya
+ * sepanjang sama. Bila running dan previous sama panjang dengan range (hari terakhir
+ * pembanding sejajar dengan hari ini), previousTotals berhenti di akhir menit sekarang pada
+ * hari terakhir pembanding (menit berjalan ikut); bila previous lebih pendek (tanggal sejajar
+ * dijepit), hari terakhir pembanding dihitung penuh. (jawaban pemilik Q7)
+ *
+ * Status penjualan dibaca sekarang (K14): penjualan yang kemudian dibatalkan keluar dari
+ * current, series, topProducts, dan categories, tetapi dihitung di kasir[].voidedCount. HPP =
+ * yang disalin per baris saat penjualan (HPP sekarang tidak dipakai). Hari ini (period hari,
+ * from = to = hari ini): current sama dengan getOwnerTodaySummary (revenue, grossProfit,
+ * salesCount, avgTicket, newCredit) dan previousTotals.revenue = lastWeekRevenue.
+ *
+ * series: period hari → kind jam, 24 bucket berkunci "0".."23" (jam Asia/Jakarta); period
+ * lain → kind hari, satu bucket per tanggal from..to permintaan (sebelum dijepit), berkunci
+ * YYYY-MM-DD. Bucket yang belum terjadi (jam yang mulai sesudah sekarang, tanggal sesudah hari
+ * ini) bernilai null. topProducts = 3 teratas listOwnerProductSales urut omzet. categories urut
+ * omzet terbesar lalu nama, category null terakhir. kasir urut omzet terbesar lalu nama
+ * (kasir yang hanya punya transaksi dibatalkan tetap ada).
+ * @summary Laporan penjualan satu periode dengan pembanding sepanjang rentang yang sama
+ */
+export const GetOwnerSalesReportQueryParams = zod.object({
+  "period": zod.enum(['hari', 'minggu', 'bulan', 'tanggal']),
+  "from": zod.iso.date().describe('Tanggal awal Asia/Jakarta YYYY-MM-DD (ikut).'),
+  "to": zod.iso.date().describe('Tanggal akhir Asia/Jakarta YYYY-MM-DD (ikut); sesudah hari ini dijepit ke hari ini.')
+})
+
+
+export const getOwnerSalesReportResponseTopProductsMax = 3;
+
+
+
+export const GetOwnerSalesReportResponse = zod.object({
+  "period": zod.enum(['hari', 'minggu', 'bulan', 'tanggal']).describe('Periode laporan (K12), kalender Asia/Jakarta: hari; minggu = Senin–Minggu; bulan = tanggal 1\nsampai akhir bulan; tanggal = rentang bebas maksimal 92 hari.\n'),
+  "range": zod.object({
+  "from": zod.iso.date(),
+  "to": zod.iso.date()
+}).describe('Rentang tanggal Asia/Jakarta YYYY-MM-DD; kedua ujung ikut.').describe('Rentang sesudah dijepit ke hari ini.'),
+  "previous": zod.object({
+  "from": zod.iso.date(),
+  "to": zod.iso.date()
+}).describe('Rentang tanggal Asia/Jakarta YYYY-MM-DD; kedua ujung ikut.').describe('Rentang pembanding (K12, jawaban pemilik Q7).'),
+  "running": zod.boolean().describe('Rentang memuat hari ini (periode berjalan).'),
+  "current": zod.object({
+  "revenue": zod.int().describe('Σ total penjualan selesai.'),
+  "grossProfit": zod.int().describe('revenue − Σ HPP yang disalin saat penjualan (HPP kosong dihitung 0); boleh negatif.'),
+  "salesCount": zod.int(),
+  "avgTicket": zod.int().describe('round_half_up(revenue / salesCount); 0 bila salesCount 0.'),
+  "newCredit": zod.int().describe('Σ bagian kasbon (metode pembayaran credit).'),
+  "marginPermille": zod.int().nullable().describe('(jawaban pemilik Q5) Margin laba kotor dalam permil bulat bertanda (164 = 16,4%):\ntanda(grossProfit) × round_half_up(|grossProfit| × 1000 / revenue); null bila revenue 0.\n')
+}).describe('Aturan sama dengan OwnerTodaySummary: hanya penjualan berstatus selesai (sekarang). Uang\ninteger rupiah.\n'),
+  "previousTotals": zod.object({
+  "revenue": zod.int().describe('Σ total penjualan selesai.'),
+  "grossProfit": zod.int().describe('revenue − Σ HPP yang disalin saat penjualan (HPP kosong dihitung 0); boleh negatif.'),
+  "salesCount": zod.int(),
+  "avgTicket": zod.int().describe('round_half_up(revenue / salesCount); 0 bila salesCount 0.'),
+  "newCredit": zod.int().describe('Σ bagian kasbon (metode pembayaran credit).'),
+  "marginPermille": zod.int().nullable().describe('(jawaban pemilik Q5) Margin laba kotor dalam permil bulat bertanda (164 = 16,4%):\ntanda(grossProfit) × round_half_up(|grossProfit| × 1000 / revenue); null bila revenue 0.\n')
+}).describe('Aturan sama dengan OwnerTodaySummary: hanya penjualan berstatus selesai (sekarang). Uang\ninteger rupiah.\n').describe('Total pembanding; dipotong di akhir menit sekarang hanya bila hari terakhirnya sejajar (Q7).'),
+  "series": zod.object({
+  "kind": zod.enum(['jam', 'hari']),
+  "buckets": zod.array(zod.object({
+  "key": zod.string().describe('Jam "0".."23" (kind jam) atau tanggal YYYY-MM-DD (kind hari).'),
+  "revenue": zod.int().nullable().describe('Omzet penjualan selesai di bucket ini; null bila bucket belum terjadi.'),
+  "grossProfit": zod.int().nullable().describe('Laba kotor bucket ini (HPP kosong = 0, boleh negatif); null bila bucket belum terjadi.')
+}))
+}),
+  "topProducts": zod.array(zod.object({
+  "productId": zod.string().nullable().describe('null bila barangnya sudah tidak ada; barisnya dikelompokkan menurut nama barang di struk\ndengan satuan terkecil di struk.\n'),
+  "productName": zod.string(),
+  "unitName": zod.string().describe('Satuan eceran (satuan pertama barang).'),
+  "unitSize": zod.int().min(1).describe('Isi satuan eceran dalam satuan dasar.'),
+  "isCurah": zod.boolean(),
+  "qtyBase": zod.int().describe('Σ qtyBase baris (2 dus isi 40 + 5 pcs = 85; curah 1,5 kg = 1500).'),
+  "revenue": zod.int().describe('Σ subtotal baris.'),
+  "grossProfit": zod.int().nullable().describe('revenue − Σ HPP baris yang disalin saat penjualan; null bila ada baris tanpa HPP.')
+}).describe('Penjualan selesai satu barang di rentang; semua satuan dijumlah dalam satuan dasar.')).max(getOwnerSalesReportResponseTopProductsMax),
+  "categories": zod.array(zod.object({
+  "category": zod.string().nullable().describe('Kategori barang sekarang; null = tanpa kategori atau barang sudah tidak ada.'),
+  "revenue": zod.int(),
+  "grossProfit": zod.int().describe('revenue − Σ HPP baris (HPP kosong = 0), sama dengan aturan SalesTotals.'),
+  "productCount": zod.int().describe('Jumlah barang berbeda yang terjual di kategori ini.')
+})),
+  "kasir": zod.array(zod.object({
+  "kasirName": zod.string().describe('Nama kasir saat penjualan.'),
+  "revenue": zod.int().describe('Omzet penjualan selesai kasir ini.'),
+  "salesCount": zod.int().describe('Jumlah penjualan selesai kasir ini.'),
+  "voidedCount": zod.int().describe('(K14) Penjualan kasir ini yang dibuat di rentang dan kini berstatus dibatalkan (kapan pun\ndibatalkan, oleh siapa pun).\n')
+}))
+})
+
+/**
+ * Periode, pemeriksaan, dan jepit sama dengan getOwnerSalesReport; hanya penjualan berstatus
+ * selesai di range. Satu baris per barang (semua satuan dijumlah dalam satuan dasar). Urutan
+ * ditentukan server (K15): omzet = revenue terbesar; jumlah = qtyBase ÷ unitSize eceran
+ * terbesar, seri → omzet lebih besar; laba = grossProfit terbesar, null terakhir, seri → omzet
+ * lebih besar; seri terakhir → nama barang. sort tidak dikenal → 422 VALIDATION.
+ * @summary Semua barang terjual di satu periode (Paling laku > Lihat semua)
+ */
+export const ListOwnerProductSalesQueryParams = zod.object({
+  "period": zod.enum(['hari', 'minggu', 'bulan', 'tanggal']),
+  "from": zod.iso.date().describe('Tanggal awal Asia/Jakarta YYYY-MM-DD (ikut).'),
+  "to": zod.iso.date().describe('Tanggal akhir Asia/Jakarta YYYY-MM-DD (ikut); sesudah hari ini dijepit ke hari ini.'),
+  "sort": zod.enum(['omzet', 'jumlah', 'laba']).optional()
+})
+
+
+
+
+export const ListOwnerProductSalesResponseItem = zod.object({
+  "productId": zod.string().nullable().describe('null bila barangnya sudah tidak ada; barisnya dikelompokkan menurut nama barang di struk\ndengan satuan terkecil di struk.\n'),
+  "productName": zod.string(),
+  "unitName": zod.string().describe('Satuan eceran (satuan pertama barang).'),
+  "unitSize": zod.int().min(1).describe('Isi satuan eceran dalam satuan dasar.'),
+  "isCurah": zod.boolean(),
+  "qtyBase": zod.int().describe('Σ qtyBase baris (2 dus isi 40 + 5 pcs = 85; curah 1,5 kg = 1500).'),
+  "revenue": zod.int().describe('Σ subtotal baris.'),
+  "grossProfit": zod.int().nullable().describe('revenue − Σ HPP baris yang disalin saat penjualan; null bila ada baris tanpa HPP.')
+}).describe('Penjualan selesai satu barang di rentang; semua satuan dijumlah dalam satuan dasar.')
+export const ListOwnerProductSalesResponse = zod.array(ListOwnerProductSalesResponseItem)
+
+/**
+ * Posisi hari ini (Asia/Jakarta), tanpa periode. Urutan angka uang ditentukan server, bukan
+ * di layar (label pemilik): unsold.items menurut sort (default: modal) — modal = heldValue
+ * terbesar, null terakhir; lama = days terbesar, seri → heldValue terbesar (null terakhir);
+ * seri terakhir → nama barang. thinMargin.items urut marginPermille naik (rugi dulu), lalu
+ * nama. Batas dari state server (reportRules; pengaturannya di F3c-2). sort tidak dikenal →
+ * 422 VALIDATION.
+ * @summary Tidak terjual ≥ 30 hari dan untung tipis (posisi sekarang)
+ */
+export const GetOwnerStockReportQueryParams = zod.object({
+  "sort": zod.enum(['modal', 'lama']).optional()
+})
+
+
+
+
+export const GetOwnerStockReportResponse = zod.object({
+  "today": zod.iso.date(),
+  "unsold": zod.object({
+  "minDays": zod.int(),
+  "count": zod.int(),
+  "heldValue": zod.int(),
+  "noCostCount": zod.int(),
+  "items": zod.array(zod.object({
+  "productId": zod.string(),
+  "productName": zod.string(),
+  "unitName": zod.string().describe('Satuan eceran.'),
+  "unitSize": zod.int().min(1),
+  "isCurah": zod.boolean(),
+  "stockQtyBase": zod.int(),
+  "lastSoldAt": zod.int().nullable().describe('Jam penjualan selesai terakhir; null = belum pernah terjual.'),
+  "sinceDate": zod.iso.date().describe('Tanggal patokan Asia/Jakarta.'),
+  "days": zod.int().describe('isoDaysBetween(sinceDate, hari ini).'),
+  "heldValue": zod.int().nullable().describe('Modal tertahan = round_half_up(stok × HPP); null bila HPP belum ada.')
+}).describe('(K17) Barang tidak terjual: patokan = terakhir terjual (penjualan selesai), atau stok\npertama (entri stok positif pertama, bila tidak ada awal katalog) bila belum pernah.\n'))
+}).describe('Barang dengan days ≥ minDays; tidak ikut stok ≤ 0, status nonaktif atau menunggu_harga,\ndan barang baru (stok pertama < minDays hari). heldValue = Σ heldValue yang tidak null;\nnoCostCount = barang tanpa HPP (tidak dijumlah).\n'),
+  "thinMargin": zod.object({
+  "thresholdPermille": zod.int(),
+  "count": zod.int(),
+  "items": zod.array(zod.object({
+  "productId": zod.string(),
+  "productName": zod.string(),
+  "unitName": zod.string().describe('Satuan eceran.'),
+  "price": zod.int().describe('Harga eceran.'),
+  "unitCost": zod.int().describe('HPP per satuan eceran.'),
+  "marginPermille": zod.int().describe('Margin bertanda dalam permil bulat; negatif = rugi (koreksi mockup M3).')
+}).describe('(K18) Barang aktif ber-HPP dengan harga eceran > 0 yang margin eceran-nya di bawah batas:\n(price − unitCost) × 1000 < thresholdPermille × price.\n'))
+}).describe('Tidak masuk Perlu perhatian (P10).')
+})
+
+/**
+ * from/to diperiksa seperti period tanggal di getOwnerSalesReport (pesan checkRange,
+ * maksimal 92 hari); to > hari ini dijepit ke hari ini; range = rentang sesudah dijepit.
+ * Hitungan final (K19) = state cocok, disesuaikan, disetujui, dihitung_ulang (memakai hasil
+ * hitung ulang) dengan jam hitung di range; ditahan, menunggu_alasan, dan diganti tidak ikut;
+ * stok_awal hanya patokan. Selisih yang sudah diberi alasan tetap dihitung. Hitungan tanpa HPP
+ * tidak dijumlah (unknownValueCount). items hanya barang yang punya selisih, urut lossValue
+ * terbesar (null terakhir), seri → gainValue terbesar, lalu nama.
+ * @summary Selisih opname per barang di satu rentang (pengaman 4)
+ */
+export const GetOwnerOpnameReportQueryParams = zod.object({
+  "from": zod.iso.date().describe('Tanggal awal Asia/Jakarta YYYY-MM-DD (ikut).'),
+  "to": zod.iso.date().describe('Tanggal akhir Asia/Jakarta YYYY-MM-DD (ikut); sesudah hari ini dijepit ke hari ini.')
+})
+
+
+
+
+export const GetOwnerOpnameReportResponse = zod.object({
+  "range": zod.object({
+  "from": zod.iso.date(),
+  "to": zod.iso.date()
+}).describe('Rentang tanggal Asia/Jakarta YYYY-MM-DD; kedua ujung ikut.'),
+  "lossValue": zod.int().describe('Σ nilai hitungan kurang yang ber-HPP (positif).'),
+  "lossCount": zod.int().describe('Barang berbeda yang punya hitungan kurang.'),
+  "gainValue": zod.int(),
+  "gainCount": zod.int(),
+  "unknownValueCount": zod.int().describe('Hitungan selisih tanpa HPP (tidak dijumlah).'),
+  "items": zod.array(zod.object({
+  "productId": zod.string(),
+  "productName": zod.string(),
+  "unitName": zod.string().describe('Satuan eceran.'),
+  "unitSize": zod.int().min(1),
+  "isCurah": zod.boolean(),
+  "countTotal": zod.int().describe('Hitungan final barang ini di rentang (termasuk cocok).'),
+  "shortCount": zod.int(),
+  "overCount": zod.int(),
+  "repeated": zod.boolean().describe('Kurang di ≥ 2 hitungan final berturut-turut.'),
+  "shortQtyBase": zod.int().describe('Σ |selisih| hitungan kurang (positif).'),
+  "overQtyBase": zod.int().describe('Σ selisih hitungan lebih.'),
+  "lossValue": zod.int().nullable().describe('Σ nilai hitungan kurang yang ber-HPP (positif); 0 bila tidak ada hitungan kurang; null bila semua hitungan kurangnya tanpa HPP.'),
+  "gainValue": zod.int().nullable().describe('Σ nilai hitungan lebih yang ber-HPP; 0 bila tidak ada hitungan lebih; null bila semua hitungan lebihnya tanpa HPP.')
+}))
+}).describe('Kartu kotor (kurang dan lebih tidak saling mengurangi).')
+
+/**
+ * Rentang & hitungan final sama dengan getOwnerOpnameReport. counts = semua hitungan final
+ * barang ini di range, terbaru dulu, masing-masing dengan yang bertugas di antara hitungan
+ * sebelumnya (final atau stok_awal, boleh sebelum range) dan hitungan ini (K20): kasir yang
+ * shift-nya tumpang dengan jeda itu dan orang toko yang punya catatan barang itu (nota barang
+ * masuk aktif, keluarkan kedaluwarsa, sesi opname lain), digabung per nama, urut nama.
+ * Petunjuk, bukan bukti. 404 bila barang tidak dikenal atau tidak punya hitungan final di
+ * range.
+ * @summary Detail selisih opname satu barang dengan yang bertugas
+ */
+export const GetOwnerOpnameProductReportParams = zod.object({
+  "productId": zod.string()
+})
+
+export const GetOwnerOpnameProductReportQueryParams = zod.object({
+  "from": zod.iso.date().describe('Tanggal awal Asia/Jakarta YYYY-MM-DD (ikut).'),
+  "to": zod.iso.date().describe('Tanggal akhir Asia/Jakarta YYYY-MM-DD (ikut); sesudah hari ini dijepit ke hari ini.')
+})
+
+
+
+
+export const GetOwnerOpnameProductReportResponse = zod.object({
+  "productId": zod.string(),
+  "productName": zod.string(),
+  "unitName": zod.string().describe('Satuan eceran.'),
+  "unitSize": zod.int().min(1),
+  "isCurah": zod.boolean(),
+  "countTotal": zod.int().describe('Hitungan final barang ini di rentang (termasuk cocok).'),
+  "shortCount": zod.int(),
+  "overCount": zod.int(),
+  "repeated": zod.boolean().describe('Kurang di ≥ 2 hitungan final berturut-turut.'),
+  "shortQtyBase": zod.int().describe('Σ |selisih| hitungan kurang (positif).'),
+  "overQtyBase": zod.int().describe('Σ selisih hitungan lebih.'),
+  "lossValue": zod.int().nullable().describe('Σ nilai hitungan kurang yang ber-HPP (positif); 0 bila tidak ada hitungan kurang; null bila semua hitungan kurangnya tanpa HPP.'),
+  "gainValue": zod.int().nullable().describe('Σ nilai hitungan lebih yang ber-HPP; 0 bila tidak ada hitungan lebih; null bila semua hitungan lebihnya tanpa HPP.')
+}).and(zod.object({
+  "range": zod.object({
+  "from": zod.iso.date(),
+  "to": zod.iso.date()
+}).describe('Rentang tanggal Asia/Jakarta YYYY-MM-DD; kedua ujung ikut.'),
+  "dutyOnShort": zod.array(zod.object({
+  "name": zod.string(),
+  "intervals": zod.int()
+})).describe('Per nama: di berapa jeda hitungan kurang orang itu bertugas (intervals dari shortCount),\nurut nama.\n'),
+  "counts": zod.array(zod.object({
+  "sessionId": zod.string(),
+  "countedAt": zod.int(),
+  "counterName": zod.string(),
+  "diffQtyBase": zod.int().describe('Selisih final (hasil hitung ulang bila dihitung_ulang); 0 = cocok.'),
+  "value": zod.int().nullable().describe('Nilai rupiah |diffQtyBase|; null bila HPP belum ada.'),
+  "reason": zod.union([zod.enum(['rusak', 'hilang', 'kedaluwarsa', 'salah_input', 'tidak_diketahui']).describe('Alasan selisih opname. rusak, hilang, kedaluwarsa, dan salah_input dipilih staf;\ntidak_diketahui = salah_input tanpa nota rujukan (J4).\n'),zod.null()]),
+  "state": zod.enum(['cocok', 'stok_awal', 'menunggu_alasan', 'disesuaikan', 'ditahan', 'disetujui', 'dihitung_ulang', 'diganti']).describe('cocok = selisih 0; stok_awal = hitungan pertama barang stockCounted false, langsung jadi\nstok (J1); menunggu_alasan = selisih, alasan belum disimpan; disesuaikan = stok sudah\ndikoreksi; ditahan = menunggu persetujuan pemilik (nilai > Rp100.000 atau HPP belum ada);\ndisetujui = disetujui pemilik; dihitung_ulang = dihitung ulang pemilik; diganti = kalah\noleh hitungan barang yang sama dengan countedAt lebih baru, tidak pernah diterapkan.\n'),
+  "previousCountedAt": zod.int().nullable().describe('Hitungan sebelumnya (awal jeda); null = hitungan pertama.'),
+  "duty": zod.array(zod.object({
+  "name": zod.string(),
+  "shifts": zod.int().describe('Shift kasir yang tumpang dengan jeda.'),
+  "records": zod.int().describe('Catatan barang ini di jeda (nota barang masuk aktif, keluarkan kedaluwarsa, sesi opname lain).')
+}).describe('Satu orang yang bertugas di jeda hitungan (K20).')).describe('Yang bertugas di jeda; kosong untuk hitungan pertama. Urut nama.')
+})).describe('Hitungan final di rentang, terbaru dulu.')
+}))
+
