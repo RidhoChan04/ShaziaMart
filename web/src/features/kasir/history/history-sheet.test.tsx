@@ -170,6 +170,12 @@ test("(ruling R4) Batalkan: 'Batalkan #…?' → alasan → 'Transaksi dibatalka
   await waitFor(() =>
     expect(within(row(1)).getByText("Dibatalkan")).toBeVisible(),
   );
+  // Tombol Batalkan baris itu sudah hilang: fokus ke judul Riwayat, bukan body.
+  await waitFor(() =>
+    expect(
+      screen.getByRole("heading", { name: "Riwayat shift ini" }),
+    ).toHaveFocus(),
+  );
   expect(stored("sale-1")).toMatchObject({
     status: "dibatalkan",
     voidReason: "Salah input",
@@ -324,6 +330,22 @@ test("pelunasan tampil berselang-seling dengan penjualan menurut jam, terbaru du
   expect(within(payRow()).getByText("Rp50.000")).toBeVisible();
 });
 
+test("pelunasan di antara dua penjualan terurut menurut jam, bukan ditaruh di atas", async () => {
+  // Penjualan 9, 8, 7 menit lalu; pelunasan 7,5 menit lalu → di antara #0003 dan #0002.
+  seedPayment({ at: Date.now() - 7.5 * 60_000 });
+  setup();
+  await screen.findByText("Pelunasan · Bu Sari");
+  const rows = sheetItems().map(
+    (li) => li.textContent?.match(/20261020-000\d|Pelunasan · Bu Sari/)?.[0],
+  );
+  expect(rows).toEqual([
+    "20261020-0003",
+    "Pelunasan · Bu Sari",
+    "20261020-0002",
+    "20261020-0001",
+  ]);
+});
+
 test("pelunasan shift lain tidak tampil di Riwayat shift ini", async () => {
   seedPayment({ shiftId: "shift-lain" });
   setup();
@@ -391,6 +413,12 @@ test("batal pelunasan Tunai: kalimat laci → alasan → 'Pelunasan dibatalkan',
   expect(
     within(payRow()).queryByRole("button", { name: /Batalkan pelunasan/ }),
   ).toBeNull();
+  await waitFor(() =>
+    expect(
+      screen.getByRole("heading", { name: "Riwayat shift ini" }),
+    ).toHaveFocus(),
+  );
+  expect(document.activeElement).not.toBe(document.body);
   expect(
     within(payRow()).getByRole("button", {
       name: `Cetak ulang pelunasan Bu Sari ${payClock}`,

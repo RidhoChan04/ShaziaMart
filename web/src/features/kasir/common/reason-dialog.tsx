@@ -27,6 +27,8 @@ type Props = {
   confirmTone: "primary" | "danger";
   /** Isi tambahan di antara keterangan dan isian Alasan, mis. pilihan pengembalian QRIS. */
   children?: ReactNode;
+  /** Fokus setelah dialog tertutup; bila tidak diisi Radix mengembalikannya ke pemicu semula. */
+  onCloseAutoFocus?: (e: Event) => void;
 };
 
 function ReasonForm({
@@ -38,7 +40,7 @@ function ReasonForm({
   onCancel,
   children,
   inputRef,
-}: Omit<Props, "open" | "title" | "description"> & {
+}: Omit<Props, "open" | "title" | "description" | "onCloseAutoFocus"> & {
   inputRef: RefObject<HTMLInputElement | null>;
 }) {
   const id = useId();
@@ -120,7 +122,13 @@ function ReasonForm({
  * Dialog alasan wajib (ruling R1/R5) menggantikan PIN pemilik: batal transaksi, batal pelunasan,
  * kasbon lewat limit. Fokus ke isian Alasan; Esc/Kembali menutup kecuali saat menyimpan.
  */
-export function ReasonDialog({ open, title, description, ...form }: Props) {
+export function ReasonDialog({
+  open,
+  title,
+  description,
+  onCloseAutoFocus,
+  ...form
+}: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   return (
     <Dialog
@@ -138,6 +146,7 @@ export function ReasonDialog({ open, title, description, ...form }: Props) {
           e.preventDefault();
           inputRef.current?.focus();
         }}
+        {...(onCloseAutoFocus ? { onCloseAutoFocus } : {})}
       >
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>

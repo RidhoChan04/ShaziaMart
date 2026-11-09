@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   getListShiftCreditPaymentsQueryKey,
@@ -31,7 +31,7 @@ import {
 } from "@/shared/ui/sheet";
 import { ReasonDialog } from "../common/reason-dialog";
 import { focusScanBox } from "../scan/scan-box";
-import { BADGE as badge, clockLabel } from "./clock";
+import { BADGE, clockLabel } from "./clock";
 import { CreditPaymentRow } from "./credit-payment-row";
 import { OldSaleSearch } from "./old-sale-search";
 import { VoidSaleDialog } from "./void-sale-dialog";
@@ -58,6 +58,15 @@ export function HistorySheet({ open, onClose }: Props) {
   const client = useQueryClient();
   const sales = useListShiftSales({ query: { enabled: open } });
   const [voiding, setVoiding] = useState<Sale | null>(null);
+  // Setelah batal berhasil tombol `Batalkan` hilang; fokus ke judul, bukan ke body.
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  const focusTitleAfterClose = useRef(false);
+  const settleFocus = (e: Event) => {
+    if (!focusTitleAfterClose.current) return;
+    focusTitleAfterClose.current = false;
+    e.preventDefault();
+    titleRef.current?.focus();
+  };
   const refresh = () =>
     client.invalidateQueries({ queryKey: getListShiftSalesQueryKey() });
 
@@ -74,6 +83,7 @@ export function HistorySheet({ open, onClose }: Props) {
   const voidSale = useVoidSale({
     mutation: {
       onSuccess: () => {
+        focusTitleAfterClose.current = true;
         setVoiding(null);
         toast.success("Transaksi dibatalkan");
         refresh();
@@ -107,6 +117,7 @@ export function HistorySheet({ open, onClose }: Props) {
   const cancelPayment = useCancelCreditPayment({
     mutation: {
       onSuccess: () => {
+        focusTitleAfterClose.current = true;
         setCancelling(null);
         toast.success("Pelunasan dibatalkan");
         refreshPayments();
@@ -157,7 +168,9 @@ export function HistorySheet({ open, onClose }: Props) {
           }}
         >
           <SheetHeader>
-            <SheetTitle>Riwayat shift ini</SheetTitle>
+            <SheetTitle ref={titleRef} tabIndex={-1} className="outline-none">
+              Riwayat shift ini
+            </SheetTitle>
             <SheetDescription>
               Cetak ulang struk atau batalkan transaksi.
             </SheetDescription>
@@ -209,6 +222,7 @@ export function HistorySheet({ open, onClose }: Props) {
         pending={voidSale.isPending}
         error={voidSale.isError ? pesanError(voidSale.error) : undefined}
         onCancel={cancelVoid}
+        onCloseAutoFocus={settleFocus}
         onSubmit={(reason, qrisRefundSource) => {
           if (voiding) {
             voidSale.mutate({
@@ -233,6 +247,7 @@ export function HistorySheet({ open, onClose }: Props) {
           cancelPayment.isError ? pesanError(cancelPayment.error) : undefined
         }
         onCancel={dismissCancelPayment}
+        onCloseAutoFocus={settleFocus}
         onSubmit={(reason) => {
           if (cancelling) {
             cancelPayment.mutate({
@@ -272,9 +287,9 @@ function SaleRow({
           <span className={voided ? "num line-through" : "num"}>
             {formatRupiah(sale.total)}
           </span>
-          {voided && <span className={badge}>Dibatalkan</span>}
+          {voided && <span className={BADGE}>Dibatalkan</span>}
           {sale.printStatus === "gagal" && (
-            <span className={badge}>Struk gagal</span>
+            <span className={BADGE}>Struk gagal</span>
           )}
         </p>
       </div>

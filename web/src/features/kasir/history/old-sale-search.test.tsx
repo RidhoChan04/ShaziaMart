@@ -12,6 +12,8 @@ import type {
 import { DAY_MS } from "@/shared/lib/business-day";
 import { renderWithQuery } from "@/test/render-app";
 import { humanTyping, scannerTyping } from "@/test/typing";
+import { KasirScreen } from "../screen/kasir-screen";
+import { ShiftActions } from "../shift/shift-actions";
 import { dayClockLabel } from "./clock";
 import { HistorySheet } from "./history-sheet";
 
@@ -281,22 +283,60 @@ test("ketikan scanner di isian → ScannedAlert, tanpa request", async () => {
   expect(await screen.findByText("Itu barcode, bukan angka")).toBeVisible();
   await new Promise((r) => setTimeout(r, 300));
   expect(urls.filter((u) => u.includes("q=8999"))).toEqual([]);
-  expect((search() as HTMLInputElement).value.length).toBeLessThanOrEqual(1);
+  expect(search()).toHaveValue("");
 });
 
-test("Esc menutup dialog dulu, lalu Riwayat", async () => {
+test("Esc menutup dialog dulu, lalu Riwayat; fokus kembali ke kolom scan", async () => {
   seed(makeSale(OLD));
-  const onClose = vi.fn();
-  renderWithQuery(<HistorySheet open onClose={onClose} />);
   const user = humanTyping();
-  await openDialog(user);
+  renderWithQuery(
+    <>
+      <ShiftActions onClosed={() => {}} />
+      <KasirScreen />
+    </>,
+  );
+  await user.click(screen.getByRole("button", { name: "Riwayat" }));
+  const sheet = await screen.findByRole("dialog", {
+    name: "Riwayat shift ini",
+  });
+  await user.type(search(), "0145");
+  await user.click(
+    await screen.findByRole("button", { name: `Batalkan ${OLD}` }),
+  );
+  await screen.findByRole("dialog", { name: `Batalkan ${OLD}?` });
   await user.keyboard("{Escape}");
   await waitFor(() =>
     expect(
       screen.queryByRole("dialog", { name: `Batalkan ${OLD}?` }),
     ).toBeNull(),
   );
-  expect(onClose).not.toHaveBeenCalled();
+  expect(sheet).toBeInTheDocument();
   await user.keyboard("{Escape}");
-  expect(onClose).toHaveBeenCalled();
+  await waitFor(() =>
+    expect(
+      screen.queryByRole("dialog", { name: "Riwayat shift ini" }),
+    ).toBeNull(),
+  );
+  await waitFor(() =>
+    expect(
+      screen.getByRole("combobox", {
+        name: "Scan barcode / ketik nama atau kode",
+      }),
+    ).toHaveFocus(),
+  );
+});
+
+test("batal transaksi lama berhasil → fokus ke kotak Cari nomor struk, bukan body", async () => {
+  seed(makeSale(OLD));
+  const user = setup();
+  const ui = await openDialog(user);
+  await user.type(ui.getByRole("textbox", { name: "Alasan" }), "Salah{Enter}");
+  await toasted();
+  await waitFor(() =>
+    expect(
+      screen.queryByRole("dialog", { name: `Batalkan ${OLD}?` }),
+    ).toBeNull(),
+  );
+  await waitFor(() => expect(search()).toHaveFocus());
+  expect(document.activeElement).not.toBe(document.body);
 });

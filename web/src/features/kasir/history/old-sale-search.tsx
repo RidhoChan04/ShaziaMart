@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   getListShiftSalesQueryKey,
@@ -34,6 +34,8 @@ export function OldSaleSearch() {
   const [q, setQ] = useState("");
   const [voiding, setVoiding] = useState<KasirLookupSale | null>(null);
   const guard = useScanGuard(setInput);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const focusSearchAfterClose = useRef(false);
 
   useEffect(() => {
     const timer = setTimeout(() => setQ(input.trim()), DEBOUNCE_MS);
@@ -46,6 +48,7 @@ export function OldSaleSearch() {
   const voidSale = useVoidSale({
     mutation: {
       onSuccess: () => {
+        focusSearchAfterClose.current = true;
         setVoiding(null);
         toast.success("Transaksi dibatalkan");
         void client.invalidateQueries({ queryKey: getLookupSalesQueryKey() });
@@ -68,6 +71,7 @@ export function OldSaleSearch() {
         Transaksi shift sebelumnya
       </h3>
       <Input
+        ref={searchRef}
         id={inputId}
         aria-label="Cari nomor struk"
         aria-describedby={noteId}
@@ -113,6 +117,13 @@ export function OldSaleSearch() {
         pending={voidSale.isPending}
         error={voidSale.isError ? pesanError(voidSale.error) : undefined}
         onCancel={cancelVoid}
+        onCloseAutoFocus={(e) => {
+          // Tombol `Batalkan` baris itu sudah hilang; kembali ke kotak cari.
+          if (!focusSearchAfterClose.current) return;
+          focusSearchAfterClose.current = false;
+          e.preventDefault();
+          searchRef.current?.focus();
+        }}
         onSubmit={(reason, qrisRefundSource) => {
           if (voiding) {
             voidSale.mutate({
