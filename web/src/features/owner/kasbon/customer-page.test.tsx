@@ -272,7 +272,7 @@ test("Tunai ke pemilik → body method titip", async () => {
   server.events.removeAllListeners();
 });
 
-test("respons hilang lalu simpan lagi → id sama, buku sekali", async () => {
+test("respons hilang lalu simpan lagi → id sama, buku sekali, pemberitahuan sudah tersimpan", async () => {
   const ids: string[] = [];
   let lose = true;
   let inner = false;
@@ -294,8 +294,19 @@ test("respons hilang lalu simpan lagi → id sama, buku sekali", async () => {
   await user.type(ui.getByRole("textbox", { name: "Nominal" }), "50000");
   await user.click(ui.getByRole("button", { name: "Simpan pelunasan" }));
   expect(await ui.findByRole("alert")).toBeInTheDocument();
+  await waitFor(() =>
+    expect(
+      within(
+        screen.getByRole("region", { name: "Riwayat", hidden: true }),
+      ).getAllByRole("listitem", { hidden: true })[0],
+    ).toHaveTextContent("Transfer ke pemilik"),
+  );
   await user.click(ui.getByRole("button", { name: "Simpan pelunasan" }));
-  expect(await screen.findByText("Pelunasan tersimpan")).toBeInTheDocument();
+  expect(
+    await screen.findByText(
+      "Pelunasan ini sudah tersimpan sebelumnya — cek riwayat",
+    ),
+  ).toBeInTheDocument();
   expect(ids).toHaveLength(2);
   expect(ids[0]).toBe(ids[1]);
   expect(
@@ -306,7 +317,7 @@ test("respons hilang lalu simpan lagi → id sama, buku sekali", async () => {
   ).toHaveLength(1);
 });
 
-test("respons hilang, lembar ditutup lalu dibuka lagi → id sama, buku sekali; nominal berubah → id baru", async () => {
+test("respons hilang, lembar ditutup lalu dibuka lagi → id sama, buku sekali, pemberitahuan; setelah berhasil id baru", async () => {
   const ids: string[] = [];
   let lose = true;
   let inner = false;
@@ -350,7 +361,11 @@ test("respons hilang, lembar ditutup lalu dibuka lagi → id sama, buku sekali; 
   await user.click(
     within(again).getByRole("button", { name: "Simpan pelunasan" }),
   );
-  expect(await screen.findByText("Pelunasan tersimpan")).toBeInTheDocument();
+  expect(
+    await screen.findByText(
+      "Pelunasan ini sudah tersimpan sebelumnya — cek riwayat",
+    ),
+  ).toBeInTheDocument();
   expect(ids).toHaveLength(2);
   expect(ids[0]).toBe(ids[1]);
   expect(
@@ -440,6 +455,37 @@ test("kirim ulang dengan id tertunda yang sudah tersimpan → pemberitahuan suda
   expect(
     mockDb.get().creditPayments.filter((p) => p.id === ids[0]),
   ).toHaveLength(1);
+});
+
+test("nominal atau cara bayar berubah selama id tertunda → id baru", async () => {
+  const ids: string[] = [];
+  server.use(
+    http.post(OWNER_PAY("Bu Sari"), async ({ request }) => {
+      const body = (await request.clone().json()) as OwnerCreditPaymentInput;
+      ids.push(body.id);
+      return HttpResponse.error();
+    }),
+  );
+  const { user, sheet } = await openPaySheet();
+  const ui = within(sheet);
+  const box = ui.getByRole("textbox", { name: "Nominal" });
+  const save = () =>
+    user.click(ui.getByRole("button", { name: "Simpan pelunasan" }));
+  await user.type(box, "30000");
+  await save();
+  await ui.findByRole("alert");
+  await save();
+  await waitFor(() => expect(ids).toHaveLength(2));
+  expect(ids[1]).toBe(ids[0]);
+  await user.clear(box);
+  await user.type(box, "40000");
+  await save();
+  await waitFor(() => expect(ids).toHaveLength(3));
+  expect(ids[2]).not.toBe(ids[0]);
+  await user.click(ui.getByRole("radio", { name: "Tunai ke pemilik" }));
+  await save();
+  await waitFor(() => expect(ids).toHaveLength(4));
+  expect(ids[3]).not.toBe(ids[2]);
 });
 
 test("simpan berhasil → tutup → buka lagi → input yang sama → id baru, dua pelunasan", async () => {
@@ -685,9 +731,7 @@ test("409 IN_OPEN_SHIFT (shift dibuka di sela): pesan di lembar dan data dimuat 
   await user.click(
     within(dialog).getByRole("button", { name: "Batalkan pelunasan" }),
   );
-  expect(await within(dialog).findByRole("alert")).toHaveTextContent(
-    "Masih di shift yang buka — batalkan dari kasir",
-  );
+  await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
   expect(screen.queryByText("Pelunasan dibatalkan")).toBeNull();
 });
 

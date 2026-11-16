@@ -1,6 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
+import { ApiError } from "@/shared/api/fetcher";
 import {
   getGetOwnerCustomerQueryKey,
   useCancelOwnerCreditPayment,
@@ -71,7 +72,11 @@ export function CancelPaymentSheet({
         setConfirm(false);
         onClose();
       },
-      onError: () => {
+      onError: (error) => {
+        // 409 IN_OPEN_SHIFT: dialog alasan ditutup agar tidak muncul lagi dengan galat basi.
+        if (error instanceof ApiError && error.code === "IN_OPEN_SHIFT") {
+          setConfirm(false);
+        }
         void client.invalidateQueries({
           queryKey: getGetOwnerCustomerQueryKey(customer.id),
         });

@@ -93,7 +93,7 @@ export function OwnerPaymentSheet({
     createdAt: number;
   } | null>(null);
   // Kirim terakhir: apakah memakai id tertunda yang sudah pernah dikirim, dan kapan.
-  const attempt = useRef({ reused: false, at: 0 });
+  const attempt = useRef({ reused: false, knownBefore: false, at: 0 });
   const [method, setMethod] =
     useState<OwnerCreditPaymentInputMethod>("transfer");
   const [text, setText] = useState("");
@@ -104,14 +104,16 @@ export function OwnerPaymentSheet({
         if (pending.current?.id === variables.data.id) pending.current = null;
         setMethod("transfer");
         setText("");
-        // Server mengulang catatan lama (id dipakai ulang): riwayat memuat entri yang lebih tua
-        // dari kirim ini. Selalu tampilkan pemberitahuan, juga bila isinya sama.
+        // Id dipakai ulang dan server sudah mengenalnya: riwayat sebelum kirim sudah memuatnya
+        // (muat ulang setelah galat), atau, sebagai cadangan, entrinya lebih tua dari kirim ini.
+        // Selalu tampilkan pemberitahuan, juga bila isinya sama.
+        const { reused, knownBefore, at } = attempt.current;
         const replayed =
-          attempt.current.reused &&
-          saved.history.some(
-            (e) =>
-              e.payment?.id === variables.data.id && e.at < attempt.current.at,
-          );
+          reused &&
+          (knownBefore ||
+            saved.history.some(
+              (e) => e.payment?.id === variables.data.id && e.at < at,
+            ));
         if (replayed) toast.warning(REPLAYED_NOTICE);
         else toast.success("Pelunasan tersimpan");
         onSaved(saved);
@@ -242,7 +244,12 @@ export function OwnerPaymentSheet({
               kept.method === method &&
               now - kept.createdAt < PENDING_MAX_AGE_MS;
             const id = same ? kept.id : newId();
-            attempt.current = { reused: same, at: now };
+            attempt.current = {
+              reused: same,
+              knownBefore:
+                same && customer.history.some((e) => e.payment?.id === id),
+              at: now,
+            };
             pending.current = {
               id,
               amount,
