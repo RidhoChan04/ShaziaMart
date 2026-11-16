@@ -1,10 +1,12 @@
 import { CircleCheck, TriangleAlert } from "lucide-react";
 import { useState } from "react";
+import { useGetSession } from "@/shared/api/gen/auth/auth";
 import { useGetKasirSettings } from "@/shared/api/gen/settings/settings";
 import type {
   Customer,
   KasirCreditPayment,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
+import { useGetCurrentShift } from "@/shared/api/gen/shift/shift";
 import { useServerHealth } from "@/shared/hooks/use-server-health";
 import { formatAngka, formatRupiah } from "@/shared/lib/money";
 import { Button } from "@/shared/ui/button";
@@ -20,10 +22,7 @@ import { CustomerPicker } from "../payment/customer-picker";
 import { QrisPanel } from "../payment/qris-tab";
 import { CashFields, ChangeLine, MoneyField } from "../payment/tunai-tab";
 import { focusScanBox } from "../scan/scan-box";
-import {
-  clearPendingRepaymentId,
-  pendingRepaymentId,
-} from "./pending-repayment-id";
+import { pendingRepaymentId } from "./pending-repayment-id";
 import {
   type RepaymentDraft,
   repaymentState,
@@ -104,6 +103,13 @@ function Saved({
 }
 
 function RepaymentSession({ onClose }: { onClose: () => void }) {
+  // Cache gerbang (sesi & shift sudah dimuat); dipakai untuk mengikat id ke kasir dan shift.
+  const userId = useGetSession({
+    query: { staleTime: Number.POSITIVE_INFINITY },
+  }).data?.user.id;
+  const shiftId = useGetCurrentShift({
+    query: { staleTime: Number.POSITIVE_INFINITY },
+  }).data?.shift?.id;
   const [draft, setDraft] = useState<RepaymentDraft>(EMPTY);
   const [printChoice, setPrintChoice] = useState<boolean | null>(null);
   const [saved, setSaved] = useState<KasirCreditPayment | null>(null);
@@ -113,23 +119,23 @@ function RepaymentSession({ onClose }: { onClose: () => void }) {
   const set = (patch: Partial<RepaymentDraft>) =>
     setDraft((d) => ({ ...d, ...patch }));
   const state = repaymentState(draft);
-  const repayment = useSubmitRepayment((payment) => {
-    clearPendingRepaymentId();
-    setSaved(payment);
-  });
+  const repayment = useSubmitRepayment(setSaved);
   const busy = repayment.pending;
-  const canSubmit = state.canSubmit && !busy && online;
+  const canSubmit =
+    state.canSubmit && !busy && online && Boolean(userId && shiftId);
   const customer: Customer | null = draft.customer;
 
   function submit() {
     if (!canSubmit || draft.customer === null || state.amount === null) return;
-    // Id bertahan lintas buka-tutup lembar sampai simpan berhasil.
-    const id = pendingRepaymentId(
+    if (!userId || !shiftId) return;
+    // Id bertahan lintas buka-tutup lembar sampai simpan berhasil (terikat kasir, shift, 10 menit).
+    const { id, reused } = pendingRepaymentId(
+      { userId, shiftId },
       draft.customer.id,
       state.amount,
       draft.method,
     );
-    repayment.submit(toRepaymentInput(id, draft, state, print));
+    repayment.submit(toRepaymentInput(id, draft, state, print), reused);
   }
 
   return (

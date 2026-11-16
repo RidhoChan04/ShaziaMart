@@ -1,6 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
+import { ApiError } from "@/shared/api/fetcher";
 import {
   getListShiftCreditPaymentsQueryKey,
   getSearchCustomersQueryKey,
@@ -11,8 +12,10 @@ import type {
   KasirCreditPaymentInput,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { pesanError } from "@/shared/lib/error-messages";
+import { clearPendingRepaymentId } from "./pending-repayment-id";
 
-const REPLAYED_NOTICE = "Pelunasan ini sudah tersimpan sebelumnya";
+const REPLAYED_NOTICE =
+  "Pelunasan ini sudah tersimpan sebelumnya — cek Riwayat";
 
 const sameRequest = (p: KasirCreditPayment, i: KasirCreditPaymentInput) =>
   p.customerId === i.customerId &&
@@ -29,14 +32,23 @@ export function useSubmitRepayment(
 ) {
   const client = useQueryClient();
   const { mutate, isPending } = useCreateCreditPayment({
-    mutation: { retry: false },
+    // Tingkat hook (bukan per panggilan): tetap jalan walau lembar sudah dilepas (mis. kunci).
+    mutation: {
+      retry: false,
+      onSuccess: clearPendingRepaymentId,
+      onError: (err) => {
+        if (err instanceof ApiError && err.code === "ID_TAKEN") {
+          clearPendingRepaymentId();
+        }
+      },
+    },
   });
   // Penjaga sinkron: klik kedua sebelum render ulang tetap diabaikan.
   const inFlight = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  function submit(input: KasirCreditPaymentInput) {
+  function submit(input: KasirCreditPaymentInput, reusedId: boolean) {
     if (inFlight.current) return;
     inFlight.current = true;
     setError(null);
@@ -51,7 +63,8 @@ export function useSubmitRepayment(
           void client.invalidateQueries({
             queryKey: getSearchCustomersQueryKey(),
           });
-          if (!sameRequest(payment, input)) setNotice(REPLAYED_NOTICE);
+          if (reusedId || !sameRequest(payment, input))
+            setNotice(REPLAYED_NOTICE);
           if (payment.printStatus === "gagal") {
             toast.error("Struk gagal dicetak — cetak ulang dari Riwayat");
           }

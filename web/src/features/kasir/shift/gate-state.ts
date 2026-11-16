@@ -16,6 +16,7 @@ import {
   useGetCurrentShift,
 } from "@/shared/api/gen/shift/shift";
 import { HEALTH_POLL_MS } from "@/shared/hooks/use-server-health";
+import { clearPendingRepaymentId } from "../credit/pending-repayment-id";
 
 export type GateState =
   | { status: "loading" }
@@ -76,10 +77,13 @@ export function useGateState(): GateState {
 }
 
 export function setSession(client: QueryClient, session: Session | null) {
+  // Kunci/ganti kasir: id pelunasan yang menggantung tidak boleh terbawa.
+  clearPendingRepaymentId();
   client.setQueryData(getGetSessionQueryKey(), session);
 }
 
 export function setShift(client: QueryClient, shift: Shift | null) {
+  clearPendingRepaymentId();
   const body: CurrentShift = { shift };
   client.setQueryData(getGetCurrentShiftQueryKey(), body);
 }

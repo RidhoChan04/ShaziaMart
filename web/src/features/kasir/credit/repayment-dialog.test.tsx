@@ -6,13 +6,20 @@ import { problem } from "@/mocks/handlers/respond";
 import { loginWithShift, post } from "@/mocks/handlers/test-helpers";
 import { server } from "@/mocks/node";
 import { setScenario } from "@/mocks/scenarios";
-import type { KasirCreditPaymentInput } from "@/shared/api/gen/shaziaMartAPI.schemas";
+import { getGetSessionQueryKey } from "@/shared/api/gen/auth/auth";
+import type {
+  CurrentShift,
+  KasirCreditPaymentInput,
+  Session,
+} from "@/shared/api/gen/shaziaMartAPI.schemas";
+import { getGetCurrentShiftQueryKey } from "@/shared/api/gen/shift/shift";
 import { getGetHealthQueryKey } from "@/shared/api/gen/system/system";
 import { renderWithQuery } from "@/test/render-app";
 import { fillSpecCart, seedMatch } from "@/test/spec-cart";
 import { humanTyping, scannerTyping } from "@/test/typing";
 import { useCart } from "../cart/cart-store";
 import { KasirScreen } from "../screen/kasir-screen";
+import { setSession } from "../shift/gate-state";
 import { ShiftActions } from "../shift/shift-actions";
 import { clearPendingRepaymentId } from "./pending-repayment-id";
 
@@ -266,30 +273,45 @@ function loseFirstResponse(ids: string[]) {
   );
 }
 
-test("jawaban hilang (server menyimpan) → tutup lembar → buka lagi, isian sama → id sama; satu entri buku dan satu baris laci", async () => {
-  const ids: string[] = [];
-  loseFirstResponse(ids);
-  const first = await openWithSari();
-  await first.user.type(first.amount(), "50000");
-  await first.user.type(first.received(), "50000");
-  await first.user.click(first.save());
-  expect(await first.ui.findByRole("alert")).toHaveTextContent(OFFLINE);
-  await first.user.click(first.ui.getByRole("button", { name: "Batal" }));
-  await waitFor(() => expect(sheet()).toBeNull());
+const NOTICE = "Pelunasan ini sudah tersimpan sebelumnya — cek Riwayat";
 
-  await first.user.click(first.trigger);
+/** Isi Bu Sari, tunai, nominal pas; lalu simpan. */
+async function payFifty(ctx: Awaited<ReturnType<typeof openWithSari>>) {
+  await ctx.user.type(ctx.amount(), "50000");
+  await ctx.user.type(ctx.received(), "50000");
+  await ctx.user.click(ctx.save());
+}
+
+/** Tutup lembar (Batal) lalu buka lagi dan isi sama persis, tanpa menyimpan. */
+async function reopenAndFill(ctx: Awaited<ReturnType<typeof openWithSari>>) {
+  await ctx.user.click(ctx.ui.getByRole("button", { name: "Batal" }));
+  await waitFor(() => expect(sheet()).toBeNull());
+  await ctx.user.click(ctx.trigger);
   const ui = sheetUi();
-  await first.user.click(await ui.findByRole("button", { name: /Bu Sari/ }));
-  await first.user.type(
+  await ctx.user.click(await ui.findByRole("button", { name: /Bu Sari/ }));
+  await ctx.user.type(
     ui.getByRole("textbox", { name: "NOMINAL PELUNASAN" }),
     "50000",
   );
-  await first.user.type(
+  await ctx.user.type(
     ui.getByRole("textbox", { name: "UANG DITERIMA" }),
     "50000",
   );
-  await first.user.click(ui.getByRole("button", { name: "Simpan pelunasan" }));
+  return ui;
+}
+
+const payments50 = () => saved().filter((p) => p.amount === 50_000);
+
+test("jawaban hilang (server menyimpan) → tutup lembar → buka lagi, isian sama → id sama + pemberitahuan 'cek Riwayat'; satu entri buku dan satu baris laci", async () => {
+  const ids: string[] = [];
+  loseFirstResponse(ids);
+  const ctx = await openWithSari();
+  await payFifty(ctx);
+  expect(await ctx.ui.findByRole("alert")).toHaveTextContent(OFFLINE);
+  const ui = await reopenAndFill(ctx);
+  await ctx.user.click(ui.getByRole("button", { name: "Simpan pelunasan" }));
   expect(await screen.findByText("Pelunasan tersimpan")).toBeInTheDocument();
+  expect(sheetUi().getByRole("status")).toHaveTextContent(NOTICE);
   expect(ids).toHaveLength(2);
   expect(ids[1]).toBe(ids[0]);
   expect(saved().filter((p) => p.id === ids[0])).toHaveLength(1);
@@ -301,7 +323,7 @@ test("jawaban hilang (server menyimpan) → tutup lembar → buka lagi, isian sa
   ).toHaveLength(1);
 });
 
-test("gagal lalu nominal diganti → id baru; setelah berhasil, pelunasan berikutnya memakai id baru", async () => {
+test("gagal lalu nominal diganti → id baru", async () => {
   const ids: string[] = [];
   loseFirstResponse(ids);
   const { user, amount, received, save } = await openWithSari();
@@ -313,6 +335,115 @@ test("gagal lalu nominal diganti → id baru; setelah berhasil, pelunasan beriku
   await user.type(amount(), "20000");
   await user.clear(received());
   await user.type(received(), "20000");
+  await user.click(save());
+  await screen.findByText("Pelunasan tersimpan");
+  expect(ids).toHaveLength(2);
+  expect(ids[1]).not.toBe(ids[0]);
+});
+
+test("simpan berhasil → Tutup → buka lagi, isian sama → id baru; dua pelunasan tercatat", async () => {
+  const ids: string[] = [];
+  const bodies = trackPayments();
+  const ctx = await openWithSari();
+  await payFifty(ctx);
+  await screen.findByText("Pelunasan tersimpan");
+  ids.push(bodies[0]?.id ?? "");
+  await ctx.user.click(sheetUi().getByRole("button", { name: "Tutup" }));
+  await waitFor(() => expect(sheet()).toBeNull());
+  await ctx.user.click(ctx.trigger);
+  const ui = sheetUi();
+  await ctx.user.click(await ui.findByRole("button", { name: /Bu Sari/ }));
+  await ctx.user.type(
+    ui.getByRole("textbox", { name: "NOMINAL PELUNASAN" }),
+    "50000",
+  );
+  await ctx.user.type(
+    ui.getByRole("textbox", { name: "UANG DITERIMA" }),
+    "50000",
+  );
+  await ctx.user.click(ui.getByRole("button", { name: "Simpan pelunasan" }));
+  await screen.findByText("Pelunasan tersimpan");
+  expect(bodies).toHaveLength(2);
+  expect(bodies[1]?.id).not.toBe(ids[0]);
+  expect(payments50()).toHaveLength(2);
+  expect(sheetUi().queryByRole("status")).toBeNull();
+});
+
+test("jawaban hilang → kunci lalu masuk lagi → isian sama → id baru; dua pelunasan", async () => {
+  const ids: string[] = [];
+  loseFirstResponse(ids);
+  const ctx = await openWithSari();
+  await payFifty(ctx);
+  await ctx.ui.findByRole("alert");
+  const session = ctx.queryClient.getQueryData<Session>(
+    getGetSessionQueryKey(),
+  );
+  await act(async () => {
+    setSession(ctx.queryClient, null);
+    setSession(ctx.queryClient, session ?? null);
+  });
+  const ui = await reopenAndFill(ctx);
+  await ctx.user.click(ui.getByRole("button", { name: "Simpan pelunasan" }));
+  await screen.findByText("Pelunasan tersimpan");
+  expect(ids).toHaveLength(2);
+  expect(ids[1]).not.toBe(ids[0]);
+  expect(payments50()).toHaveLength(2);
+});
+
+test("jawaban hilang → shift berganti → isian sama → id baru", async () => {
+  const ids: string[] = [];
+  loseFirstResponse(ids);
+  const ctx = await openWithSari();
+  await payFifty(ctx);
+  await ctx.ui.findByRole("alert");
+  const cur = ctx.queryClient.getQueryData<CurrentShift>(
+    getGetCurrentShiftQueryKey(),
+  );
+  // Hanya id shift yang berubah di cache (tanpa setShift): ikatan shift saja yang menolak id lama.
+  ctx.queryClient.setQueryData(getGetCurrentShiftQueryKey(), {
+    shift: cur?.shift && { ...cur.shift, id: "shift-lain" },
+  });
+  const ui = await reopenAndFill(ctx);
+  await ctx.user.click(ui.getByRole("button", { name: "Simpan pelunasan" }));
+  await screen.findByText("Pelunasan tersimpan");
+  expect(ids[1]).not.toBe(ids[0]);
+});
+
+test("jawaban hilang → lewat 10 menit → isian sama → id baru; dua pelunasan", async () => {
+  const ids: string[] = [];
+  loseFirstResponse(ids);
+  const ctx = await openWithSari();
+  await payFifty(ctx);
+  await ctx.ui.findByRole("alert");
+  const real = Date.now();
+  const spy = vi.spyOn(Date, "now").mockReturnValue(real + 10 * 60_000 + 1);
+  try {
+    const ui = await reopenAndFill(ctx);
+    await ctx.user.click(ui.getByRole("button", { name: "Simpan pelunasan" }));
+    await screen.findByText("Pelunasan tersimpan");
+  } finally {
+    spy.mockRestore();
+  }
+  expect(ids[1]).not.toBe(ids[0]);
+  expect(payments50()).toHaveLength(2);
+});
+
+test("409 ID_TAKEN → id dilepas; percobaan berikutnya memakai id baru dan berhasil", async () => {
+  const ids: string[] = [];
+  let taken = true;
+  server.use(
+    http.post("/api/credit-payments", async ({ request }) => {
+      ids.push(((await request.clone().json()) as KasirCreditPaymentInput).id);
+      if (!taken) return;
+      taken = false;
+      return problem(409, "ID_TAKEN");
+    }),
+  );
+  const { user, ui, amount, received, save } = await openWithSari();
+  await user.type(amount(), "50000");
+  await user.type(received(), "50000");
+  await user.click(save());
+  await ui.findByRole("alert");
   await user.click(save());
   await screen.findByText("Pelunasan tersimpan");
   expect(ids).toHaveLength(2);
@@ -341,14 +472,12 @@ test("id sudah tersimpan dengan isi lain → 'Pelunasan ini sudah tersimpan sebe
   await user.type(received(), "50000");
   await user.click(save());
   await screen.findByText("Pelunasan tersimpan");
-  expect(
-    ui.getByText("Pelunasan ini sudah tersimpan sebelumnya"),
-  ).toBeInTheDocument();
+  expect(ui.getByText(NOTICE)).toBeInTheDocument();
   expect(ui.getByText("Sisa kasbon Rp90.000")).toBeInTheDocument();
   expect(saved().filter((p) => p.id === "pel-tetap")).toHaveLength(1);
   // Status = ikon + teks: ikon disembunyikan dari pembaca layar.
   const notice = ui.getByRole("status");
-  expect(notice).toHaveTextContent("Pelunasan ini sudah tersimpan sebelumnya");
+  expect(notice).toHaveTextContent(NOTICE);
   expect(notice.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
   const title = ui.getByRole("heading", { name: "Pelunasan tersimpan" });
   expect(title.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
