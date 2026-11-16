@@ -1,6 +1,10 @@
-import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
-import { useCreateOwnerCreditPayment } from "@/shared/api/gen/owner/owner";
+import {
+  getGetOwnerCustomerQueryKey,
+  useCreateOwnerCreditPayment,
+} from "@/shared/api/gen/owner/owner";
 import type {
   OwnerCreditPaymentInputMethod,
   OwnerCustomer,
@@ -62,8 +66,10 @@ function Choice({
 
 /**
  * Tombol `Catat pelunasan` + lembar bawah: pelunasan langsung oleh pemilik (Transfer atau Tunai ke
- * pemilik), tidak pernah masuk laci. `id` dibuat saat lembar dibuka dan dipakai ulang oleh setiap
- * percobaan simpan sampai berhasil, jadi respons yang hilang tidak menggandakan pelunasan.
+ * pemilik), tidak pernah masuk laci. `id` dibuat saat simpan pertama dan dipakai ulang oleh setiap
+ * percobaan sampai ada yang berhasil (juga setelah lembar ditutup lalu dibuka lagi), selama nominal
+ * dan cara bayarnya sama; respons yang hilang tidak menggandakan pelunasan. Nominal atau cara bayar
+ * berubah = pelunasan lain = `id` baru (server mengulang catatan asli, bukan isi yang baru).
  */
 export function OwnerPaymentSheet({
   customer,
@@ -73,16 +79,30 @@ export function OwnerPaymentSheet({
   onSaved: (saved: OwnerCustomer) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [paymentId, setPaymentId] = useState(() => newId());
+  const client = useQueryClient();
+  const pending = useRef<{
+    id: string;
+    amount: number;
+    method: OwnerCreditPaymentInputMethod;
+  } | null>(null);
   const [method, setMethod] =
     useState<OwnerCreditPaymentInputMethod>("transfer");
   const [text, setText] = useState("");
   const create = useCreateOwnerCreditPayment({
     mutation: {
       onSuccess: (saved) => {
+        pending.current = null;
+        setMethod("transfer");
+        setText("");
         toast.success("Pelunasan tersimpan");
         onSaved(saved);
         setOpen(false);
+      },
+      // Respons bisa hilang padahal server sudah menyimpan: muat ulang agar pelunasan itu tampil.
+      onError: () => {
+        void client.invalidateQueries({
+          queryKey: getGetOwnerCustomerQueryKey(customer.id),
+        });
       },
     },
   });
@@ -100,12 +120,7 @@ export function OwnerPaymentSheet({
       onOpenChange={(next) => {
         if (!next && create.isPending) return;
         setOpen(next);
-        if (next) {
-          setPaymentId(newId());
-          setMethod("transfer");
-          setText("");
-          create.reset();
-        }
+        if (next) create.reset();
       }}
     >
       <SheetTrigger asChild>
@@ -197,9 +212,14 @@ export function OwnerPaymentSheet({
           disabled={problem !== null || create.isPending}
           onClick={() => {
             if (amount === null) return;
+            const kept = pending.current;
+            const same =
+              kept !== null && kept.amount === amount && kept.method === method;
+            const id = same ? kept.id : newId();
+            pending.current = { id, amount, method };
             create.mutate({
               customerId: customer.id,
-              data: { id: paymentId, amount, method },
+              data: { id, amount, method },
             });
           }}
         >

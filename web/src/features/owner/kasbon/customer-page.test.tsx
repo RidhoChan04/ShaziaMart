@@ -7,6 +7,7 @@ import { mockDb } from "@/mocks/db";
 import {
   cashSale,
   customerId,
+  get,
   json,
   loginWithShift,
   ownerLogin,
@@ -16,6 +17,7 @@ import { appendCredit } from "@/mocks/ledger";
 import { server } from "@/mocks/node";
 import type {
   OwnerCreditPaymentInput,
+  OwnerCustomer,
   Sale,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { renderApp } from "@/test/render-app";
@@ -304,6 +306,70 @@ test("respons hilang lalu simpan lagi → id sama, buku sekali", async () => {
   ).toHaveLength(1);
 });
 
+test("respons hilang, lembar ditutup lalu dibuka lagi → id sama, buku sekali; nominal berubah → id baru", async () => {
+  const ids: string[] = [];
+  let lose = true;
+  let inner = false;
+  server.use(
+    http.post(OWNER_PAY("Bu Sari"), async ({ request }) => {
+      const body = (await request.clone().json()) as OwnerCreditPaymentInput;
+      if (inner) return;
+      ids.push(body.id);
+      if (!lose) return;
+      lose = false;
+      inner = true;
+      await post(OWNER_PAY("Bu Sari"), body);
+      inner = false;
+      return HttpResponse.error();
+    }),
+  );
+  const { user, sheet } = await openPaySheet();
+  await user.type(
+    within(sheet).getByRole("textbox", { name: "Nominal" }),
+    "50000",
+  );
+  await user.click(
+    within(sheet).getByRole("button", { name: "Simpan pelunasan" }),
+  );
+  expect(await within(sheet).findByRole("alert")).toBeInTheDocument();
+  await user.click(within(sheet).getByRole("button", { name: "Batal" }));
+  await waitFor(() =>
+    expect(
+      screen.queryByRole("dialog", { name: "Catat pelunasan" }),
+    ).toBeNull(),
+  );
+  // Pelunasan yang sudah tersimpan di server muncul di riwayat setelah muat ulang.
+  await waitFor(() =>
+    expect(history()[0]).toHaveTextContent("Transfer ke pemilik"),
+  );
+  await user.click(screen.getByRole("button", { name: "Catat pelunasan" }));
+  const again = await screen.findByRole("dialog", { name: "Catat pelunasan" });
+  const box = within(again).getByRole("textbox", { name: "Nominal" });
+  await user.clear(box);
+  await user.type(box, "50000");
+  await user.click(
+    within(again).getByRole("button", { name: "Simpan pelunasan" }),
+  );
+  expect(await screen.findByText("Pelunasan tersimpan")).toBeInTheDocument();
+  expect(ids).toHaveLength(2);
+  expect(ids[0]).toBe(ids[1]);
+  expect(
+    mockDb.get().creditLedger.filter((e) => e.paymentId === ids[0]),
+  ).toHaveLength(1);
+  // Setelah berhasil, pelunasan berikutnya memakai id baru.
+  await user.click(screen.getByRole("button", { name: "Catat pelunasan" }));
+  const third = await screen.findByRole("dialog", { name: "Catat pelunasan" });
+  await user.type(
+    within(third).getByRole("textbox", { name: "Nominal" }),
+    "10000",
+  );
+  await user.click(
+    within(third).getByRole("button", { name: "Simpan pelunasan" }),
+  );
+  await waitFor(() => expect(ids).toHaveLength(3));
+  expect(ids[2]).not.toBe(ids[0]);
+});
+
 test("tombol Simpan nonaktif selama pending (tidak terkirim dua kali)", async () => {
   let calls = 0;
   server.use(
@@ -510,6 +576,63 @@ test("409 IN_OPEN_SHIFT (shift dibuka di sela): pesan di lembar dan data dimuat 
     "Masih di shift yang buka — batalkan dari kasir",
   );
   expect(screen.queryByText("Pelunasan dibatalkan")).toBeNull();
+});
+
+test("409 IN_OPEN_SHIFT: lembar yang terbuka ikut keadaan terbaru (tanpa Batalkan, ada keterangan)", async () => {
+  await plantClosedShiftCashPayment();
+  await closeShiftAndOpenAnother();
+  const user = userEvent.setup();
+  renderApp(page("Bu Sari"));
+  await title("Bu Sari");
+  await user.click(within(rowOf("Tunai di kasir")).getByRole("button"));
+  const sheet = await screen.findByRole("dialog", {
+    name: "Pelunasan Rp50.000",
+  });
+  await user.click(
+    within(sheet).getByRole("button", { name: "Batalkan pelunasan" }),
+  );
+  const dialog = await screen.findByRole("alertdialog");
+  const fresh = await json<OwnerCustomer>(
+    await get(`/api/owner/customers/${customerId("Bu Sari")}`),
+  );
+  for (const e of fresh.history) {
+    if (e.payment?.id === "pel-1") e.payment.inOpenShift = true;
+  }
+  server.use(
+    http.get(`/api/owner/customers/${customerId("Bu Sari")}`, () =>
+      HttpResponse.json(fresh),
+    ),
+    http.post("/api/owner/credit-payments/pel-1/cancel", () =>
+      HttpResponse.json(
+        {
+          type: "about:blank",
+          title: "x",
+          status: 409,
+          code: "IN_OPEN_SHIFT",
+          detail: "Masih di shift yang buka — batalkan dari kasir",
+        },
+        {
+          status: 409,
+          headers: { "Content-Type": "application/problem+json" },
+        },
+      ),
+    ),
+  );
+  await user.type(
+    within(dialog).getByRole("textbox", { name: "Alasan" }),
+    "Salah catat",
+  );
+  await user.click(
+    within(dialog).getByRole("button", { name: "Batalkan pelunasan" }),
+  );
+  await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+  const open = screen.getByRole("dialog", { name: "Pelunasan Rp50.000" });
+  expect(
+    within(open).queryByRole("button", { name: "Batalkan pelunasan" }),
+  ).toBeNull();
+  expect(
+    within(open).getByText("Masih di shift yang buka — batalkan dari kasir"),
+  ).toBeInTheDocument();
 });
 
 test("Lebih bayar (Q8): kartu Lebih bayar + Limit, Catat pelunasan nonaktif, pelunasan lama tetap aktif", async () => {

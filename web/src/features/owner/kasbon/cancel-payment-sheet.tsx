@@ -109,18 +109,24 @@ export function CancelPaymentSheet({
         <SheetDescription>
           {`${paymentLabel(payment)} · ${dayTime(shown.at)} · ${payment.byName}`}
         </SheetDescription>
-        <Button
-          variant="danger"
-          className="h-12 w-full text-[17px]"
-          onClick={() => {
-            succeeded.current = false;
-            cancel.reset();
-            setReason("");
-            setConfirm(true);
-          }}
-        >
-          Batalkan pelunasan
-        </Button>
+        {payment.inOpenShift ? (
+          <p className="text-[15px] text-muted">
+            Masih di shift yang buka — batalkan dari kasir
+          </p>
+        ) : (
+          <Button
+            variant="danger"
+            className="h-12 w-full text-[17px]"
+            onClick={() => {
+              succeeded.current = false;
+              cancel.reset();
+              setReason("");
+              setConfirm(true);
+            }}
+          >
+            Batalkan pelunasan
+          </Button>
+        )}
         <SheetClose asChild>
           <Button variant="outline" className="h-12 w-full text-[17px]">
             Tutup
@@ -128,7 +134,7 @@ export function CancelPaymentSheet({
         </SheetClose>
       </SheetContent>
       <Dialog
-        open={confirm && entry !== null}
+        open={confirm && entry !== null && !payment.inOpenShift}
         onOpenChange={(next) => {
           if (cancel.isPending) return;
           setConfirm(next);

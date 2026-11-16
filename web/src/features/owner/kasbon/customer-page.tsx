@@ -7,10 +7,7 @@ import {
   getListOwnerCustomersQueryKey,
   useGetOwnerCustomer,
 } from "@/shared/api/gen/owner/owner";
-import type {
-  CreditHistoryEntry,
-  OwnerCustomer,
-} from "@/shared/api/gen/shaziaMartAPI.schemas";
+import type { OwnerCustomer } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { pesanError } from "@/shared/lib/error-messages";
 import { formatRupiah } from "@/shared/lib/money";
 import { Button } from "@/shared/ui/button";
@@ -66,7 +63,8 @@ export function CustomerPage() {
   const { customerId } = useParams({ from: "/owner/kasbon/$customerId" });
   const client = useQueryClient();
   const query = useGetOwnerCustomer(customerId);
-  const [target, setTarget] = useState<CreditHistoryEntry | null>(null);
+  // Hanya id yang disimpan: lembar batal selalu memakai baris terbaru dari data yang dimuat ulang.
+  const [targetId, setTargetId] = useState<string | null>(null);
 
   if (!query.data) {
     return query.isError ? (
@@ -97,6 +95,7 @@ export function CustomerPage() {
     });
   };
   const now = Date.now();
+  const target = customer.history.find((e) => e.id === targetId) ?? null;
 
   return (
     <div className="pb-24 lg:pb-8">
@@ -108,7 +107,11 @@ export function CustomerPage() {
       <div className="grid gap-5 lg:max-w-2xl">
         <SummaryCard customer={customer} />
         <div className="flex gap-3">
-          <OwnerPaymentSheet customer={customer} onSaved={refresh} />
+          <OwnerPaymentSheet
+            key={customer.id}
+            customer={customer}
+            onSaved={refresh}
+          />
           <LimitSheet customer={customer} onSaved={refresh} />
         </div>
         <Section title="Riwayat">
@@ -123,7 +126,7 @@ export function CustomerPage() {
                   key={entry.id}
                   entry={entry}
                   now={now}
-                  onOpen={setTarget}
+                  onOpen={(e) => setTargetId(e.id)}
                 />
               ))}
             </RowList>
@@ -134,7 +137,7 @@ export function CustomerPage() {
         entry={target}
         customer={customer}
         onDone={refresh}
-        onClose={() => setTarget(null)}
+        onClose={() => setTargetId(null)}
       />
     </div>
   );
