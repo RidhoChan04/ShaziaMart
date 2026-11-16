@@ -370,6 +370,119 @@ test("respons hilang, lembar ditutup lalu dibuka lagi → id sama, buku sekali; 
   expect(ids[2]).not.toBe(ids[0]);
 });
 
+/** Pelunasan pertama: server menyimpan tetapi respons hilang; kirim berikutnya lolos apa adanya. */
+function loseFirstResponse(ids: string[]) {
+  let lose = true;
+  let inner = false;
+  server.use(
+    http.post(OWNER_PAY("Bu Sari"), async ({ request }) => {
+      const body = (await request.clone().json()) as OwnerCreditPaymentInput;
+      if (inner) return;
+      ids.push(body.id);
+      if (!lose) return;
+      lose = false;
+      inner = true;
+      await post(OWNER_PAY("Bu Sari"), body);
+      inner = false;
+      return HttpResponse.error();
+    }),
+  );
+}
+
+test("id tertunda lewat 10 menit → input yang sama dikirim dengan id baru, dua pelunasan", async () => {
+  const ids: string[] = [];
+  loseFirstResponse(ids);
+  const { user, sheet } = await openPaySheet();
+  await user.type(
+    within(sheet).getByRole("textbox", { name: "Nominal" }),
+    "30000",
+  );
+  await user.click(
+    within(sheet).getByRole("button", { name: "Simpan pelunasan" }),
+  );
+  expect(await within(sheet).findByRole("alert")).toBeInTheDocument();
+  vi.setSystemTime(NOW + 10 * 60_000 + 1000);
+  await user.click(
+    within(sheet).getByRole("button", { name: "Simpan pelunasan" }),
+  );
+  expect(await screen.findByText("Pelunasan tersimpan")).toBeInTheDocument();
+  expect(ids).toHaveLength(2);
+  expect(ids[0]).not.toBe(ids[1]);
+  expect(
+    mockDb
+      .get()
+      .creditPayments.filter((p) => ids.includes(p.id) && p.amount === 30_000),
+  ).toHaveLength(2);
+});
+
+test("kirim ulang dengan id tertunda yang sudah tersimpan → pemberitahuan sudah tersimpan sebelumnya", async () => {
+  const ids: string[] = [];
+  loseFirstResponse(ids);
+  const { user, sheet } = await openPaySheet();
+  await user.type(
+    within(sheet).getByRole("textbox", { name: "Nominal" }),
+    "30000",
+  );
+  await user.click(
+    within(sheet).getByRole("button", { name: "Simpan pelunasan" }),
+  );
+  expect(await within(sheet).findByRole("alert")).toBeInTheDocument();
+  vi.setSystemTime(NOW + 60_000);
+  await user.click(
+    within(sheet).getByRole("button", { name: "Simpan pelunasan" }),
+  );
+  expect(
+    await screen.findByText(
+      "Pelunasan ini sudah tersimpan sebelumnya — cek riwayat",
+    ),
+  ).toBeInTheDocument();
+  expect(ids[0]).toBe(ids[1]);
+  expect(
+    mockDb.get().creditPayments.filter((p) => p.id === ids[0]),
+  ).toHaveLength(1);
+});
+
+test("simpan berhasil → tutup → buka lagi → input yang sama → id baru, dua pelunasan", async () => {
+  const bodies: OwnerCreditPaymentInput[] = [];
+  server.events.on("request:start", async ({ request }) => {
+    if (request.method === "POST" && request.url.endsWith(OWNER_PAY("Bu Sari")))
+      bodies.push((await request.clone().json()) as OwnerCreditPaymentInput);
+  });
+  const { user, sheet } = await openPaySheet();
+  await user.type(
+    within(sheet).getByRole("textbox", { name: "Nominal" }),
+    "30000",
+  );
+  await user.click(
+    within(sheet).getByRole("button", { name: "Simpan pelunasan" }),
+  );
+  expect(await screen.findByText("Pelunasan tersimpan")).toBeInTheDocument();
+  await waitFor(() =>
+    expect(
+      screen.queryByRole("dialog", { name: "Catat pelunasan" }),
+    ).toBeNull(),
+  );
+  await user.click(screen.getByRole("button", { name: "Catat pelunasan" }));
+  const again = await screen.findByRole("dialog", { name: "Catat pelunasan" });
+  await user.type(
+    within(again).getByRole("textbox", { name: "Nominal" }),
+    "30000",
+  );
+  await user.click(
+    within(again).getByRole("button", { name: "Simpan pelunasan" }),
+  );
+  await waitFor(() => expect(bodies).toHaveLength(2));
+  expect(bodies[0]?.id).not.toBe(bodies[1]?.id);
+  await waitFor(() =>
+    expect(
+      mockDb
+        .get()
+        .creditPayments.filter((p) => bodies.some((b) => b.id === p.id)),
+    ).toHaveLength(2),
+  );
+  server.events.removeAllListeners();
+});
+
 test("tombol Simpan nonaktif selama pending (tidak terkirim dua kali)", async () => {
   let calls = 0;
   server.use(

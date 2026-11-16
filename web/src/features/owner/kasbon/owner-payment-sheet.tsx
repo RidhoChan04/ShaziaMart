@@ -1,6 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
+import { ApiError } from "@/shared/api/fetcher";
 import {
   getGetOwnerCustomerQueryKey,
   useCreateOwnerCreditPayment,
@@ -23,6 +24,11 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/shared/ui/sheet";
+
+const REPLAYED_NOTICE =
+  "Pelunasan ini sudah tersimpan sebelumnya — cek riwayat";
+/** Id tertunda hanya dipakai ulang selama kirim ulang masuk akal; lewat itu pelunasan baru. */
+const PENDING_MAX_AGE_MS = 10 * 60 * 1000;
 
 const METHODS: { value: OwnerCreditPaymentInputMethod; label: string }[] = [
   { value: "transfer", label: "Transfer" },
@@ -67,8 +73,8 @@ function Choice({
 /**
  * Tombol `Catat pelunasan` + lembar bawah: pelunasan langsung oleh pemilik (Transfer atau Tunai ke
  * pemilik), tidak pernah masuk laci. `id` dibuat saat simpan pertama dan dipakai ulang oleh setiap
- * percobaan sampai ada yang berhasil (juga setelah lembar ditutup lalu dibuka lagi), selama nominal
- * dan cara bayarnya sama; respons yang hilang tidak menggandakan pelunasan. Nominal atau cara bayar
+ * percobaan sampai berhasil atau ID_TAKEN (juga setelah lembar ditutup lalu dibuka lagi), selama nominal
+ * dan cara bayarnya sama dan umurnya kurang dari 10 menit; respons yang hilang tidak menggandakan pelunasan. Nominal atau cara bayar
  * berubah = pelunasan lain = `id` baru (server mengulang catatan asli, bukan isi yang baru).
  */
 export function OwnerPaymentSheet({
@@ -84,22 +90,38 @@ export function OwnerPaymentSheet({
     id: string;
     amount: number;
     method: OwnerCreditPaymentInputMethod;
+    createdAt: number;
   } | null>(null);
+  // Kirim terakhir: apakah memakai id tertunda yang sudah pernah dikirim, dan kapan.
+  const attempt = useRef({ reused: false, at: 0 });
   const [method, setMethod] =
     useState<OwnerCreditPaymentInputMethod>("transfer");
   const [text, setText] = useState("");
   const create = useCreateOwnerCreditPayment({
     mutation: {
-      onSuccess: (saved) => {
-        pending.current = null;
+      onSuccess: (saved, variables) => {
+        // Hook-level: tetap berjalan walau halaman sudah ditinggalkan.
+        if (pending.current?.id === variables.data.id) pending.current = null;
         setMethod("transfer");
         setText("");
-        toast.success("Pelunasan tersimpan");
+        // Server mengulang catatan lama (id dipakai ulang): riwayat memuat entri yang lebih tua
+        // dari kirim ini. Selalu tampilkan pemberitahuan, juga bila isinya sama.
+        const replayed =
+          attempt.current.reused &&
+          saved.history.some(
+            (e) =>
+              e.payment?.id === variables.data.id && e.at < attempt.current.at,
+          );
+        if (replayed) toast.warning(REPLAYED_NOTICE);
+        else toast.success("Pelunasan tersimpan");
         onSaved(saved);
         setOpen(false);
       },
       // Respons bisa hilang padahal server sudah menyimpan: muat ulang agar pelunasan itu tampil.
-      onError: () => {
+      onError: (error) => {
+        if (error instanceof ApiError && error.code === "ID_TAKEN") {
+          pending.current = null;
+        }
         void client.invalidateQueries({
           queryKey: getGetOwnerCustomerQueryKey(customer.id),
         });
@@ -212,11 +234,21 @@ export function OwnerPaymentSheet({
           disabled={problem !== null || create.isPending}
           onClick={() => {
             if (amount === null) return;
+            const now = Date.now();
             const kept = pending.current;
             const same =
-              kept !== null && kept.amount === amount && kept.method === method;
+              kept !== null &&
+              kept.amount === amount &&
+              kept.method === method &&
+              now - kept.createdAt < PENDING_MAX_AGE_MS;
             const id = same ? kept.id : newId();
-            pending.current = { id, amount, method };
+            attempt.current = { reused: same, at: now };
+            pending.current = {
+              id,
+              amount,
+              method,
+              createdAt: same ? kept.createdAt : now,
+            };
             create.mutate({
               customerId: customer.id,
               data: { id, amount, method },
