@@ -65,6 +65,37 @@ test("penjaga mengenali kelas palet bawaan dan meloloskan token serta utilitas b
   ).toEqual([]);
 });
 
+/** Nilai hex token `--color-{name}` pertama di styles.css (blok @theme). */
+function tokenHex(name: string): string {
+  const m = styles.match(new RegExp(`--color-${name}:\\s*(#[0-9a-f]{6})`, "i"));
+  if (!m?.[1]) throw new Error(`token ${name} tanpa hex`);
+  return m[1];
+}
+
+/** Rasio kontras WCAG 2 dua warna hex. */
+function contrast(a: string, b: string): number {
+  const lum = (hex: string) => {
+    const [r, g, bl] = [1, 3, 5].map((i) => {
+      const c = Number.parseInt(hex.slice(i, i + 2), 16) / 255;
+      return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    }) as [number, number, number];
+    return 0.2126 * r + 0.7152 * g + 0.0722 * bl;
+  };
+  const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x) as [number, number];
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+// Palet grafik dicek validator dataviz (lightness, chroma, ΔE CVD, kontras); penjaga ini hanya
+// mengunci kontras batang berwarna ≥ 3:1 terhadap kartu putih agar token tidak diganti diam-diam.
+test.each(["chart-1", "chart-1-now", "chart-3"])(
+  "batang %s kontras ≥ 3:1 terhadap kartu",
+  (name) => {
+    expect(
+      contrast(tokenHex(name), tokenHex("surface")),
+    ).toBeGreaterThanOrEqual(3);
+  },
+);
+
 test("kelas warna Tailwind di src/**/*.tsx hanya memakai token dari app/styles.css", () => {
   expect(Object.keys(sources).length).toBeGreaterThan(50);
   const found = Object.entries(sources).flatMap(([file, text]) =>

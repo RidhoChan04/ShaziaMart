@@ -20,6 +20,9 @@
   --color-chart-1: #1f7a4d;
   --color-chart-1-now: #2e9a62;
   --color-chart-2: #d1d1d6;
+  /* Laba kotor di grafik Laporan (seri depan): biru kategori 1 palet dataviz; validator lolos
+     terhadap chart-1 & chart-1-now (ΔE CVD ≥ 20) dan 4,42:1 terhadap putih. */
+  --color-chart-3: #2a78d6;
   --color-glass: rgb(255 255 255 / 0.72);
   /* Tanda status (Menipis / Minus) dan latar pemindai kamera. */
   --color-warning-soft: #fff0d9;
@@ -70,6 +73,19 @@
 
   body {
     font-size: 16px;
+  }
+}
+
+/* (koreksi mockup M4) Toast app pemilik di HP/tablet: tepat di atas tab bar mengambang, tidak
+   menutupi tab bar maupun pil kembali di atas. Tinggi tab bar = kapsul 56 px (tab 48 px + p-1)
+   + jarak bawah 12 px; + 8 px celah = 76 px. Sonner menulis variabel offset sebagai style
+   inline, jadi perlu !important. Kasir & staf (data-app lain) dan laptop (sidebar) tidak berubah. */
+@media (max-width: 1023.98px) {
+  :root[data-app="owner"] [data-sonner-toaster][data-y-position="bottom"] {
+    /* biome-ignore lint/complexity/noImportantStyles: mengalahkan style inline sonner */
+    --offset-bottom: calc(76px + env(safe-area-inset-bottom)) !important;
+    /* biome-ignore lint/complexity/noImportantStyles: mengalahkan style inline sonner */
+    --mobile-offset-bottom: calc(76px + env(safe-area-inset-bottom)) !important;
   }
 }
 
