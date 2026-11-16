@@ -2,11 +2,12 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useId, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
+  getGetOwnerCustomerQueryKey,
   getGetOwnerSaleQueryKey,
   getGetOwnerTodaySummaryQueryKey,
   getListOwnerCustomersQueryKey,
   getListOwnerSalesQueryKey,
-  useListOwnerCustomers,
+  useGetOwnerCustomer,
   useVoidOwnerSale,
 } from "@/shared/api/gen/owner/owner";
 import type { OwnerSale } from "@/shared/api/gen/shaziaMartAPI.schemas";
@@ -38,6 +39,11 @@ function useRefreshAfterVoid() {
     void client.invalidateQueries({
       queryKey: getListOwnerCustomersQueryKey(),
     });
+    if (saved.customerId !== null) {
+      void client.invalidateQueries({
+        queryKey: getGetOwnerCustomerQueryKey(saved.customerId),
+      });
+    }
     void client.invalidateQueries({
       predicate: (q) =>
         typeof q.queryKey[0] === "string" &&
@@ -67,13 +73,14 @@ export function VoidSaleSheet({ sale }: { sale: OwnerSale }) {
   const reasonId = useId();
   const refresh = useRefreshAfterVoid();
   const credit = partOf(sale, "credit");
-  const customers = useListOwnerCustomers({
-    query: { enabled: open && credit > 0 && sale.customerId !== null },
+  // Kalimat Q8 butuh saldo terkini: selama saldo belum dimuat (atau gagal), konfirmasi ditahan.
+  const needsBalance = credit > 0 && sale.customerId !== null;
+  const customer = useGetOwnerCustomer(sale.customerId ?? "", {
+    query: { enabled: open && needsBalance },
   });
-  const balance = customers.data?.customers.find(
-    (c) => c.id === sale.customerId,
-  )?.balance;
-  const note = overpaidNote(sale, balance);
+  const balanceReady =
+    !needsBalance || (customer.isSuccess && !customer.isFetching);
+  const note = overpaidNote(sale, customer.data?.balance);
   const voidSale = useVoidOwnerSale({
     mutation: {
       onSuccess: (saved) => {
@@ -85,7 +92,7 @@ export function VoidSaleSheet({ sale }: { sale: OwnerSale }) {
     },
   });
   const clean = cleanReason(reason);
-  const ready = clean !== null && !voidSale.isPending;
+  const ready = clean !== null && !voidSale.isPending && balanceReady;
 
   return (
     <Dialog
@@ -124,6 +131,20 @@ export function VoidSaleSheet({ sale }: { sale: OwnerSale }) {
           </DialogDescription>
         </DialogHeader>
         {note && <p className="text-sm font-semibold tabular-nums">{note}</p>}
+        {needsBalance && customer.isError && (
+          <div className="grid justify-items-start gap-2">
+            <p role="alert" className="text-sm font-medium text-danger">
+              {`Saldo pelanggan belum bisa dimuat. ${pesanError(customer.error)}`}
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void customer.refetch()}
+            >
+              Coba lagi
+            </Button>
+          </div>
+        )}
         <form
           className="grid gap-3"
           onSubmit={(e) => {

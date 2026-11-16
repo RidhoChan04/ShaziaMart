@@ -17,15 +17,21 @@ export function saleDayLabel(iso: string): string {
   return `${WEEKDAY.format(Date.parse(`${iso}T12:00:00+07:00`))}, ${formatIsoDate(iso)}`;
 }
 
+/** Tanggal yang ditunjuk nomor struk lengkap (`20261104-0145`), atau null bila `q` bukan nomor struk. */
+export function receiptDate(q: string): string | null {
+  const m = /^(\d{4})(\d{2})(\d{2})-/.exec(q.trim());
+  const iso = m ? `${m[1]}-${m[2]}-${m[3]}` : null;
+  return iso && isIsoDate(iso) ? iso : null;
+}
+
 /** Tanggal daftar: nomor struk lengkap (`20261104-0145`) menunjuk harinya sendiri; selain itu `tanggal`, bawaan hari ini. */
 export function effectiveDate(
   tanggal: string | undefined,
   q: string,
   now: number,
 ): string {
-  const m = /^(\d{4})(\d{2})(\d{2})-/.exec(q.trim());
-  const fromNumber = m ? `${m[1]}-${m[2]}-${m[3]}` : null;
-  if (fromNumber && isIsoDate(fromNumber)) return fromNumber;
+  const fromNumber = receiptDate(q);
+  if (fromNumber) return fromNumber;
   return tanggal && isIsoDate(tanggal) ? tanggal : jakartaIsoDate(now);
 }
 

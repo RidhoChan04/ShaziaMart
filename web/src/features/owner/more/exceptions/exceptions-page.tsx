@@ -74,6 +74,8 @@ function ExceptionsList({ kind }: { kind: ExceptionKind }) {
           queryKey: getGetOwnerTodaySummaryQueryKey(),
         });
         toast.success("Ditandai sudah ditinjau");
+        // Tombol hilang bersama daftarnya: fokus pindah ke judul halaman.
+        document.querySelector<HTMLElement>("main h1")?.focus();
       },
     },
   });

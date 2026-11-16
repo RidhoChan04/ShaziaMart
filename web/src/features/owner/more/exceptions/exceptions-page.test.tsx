@@ -189,6 +189,8 @@ test("'Tandai sudah ditinjau' mengirim upTo = jam kejadian terbaru yang tampil (
   expect(invalidate).toHaveBeenCalledWith({
     queryKey: getGetOwnerTodaySummaryQueryKey(),
   });
+  // Tombol hilang: fokus pindah ke judul halaman, bukan lenyap ke body.
+  expect(screen.getByRole("heading", { level: 1 })).toHaveFocus();
 });
 
 test("kejadian yang masuk setelah daftar dimuat tidak ikut ditandai: tetap di daftar dan di butir Beranda", async () => {

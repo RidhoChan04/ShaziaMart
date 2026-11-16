@@ -234,6 +234,52 @@ test("(Q8) kasbon yang sudah dicicil: dialog menambah 'Saldo Bu Sari menjadi leb
   expect(customerBalance("Bu Sari")).toBe(-80_000);
 });
 
+test("(Q8) saldo pelanggan masih dimuat: konfirmasi tetap nonaktif sampai kalimatnya siap", async () => {
+  const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+  const sale = await sell(mixedBody("Bu Sari"));
+  await nextShift();
+  await ownerLogin();
+  server.use(
+    http.get("/api/owner/customers/:id", () => new Promise<never>(() => {})),
+  );
+  renderApp(detail(sale.id));
+  await user.click(
+    await screen.findByRole("button", { name: "Batalkan transaksi" }),
+  );
+  const dialog = await screen.findByRole("dialog");
+  await user.type(within(dialog).getByLabelText("Alasan"), "Salah pelanggan");
+  expect(
+    within(dialog).getByRole("button", { name: "Batalkan transaksi" }),
+  ).toBeDisabled();
+});
+
+test("(Q8) saldo pelanggan gagal dimuat: baris galat + Coba lagi, konfirmasi tetap nonaktif", async () => {
+  const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+  const sale = await sell(mixedBody("Bu Sari"));
+  await nextShift();
+  await ownerLogin();
+  server.use(
+    http.get("/api/owner/customers/:id", () =>
+      HttpResponse.json({ message: "Gagal" }, { status: 500 }),
+    ),
+  );
+  renderApp(detail(sale.id));
+  await user.click(
+    await screen.findByRole("button", { name: "Batalkan transaksi" }),
+  );
+  const dialog = await screen.findByRole("dialog");
+  expect(
+    await within(dialog).findByText(/Saldo pelanggan belum bisa dimuat/),
+  ).toBeInTheDocument();
+  expect(
+    within(dialog).getByRole("button", { name: "Coba lagi" }),
+  ).toBeInTheDocument();
+  await user.type(within(dialog).getByLabelText("Alasan"), "Salah pelanggan");
+  expect(
+    within(dialog).getByRole("button", { name: "Batalkan transaksi" }),
+  ).toBeDisabled();
+});
+
 test("kasbon tanpa cicilan: dialog tanpa kalimat 'lebih bayar'", async () => {
   const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
   const sale = await sell(mixedBody("Bu Sari"));

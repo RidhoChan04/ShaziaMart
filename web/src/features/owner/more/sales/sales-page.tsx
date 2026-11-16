@@ -14,7 +14,7 @@ import { Button } from "@/shared/ui/button";
 import { SubPageHeader } from "../../common/sub-page-header";
 import { RowList } from "../../products/detail/section";
 import { ReceiptBadgeView } from "../receipts/receipt-badge";
-import { effectiveDate, saleDayLabel } from "./sales-model";
+import { effectiveDate, receiptDate, saleDayLabel } from "./sales-model";
 
 const rowClass =
   "flex min-h-16 items-center gap-3 px-4 py-2.5 hover:bg-bg focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary";
@@ -73,13 +73,18 @@ export function SalesPage() {
   const rows = query.data;
 
   // Hari ini = alamat polos; hari lain disimpan di URL agar tombol kembali menjaganya.
+  // Nomor struk lengkap menunjuk harinya sendiri: panah harus melepasnya, kalau tidak hari tak berpindah.
+  const byNumber = receiptDate(q) !== null;
   const dayLink = (iso: string) => ({
     to: "/owner/lainnya/transaksi" as const,
     search: {
       ...(iso === today ? {} : { tanggal: iso }),
-      ...(search.q ? { q: search.q } : {}),
+      ...(search.q && !byNumber ? { q: search.q } : {}),
     },
   });
+  const leaveNumber = () => {
+    if (byNumber) setText("");
+  };
 
   return (
     <div className="pb-24 lg:pb-8">
@@ -96,6 +101,7 @@ export function SalesPage() {
           <Link
             {...dayLink(addIsoDays(date, -1))}
             aria-label="Hari sebelumnya"
+            onClick={leaveNumber}
             className={stepClass}
           >
             <ChevronLeft aria-hidden="true" className="size-5" />
@@ -116,6 +122,7 @@ export function SalesPage() {
             <Link
               {...dayLink(addIsoDays(date, 1))}
               aria-label="Hari berikutnya"
+              onClick={leaveNumber}
               className={stepClass}
             >
               <ChevronRight aria-hidden="true" className="size-5" />

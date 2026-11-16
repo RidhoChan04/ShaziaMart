@@ -248,9 +248,9 @@ function exceptionItem(e: ExceptionAttention): AttentionItem {
   };
 }
 
-/** Urutan: stok minus, kedaluwarsa, selisih opname besar, opname tertahan diganti, utang lewat, perubahan modal, barang baru menunggu harga, opname menunggu persetujuan, stok menipis, segera kedaluwarsa, utang segera, barang habis, selisih kas, pengecualian kasir (batal transaksi, batal pelunasan, kasbon lewat limit), kasbon > 30 hari. */
+/** Urutan (mockup pengecualian disetujui): pengecualian kasir (batal transaksi, batal pelunasan, kasbon lewat limit), stok minus, kedaluwarsa, selisih opname besar, opname tertahan diganti, utang lewat, perubahan modal, barang baru menunggu harga, opname menunggu persetujuan, stok menipis, segera kedaluwarsa, utang segera, barang habis, selisih kas, kasbon > 30 hari. */
 export function attentionItems(a: Attention): AttentionItem[] {
-  const items: AttentionItem[] = [];
+  const items: AttentionItem[] = [...a.exceptions.map(exceptionItem)];
   if (a.negativeStockCount > 0) {
     items.push({
       key: "negative-stock",
@@ -323,7 +323,6 @@ export function attentionItems(a: Attention): AttentionItem[] {
       link: { to: "/owner/lainnya" },
     });
   }
-  items.push(...a.exceptions.map(exceptionItem));
   if (a.overdueCredit.count > 0) {
     items.push({
       key: "overdue-credit",

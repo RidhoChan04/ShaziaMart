@@ -111,6 +111,24 @@ test("nomor struk lengkap dari hari lain dicari di harinya (tanggal di navigator
   expect(rows).toHaveLength(1);
 });
 
+test("dengan nomor struk lengkap di kotak cari, panah hari tetap berpindah hari dan melepas nomornya", async () => {
+  const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+  await seedToday();
+  renderApp(PAGE);
+  const box = await screen.findByRole("searchbox", {
+    name: "Cari nomor struk",
+  });
+  await user.type(box, "20261104-0003");
+  await waitFor(() => expect(dayGroup()).toHaveTextContent("Rabu, 4 Nov 2026"));
+  const prev = screen.getByRole("link", { name: "Hari sebelumnya" });
+  expect(prev).toHaveAttribute("href", `${PAGE}?tanggal=2026-11-03`);
+  await user.click(prev);
+  await waitFor(() =>
+    expect(dayGroup()).toHaveTextContent("Selasa, 3 Nov 2026"),
+  );
+  expect(box).toHaveValue("");
+});
+
 test("hari tanpa transaksi: 'Tidak ada transaksi'", async () => {
   await ownerLogin();
   renderApp(`${PAGE}?tanggal=2025-01-01`);

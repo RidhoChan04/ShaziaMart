@@ -1,3 +1,4 @@
+/** Pembantu khusus tes (data pengecualian kasir untuk tes halaman Pemilik); jangan diimpor dari kode produksi. */
 import {
   cashSale,
   customerId,

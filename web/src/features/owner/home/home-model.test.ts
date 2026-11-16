@@ -716,7 +716,7 @@ describe("attentionItems: pengecualian kasir (ruling R9)", () => {
     ]);
   });
 
-  test("posisi: sesudah Selisih kas, sebelum Kasbon > 30 hari; butir lama tidak berubah", () => {
+  test("posisi: paling atas, sebelum Stok minus (mockup disetujui); butir lama tidak berubah", () => {
     const a: Attention = {
       ...empty,
       negativeStockCount: 3,
@@ -727,11 +727,11 @@ describe("attentionItems: pengecualian kasir (ruling R9)", () => {
       exceptions: three,
     };
     expect(attentionItems(a).map((i) => i.key)).toEqual([
-      "negative-stock",
-      "cash-s1",
       "exception-batal_transaksi",
       "exception-batal_pelunasan",
       "exception-kasbon_lewat_limit",
+      "negative-stock",
+      "cash-s1",
       "overdue-credit",
     ]);
     expect(attentionItems({ ...a, exceptions: [] }).map((i) => i.key)).toEqual([
