@@ -14,6 +14,7 @@ import { humanTyping, scannerTyping } from "@/test/typing";
 import { useCart } from "../cart/cart-store";
 import { KasirScreen } from "../screen/kasir-screen";
 import { ShiftActions } from "../shift/shift-actions";
+import { clearPendingRepaymentId } from "./pending-repayment-id";
 
 vi.mock("@/shared/lib/beep", () => ({ beep: vi.fn() }));
 vi.mock("@/shared/lib/id", async (importOriginal) => {
@@ -24,6 +25,7 @@ vi.mock("@/shared/lib/id", async (importOriginal) => {
 const OFFLINE = "Server tidak tersambung — coba lagi";
 
 beforeEach(async () => {
+  clearPendingRepaymentId();
   useCart.setState(useCart.getInitialState(), true);
   await loginWithShift();
 });
@@ -243,6 +245,78 @@ test("respons hilang (server menyimpan lalu HttpResponse.error) → pesan; klik 
   expect(
     (mockDb.get().shift?.creditCash ?? []).filter((c) => c.amount === 50_000),
   ).toHaveLength(1);
+});
+
+/** Server menyimpan lalu jawabannya hilang (hanya percobaan pertama). */
+function loseFirstResponse(ids: string[]) {
+  let lose = true;
+  let inner = false;
+  server.use(
+    http.post("/api/credit-payments", async ({ request }) => {
+      const body = (await request.clone().json()) as KasirCreditPaymentInput;
+      if (inner) return;
+      ids.push(body.id);
+      if (!lose) return;
+      lose = false;
+      inner = true;
+      await post("/api/credit-payments", body);
+      inner = false;
+      return HttpResponse.error();
+    }),
+  );
+}
+
+test("jawaban hilang (server menyimpan) → tutup lembar → buka lagi, isian sama → id sama; satu entri buku dan satu baris laci", async () => {
+  const ids: string[] = [];
+  loseFirstResponse(ids);
+  const first = await openWithSari();
+  await first.user.type(first.amount(), "50000");
+  await first.user.type(first.received(), "50000");
+  await first.user.click(first.save());
+  expect(await first.ui.findByRole("alert")).toHaveTextContent(OFFLINE);
+  await first.user.click(first.ui.getByRole("button", { name: "Batal" }));
+  await waitFor(() => expect(sheet()).toBeNull());
+
+  await first.user.click(first.trigger);
+  const ui = sheetUi();
+  await first.user.click(await ui.findByRole("button", { name: /Bu Sari/ }));
+  await first.user.type(
+    ui.getByRole("textbox", { name: "NOMINAL PELUNASAN" }),
+    "50000",
+  );
+  await first.user.type(
+    ui.getByRole("textbox", { name: "UANG DITERIMA" }),
+    "50000",
+  );
+  await first.user.click(ui.getByRole("button", { name: "Simpan pelunasan" }));
+  expect(await screen.findByText("Pelunasan tersimpan")).toBeInTheDocument();
+  expect(ids).toHaveLength(2);
+  expect(ids[1]).toBe(ids[0]);
+  expect(saved().filter((p) => p.id === ids[0])).toHaveLength(1);
+  expect(
+    mockDb.get().creditLedger.filter((e) => e.paymentId === ids[0]),
+  ).toHaveLength(1);
+  expect(
+    (mockDb.get().shift?.creditCash ?? []).filter((c) => c.amount === 50_000),
+  ).toHaveLength(1);
+});
+
+test("gagal lalu nominal diganti → id baru; setelah berhasil, pelunasan berikutnya memakai id baru", async () => {
+  const ids: string[] = [];
+  loseFirstResponse(ids);
+  const { user, amount, received, save } = await openWithSari();
+  await user.type(amount(), "50000");
+  await user.type(received(), "50000");
+  await user.click(save());
+  await screen.findByRole("alert");
+  await user.clear(amount());
+  await user.type(amount(), "20000");
+  await user.clear(received());
+  await user.type(received(), "20000");
+  await user.click(save());
+  await screen.findByText("Pelunasan tersimpan");
+  expect(ids).toHaveLength(2);
+  expect(ids[1]).not.toBe(ids[0]);
 });
 
 test("id sudah tersimpan dengan isi lain → 'Pelunasan ini sudah tersimpan sebelumnya' dan data server yang tampil", async () => {

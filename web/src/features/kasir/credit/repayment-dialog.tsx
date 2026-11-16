@@ -6,7 +6,6 @@ import type {
   KasirCreditPayment,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { useServerHealth } from "@/shared/hooks/use-server-health";
-import { newId } from "@/shared/lib/id";
 import { formatAngka, formatRupiah } from "@/shared/lib/money";
 import { Button } from "@/shared/ui/button";
 import {
@@ -21,6 +20,10 @@ import { CustomerPicker } from "../payment/customer-picker";
 import { QrisPanel } from "../payment/qris-tab";
 import { CashFields, ChangeLine, MoneyField } from "../payment/tunai-tab";
 import { focusScanBox } from "../scan/scan-box";
+import {
+  clearPendingRepaymentId,
+  pendingRepaymentId,
+} from "./pending-repayment-id";
 import {
   type RepaymentDraft,
   repaymentState,
@@ -101,8 +104,6 @@ function Saved({
 }
 
 function RepaymentSession({ onClose }: { onClose: () => void }) {
-  // Id dibuat sekali saat lembar dibuka: kirim ulang memakai id yang sama.
-  const [id] = useState(() => newId());
   const [draft, setDraft] = useState<RepaymentDraft>(EMPTY);
   const [printChoice, setPrintChoice] = useState<boolean | null>(null);
   const [saved, setSaved] = useState<KasirCreditPayment | null>(null);
@@ -112,13 +113,22 @@ function RepaymentSession({ onClose }: { onClose: () => void }) {
   const set = (patch: Partial<RepaymentDraft>) =>
     setDraft((d) => ({ ...d, ...patch }));
   const state = repaymentState(draft);
-  const repayment = useSubmitRepayment(setSaved);
+  const repayment = useSubmitRepayment((payment) => {
+    clearPendingRepaymentId();
+    setSaved(payment);
+  });
   const busy = repayment.pending;
   const canSubmit = state.canSubmit && !busy && online;
   const customer: Customer | null = draft.customer;
 
   function submit() {
-    if (!canSubmit) return;
+    if (!canSubmit || draft.customer === null || state.amount === null) return;
+    // Id bertahan lintas buka-tutup lembar sampai simpan berhasil.
+    const id = pendingRepaymentId(
+      draft.customer.id,
+      state.amount,
+      draft.method,
+    );
     repayment.submit(toRepaymentInput(id, draft, state, print));
   }
 

@@ -57,7 +57,16 @@ export function useSubmitRepayment(
           }
           onSaved(payment);
         },
-        onError: (err) => setError(pesanError(err)),
+        onError: (err) => {
+          // Jawaban bisa hilang padahal server sudah menyimpan: segarkan agar tampak di Riwayat.
+          void client.invalidateQueries({
+            queryKey: getListShiftCreditPaymentsQueryKey(),
+          });
+          void client.invalidateQueries({
+            queryKey: getSearchCustomersQueryKey(),
+          });
+          setError(pesanError(err));
+        },
         onSettled: () => {
           inFlight.current = false;
         },
