@@ -21,6 +21,7 @@ import { roundHalfUp } from "@/shared/lib/quantity";
 import {
   clampToToday,
   type IsoRange,
+  previousCutAtNow,
   previousRange,
 } from "@/shared/lib/report-period";
 import type { MockProduct, MockSale, MockState } from "../db";
@@ -79,21 +80,13 @@ function totalsOf(done: readonly MockSale[]): SalesTotals {
 }
 
 /**
- * Jendela pembanding (K12, jawaban pemilik Q7): bila periode berjalan dan pembanding sama
- * panjang (hari terakhirnya sejajar dengan hari ini), berhenti di akhir menit sekarang pada hari
- * terakhir pembanding; bila lebih pendek (tanggal sejajar dijepit), hari terakhir dihitung penuh.
+ * Jendela pembanding (K12, jawaban pemilik Q7): bila hari terakhir pembanding sejajar dengan hari
+ * ini (`previousCutAtNow`), berhenti di akhir menit sekarang pada hari itu; selain itu (periode
+ * lewat, atau tanggal sejajar dijepit ke bulan yang lebih pendek) dihitung penuh.
  */
-function previousWindow(
-  range: IsoRange,
-  previous: IsoRange,
-  running: boolean,
-  now: number,
-): Window {
+function previousWindow(previous: IsoRange, cut: boolean, now: number): Window {
   const full = windowOf(previous);
-  const aligned =
-    isoDaysBetween(previous.from, previous.to) ===
-    isoDaysBetween(range.from, range.to);
-  if (!running || !aligned) return full;
+  if (!cut) return full;
   const minuteOfDay = Math.floor(
     (now - dayStart(jakartaIsoDate(now))) / MINUTE_MS,
   );
@@ -305,7 +298,8 @@ export function salesReport(
   now: number,
 ): SalesReport {
   const { running, ...range } = rangeOf(q, now);
-  const previous = previousRange(q.period, range);
+  const previous = previousRange(q.period, range, running);
+  const cut = previousCutAtNow(q.period, range, running);
   const current = windowOf(range);
   const done = doneIn(state, current);
   const accs = productAccs(state, done);
@@ -315,9 +309,7 @@ export function salesReport(
     previous,
     running,
     current: totalsOf(done),
-    previousTotals: totalsOf(
-      doneIn(state, previousWindow(range, previous, running, now)),
-    ),
+    previousTotals: totalsOf(doneIn(state, previousWindow(previous, cut, now))),
     series: seriesOf(q.period, { from: q.from, to: q.to }, done, now),
     topProducts: sortProducts(accs.map(toProductSales), "omzet").slice(
       0,

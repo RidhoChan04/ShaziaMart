@@ -8,9 +8,11 @@ import {
   MAX_RANGE_DAYS,
   periodRange,
   periodTitle,
+  previousCutAtNow,
   previousRange,
   rangeLabel,
   shiftPeriod,
+  weekdayLabel,
 } from "./report-period";
 
 describe("periodRange", () => {
@@ -31,35 +33,77 @@ describe("periodRange", () => {
 });
 
 describe("previousRange (K12, jawaban pemilik Q7)", () => {
+  // Kolom ke-4 = running (range sudah dijepit ke hari ini). Bulan yang sudah lewat → bulan
+  // sebelumnya penuh; bulan berjalan → tanggal sejajar, dijepit ke akhir bulan yang lebih pendek.
   test.each([
-    ["hari", "2026-11-05", "2026-11-05", "2026-10-29", "2026-10-29"],
-    ["minggu", "2026-11-02", "2026-11-05", "2026-10-26", "2026-10-29"],
-    ["minggu", "2026-11-02", "2026-11-08", "2026-10-26", "2026-11-01"],
-    ["bulan", "2026-11-01", "2026-11-05", "2026-10-01", "2026-10-05"],
-    ["bulan", "2026-10-01", "2026-10-31", "2026-09-01", "2026-09-30"],
-    ["bulan", "2026-11-01", "2026-11-30", "2026-10-01", "2026-10-31"],
-    ["bulan", "2026-03-01", "2026-03-30", "2026-02-01", "2026-02-28"],
-    ["bulan", "2028-03-01", "2028-03-30", "2028-02-01", "2028-02-29"],
-    ["bulan", "2026-03-01", "2026-03-31", "2026-02-01", "2026-02-28"],
+    ["hari", "2026-11-05", "2026-11-05", true, "2026-10-29", "2026-10-29"],
+    ["hari", "2026-11-04", "2026-11-04", false, "2026-10-28", "2026-10-28"],
+    ["minggu", "2026-11-02", "2026-11-05", true, "2026-10-26", "2026-10-29"],
+    ["minggu", "2026-11-02", "2026-11-08", false, "2026-10-26", "2026-11-01"],
+    ["bulan", "2026-11-01", "2026-11-05", true, "2026-10-01", "2026-10-05"],
+    ["bulan", "2026-10-01", "2026-10-31", false, "2026-09-01", "2026-09-30"],
+    // bulan yang sudah lewat (November selesai) → Oktober penuh
+    ["bulan", "2026-11-01", "2026-11-30", false, "2026-10-01", "2026-10-31"],
+    // (jawaban pemilik Q7) hari terakhir bulan berjalan: 30 Nov → 1–30 Okt, bukan Oktober penuh
+    ["bulan", "2026-11-01", "2026-11-30", true, "2026-10-01", "2026-10-30"],
+    ["bulan", "2026-02-01", "2026-02-28", true, "2026-01-01", "2026-01-28"],
+    ["bulan", "2026-02-01", "2026-02-28", false, "2026-01-01", "2026-01-31"],
+    ["bulan", "2028-02-01", "2028-02-29", true, "2028-01-01", "2028-01-29"],
+    ["bulan", "2026-04-01", "2026-04-30", true, "2026-03-01", "2026-03-30"],
+    ["bulan", "2026-06-01", "2026-06-30", true, "2026-05-01", "2026-05-30"],
+    ["bulan", "2026-09-01", "2026-09-30", true, "2026-08-01", "2026-08-30"],
+    ["bulan", "2026-03-01", "2026-03-30", true, "2026-02-01", "2026-02-28"],
+    ["bulan", "2028-03-01", "2028-03-30", true, "2028-02-01", "2028-02-29"],
+    ["bulan", "2026-03-01", "2026-03-31", false, "2026-02-01", "2026-02-28"],
+    ["bulan", "2026-03-01", "2026-03-31", true, "2026-02-01", "2026-02-28"],
     // (jawaban pemilik Q7) 31 hari vs 30 hari
-    ["bulan", "2026-05-01", "2026-05-31", "2026-04-01", "2026-04-30"],
+    ["bulan", "2026-05-01", "2026-05-31", false, "2026-04-01", "2026-04-30"],
+    ["bulan", "2026-05-01", "2026-05-31", true, "2026-04-01", "2026-04-30"],
+    ["bulan", "2026-10-01", "2026-10-31", true, "2026-09-01", "2026-09-30"],
     // (jawaban pemilik Q7) berjalan 30 Mei: sejajar = 30 Apr = akhir April
-    ["bulan", "2026-05-01", "2026-05-30", "2026-04-01", "2026-04-30"],
+    ["bulan", "2026-05-01", "2026-05-30", true, "2026-04-01", "2026-04-30"],
     // (jawaban pemilik Q7) 29 Mar dijepit ke 28 Feb
-    ["bulan", "2026-03-01", "2026-03-29", "2026-02-01", "2026-02-28"],
-    ["bulan", "2026-07-01", "2026-07-31", "2026-06-01", "2026-06-30"],
+    ["bulan", "2026-03-01", "2026-03-29", true, "2026-02-01", "2026-02-28"],
+    ["bulan", "2026-07-01", "2026-07-31", false, "2026-06-01", "2026-06-30"],
     // (pra-cek) lintas tahun di arah lain
-    ["bulan", "2026-12-01", "2026-12-31", "2026-11-01", "2026-11-30"],
+    ["bulan", "2026-12-01", "2026-12-31", false, "2026-11-01", "2026-11-30"],
     // (pra-cek) lintas tahun
-    ["bulan", "2027-01-01", "2027-01-05", "2026-12-01", "2026-12-05"],
-    ["tanggal", "2026-10-10", "2026-10-16", "2026-10-03", "2026-10-09"],
-    ["tanggal", "2026-11-05", "2026-11-05", "2026-11-04", "2026-11-04"],
-    ["tanggal", "2027-01-01", "2027-01-31", "2026-12-01", "2026-12-31"],
-  ] as const)("previousRange %s %s..%s → %s..%s", (p, f, t, pf, pt) =>
-    expect(previousRange(p, { from: f, to: t })).toEqual({
-      from: pf,
-      to: pt,
-    }),
+    ["bulan", "2027-01-01", "2027-01-05", true, "2026-12-01", "2026-12-05"],
+    ["bulan", "2027-01-01", "2027-01-31", false, "2026-12-01", "2026-12-31"],
+    ["tanggal", "2026-10-10", "2026-10-16", false, "2026-10-03", "2026-10-09"],
+    ["tanggal", "2026-11-05", "2026-11-05", true, "2026-11-04", "2026-11-04"],
+    ["tanggal", "2027-01-01", "2027-01-31", false, "2026-12-01", "2026-12-31"],
+  ] as const)(
+    "previousRange %s %s..%s running=%s → %s..%s",
+    (p, f, t, running, pf, pt) =>
+      expect(previousRange(p, { from: f, to: t }, running)).toEqual({
+        from: pf,
+        to: pt,
+      }),
+  );
+});
+
+describe("previousCutAtNow (jawaban pemilik Q7)", () => {
+  test.each([
+    ["hari", "2026-11-05", "2026-11-05", true, true],
+    ["hari", "2026-11-04", "2026-11-04", false, false],
+    ["minggu", "2026-11-02", "2026-11-05", true, true],
+    ["tanggal", "2026-10-10", "2026-11-05", true, true],
+    ["tanggal", "2026-10-10", "2026-10-16", false, false],
+    ["bulan", "2026-11-01", "2026-11-05", true, true],
+    // hari terakhir bulan berjalan, bulan pembanding lebih panjang → sejajar, dipotong
+    ["bulan", "2026-11-01", "2026-11-30", true, true],
+    ["bulan", "2026-02-01", "2026-02-28", true, true],
+    ["bulan", "2028-02-01", "2028-02-29", true, true],
+    // sejajar tepat di akhir bulan pembanding yang lebih pendek → masih dipotong
+    ["bulan", "2026-03-01", "2026-03-28", true, true],
+    ["bulan", "2026-05-01", "2026-05-30", true, true],
+    // tanggal sejajar dijepit → bulan pembanding dihitung penuh
+    ["bulan", "2026-03-01", "2026-03-30", true, false],
+    ["bulan", "2026-05-01", "2026-05-31", true, false],
+    ["bulan", "2026-11-01", "2026-11-30", false, false],
+  ] as const)("%s %s..%s running=%s → %s", (p, f, t, running, cut) =>
+    expect(previousCutAtNow(p, { from: f, to: t }, running)).toBe(cut),
   );
 });
 
@@ -104,6 +148,45 @@ describe("shiftPeriod", () => {
       from: "2026-11-06",
       to: "2026-12-02",
     });
+  });
+
+  test("minggu berjalan yang sudah dijepit (2–5 Nov) → minggu penuh di sebelahnya", () => {
+    const running = { from: "2026-11-02", to: "2026-11-05" };
+    expect(shiftPeriod("minggu", running, -1)).toEqual({
+      from: "2026-10-26",
+      to: "2026-11-01",
+    });
+    expect(shiftPeriod("minggu", running, 1)).toEqual({
+      from: "2026-11-09",
+      to: "2026-11-15",
+    });
+    // minggu lintas tahun yang dijepit di 31 Des
+    expect(
+      shiftPeriod("minggu", { from: "2026-12-28", to: "2026-12-31" }, -1),
+    ).toEqual({ from: "2026-12-21", to: "2026-12-27" });
+  });
+
+  test("hasil geser dari rentang berjalan/dijepit selalu lolos checkRange", () => {
+    const today = "2026-11-20";
+    const cases: [ReportPeriod, { from: string; to: string }][] = [
+      ["hari", { from: "2026-11-05", to: "2026-11-05" }],
+      ["minggu", { from: "2026-11-02", to: "2026-11-05" }],
+      ["minggu", { from: "2026-11-09", to: "2026-11-11" }],
+      ["bulan", { from: "2026-11-01", to: "2026-11-05" }],
+      ["bulan", { from: "2026-10-01", to: "2026-10-31" }],
+      ["tanggal", { from: "2026-10-10", to: "2026-11-05" }],
+      ["tanggal", { from: "2026-08-21", to: "2026-11-20" }], // tepat 92 hari
+    ];
+    for (const [period, range] of cases) {
+      const back = shiftPeriod(period, range, -1);
+      expect(checkRange(period, back.from, back.to, today), period).toBeNull();
+    }
+    const fwd = shiftPeriod(
+      "minggu",
+      { from: "2026-11-02", to: "2026-11-05" },
+      1,
+    );
+    expect(checkRange("minggu", fwd.from, fwd.to, today)).toBeNull();
   });
 });
 
@@ -159,6 +242,13 @@ test("label", () => {
   expect(periodTitle("tanggal", { from: "2026-11-05", to: "2026-11-05" })).toBe(
     "5 Nov 2026",
   );
+});
+
+test("weekdayLabel: label pembanding period hari dengan nama hari", () => {
+  expect(weekdayLabel("2026-10-29")).toBe("Kamis, 29 Okt");
+  expect(weekdayLabel("2026-11-01")).toBe("Minggu, 1 Nov");
+  expect(weekdayLabel("2026-12-28")).toBe("Senin, 28 Des");
+  expect(weekdayLabel("2028-02-29")).toBe("Selasa, 29 Feb");
 });
 
 test("compareText (K13)", () => {

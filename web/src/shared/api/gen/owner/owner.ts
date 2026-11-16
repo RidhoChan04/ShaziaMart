@@ -3919,13 +3919,14 @@ export const useReviewOwnerExceptions = <TError = ErrorType<UnauthorizedResponse
  * dijepit.
  *
  * Pembanding previous dihitung dari range (sesudah dijepit): hari → hari yang sama minggu
- * lalu; minggu → 7 hari sebelumnya; bulan penuh → bulan sebelumnya penuh; bulan sebagian
- * (berjalan) → tanggal 1 sampai tanggal sejajar bulan sebelumnya, dijepit ke akhir bulan itu
- * bila bulan itu lebih pendek (1–30 Mar vs 1–28 Feb); tanggal → rentang tepat sebelumnya
- * sepanjang sama. Bila running dan previous sama panjang dengan range (hari terakhir
- * pembanding sejajar dengan hari ini), previousTotals berhenti di akhir menit sekarang pada
- * hari terakhir pembanding (menit berjalan ikut); bila previous lebih pendek (tanggal sejajar
- * dijepit), hari terakhir pembanding dihitung penuh. (jawaban pemilik Q7)
+ * lalu; minggu → 7 hari sebelumnya; bulan yang sudah lewat → bulan sebelumnya penuh; bulan
+ * berjalan (running, termasuk hari terakhirnya) → tanggal 1 sampai tanggal sejajar bulan
+ * sebelumnya (30 Nov → 1–30 Okt), dijepit ke akhir bulan itu bila bulan itu lebih pendek
+ * (1–30 Mar vs 1–28 Feb); tanggal → rentang tepat sebelumnya sepanjang sama. Bila running dan
+ * hari terakhir previous sejajar dengan hari ini (selalu untuk hari, minggu, tanggal; untuk
+ * bulan bila tanggal sejajar tidak dijepit), previousTotals berhenti di akhir menit sekarang
+ * pada hari terakhir pembanding (menit berjalan ikut), seperti Beranda; bila tanggal sejajar
+ * dijepit, bulan pembanding yang lebih pendek dihitung penuh. (jawaban pemilik Q7)
  *
  * Status penjualan dibaca sekarang (K14): penjualan yang kemudian dibatalkan keluar dari
  * current, series, topProducts, dan categories, tetapi dihitung di kasir[].voidedCount. HPP =
@@ -4050,7 +4051,8 @@ export const getListOwnerProductSalesUrl = (params: ListOwnerProductSalesParams,
  * selesai di range. Satu baris per barang (semua satuan dijumlah dalam satuan dasar). Urutan
  * ditentukan server (K15): omzet = revenue terbesar; jumlah = qtyBase ÷ unitSize eceran
  * terbesar, seri → omzet lebih besar; laba = grossProfit terbesar, null terakhir, seri → omzet
- * lebih besar; seri terakhir → nama barang. sort tidak dikenal → 422 VALIDATION.
+ * lebih besar; seri terakhir → nama barang. sort tidak dikenal → 422 VALIDATION "Urutan
+ * tidak valid".
  * @summary Semua barang terjual di satu periode (Paling laku > Lihat semua)
  */
 export const listOwnerProductSales = async (params: ListOwnerProductSalesParams, options?: Parameters<typeof customFetch>[1]): Promise<ProductSales[]> => {
@@ -4163,7 +4165,7 @@ export const getGetOwnerStockReportUrl = (params?: GetOwnerStockReportParams,) =
  * terbesar, null terakhir; lama = days terbesar, seri → heldValue terbesar (null terakhir);
  * seri terakhir → nama barang. thinMargin.items urut marginPermille naik (rugi dulu), lalu
  * nama. Batas dari state server (reportRules; pengaturannya di F3c-2). sort tidak dikenal →
- * 422 VALIDATION.
+ * 422 VALIDATION "Urutan tidak valid".
  * @summary Tidak terjual ≥ 30 hari dan untung tipis (posisi sekarang)
  */
 export const getOwnerStockReport = async (params?: GetOwnerStockReportParams, options?: Parameters<typeof customFetch>[1]): Promise<StockReport> => {

@@ -317,7 +317,7 @@ test("(K12) laporan penjualan: pesan 422 checkRange, jepit hari ini, pembanding"
     'lebih dari 92 hari (kedua ujung ikut) → "Rentang maksimal 92 hari"',
     "to > hari ini dijepit ke hari ini dan running = true",
     "hari → hari yang sama minggu lalu",
-    "bulan penuh → bulan sebelumnya penuh",
+    "bulan yang sudah lewat → bulan sebelumnya penuh",
     "tanggal → rentang tepat sebelumnya sepanjang sama",
   ])
     expect(sales).toContain(rule);
@@ -326,11 +326,12 @@ test("(K12) laporan penjualan: pesan 422 checkRange, jepit hari ini, pembanding"
 test("(jawaban pemilik Q7) potongan menit hanya bila hari terakhir pembanding sejajar", () => {
   const sales = prose(op("/api/owner/reports/sales", "get"));
   expect(sales).toContain(
-    "bulan sebagian (berjalan) → tanggal 1 sampai tanggal sejajar bulan sebelumnya, dijepit ke akhir bulan itu bila bulan itu lebih pendek (1–30 Mar vs 1–28 Feb)",
+    "bulan berjalan (running, termasuk hari terakhirnya) → tanggal 1 sampai tanggal sejajar bulan sebelumnya (30 Nov → 1–30 Okt), dijepit ke akhir bulan itu bila bulan itu lebih pendek (1–30 Mar vs 1–28 Feb)",
   );
   expect(sales).toContain(
-    "Bila running dan previous sama panjang dengan range (hari terakhir pembanding sejajar dengan hari ini), previousTotals berhenti di akhir menit sekarang pada hari terakhir pembanding (menit berjalan ikut); bila previous lebih pendek (tanggal sejajar dijepit), hari terakhir pembanding dihitung penuh.",
+    "Bila running dan hari terakhir previous sejajar dengan hari ini (selalu untuk hari, minggu, tanggal; untuk bulan bila tanggal sejajar tidak dijepit), previousTotals berhenti di akhir menit sekarang pada hari terakhir pembanding (menit berjalan ikut), seperti Beranda; bila tanggal sejajar dijepit, bulan pembanding yang lebih pendek dihitung penuh.",
   );
+  expect(sales).not.toContain("bulan penuh → bulan sebelumnya penuh");
   expect(sales).toContain(
     "current sama dengan getOwnerTodaySummary (revenue, grossProfit, salesCount, avgTicket, newCredit) dan previousTotals.revenue = lastWeekRevenue",
   );
@@ -357,6 +358,9 @@ test("(K15) urutan barang dari server; laba null terakhir; jumlah dalam satuan e
     "jumlah = qtyBase ÷ unitSize eceran terbesar, seri → omzet lebih besar",
   );
   expect(products).toContain("laba = grossProfit terbesar, null terakhir");
+  expect(products).toContain(
+    'sort tidak dikenal → 422 VALIDATION "Urutan tidak valid"',
+  );
   expect(prose(field("ProductSales", "grossProfit"))).toContain(
     "null bila ada baris tanpa HPP",
   );
@@ -366,4 +370,7 @@ test("(label pemilik) urutan laporan stok di server, bawaan modal", () => {
   const stock = prose(op("/api/owner/reports/stock", "get"));
   expect(stock).toContain("Urutan angka uang ditentukan server");
   expect(stock).toContain("default: modal");
+  expect(stock).toContain(
+    'sort tidak dikenal → 422 VALIDATION "Urutan tidak valid"',
+  );
 });

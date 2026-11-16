@@ -1983,13 +1983,14 @@ export const ReviewOwnerExceptionsResponse = zod.object({
  * dijepit.
  *
  * Pembanding previous dihitung dari range (sesudah dijepit): hari → hari yang sama minggu
- * lalu; minggu → 7 hari sebelumnya; bulan penuh → bulan sebelumnya penuh; bulan sebagian
- * (berjalan) → tanggal 1 sampai tanggal sejajar bulan sebelumnya, dijepit ke akhir bulan itu
- * bila bulan itu lebih pendek (1–30 Mar vs 1–28 Feb); tanggal → rentang tepat sebelumnya
- * sepanjang sama. Bila running dan previous sama panjang dengan range (hari terakhir
- * pembanding sejajar dengan hari ini), previousTotals berhenti di akhir menit sekarang pada
- * hari terakhir pembanding (menit berjalan ikut); bila previous lebih pendek (tanggal sejajar
- * dijepit), hari terakhir pembanding dihitung penuh. (jawaban pemilik Q7)
+ * lalu; minggu → 7 hari sebelumnya; bulan yang sudah lewat → bulan sebelumnya penuh; bulan
+ * berjalan (running, termasuk hari terakhirnya) → tanggal 1 sampai tanggal sejajar bulan
+ * sebelumnya (30 Nov → 1–30 Okt), dijepit ke akhir bulan itu bila bulan itu lebih pendek
+ * (1–30 Mar vs 1–28 Feb); tanggal → rentang tepat sebelumnya sepanjang sama. Bila running dan
+ * hari terakhir previous sejajar dengan hari ini (selalu untuk hari, minggu, tanggal; untuk
+ * bulan bila tanggal sejajar tidak dijepit), previousTotals berhenti di akhir menit sekarang
+ * pada hari terakhir pembanding (menit berjalan ikut), seperti Beranda; bila tanggal sejajar
+ * dijepit, bulan pembanding yang lebih pendek dihitung penuh. (jawaban pemilik Q7)
  *
  * Status penjualan dibaca sekarang (K14): penjualan yang kemudian dibatalkan keluar dari
  * current, series, topProducts, dan categories, tetapi dihitung di kasir[].voidedCount. HPP =
@@ -2042,7 +2043,7 @@ export const GetOwnerSalesReportResponse = zod.object({
   "avgTicket": zod.int().describe('round_half_up(revenue / salesCount); 0 bila salesCount 0.'),
   "newCredit": zod.int().describe('Σ bagian kasbon (metode pembayaran credit).'),
   "marginPermille": zod.int().nullable().describe('(jawaban pemilik Q5) Margin laba kotor dalam permil bulat bertanda (164 = 16,4%):\ntanda(grossProfit) × round_half_up(|grossProfit| × 1000 / revenue); null bila revenue 0.\n')
-}).describe('Aturan sama dengan OwnerTodaySummary: hanya penjualan berstatus selesai (sekarang). Uang\ninteger rupiah.\n').describe('Total pembanding; dipotong di akhir menit sekarang hanya bila hari terakhirnya sejajar (Q7).'),
+}).describe('Aturan sama dengan OwnerTodaySummary: hanya penjualan berstatus selesai (sekarang). Uang\ninteger rupiah.\n').describe('Total pembanding; dipotong di akhir menit sekarang hanya bila periode berjalan dan hari terakhirnya sejajar (tidak dijepit) (Q7).'),
   "series": zod.object({
   "kind": zod.enum(['jam', 'hari']),
   "buckets": zod.array(zod.object({
@@ -2080,7 +2081,8 @@ export const GetOwnerSalesReportResponse = zod.object({
  * selesai di range. Satu baris per barang (semua satuan dijumlah dalam satuan dasar). Urutan
  * ditentukan server (K15): omzet = revenue terbesar; jumlah = qtyBase ÷ unitSize eceran
  * terbesar, seri → omzet lebih besar; laba = grossProfit terbesar, null terakhir, seri → omzet
- * lebih besar; seri terakhir → nama barang. sort tidak dikenal → 422 VALIDATION.
+ * lebih besar; seri terakhir → nama barang. sort tidak dikenal → 422 VALIDATION "Urutan
+ * tidak valid".
  * @summary Semua barang terjual di satu periode (Paling laku > Lihat semua)
  */
 export const ListOwnerProductSalesQueryParams = zod.object({
@@ -2111,7 +2113,7 @@ export const ListOwnerProductSalesResponse = zod.array(ListOwnerProductSalesResp
  * terbesar, null terakhir; lama = days terbesar, seri → heldValue terbesar (null terakhir);
  * seri terakhir → nama barang. thinMargin.items urut marginPermille naik (rugi dulu), lalu
  * nama. Batas dari state server (reportRules; pengaturannya di F3c-2). sort tidak dikenal →
- * 422 VALIDATION.
+ * 422 VALIDATION "Urutan tidak valid".
  * @summary Tidak terjual ≥ 30 hari dan untung tipis (posisi sekarang)
  */
 export const GetOwnerStockReportQueryParams = zod.object({

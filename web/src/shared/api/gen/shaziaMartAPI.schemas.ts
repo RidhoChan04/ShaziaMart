@@ -2596,7 +2596,7 @@ export interface SalesReport {
   /** Rentang memuat hari ini (periode berjalan). */
   running: boolean;
   current: SalesTotals;
-  /** Total pembanding; dipotong di akhir menit sekarang hanya bila hari terakhirnya sejajar (Q7). */
+  /** Total pembanding; dipotong di akhir menit sekarang hanya bila periode berjalan dan hari terakhirnya sejajar (tidak dijepit) (Q7). */
   previousTotals: SalesTotals;
   series: ReportSeries;
   /** @maxItems 3 */

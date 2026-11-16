@@ -98,9 +98,11 @@ export function periodRange(
 }
 
 /**
- * Periode sebelum/sesudah (`‹` / `›`): hari ±1, minggu ±7, bulan = bulan penuh sebelum/sesudah
- * bulan `range.from` (tidak pernah meluap: 31 Mar mundur → Februari penuh), tanggal = rentang
- * tepat sebelum/sesudah sepanjang sama.
+ * Periode sebelum/sesudah (`‹` / `›`), selalu periode penuh walau `range` sudah dijepit ke hari
+ * ini: hari = hari `range.from` ±1; minggu = Senin–Minggu yang memuat `range.from` ±7; bulan =
+ * bulan penuh sebelum/sesudah bulan `range.from` (tidak pernah meluap: 31 Mar mundur → Februari
+ * penuh); tanggal = rentang bebas, jadi rentang tepat sebelum/sesudah sepanjang `range` (pemanggil
+ * memberi rentang yang ingin digeser, biasanya rentang permintaan).
  */
 export function shiftPeriod(
   period: ReportPeriod,
@@ -112,12 +114,15 @@ export function shiftPeriod(
     const next = addMonths(y, m, step);
     return monthRange(next.y, next.m);
   }
-  const days =
-    period === "hari" ? 1 : period === "minggu" ? 7 : lengthOf(range);
-  return {
-    from: addIsoDays(range.from, step * days),
-    to: addIsoDays(range.to, step * days),
-  };
+  if (period === "tanggal") {
+    const days = lengthOf(range);
+    return {
+      from: addIsoDays(range.from, step * days),
+      to: addIsoDays(range.to, step * days),
+    };
+  }
+  const days = period === "hari" ? 1 : 7;
+  return periodRange(period, addIsoDays(range.from, step * days));
 }
 
 /** `to` sesudah hari ini dijepit ke hari ini; `running` = rentang memuat hari ini. */
@@ -131,11 +136,16 @@ export function clampToToday(
 
 /**
  * Rentang pembanding (K12) dari rentang yang sudah dijepit: hari → H−7; minggu → geser 7 hari;
- * bulan penuh → bulan sebelumnya penuh; bulan sebagian → tanggal sejajar bulan sebelumnya,
- * dijepit ke akhir bulan itu bila lebih pendek (jawaban pemilik Q7); tanggal → rentang tepat
- * sebelumnya sepanjang sama.
+ * bulan yang sudah lewat → bulan sebelumnya penuh; bulan berjalan (`running`, termasuk hari
+ * terakhirnya) → tanggal 1 sampai tanggal sejajar bulan sebelumnya, dijepit ke akhir bulan itu
+ * bila lebih pendek (jawaban pemilik Q7: 30 Nov → 1–30 Okt, 30 Mar → 1–28 Feb); tanggal →
+ * rentang tepat sebelumnya sepanjang sama.
  */
-export function previousRange(period: ReportPeriod, range: IsoRange): IsoRange {
+export function previousRange(
+  period: ReportPeriod,
+  range: IsoRange,
+  running: boolean,
+): IsoRange {
   if (period === "hari" || period === "minggu") {
     return {
       from: addIsoDays(range.from, -7),
@@ -150,14 +160,30 @@ export function previousRange(period: ReportPeriod, range: IsoRange): IsoRange {
     };
   }
   const { y, m } = ymd(range.from);
-  const end = ymd(range.to);
   const prev = addMonths(y, m, -1);
   const last = daysInMonth(prev.y, prev.m);
-  const full = end.d === daysInMonth(end.y, end.m);
   return {
     from: isoOf(prev.y, prev.m, 1),
-    to: isoOf(prev.y, prev.m, full ? last : Math.min(end.d, last)),
+    to: isoOf(prev.y, prev.m, running ? Math.min(ymd(range.to).d, last) : last),
   };
+}
+
+/**
+ * (jawaban pemilik Q7) Hari terakhir pembanding sejajar dengan hari ini, jadi total pembanding
+ * berhenti di jam yang sama dengan sekarang (seperti Beranda): selalu bila periode berjalan,
+ * kecuali bulan berjalan yang tanggal sejajarnya dijepit ke akhir bulan pembanding yang lebih
+ * pendek (30 Mar → 28 Feb) — bulan pembanding itu dihitung penuh.
+ */
+export function previousCutAtNow(
+  period: ReportPeriod,
+  range: IsoRange,
+  running: boolean,
+): boolean {
+  if (!running) return false;
+  if (period !== "bulan") return true;
+  const end = ymd(range.to);
+  const prev = addMonths(end.y, end.m, -1);
+  return end.d <= daysInMonth(prev.y, prev.m);
 }
 
 /**
@@ -196,11 +222,19 @@ export function rangeLabel(range: IsoRange): string {
   return `${formatIsoDayMonth(range.from)}–${formatIsoDayMonth(range.to)}`;
 }
 
+const weekdayName = (iso: string): string =>
+  WEEKDAY_NAMES[weekdayOf(iso)] ?? "";
+
+/** Label pembanding period hari (H−7), dengan nama hari: `Kamis, 29 Okt`. */
+export function weekdayLabel(iso: string): string {
+  return `${weekdayName(iso)}, ${formatIsoDayMonth(iso)}`;
+}
+
 /** Judul navigator: `Kamis, 5 Nov 2026` · `2–8 Nov 2026` · `November 2026` · `10 Okt–5 Nov 2026`. */
 export function periodTitle(period: ReportPeriod, range: IsoRange): string {
   const a = ymd(range.from);
   if (period === "hari") {
-    return `${WEEKDAY_NAMES[weekdayOf(range.from)]}, ${formatIsoDate(range.from)}`;
+    return `${weekdayName(range.from)}, ${formatIsoDate(range.from)}`;
   }
   if (period === "bulan") return `${MONTH_NAMES[a.m - 1]} ${a.y}`;
   const label = rangeLabel(range);

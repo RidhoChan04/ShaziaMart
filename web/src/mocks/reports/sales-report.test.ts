@@ -204,6 +204,60 @@ describe("salesReport", () => {
     expect(feb.current.revenue).toBe(321_000);
   });
 
+  test("(jawaban pemilik Q7) hari terakhir bulan berjalan 30 Nov 14.30 → 1–30 Okt dipotong 14.30 (bukan Oktober penuh)", () => {
+    const s = fresh();
+    addRaw(s, wib("2026-10-01", 7), 1_000, 0);
+    addRaw(s, wib("2026-10-30", 14, 30, 59), 20_000, 0);
+    addRaw(s, wib("2026-10-30", 14, 31, 0), 300_000, 0);
+    addRaw(s, wib("2026-10-31", 9), 4_000_000, 0);
+    const r = salesReport(s, MONTH, wib("2026-11-30", 14, 30));
+    expect(r.running).toBe(true);
+    expect(r.range).toEqual({ from: "2026-11-01", to: "2026-11-30" });
+    expect(r.previous).toEqual({ from: "2026-10-01", to: "2026-10-30" });
+    expect(r.previousTotals.revenue).toBe(21_000);
+    expect(r.previousTotals.salesCount).toBe(2);
+  });
+
+  test("bulan yang sudah lewat (November selesai, dilihat 5 Des) → Oktober penuh tanpa potongan", () => {
+    const s = fresh();
+    addRaw(s, wib("2026-10-30", 20), 300_000, 0);
+    addRaw(s, wib("2026-10-31", 23, 59, 59), 4_000_000, 0);
+    addRaw(s, wib("2026-11-01", 0), 50_000_000, 0);
+    const r = salesReport(s, MONTH, wib("2026-12-05", 14, 30));
+    expect(r.running).toBe(false);
+    expect(r.range).toEqual({ from: "2026-11-01", to: "2026-11-30" });
+    expect(r.previous).toEqual({ from: "2026-10-01", to: "2026-10-31" });
+    expect(r.previousTotals.revenue).toBe(4_300_000);
+  });
+
+  test("(jawaban pemilik Q7) berjalan 28 Feb 2026 14.30 → 1–28 Jan dipotong 14.30; 29 Feb 2028 14.30 → 1–29 Jan dipotong 14.30", () => {
+    const s = fresh();
+    addRaw(s, wib("2026-01-28", 14, 30, 59), 20_000, 0);
+    addRaw(s, wib("2026-01-28", 14, 31, 0), 300_000, 0);
+    addRaw(s, wib("2026-01-29", 9), 4_000_000, 0);
+    addRaw(s, wib("2026-01-31", 9), 4_000_000, 0);
+    const feb26 = salesReport(
+      s,
+      q("bulan", "2026-02-01", "2026-02-28"),
+      wib("2026-02-28", 14, 30),
+    );
+    expect(feb26.running).toBe(true);
+    expect(feb26.previous).toEqual({ from: "2026-01-01", to: "2026-01-28" });
+    expect(feb26.previousTotals.revenue).toBe(20_000);
+
+    addRaw(s, wib("2028-01-29", 14, 30, 59), 7_000, 0);
+    addRaw(s, wib("2028-01-29", 14, 31, 0), 300_000, 0);
+    addRaw(s, wib("2028-01-30", 9), 4_000_000, 0);
+    const feb28 = salesReport(
+      s,
+      q("bulan", "2028-02-01", "2028-02-29"),
+      wib("2028-02-29", 14, 30),
+    );
+    expect(feb28.running).toBe(true);
+    expect(feb28.previous).toEqual({ from: "2028-01-01", to: "2028-01-29" });
+    expect(feb28.previousTotals.revenue).toBe(7_000);
+  });
+
   test("(jawaban pemilik Q5) marginPermille: omzet 48.215.500 laba 7.912.300 → 164; omzet 0 → null; laba minus → negatif", () => {
     const s = fresh();
     addRaw(s, wib("2026-11-03", 10), 48_215_500, 40_303_200);
