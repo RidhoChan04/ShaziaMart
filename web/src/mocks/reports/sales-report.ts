@@ -26,22 +26,18 @@ import {
 } from "@/shared/lib/report-period";
 import type { MockProduct, MockSale, MockState } from "../db";
 import { eceranOf } from "../products/views";
+import {
+  byName,
+  dayStart,
+  nullsLast,
+  type Window,
+  windowOf,
+} from "./report-utils";
 
 export type SalesQuery = { period: ReportPeriod; from: string; to: string };
 
 const MINUTE_MS = 60_000;
 const TOP_PRODUCTS = 3;
-
-/** 00.00 Asia/Jakarta tanggal `iso` (UTC ms). */
-const dayStart = (iso: string): number => Date.parse(`${iso}T00:00:00+07:00`);
-
-/** Jendela waktu setengah terbuka [start, end). */
-type Window = { start: number; end: number };
-
-const windowOf = (range: IsoRange): Window => ({
-  start: dayStart(range.from),
-  end: dayStart(addIsoDays(range.to, 1)),
-});
 
 const inWindow =
   (w: Window) =>
@@ -49,10 +45,6 @@ const inWindow =
     s.createdAt >= w.start && s.createdAt < w.end;
 
 const sum = (xs: readonly number[]): number => xs.reduce((a, b) => a + b, 0);
-const byName = (a: string, b: string): number => a.localeCompare(b, "id");
-/** Negatif bila hanya `b` null: nilai null selalu di belakang. */
-const nullsLast = (a: unknown, b: unknown): number =>
-  (a === null ? 1 : 0) - (b === null ? 1 : 0);
 
 /** Permil bertanda (jawaban pemilik Q5); null bila omzet 0. */
 function marginPermille(revenue: number, grossProfit: number): number | null {

@@ -8,7 +8,7 @@ import { key } from "../products/checks";
 import { upsertSupplier } from "../receipts/receive";
 import { buildProduct } from "../seed-data";
 
-type SampleProduct = {
+export type SampleProduct = {
   name: string;
   category: string;
   unit: string;
@@ -65,8 +65,11 @@ const SUPPLIER = "CV Sumber Rejeki";
 /** Di luar rentang ID barang/satuan seed (1–60 barang). */
 const ID_BASE = 1000;
 
-/** Barang contoh; barang seed bernama sama dipakai apa adanya (nama barang unik). */
-function sampleProduct(
+/**
+ * Barang contoh (id `ID_BASE + index`, satuan eceran isi 1, HPP per eceran); barang bernama sama
+ * dipakai apa adanya (nama barang unik). Juga dipakai contoh opname (laporan).
+ */
+export function sampleProduct(
   state: MockState,
   spec: SampleProduct,
   index: number,

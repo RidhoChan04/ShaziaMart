@@ -1,11 +1,18 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import type {
+  OpnameProductReport,
+  OpnameReport,
   Problem,
   ProductSales,
   SalesReport,
+  StockReport,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { mockDb } from "../db";
+import { opnameProductReport, opnameReport } from "../reports/opname-report";
 import { salesReport } from "../reports/sales-report";
+import { applySampleOpname, ROKOK } from "../reports/sample-opname";
+import { thinMarginReport } from "../reports/thin-margin";
+import { unsoldReport } from "../reports/unsold";
 import {
   BIMOLI,
   cashSale,
@@ -111,5 +118,86 @@ describe("getOwnerSalesReport & listOwnerProductSales", () => {
     expect(report.kasir).toEqual([
       { kasirName: "Rina", revenue: 72_000, salesCount: 1, voidedCount: 0 },
     ]);
+  });
+});
+
+const stock = (query = "") => get(`/api/owner/reports/stock${query}`);
+const opname = (query: string) => get(`/api/owner/reports/opname?${query}`);
+const opnameOf = (productId: string, query: string) =>
+  get(`/api/owner/reports/opname/${productId}?${query}`);
+
+describe("getOwnerStockReport, getOwnerOpnameReport & getOwnerOpnameProductReport", () => {
+  test("tanpa sesi pemilik → 401; sort stok bawaan modal, sort tidak dikenal → 422; isi dari unsoldReport & thinMarginReport", async () => {
+    const nov = "from=2026-11-01&to=2026-11-05";
+    expect((await stock()).status).toBe(401);
+    expect((await opname(nov)).status).toBe(401);
+    expect((await opnameOf("x", nov)).status).toBe(401);
+    expect((await login("123456")).status).toBe(200);
+    expect((await stock()).status).toBe(401);
+
+    await ownerLogin();
+    const res = await stock();
+    expect(res.status).toBe(200);
+    const body = await json<StockReport>(res);
+    const state = mockDb.get();
+    expect(body).toEqual({
+      today: "2026-11-05",
+      unsold: unsoldReport(state, NOW, "modal"),
+      thinMargin: thinMarginReport(state),
+    });
+    // Seed: 6 barang lambat (3 belum pernah terjual, 3 terakhir terjual 45–57 hari lalu).
+    expect(body.unsold.count).toBeGreaterThanOrEqual(6);
+    expect(await json(await stock("?sort=modal"))).toEqual(body);
+    expect((await json<StockReport>(await stock("?sort=lama"))).unsold).toEqual(
+      unsoldReport(state, NOW, "lama"),
+    );
+    expect(await detailOf(await stock("?sort=omzet"))).toBe(
+      "Urutan tidak valid",
+    );
+  });
+
+  test("selisih opname: 422 rentang (pesan checkRange tanggal), to dijepit; 404 barang tanpa hitungan; detail dengan yang bertugas", async () => {
+    await ownerLogin();
+    mockDb.update((s) => applySampleOpname(s, NOW));
+    const rokok = mockDb.get().products.find((p) => p.name === ROKOK)?.id;
+    if (!rokok) throw new Error("tanpa contoh rokok");
+    const cases: [string, string][] = [
+      ["from=abc&to=2026-11-05", "Tanggal tidak valid"],
+      ["from=2026-11-01", "Tanggal tidak valid"],
+      ["from=2026-11-05&to=2026-11-01", "Tanggal akhir sebelum tanggal awal"],
+      ["from=2026-11-06&to=2026-11-07", "Tanggal di masa depan"],
+      ["from=2026-08-01&to=2026-11-05", "Rentang maksimal 92 hari"],
+    ];
+    for (const [query, message] of cases) {
+      expect(await detailOf(await opname(query)), query).toBe(message);
+      expect(await detailOf(await opnameOf(rokok, query)), query).toBe(message);
+    }
+
+    const res = await opname("from=2026-11-01&to=2026-11-30");
+    expect(res.status).toBe(200);
+    const report = await json<OpnameReport>(res);
+    const nov = { from: "2026-11-01", to: "2026-11-05" };
+    expect(report).toEqual(opnameReport(mockDb.get(), nov));
+    expect(report).toMatchObject({ range: nov, lossValue: 294_000 });
+
+    const detail = await json<OpnameProductReport>(
+      await opnameOf(rokok, "from=2026-11-01&to=2026-11-30"),
+    );
+    expect(detail).toEqual(opnameProductReport(mockDb.get(), rokok, nov));
+    expect(detail.counts).toHaveLength(4);
+    // Riwayat seed: shift pagi Rina & sore Budi setiap hari sebelum hari ini.
+    expect(detail.dutyOnShort).toEqual([
+      { name: "Budi", intervals: 3 },
+      { name: "Rina", intervals: 3 },
+    ]);
+
+    const missing = await opnameOf(rokok, "from=2026-10-01&to=2026-10-31");
+    expect(missing.status).toBe(404);
+    expect((await json<Problem>(missing)).code).toBe("NOT_FOUND");
+    const unknown = await opnameOf(
+      "tidak-ada",
+      "from=2026-11-01&to=2026-11-05",
+    );
+    expect(unknown.status).toBe(404);
   });
 });

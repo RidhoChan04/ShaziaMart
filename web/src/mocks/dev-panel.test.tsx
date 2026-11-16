@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { expect, test, vi } from "vitest";
 import { renderApp } from "@/test/render-app";
 import { mockDb } from "./db";
+import { ROKOK } from "./reports/sample-opname";
 import { getScenario, scenarios } from "./scenarios";
 import { reportPersistSuccess } from "./storage-status";
 
@@ -99,6 +100,25 @@ test("DevPanel: Isi contoh stok menambah barang & kiriman ber-ED contoh", async 
   const state = mockDb.get();
   expect(state.products.some((p) => p.name === "Sari Roti Tawar")).toBe(true);
   expect(state.receipts.map((r) => r.id)).toContain("contoh-stok-1");
+});
+
+test("DevPanel: Isi contoh opname menambah sesi opname contoh; dua kali tidak menggandakan", async () => {
+  const user = userEvent.setup();
+  renderApp("/kasir");
+  await expandPanel(user);
+  expect(mockDb.get().opnameSessions).toEqual([]);
+  const button = await screen.findByRole("button", {
+    name: "Isi contoh opname",
+  });
+  await user.click(button);
+  const first = mockDb.get();
+  expect(first.products.some((p) => p.name === ROKOK)).toBe(true);
+  expect(first.opnameSessions.map((s) => s.id)).toContain("contoh-opname-1");
+  await user.click(button);
+  const second = mockDb.get();
+  expect(second.opnameSessions).toHaveLength(first.opnameSessions.length);
+  expect(second.stockEntries).toHaveLength(first.stockEntries.length);
+  expect(second.products).toHaveLength(first.products.length);
 });
 
 test("DevPanel: kuota penuh menampilkan peringatan; normal tanpa peringatan", async () => {

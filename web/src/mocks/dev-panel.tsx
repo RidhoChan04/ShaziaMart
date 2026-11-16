@@ -10,6 +10,7 @@ import {
 } from "react";
 import { cn } from "@/shared/lib/cn";
 import { mockDb } from "./db";
+import { applySampleOpname } from "./reports/sample-opname";
 import {
   getScenario,
   type Scenario,
@@ -75,6 +76,11 @@ export function DevPanel() {
     void queryClient.invalidateQueries();
   }
 
+  function onSampleOpname() {
+    mockDb.update((s) => applySampleOpname(s, Date.now()));
+    void queryClient.invalidateQueries();
+  }
+
   return (
     <div
       className={cn(
@@ -131,6 +137,13 @@ export function DevPanel() {
             className="h-8 rounded-md border border-border bg-surface px-2 font-medium hover:bg-primary-soft"
           >
             Isi contoh stok
+          </button>
+          <button
+            type="button"
+            onClick={onSampleOpname}
+            className="h-8 rounded-md border border-border bg-surface px-2 font-medium hover:bg-primary-soft"
+          >
+            Isi contoh opname
           </button>
         </aside>
       ) : null}

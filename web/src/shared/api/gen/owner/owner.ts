@@ -4391,10 +4391,12 @@ export const getGetOwnerOpnameProductReportUrl = (productId: string,
  * Rentang & hitungan final sama dengan getOwnerOpnameReport. counts = semua hitungan final
  * barang ini di range, terbaru dulu, masing-masing dengan yang bertugas di antara hitungan
  * sebelumnya (final atau stok_awal, boleh sebelum range) dan hitungan ini (K20): kasir yang
- * shift-nya tumpang dengan jeda itu dan orang toko yang punya catatan barang itu (nota barang
- * masuk aktif, keluarkan kedaluwarsa, sesi opname lain), digabung per nama, urut nama.
- * Petunjuk, bukan bukti. 404 bila barang tidak dikenal atau tidak punya hitungan final di
- * range.
+ * shift-nya tumpang dengan jeda itu (termasuk shift yang masih buka) dan orang toko yang punya
+ * catatan barang itu (nota barang masuk aktif, keluarkan kedaluwarsa, sesi opname lain; catatan
+ * pemilik tidak ikut), digabung per nama, urut nama. Jeda = (hitungan sebelumnya; hitungan
+ * ini]. Hitungan dihitung_ulang memakai jam & selisih hitung ulang, counterName = pemilik yang
+ * menghitung ulang. Petunjuk, bukan bukti. 404 bila barang tidak dikenal atau tidak punya
+ * hitungan final di range.
  * @summary Detail selisih opname satu barang dengan yang bertugas
  */
 export const getOwnerOpnameProductReport = async (productId: string,
