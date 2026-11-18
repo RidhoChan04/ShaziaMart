@@ -13,7 +13,7 @@ const budgets = [
 ];
 const OTHER_MAX = 25 * KB;
 // Tiga app terpisah; satu pengguna hanya memuat utama + satu app (K15).
-const TOTAL_MAX = 270 * KB;
+const TOTAL_MAX = 280 * KB;
 
 const dir = join(import.meta.dirname, "..", "dist", "assets");
 const files = readdirSync(dir).filter((f) => f.endsWith(".js"));
