@@ -2817,11 +2817,11 @@ components:
               items:
                 $ref: "#/components/schemas/PriceChange"
     CreditLimitProblem:
-      description: Problem CREDIT_LIMIT dengan saldo, batas, dan nilai kasbon yang dicoba.
+      description: Problem CREDIT_LIMIT dengan saldo, batas, nilai kasbon yang dicoba, dan kelebihannya.
       allOf:
         - $ref: "#/components/schemas/Problem"
         - type: object
-          required: [code, balance, creditLimit, attempted]
+          required: [code, balance, creditLimit, attempted, excess]
           properties:
             code:
               type: string
@@ -2832,6 +2832,13 @@ components:
               type: integer
             attempted:
               type: integer
+            excess:
+              type: integer
+              minimum: 1
+              description: >-
+                Bagian kasbon transaksi ini di atas limit = min(attempted, balance + attempted −
+                creditLimit); sama dengan CreditOverLimit.excess yang dicatat bila disimpan dengan
+                alasan. Klien menampilkan angka ini, tidak menghitung sendiri.
     User:
       type: object
       required: [id, name, role]

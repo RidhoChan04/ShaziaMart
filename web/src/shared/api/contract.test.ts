@@ -148,8 +148,20 @@ test("creditLimitProblemSchema cocok dengan tipe hasil generate", () => {
     balance: 10000,
     creditLimit: 50000,
     attempted: 60000,
+    excess: 20000,
   });
   expect(ok.success).toBe(true);
+  // `excess` wajib: angka di dialog = angka yang dicatat server.
+  const noExcess = creditLimitProblemSchema.safeParse({
+    type: "about:blank",
+    title: "Batas kasbon terlampaui",
+    status: 409,
+    code: "CREDIT_LIMIT",
+    balance: 10000,
+    creditLimit: 50000,
+    attempted: 60000,
+  });
+  expect(noExcess.success).toBe(false);
 });
 
 test("ErrorCode 24 nilai termasuk OPNAME_NOT_HELD, OUTSIDE_SHIFT, IN_OPEN_SHIFT, VOID_TOO_OLD; tanpa PIN_REQUIRED (ruling R5)", () => {
@@ -604,6 +616,7 @@ test("409 dikunci oleh code: PRICE_CHANGED lolos skema harga, CREDIT_LIMIT tidak
     balance: 10000,
     creditLimit: 50000,
     attempted: 60000,
+    excess: 20000,
   };
   const price = {
     type: "about:blank",

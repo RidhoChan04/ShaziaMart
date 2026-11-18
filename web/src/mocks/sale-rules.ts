@@ -247,18 +247,29 @@ export function checkPayments(
   };
 }
 
-/** Aturan 7: limit hanya berlaku untuk bagian kasbon; null bila tidak melewati limit. */
+type LimitFields = Pick<
+  CreditLimitProblem,
+  "balance" | "creditLimit" | "attempted" | "excess"
+>;
+
+/**
+ * Aturan 7: limit hanya berlaku untuk bagian kasbon; null bila tidak melewati limit.
+ * `excess = min(attempted, balance + attempted − creditLimit)`: satu rumus untuk 409 dan catatan.
+ */
 export function creditExcess({
   customer,
   credit,
-}: CheckedPayments): Pick<
-  CreditLimitProblem,
-  "balance" | "creditLimit" | "attempted"
-> | null {
+}: CheckedPayments): LimitFields | null {
   if (!customer || credit === 0) return null;
   const { balance, creditLimit } = customer;
-  return balance + credit > creditLimit
-    ? { balance, creditLimit, attempted: credit }
+  const over = balance + credit - creditLimit;
+  return over > 0
+    ? {
+        balance,
+        creditLimit,
+        attempted: credit,
+        excess: Math.min(credit, over),
+      }
     : null;
 }
 
@@ -272,7 +283,7 @@ export function creditGate(
   paid: CheckedPayments,
   rawReason: unknown,
 ):
-  | { limit: Pick<CreditLimitProblem, "balance" | "creditLimit" | "attempted"> }
+  | { limit: LimitFields }
   | { creditOverLimit: { excess: number; reason: string } | null }
   | Rejection {
   // Kontrak: maxLength 200 berlaku tanpa syarat, juga bila tidak melewati limit.
@@ -284,7 +295,5 @@ export function creditGate(
   const over = creditExcess(paid);
   if (!over) return { creditOverLimit: null };
   if (reason === null) return { limit: over };
-  const { balance, creditLimit, attempted } = over;
-  const excess = Math.min(attempted, balance + attempted - creditLimit);
-  return { creditOverLimit: { excess, reason } };
+  return { creditOverLimit: { excess: over.excess, reason } };
 }

@@ -1,3 +1,4 @@
+import type { CreditLimitProblem } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { formatRupiah } from "@/shared/lib/money";
 import { ReasonDialog } from "../common/reason-dialog";
 import type { PaymentChoice } from "./payment-model";
@@ -5,13 +6,15 @@ import { PriceChangedDialog } from "./price-changed-dialog";
 import { ReplayedSaleDialog } from "./replayed-sale-dialog";
 import type { SaleSubmission } from "./use-submit-sale";
 
-/** `{nama}: sisa … + kasbon ini … melewati limit … sebesar ….` (kelebihan tampilan saja; server menghitung sendiri). */
+/** `{nama}: sisa … + kasbon ini … melewati limit … sebesar ….`; kelebihan = `excess` dari server (yang dicatat). */
 function overLimitText(
   name: string,
-  p: { balance: number; attempted: number; creditLimit: number },
+  p: Pick<
+    CreditLimitProblem,
+    "balance" | "attempted" | "creditLimit" | "excess"
+  >,
 ): string {
-  const over = p.balance + p.attempted - p.creditLimit;
-  return `${name}: sisa ${formatRupiah(p.balance)} + kasbon ini ${formatRupiah(p.attempted)} melewati limit ${formatRupiah(p.creditLimit)} sebesar ${formatRupiah(over)}.`;
+  return `${name}: sisa ${formatRupiah(p.balance)} + kasbon ini ${formatRupiah(p.attempted)} melewati limit ${formatRupiah(p.creditLimit)} sebesar ${formatRupiah(p.excess)}.`;
 }
 
 /** Jendela lanjutan saat menyimpan: harga berubah, kasbon lewat limit (alasan), transaksi sudah tersimpan. */

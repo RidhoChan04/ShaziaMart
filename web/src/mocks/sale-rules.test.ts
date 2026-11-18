@@ -162,9 +162,23 @@ describe("creditGate (ruling R3: limit = batas peringatan, alasan wajib)", () =>
   test("lewat limit tanpa alasan / alasan spasi / bukan string → limit (409 CREDIT_LIMIT)", () => {
     for (const reason of [undefined, "", "   ", 5, null]) {
       expect(creditGate(paid(490_000, 20_000), reason)).toEqual({
-        limit: { balance: 490_000, creditLimit: 500_000, attempted: 20_000 },
+        limit: {
+          balance: 490_000,
+          creditLimit: 500_000,
+          attempted: 20_000,
+          excess: 10_000,
+        },
       });
     }
+    // Saldo sudah di atas limit: kelebihan = kasbon ini saja (sama dengan yang dicatat).
+    expect(creditGate(paid(600_000, 50_000), undefined)).toEqual({
+      limit: {
+        balance: 600_000,
+        creditLimit: 500_000,
+        attempted: 50_000,
+        excess: 50_000,
+      },
+    });
   });
 
   test("lewat limit dengan alasan → excess = min(attempted, balance + attempted − limit), alasan di-trim", () => {

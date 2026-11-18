@@ -52,6 +52,7 @@ export const creditLimitProblemSchema = z.object({
   balance: z.number(),
   creditLimit: z.number(),
   attempted: z.number(),
+  excess: z.number(),
 }) satisfies z.core.$ZodType<CreditLimitProblem>;
 
 const PRODUCT_FIELDS = Object.values(ProductField) as [

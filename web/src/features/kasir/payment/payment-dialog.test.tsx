@@ -8,6 +8,7 @@ import {
 import { delay, HttpResponse, http } from "msw";
 import { beforeEach, expect, test, vi } from "vitest";
 import { mockDb } from "@/mocks/db";
+import { problem } from "@/mocks/handlers/respond";
 import { loginWithShift, placedSales } from "@/mocks/handlers/test-helpers";
 import { server } from "@/mocks/node";
 import { setScenario } from "@/mocks/scenarios";
@@ -194,6 +195,40 @@ test("(ruling R3) kasbon Pak Joko 36.000 → CREDIT_LIMIT → dialog 'Kasbon mel
     reason: "Beli beras untuk hajatan",
   });
   expect(useCart.getState().lines).toHaveLength(0);
+});
+
+test("(fix final 2) dialog lewat limit memakai excess dari server: saldo 600.000, limit 500.000, kasbon 50.000 → sebesar Rp50.000 (bukan 150.000)", async () => {
+  server.use(
+    http.post(
+      "/api/sales",
+      () =>
+        problem(409, "CREDIT_LIMIT", "Kasbon melebihi batas", {
+          balance: 600_000,
+          creditLimit: 500_000,
+          attempted: 50_000,
+          excess: 50_000,
+        }),
+      { once: true },
+    ),
+  );
+  const { user, ui, selesai } = await openPay();
+  await user.click(ui.getByRole("tab", { name: "Kasbon" }));
+  await user.type(
+    ui.getByRole("searchbox", { name: "Cari pelanggan" }),
+    "Joko",
+  );
+  await user.click(
+    await ui.findByRole("button", { name: /Pak Joko · 081234500002/ }),
+  );
+  await user.click(selesai());
+  const dialog = await screen.findByRole("dialog", {
+    name: "Kasbon melewati limit",
+  });
+  expect(
+    within(dialog).getByText(
+      "Pak Joko: sisa Rp600.000 + kasbon ini Rp50.000 melewati limit Rp500.000 sebesar Rp50.000.",
+    ),
+  ).toBeVisible();
 });
 
 test("(ruling R3) dialog lewat limit: Kembali menutup dialog, jendela bayar tetap dan keranjang utuh", async () => {

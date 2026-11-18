@@ -470,6 +470,7 @@ describe("(ruling R12) void kasir transaksi shift lama ≤ 7 hari", () => {
       balance: -60_000,
       creditLimit: 500_000,
       attempted: 570_000,
+      excess: 10_000,
     });
     const ok = await post("/api/sales", {
       ...big,

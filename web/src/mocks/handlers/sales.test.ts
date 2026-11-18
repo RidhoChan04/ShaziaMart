@@ -357,6 +357,7 @@ describe("createSale", () => {
         balance: 290000,
         creditLimit: 300000,
         attempted: credit,
+        excess: 1,
       });
     }
     expect(customerBalance("Pak Joko")).toBe(balance);
@@ -492,6 +493,7 @@ describe("kasbon lewat limit dengan alasan (ruling R3)", () => {
         balance: 290_000,
         creditLimit: 300_000,
         attempted: 36_000,
+        excess: 26_000,
       });
     }
     expect(customerBalance("Pak Joko")).toBe(290_000);

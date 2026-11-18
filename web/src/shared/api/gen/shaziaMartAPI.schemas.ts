@@ -146,13 +146,18 @@ export const CreditLimitProblemCode = {
 } as const;
 
 /**
- * Problem CREDIT_LIMIT dengan saldo, batas, dan nilai kasbon yang dicoba.
+ * Problem CREDIT_LIMIT dengan saldo, batas, nilai kasbon yang dicoba, dan kelebihannya.
  */
 export type CreditLimitProblem = Problem & {
   code: CreditLimitProblemCode;
   balance: number;
   creditLimit: number;
   attempted: number;
+  /**
+     * Bagian kasbon transaksi ini di atas limit = min(attempted, balance + attempted − creditLimit); sama dengan CreditOverLimit.excess yang dicatat bila disimpan dengan alasan. Klien menampilkan angka ini, tidak menghitung sendiri.
+     * @minimum 1
+     */
+  excess: number;
 };
 
 export type UserRole = typeof UserRole[keyof typeof UserRole];
