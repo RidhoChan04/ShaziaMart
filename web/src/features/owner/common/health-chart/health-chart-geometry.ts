@@ -24,6 +24,11 @@ const MIN_TOP = 100_000;
 const BAR_RATIO = 0.66;
 /** Batang depan lebih sempit agar batang belakang tetap terlihat di kedua sisinya. */
 const FRONT_INSET = 3;
+/**
+ * Di bawah lebar ini (mis. bulan 30 hari di HP, ±5 px) sisipan 3 px membuat batang depan jadi
+ * titik; batang depan lalu selebar batang belakang (seperti mockup). Batang jam Beranda ≥ 9,9 px.
+ */
+const MIN_INSET_BAR = 8;
 const PEAK_GAP = 4;
 /** Perkiraan lebar satu karakter label puncak (11px semibold, sedikit dilebihkan). */
 export const PEAK_CHAR_WIDTH = 6.5;
@@ -71,7 +76,8 @@ export type HealthBar = {
 
 /**
  * Semua yang dibutuhkan grafik Health dua seri, dalam piksel untuk lebar `width`: belakang
- * selebar batang, depan 3 px lebih sempit; nilai negatif digambar 0 (tabel memakai angka asli).
+ * selebar batang, depan 3 px lebih sempit (selebar batang bila batang < 8 px); nilai negatif
+ * digambar 0 (tabel memakai angka asli).
  */
 export function healthGeometry({
   buckets,
@@ -110,6 +116,7 @@ export function healthGeometry({
     front: hasPositive(buckets, "front"),
   };
   const barWidth = slot * BAR_RATIO;
+  const inset = barWidth >= MIN_INSET_BAR ? FRONT_INSET : 0;
   const bars: HealthBar[] = buckets.map((b, i) => {
     const left = x(i) - barWidth / 2;
     return {
@@ -121,8 +128,8 @@ export function healthGeometry({
       front:
         show.front && b.front !== null
           ? {
-              x: left + FRONT_INSET / 2,
-              width: Math.max(barWidth - FRONT_INSET, 1),
+              x: left + inset / 2,
+              width: Math.max(barWidth - inset, 1),
               ...bar(b.front),
             }
           : null,

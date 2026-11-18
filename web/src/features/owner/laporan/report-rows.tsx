@@ -16,8 +16,8 @@ import type {
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { formatRupiah, formatSignedRupiah } from "@/shared/lib/money";
 import { formatQty } from "@/shared/lib/quantity";
+import type { ReportSearch } from "@/shared/lib/report-search";
 import { RowList, Section } from "../products/detail/section";
-import type { ReportSearch } from "./report-search";
 
 const linkRowClass =
   "flex min-h-14 items-center gap-3 px-4 py-2 hover:bg-bg focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary";

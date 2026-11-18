@@ -1,7 +1,7 @@
-import { ReportPeriod } from "@/shared/api/gen/shaziaMartAPI.schemas";
-import { checkRange, periodRange } from "@/shared/lib/report-period";
+import { ReportPeriod } from "../api/gen/shaziaMartAPI.schemas";
+import { checkRange, periodRange } from "./report-period";
 
-/** State periode Laporan di URL (K26); dipakai halaman utama dan ketujuh sub-halaman. */
+/** State periode Laporan di URL (K26): rute app (validateSearch) dan layar Laporan pemilik. */
 export type ReportSearch = {
   periode: ReportPeriod;
   dari: string;

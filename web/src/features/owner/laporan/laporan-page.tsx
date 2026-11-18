@@ -1,3 +1,4 @@
+import { keepPreviousData } from "@tanstack/react-query";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import {
   useGetOwnerOpnameReport,
@@ -52,11 +53,17 @@ export function LaporanPage() {
   const navigate = useNavigate({ from: "/owner/laporan" });
   const { date: today } = useBusinessDay();
   const range = { from: search.dari, to: search.sampai };
-  const sales = useGetOwnerSalesReport({ period: search.periode, ...range });
+  // Ganti periode: angka periode lama tetap tampil (redup + "Memuat…") sampai data baru tiba.
+  const keep = { query: { placeholderData: keepPreviousData } };
+  const sales = useGetOwnerSalesReport(
+    { period: search.periode, ...range },
+    keep,
+  );
   const stock = useGetOwnerStockReport();
-  const opname = useGetOwnerOpnameReport(range);
+  const opname = useGetOwnerOpnameReport(range, keep);
   const queries = [sales, stock, opname];
   const failed = queries.filter((q) => q.isError && q.data === undefined);
+  const busy = sales.isPlaceholderData || opname.isPlaceholderData;
 
   return (
     <div className="grid gap-4">
@@ -67,8 +74,23 @@ export function LaporanPage() {
           onChange={(next) => void navigate({ search: next })}
         />
       </div>
+      {busy && (
+        <p
+          role="status"
+          className="fixed top-3 left-1/2 z-40 -translate-x-1/2 rounded-full border border-border bg-surface px-3 py-1 text-xs font-medium shadow-sm"
+        >
+          Memuat…
+        </p>
+      )}
       {sales.data && stock.data && opname.data ? (
-        <>
+        <div
+          data-testid="laporan-isi"
+          aria-busy={busy || undefined}
+          className={cn(
+            "grid gap-4 transition-opacity duration-150 motion-reduce:transition-none",
+            busy && "opacity-60",
+          )}
+        >
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 lg:items-start lg:gap-4">
             <RevenueCard report={sales.data} />
             <ReportTiles
@@ -87,7 +109,7 @@ export function LaporanPage() {
               />
             </div>
           </div>
-        </>
+        </div>
       ) : failed.length > 0 ? (
         <div className="mx-auto flex max-w-sm flex-col items-center gap-4 py-16 text-center">
           <p className="text-base font-semibold">

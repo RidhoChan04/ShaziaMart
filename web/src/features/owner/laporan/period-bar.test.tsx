@@ -1,8 +1,8 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, test, vi } from "vitest";
+import type { ReportSearch } from "@/shared/lib/report-search";
 import { PeriodBar } from "./period-bar";
-import type { ReportSearch } from "./report-search";
 
 const TODAY = "2026-11-05";
 const NOV: ReportSearch = {

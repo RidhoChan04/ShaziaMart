@@ -145,3 +145,40 @@ test("label puncak terjepit di dalam plot", () => {
   const half = (peak.label.length * 6.5) / 2;
   expect(peak.x - half).toBeGreaterThanOrEqual(c.plot.left);
 });
+
+test("batang sempit (bulan 30 hari di HP): batang depan selebar batang, tanpa sisipan", () => {
+  const month = Array.from(
+    { length: 30 },
+    (_, i): HealthBucket => ({
+      key: String(i),
+      label: String(i + 1),
+      tick: null,
+      back: 9_000_000,
+      front: 1_500_000,
+    }),
+  );
+  const c = geo(month, "back", null, 296);
+  const b = c.bars[0];
+  if (!b?.front) throw new Error("bar missing");
+  expect(b.width).toBeLessThan(8);
+  expect(b.front.width).toBeCloseTo(b.width, 5);
+  expect(b.front.x).toBeCloseTo(b.x, 5);
+});
+
+test("batang lebar (jam Beranda ±10 px ke atas): batang depan tetap 3 px lebih sempit", () => {
+  const hours = Array.from(
+    { length: 16 },
+    (_, i): HealthBucket => ({
+      key: String(6 + i),
+      label: String(6 + i),
+      tick: null,
+      back: 9_000,
+      front: 5_000,
+    }),
+  );
+  const b = geo(hours, "front", null, 296).bars[0];
+  if (!b?.front) throw new Error("bar missing");
+  expect(b.width).toBeCloseTo(9.9, 5);
+  expect(b.front.width).toBeCloseTo(b.width - 3, 5);
+  expect(b.front.x).toBeCloseTo(b.x + 1.5, 5);
+});

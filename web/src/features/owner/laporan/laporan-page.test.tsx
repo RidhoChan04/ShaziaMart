@@ -377,3 +377,42 @@ test("search tidak sah → bulan berjalan", async () => {
     sampai: "2026-11-30",
   });
 });
+
+test("ganti periode: periode lama tetap tampil (redup, Memuat…) sampai data baru tiba, tanpa kerangka", async () => {
+  const user = userEvent.setup();
+  let release = () => {};
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const october = salesFixture({
+    range: { from: "2026-10-01", to: "2026-10-31" },
+    previous: { from: "2026-09-01", to: "2026-09-30" },
+    running: false,
+  });
+  server.use(
+    http.get("*/api/owner/reports/sales", async ({ request }) => {
+      if (new URL(request.url).searchParams.get("from") !== "2026-10-01")
+        return HttpResponse.json(salesFixture());
+      await gate;
+      return HttpResponse.json(october);
+    }),
+  );
+  renderApp("/owner/laporan");
+  expect(await screen.findByText("Omzet 1–5 Nov")).toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "Periode sebelumnya" }));
+  expect(await screen.findByText("Oktober 2026")).toBeInTheDocument();
+  expect(await screen.findByText("Memuat…")).toBeInTheDocument();
+  // Angka periode lama tetap terlihat, ditandai sibuk; kerangka tidak muncul.
+  expect(screen.getByText("Omzet 1–5 Nov")).toBeInTheDocument();
+  expect(screen.getByTestId("laporan-isi")).toHaveAttribute(
+    "aria-busy",
+    "true",
+  );
+  expect(screen.queryByLabelText("Memuat laporan")).toBeNull();
+
+  release();
+  expect(await screen.findByText("Omzet 1–31 Okt")).toBeInTheDocument();
+  expect(screen.queryByText("Memuat…")).toBeNull();
+  expect(screen.getByTestId("laporan-isi")).not.toHaveAttribute("aria-busy");
+});
