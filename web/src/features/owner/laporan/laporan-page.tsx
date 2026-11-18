@@ -11,6 +11,7 @@ import { pesanError } from "@/shared/lib/error-messages";
 import { Button } from "@/shared/ui/button";
 import { PeriodBar } from "./period-bar";
 import { DetailLinks, TopProducts, UnsoldSummary } from "./report-rows";
+import { StaleReportAlert } from "./report-sub-state";
 import { ReportTiles } from "./report-tiles";
 import { previousLabel, RevenueCard } from "./revenue-card";
 
@@ -63,6 +64,8 @@ export function LaporanPage() {
   const opname = useGetOwnerOpnameReport(range, keep);
   const queries = [sales, stock, opname];
   const failed = queries.filter((q) => q.isError && q.data === undefined);
+  // Muat ulang gagal, data lama masih tampil: peringatan, bukan diam-diam.
+  const stale = queries.filter((q) => q.isError && q.data !== undefined);
   const busy = sales.isPlaceholderData || opname.isPlaceholderData;
 
   return (
@@ -74,6 +77,14 @@ export function LaporanPage() {
           onChange={(next) => void navigate({ search: next })}
         />
       </div>
+      {stale.length > 0 && (
+        <StaleReportAlert
+          error={stale[0]?.error}
+          onRetry={() => {
+            for (const q of stale) void q.refetch();
+          }}
+        />
+      )}
       {busy && (
         <p
           role="status"

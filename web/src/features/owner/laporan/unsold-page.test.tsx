@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { beforeEach, expect, test } from "vitest";
@@ -158,4 +158,22 @@ test("galat memuat: pesan dan Coba lagi", async () => {
   expect(
     await screen.findByRole("button", { name: "Coba lagi" }),
   ).toBeInTheDocument();
+});
+
+test("(fix final 4) muat ulang gagal saat data tampil → peringatan + Coba lagi, data lama tetap", async () => {
+  serve({ modal: stock([item({})]) });
+  const user = userEvent.setup();
+  const { queryClient } = renderApp(PATH);
+  expect(await screen.findByText("Beras Premium 5 kg")).toBeInTheDocument();
+  server.use(
+    http.get("*/api/owner/reports/stock", () => HttpResponse.error(), {
+      once: true,
+    }),
+  );
+  await queryClient.refetchQueries({ queryKey: ["/api/owner/reports/stock"] });
+  const alert = await screen.findByRole("alert");
+  expect(alert).toHaveTextContent("Server tidak tersambung — coba lagi");
+  expect(screen.getByText("Beras Premium 5 kg")).toBeInTheDocument();
+  await user.click(within(alert).getByRole("button", { name: "Coba lagi" }));
+  await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
 });

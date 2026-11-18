@@ -17,6 +17,7 @@ import {
   EMPTY_SALES,
   ReportError,
   ReportListSkeleton,
+  StaleReportAlert,
 } from "./report-sub-state";
 
 const SORTS = [
@@ -99,6 +100,12 @@ export function TopProductsPage() {
           </button>
         ))}
       </div>
+      {query.isError && query.data !== undefined && (
+        <StaleReportAlert
+          error={query.error}
+          onRetry={() => void query.refetch()}
+        />
+      )}
       {query.data ? (
         <div
           aria-busy={query.isPlaceholderData || undefined}

@@ -1,4 +1,4 @@
-import { fireEvent, screen, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
@@ -461,4 +461,26 @@ test("ganti periode: periode lama tetap tampil (redup, Memuat…) sampai data ba
   expect(await screen.findByText("Omzet 1–31 Okt")).toBeInTheDocument();
   expect(screen.queryByText("Memuat…")).toBeNull();
   expect(screen.getByTestId("laporan-isi")).not.toHaveAttribute("aria-busy");
+});
+
+test("(fix final 4) muat ulang gagal saat data lama tampil → peringatan tidak menghalangi (pesanError + Coba lagi), angka lama tetap", async () => {
+  const user = userEvent.setup();
+  useSales(salesFixture());
+  const { queryClient } = renderApp("/owner/laporan");
+  expect(await screen.findByText("Omzet 1–5 Nov")).toBeInTheDocument();
+  expect(screen.queryByRole("alert")).toBeNull();
+
+  server.use(
+    http.get("*/api/owner/reports/sales", () => HttpResponse.error(), {
+      once: true,
+    }),
+  );
+  await queryClient.refetchQueries({ queryKey: ["/api/owner/reports/sales"] });
+  const alert = await screen.findByRole("alert");
+  expect(alert).toHaveTextContent("Server tidak tersambung — coba lagi");
+  expect(screen.getByText("Omzet 1–5 Nov")).toBeInTheDocument();
+
+  await user.click(within(alert).getByRole("button", { name: "Coba lagi" }));
+  await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+  expect(screen.getByText("Omzet 1–5 Nov")).toBeInTheDocument();
 });

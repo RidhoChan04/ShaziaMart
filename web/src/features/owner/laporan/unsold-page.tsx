@@ -12,6 +12,7 @@ import { formatQty } from "@/shared/lib/quantity";
 import { SubPageHeader } from "../common/sub-page-header";
 import { RowList } from "../products/detail/section";
 import { ReportState, StatCard, ToneBadge } from "./report-bits";
+import { StaleReportAlert } from "./report-sub-state";
 
 const SEGMENTS: ReadonlyArray<readonly [StockReportSort, string]> = [
   [SORT.modal, "Modal terbesar"],
@@ -32,6 +33,12 @@ export function UnsoldPage() {
         title={`Tidak terjual ≥ ${unsold?.minDays ?? 30} hari`}
         back={{ label: "Laporan", fallback: "/owner/laporan" }}
       />
+      {query.isError && query.data !== undefined && (
+        <StaleReportAlert
+          error={query.error}
+          onRetry={() => void query.refetch()}
+        />
+      )}
       <ReportState query={query}>
         {unsold && (
           <div
