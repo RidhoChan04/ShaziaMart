@@ -16,6 +16,7 @@ import {
   describeBucket,
   type HealthSeries,
   Legend,
+  OUTLINE_WIDTH,
   type SeriesLine,
   Tooltip,
 } from "./health-chart-parts";
@@ -71,7 +72,8 @@ export function HealthChart({
   peakLabel,
 }: {
   buckets: HealthBucket[];
-  back: HealthSeries;
+  /** Garis tepi hanya untuk seri depan. */
+  back: HealthSeries & { outline?: never };
   front: HealthSeries;
   /** Seri yang diberi label puncak, warna berjalan, dan disebut lebih dulu. */
   emphasis: "back" | "front";
@@ -85,9 +87,18 @@ export function HealthChart({
 }) {
   const [active, setActive] = useState<number | null>(null);
   const [ref, width] = useWidth();
+  const frontOutline = front.outline ? OUTLINE_WIDTH : 0;
   const chart = useMemo(
-    () => healthGeometry({ buckets, emphasis, nowKey, width, peakLabel }),
-    [buckets, emphasis, nowKey, width, peakLabel],
+    () =>
+      healthGeometry({
+        buckets,
+        emphasis,
+        nowKey,
+        width,
+        peakLabel,
+        frontOutline,
+      }),
+    [buckets, emphasis, nowKey, width, peakLabel, frontOutline],
   );
   const { plot } = chart;
   const lines: SeriesLine[] =
@@ -206,8 +217,13 @@ export function HealthChart({
                   y={bar.front.y}
                   width={bar.front.width}
                   height={bar.front.height}
-                  rx={BAR_RADIUS}
+                  // Kotak isi sudah digeser setengah stroke; sudut luar tetap berjari-jari 3.
+                  rx={Math.max(BAR_RADIUS - bar.front.stroke / 2, 0)}
                   fill={fill(front, bar.now, emphasis === "front")}
+                  {...(front.outline && {
+                    stroke: front.outline,
+                    strokeWidth: bar.front.stroke,
+                  })}
                 />
               )}
             </g>

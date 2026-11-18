@@ -166,6 +166,36 @@ test("angka & pembanding dari server apa adanya; label Laba kotor · 16,4%", asy
   ).toBeInTheDocument();
 });
 
+test("grafik: laba hijau muda bergaris tepi chart-1; pembacaan omzet, laba, dan margin %", async () => {
+  const user = userEvent.setup();
+  useSales(salesFixture());
+  const { container } = renderApp("/owner/laporan");
+  await band();
+  const laba = container.querySelectorAll("svg rect[data-series='laba']");
+  expect(laba).toHaveLength(5);
+  for (const r of laba) {
+    expect(r).toHaveAttribute("fill", "var(--color-chart-3)");
+    expect(r).toHaveAttribute("stroke", "var(--color-chart-1)");
+    expect(r).toHaveAttribute("stroke-width", "1.5");
+  }
+  const swatch = screen
+    .getByTestId("chart-legend")
+    .querySelector<HTMLElement>("[data-swatch='laba']");
+  expect(swatch?.style.border).toBe("1.5px solid var(--color-chart-1)");
+
+  screen
+    .getByRole("group", { name: "Omzet dan laba kotor per hari, 1–5 Nov" })
+    .focus();
+  await user.keyboard("{ArrowRight}");
+  // 1.500.000 / 9.000.000 = 166,7‰ → dibulatkan 167 → 16,7%.
+  expect(screen.getByTestId("chart-live")).toHaveTextContent(
+    /^5 Nov, Omzet Rp9\.000\.000, Laba kotor Rp1\.500\.000 \(16,7%\)$/,
+  );
+  expect(screen.getByTestId("chart-tooltip")).toHaveTextContent(
+    "Laba kotor Rp1.500.000 (16,7%)",
+  );
+});
+
 test("omzet 0 → label Laba kotor tanpa persen; pembanding tanpa data", async () => {
   const zero = totals({
     revenue: 0,

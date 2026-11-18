@@ -85,9 +85,10 @@ function contrast(a: string, b: string): number {
   return (hi + 0.05) / (lo + 0.05);
 }
 
-// Palet grafik dicek validator dataviz (lightness, chroma, ΔE CVD, kontras); penjaga ini hanya
-// mengunci kontras batang berwarna ≥ 3:1 terhadap kartu putih agar token tidak diganti diam-diam.
-test.each(["chart-1", "chart-1-now", "chart-3"])(
+// Palet grafik dicek validator dataviz (lightness, chroma, ΔE CVD, kontras); penjaga ini mengunci
+// kontras batang agar token tidak diganti diam-diam. Batang yang tepinya menyentuh kartu putih
+// langsung (omzet/hari ini, bucket berjalan) wajib ≥ 3:1 terhadap putih.
+test.each(["chart-1", "chart-1-now"])(
   "batang %s kontras ≥ 3:1 terhadap kartu",
   (name) => {
     expect(
@@ -95,6 +96,21 @@ test.each(["chart-1", "chart-1-now", "chart-3"])(
     ).toBeGreaterThanOrEqual(3);
   },
 );
+
+// Laba kotor (keputusan pemilik 18 Nov, opsi B+): isi hijau muda chart-3 sengaja hanya 1,54:1
+// terhadap putih, jadi batasnya dipikul garis tepi 1,5 px chart-1 di tiap batang laba dan kotak
+// legenda. Aturan yang dikunci: garis tepi chart-1 vs putih 5,32:1 (≥ 3) dan isi chart-3 vs
+// chart-1 3,46:1 (≥ 3) — isi terbaca terhadap garis tepinya sendiri dan terhadap batang omzet di
+// atasnya. Catatan: terhadap batang omzet berjalan (chart-1-now) isi hanya 2,31:1.
+test("laba kotor: isi chart-3 lembut, batas dipikul garis tepi chart-1", () => {
+  const fill = tokenHex("chart-3");
+  const outline = tokenHex("chart-1");
+  expect(contrast(fill, tokenHex("surface"))).toBeCloseTo(1.54, 2);
+  expect(contrast(outline, tokenHex("surface"))).toBeCloseTo(5.32, 2);
+  expect(contrast(outline, tokenHex("surface"))).toBeGreaterThanOrEqual(3);
+  expect(contrast(fill, outline)).toBeCloseTo(3.46, 2);
+  expect(contrast(fill, outline)).toBeGreaterThanOrEqual(3);
+});
 
 test("kelas warna Tailwind di src/**/*.tsx hanya memakai token dari app/styles.css", () => {
   expect(Object.keys(sources).length).toBeGreaterThan(50);

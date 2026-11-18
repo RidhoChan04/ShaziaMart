@@ -182,3 +182,90 @@ test("batang lebar (jam Beranda ±10 px ke atas): batang depan tetap 3 px lebih 
   expect(b.front.width).toBeCloseTo(b.width - 3, 5);
   expect(b.front.x).toBeCloseTo(b.x + 1.5, 5);
 });
+
+const MONTH = Array.from(
+  { length: 30 },
+  (_, i): HealthBucket => ({
+    key: String(i),
+    label: String(i + 1),
+    tick: null,
+    back: 9_000_000,
+    front: i === 1 ? 0 : i === 2 ? 12_000 : 1_500_000,
+  }),
+);
+
+const outlined = (buckets: HealthBucket[], width: number, outline = 1.5) =>
+  healthGeometry({
+    buckets,
+    emphasis: "back",
+    nowKey: null,
+    width,
+    peakLabel: formatRupiahShort,
+    frontOutline: outline,
+  });
+
+test("tanpa garis tepi (Beranda): batang depan tanpa stroke, ukuran sama seperti sebelumnya", () => {
+  const plain = geo(SAMPLE);
+  expect(plain.bars[1]?.front?.stroke).toBe(0);
+  const zero = outlined(SAMPLE, 360, 0);
+  expect(zero.bars).toEqual(plain.bars);
+});
+
+test("garis tepi laba di dalam batang: sisi luar stroke tepat di tepi batang depan", () => {
+  const plain = geo(SAMPLE).bars[1]?.front;
+  const b = outlined(SAMPLE, 360).bars[1]?.front;
+  if (!plain || !b) throw new Error("bar missing");
+  expect(b.stroke).toBe(1.5);
+  // Stroke SVG berpusat di tepi: digeser setengah stroke ke dalam agar tidak keluar batang.
+  expect(b.x - b.stroke / 2).toBeCloseTo(plain.x, 5);
+  expect(b.x + b.width + b.stroke / 2).toBeCloseTo(plain.x + plain.width, 5);
+  expect(b.y - b.stroke / 2).toBeCloseTo(plain.y, 5);
+  expect(b.y + b.height + b.stroke / 2).toBeCloseTo(plain.y + plain.height, 5);
+});
+
+test("bulan 30 hari di HP (batang < 8 px, tanpa sisipan): stroke tetap di dalam batang, batang tidak menyatu", () => {
+  const c = outlined(MONTH, 296);
+  const [a, b] = [c.bars[0], c.bars[3]];
+  if (!a?.front || !b?.front) throw new Error("bar missing");
+  expect(a.width).toBeLessThan(8);
+  expect(a.front.stroke).toBe(1.5);
+  expect(a.front.x - a.front.stroke / 2).toBeCloseTo(a.x, 5);
+  expect(a.front.x + a.front.width + a.front.stroke / 2).toBeCloseTo(
+    a.x + a.width,
+    5,
+  );
+  // Isi muda tetap terlihat di tengah garis tepi.
+  expect(a.front.width).toBeGreaterThan(1);
+  // Celah antar batang (termasuk stroke) tetap ada.
+  const next = c.bars[1];
+  if (!next) throw new Error("bar missing");
+  expect(next.x - (a.x + a.width)).toBeGreaterThan(2);
+  expectAllFinite(c);
+});
+
+test("batang sangat sempit (92 hari) atau sangat pendek: stroke mengecil, isi tidak hilang", () => {
+  const long = Array.from(
+    { length: 92 },
+    (_, i): HealthBucket => ({
+      key: String(i),
+      label: String(i),
+      tick: null,
+      back: 9_000_000,
+      front: 1_500_000,
+    }),
+  );
+  const narrow = outlined(long, 296).bars[0];
+  if (!narrow?.front) throw new Error("bar missing");
+  expect(narrow.front.stroke).toBeCloseTo(narrow.width / 3, 5);
+  expect(narrow.front.width).toBeGreaterThan(0);
+  // Laba nol: tanpa stroke, setinggi 0 (tidak tergambar).
+  const c = outlined(MONTH, 296);
+  expect(c.bars[1]?.front?.stroke).toBe(0);
+  expect(c.bars[1]?.front?.height).toBe(0);
+  // Laba sangat kecil (< 1,5 px): stroke dibatasi setengah tinggi, isi tetap ada.
+  const tiny = c.bars[2]?.front;
+  if (!tiny) throw new Error("bar missing");
+  expect(tiny.stroke).toBeLessThan(1.5);
+  expect(tiny.height).toBeGreaterThan(0);
+  expect(tiny.y + tiny.height + tiny.stroke / 2).toBeCloseTo(c.plot.bottom, 5);
+});

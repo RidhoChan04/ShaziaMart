@@ -8,7 +8,7 @@ import {
 } from "@/shared/lib/report-period";
 import { FitAmount } from "../common/fit-amount";
 import { HealthChart } from "../common/health-chart/health-chart";
-import { reportChart } from "./report-chart";
+import { labaMargin, reportChart } from "./report-chart";
 
 const OMZET = {
   id: "omzet",
@@ -16,7 +16,14 @@ const OMZET = {
   color: "var(--color-chart-1)",
   nowColor: "var(--color-chart-1-now)",
 };
-const LABA = { id: "laba", name: "Laba kotor", color: "var(--color-chart-3)" };
+/** Isi hijau muda + garis tepi hijau toko (keputusan pemilik 18 Nov, opsi B+; lihat styles.css). */
+const LABA = {
+  id: "laba",
+  name: "Laba kotor",
+  color: "var(--color-chart-3)",
+  outline: "var(--color-chart-1)",
+  note: labaMargin,
+};
 
 /** Nama rentang pembanding: Hari = `Kamis, 29 Okt` (H−7), selain itu `1–5 Okt`. */
 export const previousLabel = (report: SalesReport): string =>

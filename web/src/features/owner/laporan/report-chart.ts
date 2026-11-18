@@ -4,6 +4,7 @@ import type {
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { formatIsoDayMonth } from "@/shared/lib/business-day";
 import { formatRupiahShort } from "@/shared/lib/money";
+import { roundHalfUp } from "@/shared/lib/quantity";
 import { weekdayLabel } from "@/shared/lib/report-period";
 import {
   type HealthBucket,
@@ -11,6 +12,19 @@ import {
   peakIndex,
 } from "../common/health-chart/health-chart-geometry";
 import { hourWindow } from "../home/home-model";
+
+/**
+ * Margin laba kotor satu bucket untuk tooltip & pembacaan grafik (`16,4%`, minus U+2212): aturan
+ * `marginPermille` server (jawaban pemilik Q5) — tanda(laba) × round_half_up(|laba| × 1000 /
+ * omzet) — lalu satu desimal seperti kartu Laba kotor; `null` bila omzet ≤ 0 atau belum terjadi.
+ */
+export function labaMargin(bucket: HealthBucket): string | null {
+  const { back: revenue, front: profit } = bucket;
+  if (revenue === null || profit === null || revenue <= 0) return null;
+  const permille = roundHalfUp(Math.abs(profit) * 1000, revenue);
+  const sign = profit < 0 && permille > 0 ? "−" : "";
+  return `${sign}${Math.floor(permille / 10)},${permille % 10}%`;
+}
 
 /** Label sumbu tanggal: tiap hari untuk ≤ 7 slot, selain itu tiap 7/14/21 hari (±5 label). */
 const tickStep = (count: number) =>

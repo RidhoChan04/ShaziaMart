@@ -71,13 +71,44 @@ export type HealthBar = {
   now: boolean;
   /** `null` bila bucket belum terjadi atau seri tidak punya nilai positif sama sekali. */
   back: { y: number; height: number } | null;
-  front: { x: number; width: number; y: number; height: number } | null;
+  /**
+   * Kotak isi batang depan. Dengan garis tepi, kotak ini sudah digeser setengah `stroke` ke dalam
+   * sehingga sisi luar stroke tepat di tepi batang (tidak keluar batang, celah antarbatang tetap).
+   */
+  front: {
+    x: number;
+    width: number;
+    y: number;
+    height: number;
+    /** Lebar garis tepi (px); 0 = tanpa garis tepi. */
+    stroke: number;
+  } | null;
 };
+
+/**
+ * Garis tepi batang depan selebar `outline`, tetapi paling banyak sepertiga lebar dan setengah
+ * tinggi batang agar isi tetap terlihat (rentang 92 hari di HP, laba yang sangat kecil); kotak
+ * digeser setengah stroke ke dalam. Batang setinggi 0 tanpa garis tepi.
+ */
+function outlined(
+  box: { x: number; width: number; y: number; height: number },
+  outline: number,
+) {
+  const stroke = Math.min(outline, box.width / 3, box.height / 2);
+  return {
+    x: box.x + stroke / 2,
+    width: box.width - stroke,
+    y: box.y + stroke / 2,
+    height: box.height - stroke,
+    stroke,
+  };
+}
 
 /**
  * Semua yang dibutuhkan grafik Health dua seri, dalam piksel untuk lebar `width`: belakang
  * selebar batang, depan 3 px lebih sempit (selebar batang bila batang < 8 px); nilai negatif
- * digambar 0 (tabel memakai angka asli).
+ * digambar 0 (tabel memakai angka asli). `frontOutline` > 0 memberi batang depan garis tepi
+ * (Laporan: laba kotor) yang tetap di dalam batang.
  */
 export function healthGeometry({
   buckets,
@@ -85,12 +116,14 @@ export function healthGeometry({
   nowKey,
   width,
   peakLabel,
+  frontOutline = 0,
 }: {
   buckets: HealthBucket[];
   emphasis: Series;
   nowKey: string | null;
   width: number;
   peakLabel: (value: number) => string;
+  frontOutline?: number;
 }) {
   const count = Math.max(buckets.length, 1);
   const plot = {
@@ -127,11 +160,14 @@ export function healthGeometry({
       back: show.back && b.back !== null ? bar(b.back) : null,
       front:
         show.front && b.front !== null
-          ? {
-              x: left + inset / 2,
-              width: Math.max(barWidth - inset, 1),
-              ...bar(b.front),
-            }
+          ? outlined(
+              {
+                x: left + inset / 2,
+                width: Math.max(barWidth - inset, 1),
+                ...bar(b.front),
+              },
+              frontOutline,
+            )
           : null,
     };
   });

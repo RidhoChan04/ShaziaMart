@@ -4,7 +4,7 @@ import type {
   ReportSeries,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { addIsoDays, isoDaysBetween } from "@/shared/lib/business-day";
-import { reportChart } from "./report-chart";
+import { labaMargin, reportChart } from "./report-chart";
 
 /** Seri harian `from`..`to`; tanggal sesudah `today` belum terjadi (null). */
 function days(
@@ -150,4 +150,25 @@ test("per jam hari lewat tanpa penjualan: jendela bawaan 06.00–21.00", () => {
   );
   expect(c.nowKey).toBeNull();
   expect(c.summary).toBe("Belum ada penjualan di periode ini");
+});
+
+const bucket = (back: number | null, front: number | null) => ({
+  key: "2026-11-04",
+  label: "4 Nov",
+  tick: null,
+  back,
+  front,
+});
+
+test("labaMargin: aturan margin server (permil, setengah ke atas) per bucket, satu desimal", () => {
+  // Angka contoh Q5: 7.912.300 / 48.215.500 → 164‰ → 16,4% (sama dengan kartu Laba kotor).
+  expect(labaMargin(bucket(48_215_500, 7_912_300))).toBe("16,4%");
+  expect(labaMargin(bucket(9_000_000, 1_500_000))).toBe("16,7%");
+  // 62,5‰ dibulatkan setengah ke atas → 63‰; minus memakai U+2212.
+  expect(labaMargin(bucket(4_000_000, -250_000))).toBe("−6,3%");
+  expect(labaMargin(bucket(1_000_000, 0))).toBe("0,0%");
+  // Omzet 0 atau bucket belum terjadi → tanpa margin.
+  expect(labaMargin(bucket(0, 0))).toBeNull();
+  expect(labaMargin(bucket(0, -5_000))).toBeNull();
+  expect(labaMargin(bucket(null, null))).toBeNull();
 });

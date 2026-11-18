@@ -8,7 +8,17 @@ export type HealthSeries = {
   color: string;
   /** Warna batang bucket berjalan (hanya seri penekanan). */
   nowColor?: string;
+  /**
+   * Garis tepi 1,5 px pada batang dan kotak warna seri ini (hanya seri depan); dipakai bila isi
+   * terlalu muda untuk kontras 3:1 terhadap kartu (laba kotor Laporan).
+   */
+  outline?: string;
+  /** Catatan di belakang nilai pada tooltip dan pembacaan (mis. margin `16,4%`); `null` = tanpa. */
+  note?: (bucket: HealthBucket) => string | null;
 };
+
+/** Lebar garis tepi `HealthSeries.outline` (px). */
+export const OUTLINE_WIDTH = 1.5;
 
 /** Seri penekanan dulu: legenda, tooltip, pembacaan, dan kolom tabel memakai urutan ini. */
 export type SeriesLine = { series: HealthSeries; pick: "back" | "front" };
@@ -25,7 +35,12 @@ function Swatch({ series }: { series: HealthSeries }) {
       aria-hidden
       data-swatch={series.id}
       className="inline-block size-2.5 shrink-0 rounded-[3px]"
-      style={{ backgroundColor: series.color }}
+      style={{
+        backgroundColor: series.color,
+        border: series.outline
+          ? `${OUTLINE_WIDTH}px solid ${series.outline}`
+          : undefined,
+      }}
     />
   );
 }
@@ -46,11 +61,14 @@ export function Legend({ lines }: { lines: SeriesLine[] }) {
   );
 }
 
-/** Nilai yang sudah terjadi di bucket ini, urut seri penekanan dulu. */
+/** Nilai yang sudah terjadi di bucket ini sebagai teks, urut seri penekanan dulu. */
 const valuesOf = (bucket: HealthBucket, lines: SeriesLine[]) =>
   lines.flatMap(({ series, pick }) => {
     const value = bucket[pick];
-    return value === null ? [] : [{ series, value }];
+    if (value === null) return [];
+    const note = series.note?.(bucket);
+    const text = `${series.name} ${money(value)}${note ? ` (${note})` : ""}`;
+    return [{ series, text }];
   });
 
 export function Tooltip({
@@ -74,10 +92,10 @@ export function Tooltip({
       }}
     >
       <div className="num font-semibold">{bucket.label}</div>
-      {valuesOf(bucket, lines).map(({ series, value }) => (
+      {valuesOf(bucket, lines).map(({ series, text }) => (
         <div key={series.id} className="num flex items-center gap-1.5">
           <Swatch series={series} />
-          {`${series.name} ${money(value)}`}
+          {text}
         </div>
       ))}
     </div>
@@ -89,12 +107,9 @@ export function describeBucket(
   bucket: HealthBucket,
   lines: SeriesLine[],
 ): string {
-  return [
-    bucket.label,
-    ...valuesOf(bucket, lines).map(
-      ({ series, value }) => `${series.name} ${money(value)}`,
-    ),
-  ].join(", ");
+  return [bucket.label, ...valuesOf(bucket, lines).map((v) => v.text)].join(
+    ", ",
+  );
 }
 
 export function DataTable({

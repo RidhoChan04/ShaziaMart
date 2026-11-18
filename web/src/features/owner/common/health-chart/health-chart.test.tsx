@@ -38,7 +38,14 @@ const renderChart = (buckets = BUCKETS, nowKey: string | null = "2026-11-05") =>
         color: "var(--color-chart-1)",
         nowColor: "var(--color-chart-1-now)",
       }}
-      front={{ id: "laba", name: "Laba kotor", color: "var(--color-chart-3)" }}
+      front={{
+        id: "laba",
+        name: "Laba kotor",
+        color: "var(--color-chart-3)",
+        outline: "var(--color-chart-1)",
+        note: (b) =>
+          b.back && b.front !== null ? `${b.key.slice(-1)}x` : null,
+      }}
       emphasis="back"
       nowKey={nowKey}
       groupLabel={GROUP.name}
@@ -98,6 +105,50 @@ test("batang: omzet di belakang selebar slot, laba di depan; bucket berjalan leb
   );
 });
 
+test("garis tepi opt-in: hanya batang laba bergaris chart-1 1,5 px, juga kotak legenda Laba kotor", () => {
+  const { container } = renderChart();
+  const laba = bars(container, "laba");
+  for (const r of laba)
+    expect(r).toHaveAttribute("stroke", "var(--color-chart-1)");
+  expect(laba.map((r) => Number(r.getAttribute("stroke-width")))).toEqual([
+    1.5,
+    1.5,
+    // Laba negatif → setinggi 0, tanpa stroke.
+    0,
+    1.5,
+    // Batang 2,95 px: stroke ≤ setengah tinggi agar isi tetap terlihat.
+    expect.closeTo(1.475, 5),
+  ]);
+  for (const r of bars(container, "omzet")) {
+    expect(r).not.toHaveAttribute("stroke");
+    expect(r).not.toHaveAttribute("stroke-width");
+  }
+  const swatch = (id: string) =>
+    screen
+      .getByTestId("chart-legend")
+      .querySelector<HTMLElement>(`[data-swatch='${id}']`);
+  expect(swatch("laba")?.style.border).toBe("1.5px solid var(--color-chart-1)");
+  expect(swatch("omzet")?.style.border).toBe("");
+});
+
+test("garis tepi tidak keluar batang: batang laba digeser setengah stroke ke dalam", () => {
+  const { container } = renderChart();
+  const omzet = bars(container, "omzet")[1];
+  const laba = bars(container, "laba")[1];
+  const n = (el: Element | undefined, a: string) => Number(el?.getAttribute(a));
+  const half = n(laba, "stroke-width") / 2;
+  // Batang lebar: laba 3 px lebih sempit dari omzet, sisi luar stroke tetap di dalamnya.
+  expect(n(laba, "x") - half).toBeCloseTo(n(omzet, "x") + 1.5, 5);
+  expect(n(laba, "x") + n(laba, "width") + half).toBeCloseTo(
+    n(omzet, "x") + n(omzet, "width") - 1.5,
+    5,
+  );
+  expect(n(laba, "y") + n(laba, "height") + half).toBeCloseTo(
+    n(omzet, "y") + n(omzet, "height"),
+    5,
+  );
+});
+
 test("laba negatif: batang setinggi 0, tabel memakai angka asli dengan minus", () => {
   const { container } = renderChart();
   expect(bars(container, "laba")[2]).toHaveAttribute("height", "0");
@@ -136,13 +187,16 @@ test("grup berlabel bisa difokus; → memindah bucket aktif dan pembacaan live",
   // Tekan pertama menampilkan bucket berjalan.
   await user.keyboard("{ArrowRight}");
   expect(live).toHaveTextContent(
-    "5 Nov, Omzet Rp3.000.000, Laba kotor Rp500.000",
+    /^5 Nov, Omzet Rp3\.000\.000, Laba kotor Rp500\.000 \(5x\)$/,
   );
   await user.keyboard("{ArrowLeft}");
   expect(live).toHaveTextContent(
-    "4 Nov, Omzet Rp8.000.000, Laba kotor Rp1.300.000",
+    /^4 Nov, Omzet Rp8\.000\.000, Laba kotor Rp1\.300\.000 \(4x\)$/,
   );
-  expect(screen.getByTestId("chart-tooltip")).toHaveTextContent("4 Nov");
+  // Tooltip (pembacaan yang terlihat) memuat catatan seri yang sama.
+  expect(screen.getByTestId("chart-tooltip")).toHaveTextContent(
+    /^4 NovOmzet Rp8\.000\.000Laba kotor Rp1\.300\.000 \(4x\)$/,
+  );
   const active = container.querySelector("svg g[data-active='true']");
   expect(active).toHaveAttribute("data-key", "2026-11-04");
   await user.keyboard("{ArrowRight}{ArrowRight}");

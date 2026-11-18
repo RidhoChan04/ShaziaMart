@@ -20,9 +20,12 @@
   --color-chart-1: #1f7a4d;
   --color-chart-1-now: #2e9a62;
   --color-chart-2: #d1d1d6;
-  /* Laba kotor di grafik Laporan (seri depan): biru kategori 1 palet dataviz; validator lolos
-     terhadap chart-1 & chart-1-now (ΔE CVD ≥ 20) dan 4,42:1 terhadap putih. */
-  --color-chart-3: #2a78d6;
+  /* Isi batang laba kotor di grafik Laporan (seri depan). Keputusan pemilik 18 Nov (opsi B+):
+     hijau muda sebahasa dengan warna toko menggantikan biru, yang memperkenalkan warna asing di
+     app. Isi ini hanya 1,54:1 terhadap putih, jadi tiap batang laba dan kotak legendanya diberi
+     garis tepi 1,5 px chart-1: tepi 5,32:1 terhadap putih, isi 3,46:1 terhadap garis tepi dan
+     terhadap batang omzet di atasnya (dikunci di palette-guard.test.ts). */
+  --color-chart-3: #a8dcc0;
   --color-glass: rgb(255 255 255 / 0.72);
   /* Tanda status (Menipis / Minus) dan latar pemindai kamera. */
   --color-warning-soft: #fff0d9;
