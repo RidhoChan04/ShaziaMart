@@ -190,7 +190,10 @@ function PaymentSession({ onClose, onPaid }: Props) {
                 </p>
               )}
               {sale.notice && (
-                <p role="status" className="text-sm font-medium text-warning">
+                <p
+                  role="status"
+                  className="text-sm font-medium text-warning-ink"
+                >
                   {sale.notice}
                 </p>
               )}

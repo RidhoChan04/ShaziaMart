@@ -144,7 +144,10 @@ test("Kembali → jendela bayar dengan total baru, keranjang tetap memakai harga
   await priceDialogGone();
 
   expect(payDialog()).not.toBeNull();
-  expect(ui.getByText(TOTAL_CHANGED)).toBeInTheDocument();
+  // Kontras ≥ 4,5:1: tinta warning, bukan text-warning (4,2:1).
+  const changed = ui.getByText(TOTAL_CHANGED);
+  expect(changed).toHaveClass("text-warning-ink");
+  expect(changed).not.toHaveClass("text-warning");
   expect(ui.getAllByText("Rp36.500").length).toBeGreaterThan(0);
   expect(useCart.getState().lines[0]?.listPrice).toBe(36500);
   expect(bodies).toHaveLength(1);
