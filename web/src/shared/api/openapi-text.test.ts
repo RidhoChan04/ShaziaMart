@@ -190,6 +190,20 @@ test("K2/K3/K4: pelunasan kasir — laci, jumlah, idempoten", () => {
   expect(create).toContain("id yang sama");
 });
 
+test("(fix final 1) replay id pelunasan yang sudah dibatalkan: 200 rekaman dibatalkan, klien anggap belum tersimpan", () => {
+  const RULE =
+    "Replay id yang sudah dibatalkan mengembalikan 200 dengan rekaman berstatus dibatalkan";
+  const CLIENT = "klien wajib memperlakukannya sebagai belum tersimpan";
+  for (const [path, method] of [
+    ["/api/credit-payments", "post"],
+    ["/api/owner/customers/{customerId}/payments", "post"],
+  ] as const) {
+    const text = prose(op(path, method));
+    expect(text).toContain(RULE);
+    expect(text).toContain(CLIENT);
+  }
+});
+
 test("K5 (ruling R2): batal pelunasan kasir vs pemilik", () => {
   expect(
     prose(op("/api/credit-payments/{paymentId}/cancel", "post")),

@@ -30,6 +30,7 @@ import {
   SheetTitle,
 } from "@/shared/ui/sheet";
 import { ReasonDialog } from "../common/reason-dialog";
+import { clearPendingRepaymentId } from "../credit/pending-repayment-id";
 import { focusScanBox } from "../scan/scan-box";
 import { BADGE, clockLabel } from "./clock";
 import { CreditPaymentRow } from "./credit-payment-row";
@@ -116,7 +117,9 @@ export function HistorySheet({ open, onClose }: Props) {
   });
   const cancelPayment = useCancelCreditPayment({
     mutation: {
-      onSuccess: () => {
+      onSuccess: (_, { paymentId }) => {
+        // Id tertunda yang sama tidak boleh memutar ulang rekaman yang kini batal.
+        clearPendingRepaymentId(paymentId);
         focusTitleAfterClose.current = true;
         setCancelling(null);
         toast.success("Pelunasan dibatalkan");

@@ -83,7 +83,10 @@ export const CreateCustomerResponse = zod.object({
  * lunas tertua dulu. createdAt = jam server (bukan dari body).
  * Idempoten menurut (pembuat, id); id global lintas jalur kasir dan pemilik. id yang sama milik
  * pengguna ini → 200 rekaman tersimpan apa adanya, tanpa entri buku kasbon atau laci kedua; id
- * sudah dipakai pengguna lain → 409 ID_TAKEN tanpa isi rekaman.
+ * sudah dipakai pengguna lain → 409 ID_TAKEN tanpa isi rekaman. Replay id yang sudah dibatalkan
+ * mengembalikan 200 dengan rekaman berstatus dibatalkan (status dibatalkan); klien wajib
+ * memperlakukannya sebagai belum tersimpan (lepas id, jangan tampilkan tersimpan, simpan
+ * berikutnya memakai id baru).
  * print = true → server mencetak struk pelunasan (bawaan klien = autoPrint toko): nama toko,
  * alamat, PELUNASAN KASBON, tanggal jam · Kasir, Pelanggan, Sisa sebelum, Dibayar (metode),
  * Sisa kasbon, (Tunai) Uang diterima dan Kembalian, lalu footer struk toko. Jalur pemilik tanpa

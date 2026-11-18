@@ -53,7 +53,8 @@ export function CancelPaymentSheet({
 }: {
   entry: CreditHistoryEntry | null;
   customer: OwnerCustomer;
-  onDone: (saved: OwnerCustomer) => void;
+  /** Setelah berhasil: data terbaru + id pelunasan yang dibatalkan. */
+  onDone: (saved: OwnerCustomer, paymentId: string) => void;
   onClose: () => void;
 }) {
   const client = useQueryClient();
@@ -65,10 +66,10 @@ export function CancelPaymentSheet({
   const [reason, setReason] = useState("");
   const cancel = useCancelOwnerCreditPayment({
     mutation: {
-      onSuccess: (saved) => {
+      onSuccess: (saved, { paymentId }) => {
         succeeded.current = true;
         toast.success("Pelunasan dibatalkan");
-        onDone(saved);
+        onDone(saved, paymentId);
         setConfirm(false);
         onClose();
       },

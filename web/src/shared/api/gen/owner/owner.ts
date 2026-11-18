@@ -3202,7 +3202,10 @@ export const useSetOwnerCustomerCreditLimit = <TError = ErrorType<UnauthorizedRe
  * Waktu dari jam server.
  * Idempoten menurut (pembuat, id); id global lintas jalur kasir dan pemilik. id yang sama milik
  * pengguna ini → 200 pelanggan sekarang tanpa entri buku kedua; id sudah dipakai pengguna lain
- * → 409 ID_TAKEN.
+ * → 409 ID_TAKEN. Replay id yang sudah dibatalkan mengembalikan 200 dengan rekaman berstatus
+ * dibatalkan (baris riwayat dengan payment.id itu memuat cancelled); klien wajib
+ * memperlakukannya sebagai belum tersimpan (lepas id, tanpa pesan tersimpan, simpan berikutnya
+ * memakai id baru).
  * @summary Catat pelunasan kasbon langsung ke pemilik
  */
 export const createOwnerCreditPayment = async (customerId: string,

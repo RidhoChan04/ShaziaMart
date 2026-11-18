@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useRef, useState } from "react";
+import { type RefObject, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ApiError } from "@/shared/api/fetcher";
 import {
@@ -27,6 +27,8 @@ import {
 
 const REPLAYED_NOTICE =
   "Pelunasan ini sudah tersimpan sebelumnya — cek riwayat";
+const CANCELLED_NOTICE =
+  "Pelunasan ini sudah dibatalkan — simpan lagi untuk mencatat yang baru";
 /** Id tertunda hanya dipakai ulang selama kirim ulang masuk akal; lewat itu pelunasan baru. */
 const PENDING_MAX_AGE_MS = 10 * 60 * 1000;
 
@@ -70,28 +72,37 @@ function Choice({
   );
 }
 
+/** Id pelunasan pemilik yang belum terkonfirmasi; disimpan halaman agar batal pelunasan bisa melepasnya. */
+export type PendingOwnerPayment = {
+  id: string;
+  customerId: string;
+  amount: number;
+  method: OwnerCreditPaymentInputMethod;
+  createdAt: number;
+};
+
 /**
  * Tombol `Catat pelunasan` + lembar bawah: pelunasan langsung oleh pemilik (Transfer atau Tunai ke
  * pemilik), tidak pernah masuk laci. `id` dibuat saat simpan pertama dan dipakai ulang oleh setiap
  * percobaan sampai berhasil atau ID_TAKEN (juga setelah lembar ditutup lalu dibuka lagi), selama nominal
  * dan cara bayarnya sama dan umurnya kurang dari 10 menit; respons yang hilang tidak menggandakan pelunasan. Nominal atau cara bayar
  * berubah = pelunasan lain = `id` baru (server mengulang catatan asli, bukan isi yang baru).
+ * Replay rekaman yang sudah dibatalkan (200, baris riwayatnya dibatalkan) = belum tersimpan: id
+ * dilepas, tanpa toast tersimpan, lembar tetap terbuka dengan pesan, dan simpan berikutnya id baru.
  */
 export function OwnerPaymentSheet({
   customer,
+  pending,
   onSaved,
 }: {
   customer: OwnerCustomer;
+  /** Id tertunda; batal pelunasan di halaman melepasnya bila id-nya sama. */
+  pending: RefObject<PendingOwnerPayment | null>;
   onSaved: (saved: OwnerCustomer) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [cancelledReplay, setCancelledReplay] = useState(false);
   const client = useQueryClient();
-  const pending = useRef<{
-    id: string;
-    amount: number;
-    method: OwnerCreditPaymentInputMethod;
-    createdAt: number;
-  } | null>(null);
   // Kirim terakhir: apakah memakai id tertunda yang sudah pernah dikirim, dan kapan.
   const attempt = useRef({ reused: false, knownBefore: false, at: 0 });
   const [method, setMethod] =
@@ -102,6 +113,15 @@ export function OwnerPaymentSheet({
       onSuccess: (saved, variables) => {
         // Hook-level: tetap berjalan walau halaman sudah ditinggalkan.
         if (pending.current?.id === variables.data.id) pending.current = null;
+        const mine = saved.history.find(
+          (e) => e.payment?.id === variables.data.id,
+        );
+        if (mine?.cancelled) {
+          // Rekaman lama sudah batal: uang belum tercatat; isian dibiarkan untuk disimpan lagi.
+          setCancelledReplay(true);
+          onSaved(saved);
+          return;
+        }
         setMethod("transfer");
         setText("");
         // Id dipakai ulang dan server sudah mengenalnya: riwayat sebelum kirim sudah memuatnya
@@ -144,7 +164,10 @@ export function OwnerPaymentSheet({
       onOpenChange={(next) => {
         if (!next && create.isPending) return;
         setOpen(next);
-        if (next) create.reset();
+        if (next) {
+          create.reset();
+          setCancelledReplay(false);
+        }
       }}
     >
       <SheetTrigger asChild>
@@ -231,15 +254,22 @@ export function OwnerPaymentSheet({
             {errorText}
           </p>
         )}
+        {cancelledReplay && (
+          <p role="alert" className="text-sm font-medium text-danger">
+            {CANCELLED_NOTICE}
+          </p>
+        )}
         <Button
           className="h-12 w-full text-[17px]"
           disabled={problem !== null || create.isPending}
           onClick={() => {
             if (amount === null) return;
+            setCancelledReplay(false);
             const now = Date.now();
             const kept = pending.current;
             const same =
               kept !== null &&
+              kept.customerId === customer.id &&
               kept.amount === amount &&
               kept.method === method &&
               now - kept.createdAt < PENDING_MAX_AGE_MS;
@@ -252,6 +282,7 @@ export function OwnerPaymentSheet({
             };
             pending.current = {
               id,
+              customerId: customer.id,
               amount,
               method,
               createdAt: same ? kept.createdAt : now,

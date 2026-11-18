@@ -12,20 +12,33 @@ import type {
   KasirCreditPaymentInput,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { pesanError } from "@/shared/lib/error-messages";
+import { formatRupiah } from "@/shared/lib/money";
 import { clearPendingRepaymentId } from "./pending-repayment-id";
 
 const REPLAYED_NOTICE =
   "Pelunasan ini sudah tersimpan sebelumnya — cek Riwayat";
+const CANCELLED_NOTICE =
+  "Pelunasan ini sudah dibatalkan — simpan lagi untuk mencatat yang baru";
 
 const sameRequest = (p: KasirCreditPayment, i: KasirCreditPaymentInput) =>
   p.customerId === i.customerId &&
   p.amount === i.amount &&
   p.method === i.method;
 
+/** Pemberitahuan replay; uang diterima berbeda dari yang diketik → angka tercatat ditulis jelas. */
+function replayedNotice(p: KasirCreditPayment, i: KasirCreditPaymentInput) {
+  if (p.method !== "tunai" || i.cashReceived === p.cashReceived) {
+    return REPLAYED_NOTICE;
+  }
+  return `${REPLAYED_NOTICE}. Tercatat: uang diterima ${formatRupiah(p.cashReceived)}, kembalian ${formatRupiah(p.change)}.`;
+}
+
 /**
  * Kirim pelunasan kasbon. Satu request sekaligus; `id` milik pemanggil dipakai ulang
  * pada setiap percobaan sehingga kirim ulang (jawaban hilang) tidak mencatat dua kali.
  * Id yang sudah tersimpan dengan isi lain → `notice`, dan yang tampil adalah data server.
+ * Replay rekaman yang sudah dibatalkan (200, status dibatalkan) = belum tersimpan: id dilepas,
+ * hasil tidak ditampilkan, dan simpan berikutnya memakai id baru.
  */
 export function useSubmitRepayment(
   onSaved: (payment: KasirCreditPayment) => void,
@@ -35,7 +48,7 @@ export function useSubmitRepayment(
     // Tingkat hook (bukan per panggilan): tetap jalan walau lembar sudah dilepas (mis. kunci).
     mutation: {
       retry: false,
-      onSuccess: clearPendingRepaymentId,
+      onSuccess: () => clearPendingRepaymentId(),
       onError: (err) => {
         if (err instanceof ApiError && err.code === "ID_TAKEN") {
           clearPendingRepaymentId();
@@ -63,8 +76,13 @@ export function useSubmitRepayment(
           void client.invalidateQueries({
             queryKey: getSearchCustomersQueryKey(),
           });
+          if (payment.status === "dibatalkan") {
+            // Id sudah dilepas di onSuccess tingkat hook; uang belum tercatat.
+            setError(CANCELLED_NOTICE);
+            return;
+          }
           if (reusedId || !sameRequest(payment, input))
-            setNotice(REPLAYED_NOTICE);
+            setNotice(replayedNotice(payment, input));
           if (payment.printStatus === "gagal") {
             toast.error("Struk gagal dicetak — cetak ulang dari Riwayat");
           }

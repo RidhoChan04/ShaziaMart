@@ -21,7 +21,10 @@ import { useCart } from "../cart/cart-store";
 import { KasirScreen } from "../screen/kasir-screen";
 import { setSession } from "../shift/gate-state";
 import { ShiftActions } from "../shift/shift-actions";
-import { clearPendingRepaymentId } from "./pending-repayment-id";
+import {
+  clearPendingRepaymentId,
+  pendingRepaymentId,
+} from "./pending-repayment-id";
 
 vi.mock("@/shared/lib/beep", () => ({ beep: vi.fn() }));
 vi.mock("@/shared/lib/id", async (importOriginal) => {
@@ -479,7 +482,10 @@ test("id sudah tersimpan dengan isi lain → 'Pelunasan ini sudah tersimpan sebe
   await user.type(received(), "50000");
   await user.click(save());
   await screen.findByText("Pelunasan tersimpan");
-  expect(ui.getByText(NOTICE)).toBeInTheDocument();
+  // (fix final 3) uang diterima tercatat (30.000) beda dari yang diketik (50.000) → ditulis jelas.
+  expect(
+    ui.getByText(`${NOTICE}. Tercatat: uang diterima Rp30.000, kembalian Rp0.`),
+  ).toBeInTheDocument();
   expect(ui.getByText("Sisa kasbon Rp90.000")).toBeInTheDocument();
   expect(saved().filter((p) => p.id === "pel-tetap")).toHaveLength(1);
   // Status = ikon + teks: ikon disembunyikan dari pembaca layar.
@@ -603,4 +609,102 @@ test("ganti pelanggan mengosongkan nominal dan uang diterima", async () => {
   await user.click(await ui.findByRole("button", { name: /Bu Sari/ }));
   expect(amount()).toHaveValue("");
   expect(received()).toHaveValue("");
+});
+
+const CANCELLED_NOTICE =
+  "Pelunasan ini sudah dibatalkan — simpan lagi untuk mencatat yang baru";
+
+test("(fix final 1) jawaban hilang → pelunasan itu dibatalkan → isian sama → server memutar ulang rekaman batal: bukan 'Pelunasan tersimpan', pesan dibatalkan; simpan lagi → id baru, tercatat", async () => {
+  const ids: string[] = [];
+  loseFirstResponse(ids);
+  const ctx = await openWithSari();
+  await payFifty(ctx);
+  expect(await ctx.ui.findByRole("alert")).toHaveTextContent(OFFLINE);
+  const lost = ids[0] ?? "";
+  // Kasir membatalkannya dari Riwayat (di luar lembar ini; id tertunda masih menunggu).
+  const cancel = await post(`/api/credit-payments/${lost}/cancel`, {
+    reason: "salah pelanggan",
+  });
+  expect(cancel.status).toBe(200);
+  const ui = await reopenAndFill(ctx);
+  await ctx.user.click(ui.getByRole("button", { name: "Simpan pelunasan" }));
+  expect(await ui.findByRole("alert")).toHaveTextContent(CANCELLED_NOTICE);
+  expect(ids).toHaveLength(2);
+  expect(ids[1]).toBe(lost);
+  expect(screen.queryByText("Pelunasan tersimpan")).toBeNull();
+  expect(
+    screen.getByRole("dialog", { name: "Pelunasan kasbon" }),
+  ).toBeInTheDocument();
+  // Simpan lagi: id baru, pelunasan baru tercatat (yang batal tetap batal).
+  await ctx.user.click(ui.getByRole("button", { name: "Simpan pelunasan" }));
+  expect(await screen.findByText("Pelunasan tersimpan")).toBeInTheDocument();
+  expect(ids).toHaveLength(3);
+  expect(ids[2]).not.toBe(lost);
+  expect(sheetUi().queryByRole("status")).toBeNull();
+  const active = payments50().filter((p) => p.cancelledAt === null);
+  expect(active.map((p) => p.id)).toEqual([ids[2]]);
+});
+
+test("(fix final 3) jawaban hilang (diterima 100.000) → isian sama tetapi diterima 50.000 → pemberitahuan memuat uang diterima & kembalian yang tercatat", async () => {
+  const ids: string[] = [];
+  loseFirstResponse(ids);
+  const ctx = await openWithSari();
+  await ctx.user.type(ctx.amount(), "50000");
+  await ctx.user.type(ctx.received(), "100000");
+  await ctx.user.click(ctx.save());
+  expect(await ctx.ui.findByRole("alert")).toHaveTextContent(OFFLINE);
+  const ui = await reopenAndFill(ctx);
+  await ctx.user.click(ui.getByRole("button", { name: "Simpan pelunasan" }));
+  expect(await screen.findByText("Pelunasan tersimpan")).toBeInTheDocument();
+  expect(ids[1]).toBe(ids[0]);
+  expect(sheetUi().getByRole("status")).toHaveTextContent(
+    `${NOTICE}. Tercatat: uang diterima Rp100.000, kembalian Rp50.000.`,
+  );
+  expect(saved().filter((p) => p.id === ids[0])).toHaveLength(1);
+});
+
+test("(fix final 3) replay dengan uang diterima sama → pemberitahuan tanpa rincian uang", async () => {
+  const ids: string[] = [];
+  loseFirstResponse(ids);
+  const ctx = await openWithSari();
+  await payFifty(ctx);
+  await ctx.ui.findByRole("alert");
+  const ui = await reopenAndFill(ctx);
+  await ctx.user.click(ui.getByRole("button", { name: "Simpan pelunasan" }));
+  await screen.findByText("Pelunasan tersimpan");
+  expect(sheetUi().getByRole("status").textContent).toBe(NOTICE);
+});
+
+test("(fix final 6) lembar dilepas saat simpan masih berjalan, lalu server menyimpan → id tertunda dilepas", async () => {
+  let release = () => {};
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let done = false;
+  server.use(
+    http.post("/api/credit-payments", async () => {
+      await gate;
+      done = true;
+    }),
+  );
+  const ctx = await openWithSari();
+  await payFifty(ctx);
+  const sari = mockDb.get().customers.find((c) => c.name === "Bu Sari")?.id;
+  const scope = {
+    userId: mockDb.get().shift?.kasirId ?? "",
+    shiftId: mockDb.get().shift?.id ?? "",
+  };
+  // Saat masih menunggu: isian sama memakai id yang sama.
+  expect(pendingRepaymentId(scope, sari ?? "", 50_000, "tunai").reused).toBe(
+    true,
+  );
+  ctx.unmount();
+  release();
+  await waitFor(() => expect(done).toBe(true));
+  await waitFor(() =>
+    expect(pendingRepaymentId(scope, sari ?? "", 50_000, "tunai").reused).toBe(
+      false,
+    ),
+  );
+  expect(payments50()).toHaveLength(1);
 });

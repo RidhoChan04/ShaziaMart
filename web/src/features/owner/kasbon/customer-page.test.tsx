@@ -845,3 +845,101 @@ test("pelanggan tidak ada → pesan galat dengan Coba lagi", async () => {
   );
   expect(screen.getByRole("button", { name: "Coba lagi" })).toBeInTheDocument();
 });
+
+const CANCELLED_NOTICE =
+  "Pelunasan ini sudah dibatalkan — simpan lagi untuk mencatat yang baru";
+
+test("(fix final 1) respons hilang → pelunasan itu dibatalkan → simpan lagi → server memutar ulang rekaman batal: tanpa toast tersimpan, pesan dibatalkan, lembar tetap; simpan lagi → id baru", async () => {
+  const ids: string[] = [];
+  loseFirstResponse(ids);
+  const { user, sheet } = await openPaySheet();
+  const ui = within(sheet);
+  await user.type(ui.getByRole("textbox", { name: "Nominal" }), "30000");
+  await user.click(ui.getByRole("button", { name: "Simpan pelunasan" }));
+  expect(await ui.findByRole("alert")).toBeInTheDocument();
+  const lost = ids[0] ?? "";
+  const cancel = await post(`/api/owner/credit-payments/${lost}/cancel`, {
+    reason: "salah catat",
+  });
+  expect(cancel.status).toBe(200);
+  vi.setSystemTime(NOW + 60_000);
+  await user.click(ui.getByRole("button", { name: "Simpan pelunasan" }));
+  await waitFor(() =>
+    expect(ui.getByRole("alert")).toHaveTextContent(CANCELLED_NOTICE),
+  );
+  expect(ids[1]).toBe(lost);
+  expect(screen.queryByText("Pelunasan tersimpan")).toBeNull();
+  expect(
+    screen.queryByText(
+      "Pelunasan ini sudah tersimpan sebelumnya — cek riwayat",
+    ),
+  ).toBeNull();
+  expect(
+    screen.getByRole("dialog", { name: "Catat pelunasan" }),
+  ).toBeInTheDocument();
+  expect(ui.getByRole("textbox", { name: "Nominal" })).toHaveValue("Rp30.000");
+  await user.click(ui.getByRole("button", { name: "Simpan pelunasan" }));
+  expect(await screen.findByText("Pelunasan tersimpan")).toBeInTheDocument();
+  expect(ids).toHaveLength(3);
+  expect(ids[2]).not.toBe(lost);
+  const active = mockDb
+    .get()
+    .creditPayments.filter((p) => ids.includes(p.id) && p.cancelledAt === null);
+  expect(active.map((p) => p.id)).toEqual([ids[2]]);
+});
+
+test("(fix final 1) respons hilang → batal pelunasan itu dari riwayat → isian sama → id baru, tersimpan tanpa pemberitahuan replay", async () => {
+  const ids: string[] = [];
+  loseFirstResponse(ids);
+  const { user, sheet } = await openPaySheet();
+  await user.type(
+    within(sheet).getByRole("textbox", { name: "Nominal" }),
+    "30000",
+  );
+  await user.click(
+    within(sheet).getByRole("button", { name: "Simpan pelunasan" }),
+  );
+  expect(await within(sheet).findByRole("alert")).toBeInTheDocument();
+  await user.click(within(sheet).getByRole("button", { name: "Batal" }));
+  await waitFor(() =>
+    expect(
+      screen.queryByRole("dialog", { name: "Catat pelunasan" }),
+    ).toBeNull(),
+  );
+  await waitFor(() =>
+    expect(history()[0]).toHaveTextContent("Transfer ke pemilik"),
+  );
+  await user.click(within(rowOf("Transfer ke pemilik")).getByRole("button"));
+  const detail = await screen.findByRole("dialog", {
+    name: "Pelunasan Rp30.000",
+  });
+  await user.click(
+    within(detail).getByRole("button", { name: "Batalkan pelunasan" }),
+  );
+  const dialog = await screen.findByRole("alertdialog");
+  await user.type(
+    within(dialog).getByRole("textbox", { name: "Alasan" }),
+    "salah catat",
+  );
+  await user.click(
+    within(dialog).getByRole("button", { name: "Batalkan pelunasan" }),
+  );
+  expect(await screen.findByText("Pelunasan dibatalkan")).toBeInTheDocument();
+  vi.setSystemTime(NOW + 60_000);
+  await user.click(screen.getByRole("button", { name: "Catat pelunasan" }));
+  const again = await screen.findByRole("dialog", { name: "Catat pelunasan" });
+  const box = within(again).getByRole("textbox", { name: "Nominal" });
+  await user.clear(box);
+  await user.type(box, "30000");
+  await user.click(
+    within(again).getByRole("button", { name: "Simpan pelunasan" }),
+  );
+  expect(await screen.findByText("Pelunasan tersimpan")).toBeInTheDocument();
+  expect(ids).toHaveLength(2);
+  expect(ids[1]).not.toBe(ids[0]);
+  expect(
+    screen.queryByText(
+      "Pelunasan ini sudah tersimpan sebelumnya — cek riwayat",
+    ),
+  ).toBeNull();
+});

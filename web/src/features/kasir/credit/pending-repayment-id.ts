@@ -40,7 +40,11 @@ export function pendingRepaymentId(
   return { id: pending.id, reused: false };
 }
 
-/** Panggil setelah simpan berhasil, galat ID_TAKEN, kunci, atau shift berganti. */
-export function clearPendingRepaymentId(): void {
-  pending = null;
+/**
+ * Panggil setelah simpan berhasil, galat ID_TAKEN, kunci, atau shift berganti. Dengan `id`: hanya
+ * dilepas bila id tertunda sama (mis. pelunasan itu dibatalkan dari Riwayat), agar isian sama
+ * berikutnya memakai id baru dan bukan memutar ulang rekaman yang sudah batal.
+ */
+export function clearPendingRepaymentId(id?: string): void {
+  if (id === undefined || pending?.id === id) pending = null;
 }

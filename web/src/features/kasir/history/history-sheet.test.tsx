@@ -8,6 +8,10 @@ import { setScenario } from "@/mocks/scenarios";
 import type { Sale } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { renderWithQuery } from "@/test/render-app";
 import { humanTyping } from "@/test/typing";
+import {
+  clearPendingRepaymentId,
+  pendingRepaymentId,
+} from "../credit/pending-repayment-id";
 import { KasirScreen } from "../screen/kasir-screen";
 import { ShiftActions } from "../shift/shift-actions";
 import { HistorySheet } from "./history-sheet";
@@ -505,4 +509,40 @@ test("menutup Riwayat mengembalikan fokus ke kolom scan", async () => {
   await screen.findByRole("dialog", { name: "Riwayat shift ini" });
   await user.keyboard("{Escape}");
   await waitFor(() => expect(scan).toHaveFocus());
+});
+
+test("(fix final 1) batal pelunasan melepas id tertunda yang sama; id tertunda lain tetap", async () => {
+  const sari =
+    mockDb.get().customers.find((c) => c.name === "Bu Sari")?.id ?? "";
+  const scope = { userId: "u", shiftId: openShiftId() };
+  clearPendingRepaymentId();
+  const kept = pendingRepaymentId(scope, sari, 50_000, "tunai");
+  seedPayment({ id: kept.id });
+  const { user } = setup();
+  await screen.findByText("Pelunasan · Bu Sari");
+  await user.click(cancelBtn());
+  const ui = within(await cancelDialog());
+  await user.type(ui.getByRole("textbox", { name: "Alasan" }), "Salah{Enter}");
+  await toasted("Pelunasan dibatalkan");
+  // Isian sama setelah batal → id baru (rekaman batal tidak diputar ulang).
+  expect(pendingRepaymentId(scope, sari, 50_000, "tunai").reused).toBe(false);
+});
+
+test("(fix final 1) batal pelunasan lain tidak melepas id tertunda", async () => {
+  const sari =
+    mockDb.get().customers.find((c) => c.name === "Bu Sari")?.id ?? "";
+  const scope = { userId: "u", shiftId: openShiftId() };
+  clearPendingRepaymentId();
+  const other = pendingRepaymentId(scope, sari, 20_000, "tunai");
+  seedPayment();
+  const { user } = setup();
+  await screen.findByText("Pelunasan · Bu Sari");
+  await user.click(cancelBtn());
+  const ui = within(await cancelDialog());
+  await user.type(ui.getByRole("textbox", { name: "Alasan" }), "Salah{Enter}");
+  await toasted("Pelunasan dibatalkan");
+  expect(pendingRepaymentId(scope, sari, 20_000, "tunai")).toEqual({
+    id: other.id,
+    reused: true,
+  });
 });

@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   getGetOwnerCustomerQueryKey,
   getGetOwnerTodaySummaryQueryKey,
@@ -17,7 +17,10 @@ import { RowList, Section } from "../products/detail/section";
 import { CancelPaymentSheet } from "./cancel-payment-sheet";
 import { HistoryRow } from "./history-row";
 import { LimitSheet } from "./limit-sheet";
-import { OwnerPaymentSheet } from "./owner-payment-sheet";
+import {
+  OwnerPaymentSheet,
+  type PendingOwnerPayment,
+} from "./owner-payment-sheet";
 
 const BACK = { label: "Kasbon", fallback: "/owner/kasbon" } as const;
 
@@ -65,6 +68,8 @@ export function CustomerPage() {
   const query = useGetOwnerCustomer(customerId);
   // Hanya id yang disimpan: lembar batal selalu memakai baris terbaru dari data yang dimuat ulang.
   const [targetId, setTargetId] = useState<string | null>(null);
+  // Id pelunasan tertunda milik lembar Catat pelunasan; dilepas bila pelunasan itu dibatalkan.
+  const pendingPayment = useRef<PendingOwnerPayment | null>(null);
 
   if (!query.data) {
     return query.isError ? (
@@ -110,6 +115,7 @@ export function CustomerPage() {
           <OwnerPaymentSheet
             key={customer.id}
             customer={customer}
+            pending={pendingPayment}
             onSaved={refresh}
           />
           <LimitSheet customer={customer} onSaved={refresh} />
@@ -136,7 +142,12 @@ export function CustomerPage() {
       <CancelPaymentSheet
         entry={target}
         customer={customer}
-        onDone={refresh}
+        onDone={(saved, paymentId) => {
+          if (pendingPayment.current?.id === paymentId) {
+            pendingPayment.current = null;
+          }
+          refresh(saved);
+        }}
         onClose={() => setTargetId(null)}
       />
     </div>
