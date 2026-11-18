@@ -108,10 +108,6 @@ export type MockSale = Sale & {
 export const VOID_MAX_DAYS = 7;
 
 /**
- * Jendela batal kasir: penjualan shift yang sedang buka → `shift_ini`; shift lain dengan
- * `isoDaysBetween(tanggal jual WIB, hari ini) ≤ 7` → `shift_lama`; selain itu `terlalu_lama`.
- */
-/**
  * Data batal sebuah penjualan untuk pemilik & pengecualian: null bila tidak dibatalkan. Penjualan
  * berstatus batal wajib punya jam, pembatal, alasan, jalur, dan pengembaliannya (`voidSaleAs`
  * selalu mengisi semuanya); rekaman yang tidak lengkap dilempar, tidak diberi nilai karangan.
@@ -157,6 +153,10 @@ export const customerNameOf = (
     ? null
     : (state.customers.find((c) => c.id === customerId)?.name ?? null);
 
+/**
+ * Jendela batal kasir: penjualan shift yang sedang buka → `shift_ini`; shift lain dengan
+ * `isoDaysBetween(tanggal jual WIB, hari ini) ≤ 7` → `shift_lama`; selain itu `terlalu_lama`.
+ */
 export function kasirVoidWindow(
   sale: MockSale,
   shift: MockShift | null,
@@ -561,6 +561,11 @@ export const mockDb = {
     current ??= load();
     return lazyCopy(current);
   },
+  /**
+   * Ubah state lewat `fn` pada draf, lalu simpan. Peringatan: objek yang dimasukkan ke draf atau
+   * diambil dari draf menjadi bagian state tersimpan — jangan diubah lagi setelah `update` selesai,
+   * karena JSON per koleksi di-cache (`keyJson`) dan akan basi.
+   */
   update(fn: (s: MockState) => void): void {
     current ??= load();
     const base = current;
@@ -577,7 +582,11 @@ export const mockDb = {
   },
 };
 
-/** Jalankan `fn` di dalam `mockDb.update` dan kembalikan hasilnya. */
+/**
+ * Jalankan `fn` di dalam `mockDb.update` dan kembalikan hasilnya. Peringatan yang sama dengan
+ * `update`: hasil yang menunjuk objek di draf adalah state tersimpan — jangan diubah setelah kembali
+ * (cache JSON akan basi); salin dulu bila perlu diubah.
+ */
 export function updateWith<T>(fn: (s: MockState) => T): T {
   const out: T[] = [];
   mockDb.update((s) => {

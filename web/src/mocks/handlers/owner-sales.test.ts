@@ -145,8 +145,15 @@ test("(fix 1) rekaman batal tanpa pembatal/jalur tidak dilabeli diam-diam: detai
     }
   });
   await ownerLogin();
-  const res = await get(`/api/owner/sales/${sale.id}`);
-  expect(res.status).toBe(500);
+  // Galat yang dilempar handler memang diharapkan: MSW mencetak tumpukannya lewat console.error.
+  const error = vi.spyOn(console, "error").mockImplementation(() => {});
+  try {
+    const res = await get(`/api/owner/sales/${sale.id}`);
+    expect(res.status).toBe(500);
+    expect(error).toHaveBeenCalled();
+  } finally {
+    error.mockRestore();
+  }
 });
 
 describe("voidOwnerSale (jawaban pemilik Q1: laci tidak pernah dikoreksi)", () => {
