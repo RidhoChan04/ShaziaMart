@@ -65,9 +65,10 @@ test("pelunasan tunai Bu Sari: kembalian, tersimpan, dan baris tutup shift", asy
   await dialog.getByRole("button", { name: "Simpan pelunasan" }).click();
 
   const saved = page.getByRole("dialog", {
-    name: /^Pelunasan (kasbon|tersimpan)$/,
+    name: "Pelunasan tersimpan",
+    exact: true,
   });
-  await expect(saved).toContainText("Pelunasan tersimpan");
+  await expect(saved).toBeVisible();
   await expect(saved).toContainText("KEMBALIAN");
   await expect(saved).toContainText("Rp50.000");
   await expect(saved).toContainText("Sisa kasbon Rp70.000");
@@ -99,9 +100,10 @@ test("pelunasan QRIS saat keranjang berisi tidak mengosongkan keranjang", async 
   await dialog.getByRole("tab", { name: "QRIS" }).click();
   await dialog.getByRole("button", { name: "Sudah masuk" }).click();
   const saved = page.getByRole("dialog", {
-    name: /^Pelunasan (kasbon|tersimpan)$/,
+    name: "Pelunasan tersimpan",
+    exact: true,
   });
-  await expect(saved).toContainText("Pelunasan tersimpan");
+  await expect(saved).toBeVisible();
   await expect(saved).toContainText("Sisa kasbon Rp100.000");
   await saved.getByRole("button", { name: "Tutup" }).click();
   await expect(saved).toBeHidden();
@@ -122,7 +124,7 @@ test("kasir membatalkan pelunasan QRIS; pemilik melihatnya dan meninjau butir Be
   await dialog.getByRole("tab", { name: "QRIS" }).click();
   await dialog.getByRole("button", { name: "Sudah masuk" }).click();
   await page
-    .getByRole("dialog", { name: /^Pelunasan (kasbon|tersimpan)$/ })
+    .getByRole("dialog", { name: "Pelunasan tersimpan", exact: true })
     .getByRole("button", { name: "Tutup" })
     .click();
 
@@ -142,7 +144,7 @@ test("kasir membatalkan pelunasan QRIS; pemilik melihatnya dan meninjau butir Be
   await cancel.getByRole("button", { name: "Batalkan pelunasan" }).click();
   await expect(cancel).toBeHidden();
   await expect(sheet.getByText("Dibatalkan")).toBeVisible();
-  await page.keyboard.press("Escape");
+  await closeHistory(page);
 
   const owner = await ownerPage(context, "/owner/kasbon");
   await owner.getByRole("link", { name: /Bu Sari/ }).click();
@@ -241,7 +243,7 @@ test("batal transaksi dan kasbon lewat limit di kasir; pemilik membatalkan trans
   await repay.getByRole("tab", { name: "QRIS" }).click();
   await repay.getByRole("button", { name: "Sudah masuk" }).click();
   await page
-    .getByRole("dialog", { name: /^Pelunasan (kasbon|tersimpan)$/ })
+    .getByRole("dialog", { name: "Pelunasan tersimpan", exact: true })
     .getByRole("button", { name: "Tutup" })
     .click();
   await page.getByRole("button", { name: "Riwayat" }).click();
@@ -274,7 +276,7 @@ test("batal transaksi dan kasbon lewat limit di kasir; pemilik membatalkan trans
   await closed.getByRole("button", { name: "Selesai" }).click();
 
   const owner = await ownerPage(context, "/owner");
-  // Beranda: tiga butir pengecualian di atas Stok minus, dengan rentang tanggal.
+  // Beranda: tiga butir pengecualian paling atas, dengan rentang tanggal.
   const attention = owner.getByRole("region", { name: "Perlu perhatian" });
   const items = attention.getByRole("listitem");
   const voided = items.filter({ hasText: "1 transaksi dibatalkan kasir" });
@@ -291,8 +293,7 @@ test("batal transaksi dan kasbon lewat limit di kasir; pemilik membatalkan trans
       /dibatalkan kasir|kasbon lewat limit/.test(t) ? [i] : [],
     ),
   );
-  const stokMinus = texts.findIndex((t) => t.includes("Stok minus"));
-  if (stokMinus >= 0) expect(lastException).toBeLessThan(stokMinus);
+  // Tiga butir pengecualian = tiga butir teratas (di atas butir stok mana pun).
   expect(lastException).toBe(2);
 
   await owner.goto("/owner/lainnya");
@@ -459,7 +460,7 @@ test("toast Ditandai sudah ditinjau di HP pemilik berada di atas tab bar dan tid
   await dialog.getByRole("tab", { name: "QRIS" }).click();
   await dialog.getByRole("button", { name: "Sudah masuk" }).click();
   await page
-    .getByRole("dialog", { name: /^Pelunasan (kasbon|tersimpan)$/ })
+    .getByRole("dialog", { name: "Pelunasan tersimpan", exact: true })
     .getByRole("button", { name: "Tutup" })
     .click();
   await page.getByRole("button", { name: "Riwayat" }).click();
@@ -470,15 +471,29 @@ test("toast Ditandai sudah ditinjau di HP pemilik berada di atas tab bar dan tid
   const cancel = page.getByRole("dialog", { name: /^Batalkan pelunasan/ });
   await cancel.getByLabel("Alasan").fill("Salah catat");
   await cancel.getByRole("button", { name: "Batalkan pelunasan" }).click();
-  // Toast kasir tidak ikut aturan pemilik: tetap di tepi bawah layar (tanpa celah tab bar 76 px).
+  // Toast kasir tidak ikut aturan pemilik: jaraknya ke tepi bawah layar = offset bawaan sonner
+  // (variabel --offset-bottom toaster), bukan celah tab bar pemilik.
   const kasirToast = page.locator("[data-sonner-toast]", {
     hasText: "Pelunasan dibatalkan",
   });
   await expect(kasirToast).toBeVisible();
-  const kasirBox = await kasirToast.boundingBox();
+  const offset = await page
+    .locator("[data-sonner-toaster]")
+    .first()
+    .evaluate((el) =>
+      Number.parseFloat(
+        getComputedStyle(el).getPropertyValue("--offset-bottom"),
+      ),
+    );
+  expect(offset).toBeGreaterThan(0);
   const viewportHeight = page.viewportSize()?.height ?? 0;
-  if (!kasirBox) throw new Error("toast kasir tanpa bounding box");
-  expect(viewportHeight - (kasirBox.y + kasirBox.height)).toBeLessThan(76);
+  await expect
+    .poll(async () => {
+      const box = await kasirToast.boundingBox();
+      return box ? Math.round(viewportHeight - (box.y + box.height)) : null;
+    })
+    .toBe(Math.round(offset));
+  await closeHistory(page);
 
   const owner = await ownerPage(context, "/owner/pengecualian/batal_pelunasan");
   await owner.getByRole("button", { name: "Tandai sudah ditinjau" }).click();

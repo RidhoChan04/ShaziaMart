@@ -85,6 +85,23 @@ test("Laporan: Paling laku urut Jumlah, Per kasir, dan Tidak terjual", async ({
   await expect
     .poll(async () => (await rows.allInnerTexts()).join("|"))
     .not.toBe(byOmzet.join("|"));
+  // Baris pertama = barang teratas menurut server untuk sort=jumlah (urutan dari server, K15).
+  const search = new URL(page.url()).searchParams;
+  const topByQty = await page.evaluate(
+    async (qs) => {
+      const res = await fetch(`/api/owner/reports/products?${qs}`);
+      const body = (await res.json()) as { productName: string }[];
+      return body[0]?.productName ?? null;
+    },
+    new URLSearchParams({
+      period: search.get("periode") ?? "",
+      from: search.get("dari") ?? "",
+      to: search.get("sampai") ?? "",
+      sort: "jumlah",
+    }).toString(),
+  );
+  expect(topByQty).not.toBeNull();
+  await expect(rows.first()).toContainText(topByQty ?? "");
   await expectNoA11yViolations(page);
 
   await page.goBack();
