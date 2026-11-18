@@ -284,6 +284,44 @@ describe("salesReport", () => {
     });
   });
 
+  test("marginPermille per bucket: aturan sama dengan total (164, minus −21, omzet 0 / belum terjadi → null)", () => {
+    const s = fresh();
+    addRaw(s, wib("2026-11-03", 10), 48_215_500, 40_303_200);
+    addRaw(s, wib("2026-11-02", 10), 10_000, 10_210);
+    const days = salesReport(s, MONTH, NOW).series.buckets;
+    expect(days.slice(0, 6)).toEqual([
+      { key: "2026-11-01", revenue: 0, grossProfit: 0, marginPermille: null },
+      {
+        key: "2026-11-02",
+        revenue: 10_000,
+        grossProfit: -210,
+        marginPermille: -21,
+      },
+      {
+        key: "2026-11-03",
+        revenue: 48_215_500,
+        grossProfit: 7_912_300,
+        marginPermille: 164,
+      },
+      { key: "2026-11-04", revenue: 0, grossProfit: 0, marginPermille: null },
+      { key: "2026-11-05", revenue: 0, grossProfit: 0, marginPermille: null },
+      {
+        key: "2026-11-06",
+        revenue: null,
+        grossProfit: null,
+        marginPermille: null,
+      },
+    ]);
+    const hours = salesReport(s, q("hari", "2026-11-03", "2026-11-03"), NOW)
+      .series.buckets;
+    expect(hours[10]).toEqual({
+      key: "10",
+      revenue: 48_215_500,
+      grossProfit: 7_912_300,
+      marginPermille: 164,
+    });
+  });
+
   test("batas WIB: 17.30 UTC 4 Nov (00.30 WIB) masuk 5 Nov; 16.59 UTC 4 Nov masuk 4 Nov", () => {
     const s = fresh();
     addRaw(s, Date.UTC(2026, 10, 4, 17, 30), 7_000, 0);
@@ -294,6 +332,7 @@ describe("salesReport", () => {
       key: "0",
       revenue: 7_000,
       grossProfit: 7_000,
+      marginPermille: 1_000,
     });
     const nov4 = salesReport(s, q("hari", "2026-11-04", "2026-11-04"), NOW);
     expect(nov4.current.revenue).toBe(900);
@@ -338,12 +377,14 @@ describe("salesReport", () => {
       key: "2026-11-01",
       revenue: 0,
       grossProfit: 0,
+      marginPermille: null,
     });
     expect(days.buckets[29]?.key).toBe("2026-11-30");
     expect(days.buckets[4]).toEqual({
       key: "2026-11-05",
       revenue: 18_000,
       grossProfit: 1_500,
+      marginPermille: 83,
     });
     expect(days.buckets.slice(5).every((x) => x.revenue === null)).toBe(true);
     expect(days.buckets.slice(5).every((x) => x.grossProfit === null)).toBe(
@@ -363,8 +404,14 @@ describe("salesReport", () => {
       key: "14",
       revenue: 18_000,
       grossProfit: 1_500,
+      marginPermille: 83,
     });
-    expect(hours.buckets[3]).toEqual({ key: "3", revenue: 0, grossProfit: 0 });
+    expect(hours.buckets[3]).toEqual({
+      key: "3",
+      revenue: 0,
+      grossProfit: 0,
+      marginPermille: null,
+    });
     expect(hours.buckets.slice(15).every((x) => x.revenue === null)).toBe(true);
     // Hari lampau: semua jam sudah terjadi.
     const past = salesReport(

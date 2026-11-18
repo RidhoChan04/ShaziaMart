@@ -67,8 +67,13 @@ function salesFixture(over: Partial<SalesReport> = {}): SalesReport {
       buckets: Array.from({ length: 30 }, (_, i) => {
         const key = `2026-11-${String(i + 1).padStart(2, "0")}`;
         return i < 5
-          ? { key, revenue: 9_000_000, grossProfit: 1_500_000 }
-          : { key, revenue: null, grossProfit: null };
+          ? {
+              key,
+              revenue: 9_000_000,
+              grossProfit: 1_500_000,
+              marginPermille: 167,
+            }
+          : { key, revenue: null, grossProfit: null, marginPermille: null };
       }),
     },
     topProducts: [],
@@ -171,6 +176,17 @@ test("grafik: laba hijau muda bergaris tepi chart-1; pembacaan omzet, laba, dan 
   useSales(salesFixture());
   const { container } = renderApp("/owner/laporan");
   await band();
+  // Keputusan pemilik: bucket berjalan (5 Nov) tidak lebih terang di Laporan — semua omzet
+  // chart-1, agar isi & garis tepi laba 3,46:1 terhadap omzet di setiap batang.
+  const omzet = container.querySelectorAll("svg rect[data-series='omzet']");
+  expect(omzet).toHaveLength(5);
+  for (const r of omzet)
+    expect(r).toHaveAttribute("fill", "var(--color-chart-1)");
+  expect(
+    container.querySelector(
+      "g[data-key='2026-11-05'] rect[data-series='omzet']",
+    ),
+  ).toHaveAttribute("fill", "var(--color-chart-1)");
   const laba = container.querySelectorAll("svg rect[data-series='laba']");
   expect(laba).toHaveLength(5);
   for (const r of laba) {
@@ -187,7 +203,7 @@ test("grafik: laba hijau muda bergaris tepi chart-1; pembacaan omzet, laba, dan 
     .getByRole("group", { name: "Omzet dan laba kotor per hari, 1–5 Nov" })
     .focus();
   await user.keyboard("{ArrowRight}");
-  // 1.500.000 / 9.000.000 = 166,7‰ → dibulatkan 167 → 16,7%.
+  // marginPermille bucket dari server (167) → 16,7%.
   expect(screen.getByTestId("chart-live")).toHaveTextContent(
     /^5 Nov, Omzet Rp9\.000\.000, Laba kotor Rp1\.500\.000 \(16,7%\)$/,
   );

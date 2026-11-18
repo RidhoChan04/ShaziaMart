@@ -190,7 +190,8 @@ const MONTH = Array.from(
     label: String(i + 1),
     tick: null,
     back: 9_000_000,
-    front: i === 1 ? 0 : i === 2 ? 12_000 : 1_500_000,
+    // Sumbu 10 jt = 118 px: 470 rb ≈ 5,5 px, 380 rb ≈ 4,5 px, 12 rb ≈ 0,1 px.
+    front: [1_500_000, 0, 12_000, 470_000, 380_000][i] ?? 1_500_000,
   }),
 );
 
@@ -262,10 +263,46 @@ test("batang sangat sempit (92 hari) atau sangat pendek: stroke mengecil, isi ti
   const c = outlined(MONTH, 296);
   expect(c.bars[1]?.front?.stroke).toBe(0);
   expect(c.bars[1]?.front?.height).toBe(0);
-  // Laba sangat kecil (< 1,5 px): stroke dibatasi setengah tinggi, isi tetap ada.
-  const tiny = c.bars[2]?.front;
-  if (!tiny) throw new Error("bar missing");
-  expect(tiny.stroke).toBeLessThan(1.5);
-  expect(tiny.height).toBeGreaterThan(0);
-  expect(tiny.y + tiny.height + tiny.stroke / 2).toBeCloseTo(c.plot.bottom, 5);
+  // Batang ≥ 2 × 1,5 + 2 px: garis tepi penuh, isi tampak (tinggi − 2 × stroke) ≥ 2 px.
+  const short = c.bars[3]?.front;
+  if (!short) throw new Error("bar missing");
+  expect(short.height + short.stroke).toBeCloseTo(5.54, 1);
+  expect(short.stroke).toBe(1.5);
+  expect(short.height + short.stroke - 2 * short.stroke).toBeGreaterThanOrEqual(
+    2,
+  );
+  // Batang < 5 px (mis. laba 07.00 Rp42.184 di Hari): tanpa garis tepi agar isi muda tetap
+  // terlihat; batasnya terhadap batang omzet di atasnya 3,46:1.
+  for (const i of [2, 4]) {
+    const tiny = c.bars[i]?.front;
+    if (!tiny) throw new Error("bar missing");
+    expect(tiny.stroke).toBe(0);
+    expect(tiny.height).toBeGreaterThan(0);
+    expect(tiny.y + tiny.height).toBeCloseTo(c.plot.bottom, 5);
+  }
+  expect(c.bars[4]?.front?.height).toBeCloseTo(4.48, 1);
+});
+
+test("isi muda selalu tampak: sisa isi di dalam garis tepi ≥ 2 px tinggi dan > 0 lebar", () => {
+  for (const width of [296, 360, 1280]) {
+    for (const count of [6, 16, 30, 92]) {
+      const buckets = Array.from(
+        { length: count },
+        (_, i): HealthBucket => ({
+          key: String(i),
+          label: String(i),
+          tick: null,
+          back: 10_000_000,
+          front: (i * 137_000) % 2_000_000,
+        }),
+      );
+      for (const b of outlined(buckets, width).bars) {
+        const f = b.front;
+        if (!f || f.stroke === 0) continue;
+        // Kotak isi = garis tengah stroke; isi tampak = kotak − stroke.
+        expect(f.height - f.stroke).toBeGreaterThanOrEqual(2 - 1e-9);
+        expect(f.width - f.stroke).toBeGreaterThan(0);
+      }
+    }
+  }
 });

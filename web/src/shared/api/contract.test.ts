@@ -1007,9 +1007,11 @@ test("bentuk laporan penjualan: key lengkap, semua wajib, nullable sesuai kontra
   >();
   expectTypeOf<SalesTotals["marginPermille"]>().toEqualTypeOf<number | null>();
   expectTypeOf<keyof ReportBucket>().toEqualTypeOf<
-    "key" | "revenue" | "grossProfit"
+    "key" | "revenue" | "grossProfit" | "marginPermille"
   >();
+  expectTypeOf<Required<ReportBucket>>().toEqualTypeOf<ReportBucket>();
   expectTypeOf<ReportBucket["revenue"]>().toEqualTypeOf<number | null>();
+  expectTypeOf<ReportBucket["marginPermille"]>().toEqualTypeOf<number | null>();
   expectTypeOf<ReportSeries["kind"]>().toEqualTypeOf<"jam" | "hari">();
   expectTypeOf<keyof ProductSales>().toEqualTypeOf<
     | "productId"
@@ -1142,8 +1144,18 @@ test("fixture SalesReport valid; topProducts maksimal 3", () => {
     series: {
       kind: "hari",
       buckets: [
-        { key: "2026-11-05", revenue: 1000, grossProfit: -50 },
-        { key: "2026-11-06", revenue: null, grossProfit: null },
+        {
+          key: "2026-11-05",
+          revenue: 1000,
+          grossProfit: -50,
+          marginPermille: -50,
+        },
+        {
+          key: "2026-11-06",
+          revenue: null,
+          grossProfit: null,
+          marginPermille: null,
+        },
       ],
     },
     topProducts: [product, product, product],
@@ -1164,6 +1176,14 @@ test("fixture SalesReport valid; topProducts maksimal 3", () => {
   expect(
     GetOwnerSalesReportResponse.safeParse({ ...report, period: "tahun" })
       .success,
+  ).toBe(false);
+  // marginPermille bucket wajib ada (boleh null).
+  const noMargin = { key: "2026-11-05", revenue: 1000, grossProfit: -50 };
+  expect(
+    GetOwnerSalesReportResponse.safeParse({
+      ...report,
+      series: { kind: "hari", buckets: [noMargin] },
+    }).success,
   ).toBe(false);
 });
 

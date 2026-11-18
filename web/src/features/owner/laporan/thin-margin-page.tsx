@@ -1,15 +1,10 @@
 import { TrendingDown } from "lucide-react";
 import { useGetOwnerStockReport } from "@/shared/api/gen/owner/owner";
+import { formatPermille } from "@/shared/lib/margin";
 import { formatRupiah } from "@/shared/lib/money";
 import { SubPageHeader } from "../common/sub-page-header";
 import { RowList } from "../products/detail/section";
 import { ReportState, ToneBadge } from "./report-bits";
-
-/** Permil bertanda → `8,3%` / `−2,1%` (hanya pemformatan; pembulatan sudah di server). */
-function percentText(permille: number): string {
-  const abs = Math.abs(permille);
-  return `${permille < 0 ? "−" : ""}${Math.floor(abs / 10)},${abs % 10}%`;
-}
 
 /** Untung tipis (K18): urutan naik dengan rugi di atas dari server; nada `Rugi` hanya dari tanda margin server (M3). */
 export function ThinMarginPage() {
@@ -25,7 +20,7 @@ export function ThinMarginPage() {
         {thin && (
           <>
             <p className="px-1 text-muted">
-              {`Margin di bawah ${thin.thresholdPermille % 10 === 0 ? thin.thresholdPermille / 10 : percentText(thin.thresholdPermille).replace("%", "")}% dari harga eceran`}
+              {`Margin di bawah ${thin.thresholdPermille % 10 === 0 ? `${thin.thresholdPermille / 10}%` : formatPermille(thin.thresholdPermille)} dari harga eceran`}
             </p>
             {thin.items.length === 0 ? (
               <p className="rounded-lg bg-surface px-4 py-4 text-muted">
@@ -51,8 +46,8 @@ export function ThinMarginPage() {
                           icon={TrendingDown}
                         >
                           {p.marginPermille < 0
-                            ? `Rugi ${percentText(p.marginPermille)}`
-                            : percentText(p.marginPermille)}
+                            ? `Rugi ${formatPermille(p.marginPermille)}`
+                            : formatPermille(p.marginPermille)}
                         </ToneBadge>
                       </span>
                     </li>

@@ -111,13 +111,11 @@ test("garis tepi opt-in: hanya batang laba bergaris chart-1 1,5 px, juga kotak l
   for (const r of laba)
     expect(r).toHaveAttribute("stroke", "var(--color-chart-1)");
   expect(laba.map((r) => Number(r.getAttribute("stroke-width")))).toEqual([
-    1.5,
-    1.5,
+    1.5, 1.5,
     // Laba negatif → setinggi 0, tanpa stroke.
+    0, 1.5,
+    // Batang 2,95 px (< 2 × 1,5 + 2): tanpa garis tepi agar isi muda tetap terlihat.
     0,
-    1.5,
-    // Batang 2,95 px: stroke ≤ setengah tinggi agar isi tetap terlihat.
-    expect.closeTo(1.475, 5),
   ]);
   for (const r of bars(container, "omzet")) {
     expect(r).not.toHaveAttribute("stroke");

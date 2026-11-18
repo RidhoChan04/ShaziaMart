@@ -2,11 +2,12 @@ import type {
   StockReport,
   ThinMarginItem,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
+import { marginPermille } from "@/shared/lib/margin";
 import { unitCost } from "@/shared/lib/product-rules";
 import type { MockState } from "../db";
 import { eceranOf } from "../products/views";
 import { usableCost } from "../receipts/check";
-import { byName, marginPermille } from "./report-utils";
+import { byName } from "./report-utils";
 
 /**
  * (K18, P10, koreksi mockup M3) Barang aktif ber-HPP dengan harga eceran > 0 yang margin

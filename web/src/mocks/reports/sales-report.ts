@@ -17,6 +17,7 @@ import {
   isoDaysBetween,
   jakartaIsoDate,
 } from "@/shared/lib/business-day";
+import { marginPermille } from "@/shared/lib/margin";
 import { roundHalfUp } from "@/shared/lib/quantity";
 import {
   clampToToday,
@@ -29,7 +30,6 @@ import { eceranOf } from "../products/views";
 import {
   byName,
   dayStart,
-  marginPermille,
   nullsLast,
   type Window,
   windowOf,
@@ -104,9 +104,15 @@ function seriesOf(
   const buckets = Array.from({ length: count }, (_, i): ReportBucket => {
     const key = hourly ? String(i) : addIsoDays(requested.from, i);
     if (start + i * size > now)
-      return { key, revenue: null, grossProfit: null };
+      return { key, revenue: null, grossProfit: null, marginPermille: null };
     const r = revenue[i] ?? 0;
-    return { key, revenue: r, grossProfit: r - (cost[i] ?? 0) };
+    const grossProfit = r - (cost[i] ?? 0);
+    return {
+      key,
+      revenue: r,
+      grossProfit,
+      marginPermille: marginPermille(r, grossProfit),
+    };
   });
   return { kind: hourly ? "jam" : "hari", buckets };
 }

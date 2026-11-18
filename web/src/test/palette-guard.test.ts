@@ -97,18 +97,17 @@ test.each(["chart-1", "chart-1-now"])(
   },
 );
 
-// Laba kotor (keputusan pemilik 18 Nov, opsi B+): isi hijau muda chart-3 sengaja hanya 1,54:1
-// terhadap putih, jadi batasnya dipikul garis tepi 1,5 px chart-1 di tiap batang laba dan kotak
-// legenda. Aturan yang dikunci: garis tepi chart-1 vs putih 5,32:1 (≥ 3) dan isi chart-3 vs
-// chart-1 3,46:1 (≥ 3) — isi terbaca terhadap garis tepinya sendiri dan terhadap batang omzet di
-// atasnya. Catatan: terhadap batang omzet berjalan (chart-1-now) isi hanya 2,31:1.
-test("laba kotor: isi chart-3 lembut, batas dipikul garis tepi chart-1", () => {
+// Laba kotor (keputusan pemilik 18 Nov, opsi B+): isi hijau muda chart-3 sengaja lembut, jadi
+// batasnya dipikul garis tepi 1,5 px chart-1 di tiap batang laba dan kotak legenda. Angka saat ini
+// (WCAG 2): isi vs putih 1,54:1; garis tepi chart-1 vs putih 5,32:1; isi vs chart-1 3,46:1. Aturan
+// yang dikunci: garis tepi vs putih ≥ 3 dan isi vs chart-1 ≥ 3 — isi terbaca terhadap garis
+// tepinya sendiri dan terhadap batang omzet di atasnya. Laporan tidak memakai chart-1-now (isi vs
+// chart-1-now hanya 2,31:1): keputusan pemilik, bucket berjalan di Laporan tidak lebih terang,
+// semua omzet chart-1; hanya Beranda yang memakai chart-1-now.
+test("laba kotor: garis tepi chart-1 dan isi chart-3 masing-masing ≥ 3:1", () => {
   const fill = tokenHex("chart-3");
   const outline = tokenHex("chart-1");
-  expect(contrast(fill, tokenHex("surface"))).toBeCloseTo(1.54, 2);
-  expect(contrast(outline, tokenHex("surface"))).toBeCloseTo(5.32, 2);
   expect(contrast(outline, tokenHex("surface"))).toBeGreaterThanOrEqual(3);
-  expect(contrast(fill, outline)).toBeCloseTo(3.46, 2);
   expect(contrast(fill, outline)).toBeGreaterThanOrEqual(3);
 });
 

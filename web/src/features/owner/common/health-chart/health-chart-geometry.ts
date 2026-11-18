@@ -85,16 +85,21 @@ export type HealthBar = {
   } | null;
 };
 
+/** Isi muda yang wajib tetap tampak di dalam garis tepi (px, tinggi). */
+const MIN_FILL = 2;
+
 /**
- * Garis tepi batang depan selebar `outline`, tetapi paling banyak sepertiga lebar dan setengah
- * tinggi batang agar isi tetap terlihat (rentang 92 hari di HP, laba yang sangat kecil); kotak
- * digeser setengah stroke ke dalam. Batang setinggi 0 tanpa garis tepi.
+ * Garis tepi batang depan selebar `outline`, paling banyak sepertiga lebar batang (rentang 92 hari
+ * di HP) agar isi tetap tampak; kotak digeser setengah stroke ke dalam. Batang yang lebih pendek
+ * dari 2 × stroke + 2 px (laba sangat kecil, setinggi 0) tanpa garis tepi agar isi mudanya tidak
+ * tertutup; batasnya terhadap batang omzet di atasnya tetap 3,46:1.
  */
 function outlined(
   box: { x: number; width: number; y: number; height: number },
   outline: number,
 ) {
-  const stroke = Math.min(outline, box.width / 3, box.height / 2);
+  const thin = Math.min(outline, box.width / 3);
+  const stroke = box.height >= 2 * thin + MIN_FILL ? thin : 0;
   return {
     x: box.x + stroke / 2,
     width: box.width - stroke,

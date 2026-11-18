@@ -5526,7 +5526,7 @@ components:
             tanda(grossProfit) × round_half_up(|grossProfit| × 1000 / revenue); null bila revenue 0.
     ReportBucket:
       type: object
-      required: [key, revenue, grossProfit]
+      required: [key, revenue, grossProfit, marginPermille]
       properties:
         key:
           type: string
@@ -5539,6 +5539,13 @@ components:
           type: integer
           nullable: true
           description: Laba kotor bucket ini (HPP kosong = 0, boleh negatif); null bila bucket belum terjadi.
+        marginPermille:
+          type: integer
+          nullable: true
+          description: |
+            Margin laba kotor bucket ini dalam permil bulat bertanda, aturan sama dengan
+            SalesTotals.marginPermille: tanda(grossProfit) × round_half_up(|grossProfit| × 1000 /
+            revenue); null bila revenue 0 atau bucket belum terjadi.
     ReportSeries:
       type: object
       required: [kind, buckets]

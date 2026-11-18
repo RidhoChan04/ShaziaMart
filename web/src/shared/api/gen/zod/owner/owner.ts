@@ -2049,7 +2049,8 @@ export const GetOwnerSalesReportResponse = zod.object({
   "buckets": zod.array(zod.object({
   "key": zod.string().describe('Jam "0".."23" (kind jam) atau tanggal YYYY-MM-DD (kind hari).'),
   "revenue": zod.int().nullable().describe('Omzet penjualan selesai di bucket ini; null bila bucket belum terjadi.'),
-  "grossProfit": zod.int().nullable().describe('Laba kotor bucket ini (HPP kosong = 0, boleh negatif); null bila bucket belum terjadi.')
+  "grossProfit": zod.int().nullable().describe('Laba kotor bucket ini (HPP kosong = 0, boleh negatif); null bila bucket belum terjadi.'),
+  "marginPermille": zod.int().nullable().describe('Margin laba kotor bucket ini dalam permil bulat bertanda, aturan sama dengan\nSalesTotals.marginPermille: tanda(grossProfit) × round_half_up(|grossProfit| × 1000 /\nrevenue); null bila revenue 0 atau bucket belum terjadi.\n')
 }))
 }),
   "topProducts": zod.array(zod.object({

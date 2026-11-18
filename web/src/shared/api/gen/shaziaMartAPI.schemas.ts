@@ -2515,6 +2515,13 @@ export interface ReportBucket {
      * @nullable
      */
   grossProfit: number | null;
+  /**
+     * Margin laba kotor bucket ini dalam permil bulat bertanda, aturan sama dengan
+     * SalesTotals.marginPermille: tanda(grossProfit) × round_half_up(|grossProfit| × 1000 /
+     * revenue); null bila revenue 0 atau bucket belum terjadi.
+     * @nullable
+     */
+  marginPermille: number | null;
 }
 
 export type ReportSeriesKind = typeof ReportSeriesKind[keyof typeof ReportSeriesKind];

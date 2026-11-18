@@ -1,4 +1,5 @@
 import type { SalesReport } from "@/shared/api/gen/shaziaMartAPI.schemas";
+import { formatPermille } from "@/shared/lib/margin";
 import {
   formatAngka,
   formatRupiah,
@@ -6,12 +7,6 @@ import {
 } from "@/shared/lib/money";
 import { compareText } from "@/shared/lib/report-period";
 import { FitAmount } from "../common/fit-amount";
-
-/** Permil bertanda → persen satu desimal: `164` → `16,4`, `-21` → `−2,1`. */
-function percentText(permille: number): string {
-  const abs = Math.abs(permille);
-  return `${permille < 0 ? "−" : ""}${Math.floor(abs / 10)},${abs % 10}`;
-}
 
 /** Laba boleh negatif: `−Rp…` (U+2212) seperti angka laporan lain, positif tanpa `+`. */
 const profitText = (n: number) =>
@@ -33,7 +28,9 @@ export function ReportTiles({
   const tiles = [
     {
       title:
-        margin === null ? "Laba kotor" : `Laba kotor · ${percentText(margin)}%`,
+        margin === null
+          ? "Laba kotor"
+          : `Laba kotor · ${formatPermille(margin)}`,
       value: profitText(now.grossProfit),
       compare: compareText(
         now.grossProfit,

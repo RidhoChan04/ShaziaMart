@@ -4,7 +4,7 @@ import type {
   ReportSeries,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { addIsoDays, isoDaysBetween } from "@/shared/lib/business-day";
-import { labaMargin, reportChart } from "./report-chart";
+import { reportChart } from "./report-chart";
 
 /** Seri harian `from`..`to`; tanggal sesudah `today` belum terjadi (null). */
 function days(
@@ -19,8 +19,13 @@ function days(
     buckets: Array.from({ length: count }, (_, i): ReportBucket => {
       const key = addIsoDays(from, i);
       return key > today
-        ? { key, revenue: null, grossProfit: null }
-        : { key, revenue: value(i), grossProfit: value(i) / 10 };
+        ? { key, revenue: null, grossProfit: null, marginPermille: null }
+        : {
+            key,
+            revenue: value(i),
+            grossProfit: value(i) / 10,
+            marginPermille: value(i) > 0 ? 100 : null,
+          };
     }),
   };
 }
@@ -32,11 +37,17 @@ function hours(values: Record<number, number>, nowHour: number | null) {
       { length: 24 },
       (_, h): ReportBucket =>
         nowHour !== null && h > nowHour
-          ? { key: String(h), revenue: null, grossProfit: null }
+          ? {
+              key: String(h),
+              revenue: null,
+              grossProfit: null,
+              marginPermille: null,
+            }
           : {
               key: String(h),
               revenue: values[h] ?? 0,
               grossProfit: (values[h] ?? 0) / 5,
+              marginPermille: values[h] ? 200 : null,
             },
     ),
   } satisfies ReportSeries;
@@ -152,23 +163,40 @@ test("per jam hari lewat tanpa penjualan: jendela bawaan 06.00–21.00", () => {
   expect(c.summary).toBe("Belum ada penjualan di periode ini");
 });
 
-const bucket = (back: number | null, front: number | null) => ({
-  key: "2026-11-04",
-  label: "4 Nov",
-  tick: null,
-  back,
-  front,
-});
-
-test("labaMargin: aturan margin server (permil, setengah ke atas) per bucket, satu desimal", () => {
-  // Angka contoh Q5: 7.912.300 / 48.215.500 → 164‰ → 16,4% (sama dengan kartu Laba kotor).
-  expect(labaMargin(bucket(48_215_500, 7_912_300))).toBe("16,4%");
-  expect(labaMargin(bucket(9_000_000, 1_500_000))).toBe("16,7%");
-  // 62,5‰ dibulatkan setengah ke atas → 63‰; minus memakai U+2212.
-  expect(labaMargin(bucket(4_000_000, -250_000))).toBe("−6,3%");
-  expect(labaMargin(bucket(1_000_000, 0))).toBe("0,0%");
-  // Omzet 0 atau bucket belum terjadi → tanpa margin.
-  expect(labaMargin(bucket(0, 0))).toBeNull();
-  expect(labaMargin(bucket(0, -5_000))).toBeNull();
-  expect(labaMargin(bucket(null, null))).toBeNull();
+test("margin per bucket dari server apa adanya (tanpa dihitung ulang), per kunci bucket", () => {
+  const series: ReportSeries = {
+    kind: "hari",
+    buckets: [
+      // Nilai sengaja tidak cocok dengan omzet/laba: grafik harus memakai angka server.
+      {
+        key: "2026-11-01",
+        revenue: 9_000_000,
+        grossProfit: 1_500_000,
+        marginPermille: 999,
+      },
+      {
+        key: "2026-11-02",
+        revenue: 4_000_000,
+        grossProfit: -250_000,
+        marginPermille: -63,
+      },
+      { key: "2026-11-03", revenue: 0, grossProfit: 0, marginPermille: null },
+      {
+        key: "2026-11-04",
+        revenue: null,
+        grossProfit: null,
+        marginPermille: null,
+      },
+    ],
+  };
+  const c = reportChart(series, false);
+  expect([...c.margins]).toEqual([
+    ["2026-11-01", 999],
+    ["2026-11-02", -63],
+    ["2026-11-03", null],
+    ["2026-11-04", null],
+  ]);
+  const h = reportChart(hours({ 9: 50_000 }, 14), true);
+  expect(h.margins.get("9")).toBe(200);
+  expect(h.margins.get("10")).toBeNull();
 });

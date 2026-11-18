@@ -1,5 +1,6 @@
 import { useId, useMemo } from "react";
 import type { SalesReport } from "@/shared/api/gen/shaziaMartAPI.schemas";
+import { formatPermille } from "@/shared/lib/margin";
 import { formatRupiah, formatRupiahShort } from "@/shared/lib/money";
 import {
   compareText,
@@ -7,22 +8,23 @@ import {
   weekdayLabel,
 } from "@/shared/lib/report-period";
 import { FitAmount } from "../common/fit-amount";
-import { HealthChart } from "../common/health-chart/health-chart";
-import { labaMargin, reportChart } from "./report-chart";
+import {
+  type HealthBucket,
+  HealthChart,
+} from "../common/health-chart/health-chart";
+import { reportChart } from "./report-chart";
 
-const OMZET = {
-  id: "omzet",
-  name: "Omzet",
-  color: "var(--color-chart-1)",
-  nowColor: "var(--color-chart-1-now)",
-};
+/**
+ * Keputusan pemilik 18 Nov: bucket berjalan tidak lebih terang di Laporan (tanpa `nowColor`), agar
+ * isi & garis tepi laba 3,46:1 terhadap omzet di setiap batang. Beranda tetap memakai chart-1-now.
+ */
+const OMZET = { id: "omzet", name: "Omzet", color: "var(--color-chart-1)" };
 /** Isi hijau muda + garis tepi hijau toko (keputusan pemilik 18 Nov, opsi B+; lihat styles.css). */
 const LABA = {
   id: "laba",
   name: "Laba kotor",
   color: "var(--color-chart-3)",
   outline: "var(--color-chart-1)",
-  note: labaMargin,
 };
 
 /** Nama rentang pembanding: Hari = `Kamis, 29 Okt` (H−7), selain itu `1–5 Okt`. */
@@ -37,6 +39,17 @@ export function RevenueCard({ report }: { report: SalesReport }) {
   const chart = useMemo(
     () => reportChart(report.series, report.running),
     [report.series, report.running],
+  );
+  // Catatan margin di tooltip & pembacaan: angka server per bucket, hanya diformat.
+  const laba = useMemo(
+    () => ({
+      ...LABA,
+      note: (b: HealthBucket) => {
+        const m = chart.margins.get(b.key);
+        return m == null ? null : formatPermille(m);
+      },
+    }),
+    [chart.margins],
   );
   const range = rangeLabel(report.range);
   const pill = compareText(
@@ -71,7 +84,7 @@ export function RevenueCard({ report }: { report: SalesReport }) {
         <HealthChart
           buckets={chart.buckets}
           back={OMZET}
-          front={LABA}
+          front={laba}
           emphasis="back"
           nowKey={chart.nowKey}
           groupLabel={`Omzet dan laba kotor per ${chart.unit}, ${range}`}
