@@ -300,7 +300,14 @@ async function reopenAndFill(ctx: Awaited<ReturnType<typeof openWithSari>>) {
   return ui;
 }
 
-const payments50 = () => saved().filter((p) => p.amount === 50_000);
+/**
+ * Pelunasan Rp50.000 Bu Sari; pelunasan riwayat seed Mbak Dewi (tanggal dari jam sungguhan) bisa
+ * juga berjumlah Rp50.000, jadi disaring per pelanggan.
+ */
+const payments50 = () => {
+  const sari = mockDb.get().customers.find((c) => c.name === "Bu Sari")?.id;
+  return saved().filter((p) => p.amount === 50_000 && p.customerId === sari);
+};
 
 test("jawaban hilang (server menyimpan) → tutup lembar → buka lagi, isian sama → id sama + pemberitahuan 'cek Riwayat'; satu entri buku dan satu baris laci", async () => {
   const ids: string[] = [];
