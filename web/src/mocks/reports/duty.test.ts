@@ -23,6 +23,11 @@ function state(): MockState {
   return s;
 }
 const kopi = (s: MockState) => productNamed(s, KOPI).id;
+const ownerOf = (s: MockState) => {
+  const owner = s.users.find((u) => u.role === "pemilik");
+  if (!owner) throw new Error("seed tanpa pemilik");
+  return owner;
+};
 
 describe("dutyBetween (K20, P11)", () => {
   test("shift yang tumpang dengan jeda (closedShifts + shift buka) dihitung; shift di luar jeda tidak", () => {
@@ -103,10 +108,50 @@ describe("dutyBetween (K20, P11)", () => {
       at: FROM,
       diff: 0,
     });
-    // Pemilik bukan orang toko.
-    addReceipt(s, { id: "n5", by: "Pak Ahmad", at: inside, product: KOPI });
+    // Pemilik bukan orang toko: nota & sesi lewat id pembuat, log kedaluwarsa lewat nama.
+    const ownerId = ownerOf(s).id;
+    addReceipt(s, {
+      id: "n5",
+      by: "Pak Ahmad",
+      byId: ownerId,
+      at: inside,
+      product: KOPI,
+    });
+    addCount(s, {
+      session: "pemilik",
+      by: "Pak Ahmad",
+      byId: ownerId,
+      product: KOPI,
+      at: inside,
+      diff: 0,
+    });
+    addExpiry(s, { by: "Pak Ahmad", at: inside, product: KOPI });
     expect(dutyBetween(s, kopi(s), FROM, TO, "S")).toEqual([
       { name: "Dedi", shifts: 0, records: 3 },
+    ]);
+  });
+
+  test("kasir bernama sama dengan pemilik tetapi id berbeda → nota & sesinya tetap dihitung", () => {
+    const s = state();
+    const inside = wib("2026-11-02", 15);
+    const owner = ownerOf(s);
+    addReceipt(s, {
+      id: "n1",
+      by: owner.name,
+      byId: "kasir-kembar",
+      at: inside,
+      product: KOPI,
+    });
+    addCount(s, {
+      session: "lain",
+      by: owner.name,
+      byId: "kasir-kembar",
+      product: KOPI,
+      at: inside,
+      diff: 0,
+    });
+    expect(dutyBetween(s, kopi(s), FROM, TO, "S")).toEqual([
+      { name: owner.name, shifts: 0, records: 2 },
     ]);
   });
 

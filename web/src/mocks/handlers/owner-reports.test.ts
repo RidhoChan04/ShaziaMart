@@ -190,6 +190,12 @@ describe("getOwnerStockReport, getOwnerOpnameReport & getOwnerOpnameProductRepor
       { name: "Budi", intervals: 3 },
       { name: "Rina", intervals: 3 },
     ]);
+    // Hitungan −5 (3 Nov 16.20) sejak 2 Nov 09.15: shift 2 & 3 Nov, nota masuk Rina 2 Nov.
+    expect(detail.counts[1]?.duty).toEqual([
+      { name: "Budi", shifts: 2, records: 0 },
+      { name: "Rina", shifts: 2, records: 1 },
+    ]);
+    expect(detail.counts[0]?.counterName).toBe("Pak Ahmad");
 
     const missing = await opnameOf(rokok, "from=2026-10-01&to=2026-10-31");
     expect(missing.status).toBe(404);

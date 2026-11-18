@@ -26,8 +26,9 @@ function shiftNames(
 }
 
 /**
- * Nama pencatat per catatan barang `productId` di jeda: nota barang masuk aktif, keluarkan
- * kedaluwarsa, dan sesi opname selain `excludeSessionId`.
+ * Nama pencatat per catatan orang toko untuk barang `productId` di jeda: nota barang masuk aktif,
+ * keluarkan kedaluwarsa, dan sesi opname selain `excludeSessionId`. Catatan pemilik dibuang:
+ * nota & sesi lewat id pembuat; log kedaluwarsa hanya menyimpan nama, jadi lewat nama pemilik.
  */
 function recordNames(
   state: Readonly<MockState>,
@@ -35,23 +36,32 @@ function recordNames(
   inGap: (at: number) => boolean,
   excludeSessionId: string,
 ): string[] {
+  const owners = state.users.filter((u) => u.role === "pemilik");
+  const ownerIds = new Set(owners.map((u) => u.id));
+  const ownerNames = new Set(owners.map((u) => u.name));
   const receipts = state.receipts
     .filter(
       (r) =>
         r.status === "aktif" &&
+        !ownerIds.has(r.createdById) &&
         inGap(r.createdAt) &&
         r.lines.some((l) => l.productId === productId),
     )
     .map((r) => r.createdByName);
   const expiry = state.expiryLog
     .filter(
-      (e) => e.kind === "keluar" && e.productId === productId && inGap(e.at),
+      (e) =>
+        e.kind === "keluar" &&
+        !ownerNames.has(e.actorName) &&
+        e.productId === productId &&
+        inGap(e.at),
     )
     .map((e) => e.actorName);
   const sessions = state.opnameSessions
     .filter(
       (s) =>
         s.id !== excludeSessionId &&
+        !ownerIds.has(s.createdById) &&
         s.items.some((i) => i.productId === productId && inGap(i.countedAt)),
     )
     .map((s) => s.createdByName);
@@ -72,9 +82,6 @@ export function dutyBetween(
   to: number,
   excludeSessionId: string,
 ): DutyEntry[] {
-  const owners = new Set(
-    state.users.filter((u) => u.role === "pemilik").map((u) => u.name),
-  );
   const people = new Map<string, DutyEntry>();
   const entryOf = (name: string): DutyEntry => {
     const found = people.get(name) ?? { name, shifts: 0, records: 0 };
@@ -84,7 +91,7 @@ export function dutyBetween(
   for (const name of shiftNames(state, from, to)) entryOf(name).shifts += 1;
   const inGap = (at: number): boolean => at > from && at <= to;
   for (const name of recordNames(state, productId, inGap, excludeSessionId)) {
-    if (!owners.has(name)) entryOf(name).records += 1;
+    entryOf(name).records += 1;
   }
   return [...people.values()].sort((a, b) => byName(a.name, b.name));
 }

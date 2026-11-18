@@ -95,12 +95,13 @@ describe("opnameReport (K19) dengan applySampleOpname", () => {
         c.previousCountedAt,
       ]),
     ).toEqual([
+      // Hitung ulang pemilik: jam, selisih, dan pencatat dari hitung ulang.
       [
-        wib("2026-11-04", 10, 5),
-        "Rina",
+        wib("2026-11-04", 12, 5),
+        "Pak Ahmad",
         -6,
         126_000,
-        "disetujui",
+        "dihitung_ulang",
         "hilang",
         wib("2026-11-03", 16, 20),
       ],
@@ -133,6 +134,11 @@ describe("opnameReport (K19) dengan applySampleOpname", () => {
       ],
     ]);
     expect(detail?.range).toEqual(NOV);
+    // Jeda hitungan −5: nota masuk Rina tercatat sebagai catatan orang toko (fixture tanpa shift;
+    // shift riwayat seed dicek di owner-reports.test.ts).
+    expect(detail?.counts[1]?.duty).toEqual([
+      { name: "Rina", shifts: 0, records: 1 },
+    ]);
   });
 });
 
@@ -273,6 +279,33 @@ describe("opnameReport (K19) aturan hitungan final", () => {
       // Bimoli: semua hitungan tanpa HPP → null, di belakang.
       [BIMOLI, null, null, false],
     ]);
+  });
+
+  test("(P11) kurang, cocok, kurang → tidak berulang; kurang, lebih, kurang, kurang → berulang", () => {
+    const s = blankState([KOPI, BIMOLI]);
+    const series = (name: string, diffs: number[]) =>
+      diffs.forEach((diff, i) => {
+        addCount(s, {
+          session: `${name}-${i}`,
+          product: name,
+          at: wib(`2026-11-0${i + 1}`, 8),
+          diff,
+        });
+      });
+    series(KOPI, [-1, 0, -2]);
+    series(BIMOLI, [-1, 1, -1, -1]);
+    const byName = new Map(
+      opnameReport(s, NOV).items.map((i) => [i.productName, i]),
+    );
+    expect(byName.get(KOPI)).toMatchObject({
+      shortCount: 2,
+      countTotal: 3,
+      repeated: false,
+    });
+    expect(byName.get(BIMOLI)).toMatchObject({
+      shortCount: 3,
+      repeated: true,
+    });
   });
 
   test("urut kerugian terbesar, seri → keuntungan terbesar, lalu nama", () => {

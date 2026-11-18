@@ -2606,8 +2606,9 @@ export interface SalesReport {
 }
 
 /**
- * (K17) Barang tidak terjual: patokan = terakhir terjual (penjualan selesai), atau stok
- * pertama (entri stok positif pertama, bila tidak ada awal katalog) bila belum pernah.
+ * (K17) Barang tidak terjual: patokan = terakhir terjual (penjualan selesai). Belum pernah
+ * terjual → patokan = mulai ada: entri stok positif pertama, atau awal katalog bila tidak ada
+ * entri atau stok sudah ada sebelum entri itu (stok awal tanpa entri).
  */
 export interface UnsoldItem {
   productId: string;
@@ -2653,7 +2654,8 @@ export interface ThinMarginItem {
 
 /**
  * Barang dengan days ≥ minDays; tidak ikut stok ≤ 0, status nonaktif atau menunggu_harga,
- * dan barang baru (stok pertama < minDays hari). heldValue = Σ heldValue yang tidak null;
+ * dan barang baru (belum pernah terjual dan mulai ada < minDays hari; barang yang pernah
+ * terjual tidak pernah dianggap baru). heldValue = Σ heldValue yang tidak null;
  * noCostCount = barang tanpa HPP (tidak dijumlah).
  */
 export type StockReportUnsold = {
@@ -2677,7 +2679,8 @@ export interface StockReport {
   today: string;
   /**
      * Barang dengan days ≥ minDays; tidak ikut stok ≤ 0, status nonaktif atau menunggu_harga,
-     * dan barang baru (stok pertama < minDays hari). heldValue = Σ heldValue yang tidak null;
+     * dan barang baru (belum pernah terjual dan mulai ada < minDays hari; barang yang pernah
+     * terjual tidak pernah dianggap baru). heldValue = Σ heldValue yang tidak null;
      * noCostCount = barang tanpa HPP (tidak dijumlah).
      */
   unsold: StockReportUnsold;

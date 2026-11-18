@@ -2141,8 +2141,8 @@ export const GetOwnerStockReportResponse = zod.object({
   "sinceDate": zod.iso.date().describe('Tanggal patokan Asia/Jakarta.'),
   "days": zod.int().describe('isoDaysBetween(sinceDate, hari ini).'),
   "heldValue": zod.int().nullable().describe('Modal tertahan = round_half_up(stok × HPP); null bila HPP belum ada.')
-}).describe('(K17) Barang tidak terjual: patokan = terakhir terjual (penjualan selesai), atau stok\npertama (entri stok positif pertama, bila tidak ada awal katalog) bila belum pernah.\n'))
-}).describe('Barang dengan days ≥ minDays; tidak ikut stok ≤ 0, status nonaktif atau menunggu_harga,\ndan barang baru (stok pertama < minDays hari). heldValue = Σ heldValue yang tidak null;\nnoCostCount = barang tanpa HPP (tidak dijumlah).\n'),
+}).describe('(K17) Barang tidak terjual: patokan = terakhir terjual (penjualan selesai). Belum pernah\nterjual → patokan = mulai ada: entri stok positif pertama, atau awal katalog bila tidak ada\nentri atau stok sudah ada sebelum entri itu (stok awal tanpa entri).\n'))
+}).describe('Barang dengan days ≥ minDays; tidak ikut stok ≤ 0, status nonaktif atau menunggu_harga,\ndan barang baru (belum pernah terjual dan mulai ada < minDays hari; barang yang pernah\nterjual tidak pernah dianggap baru). heldValue = Σ heldValue yang tidak null;\nnoCostCount = barang tanpa HPP (tidak dijumlah).\n'),
   "thinMargin": zod.object({
   "thresholdPermille": zod.int(),
   "count": zod.int(),

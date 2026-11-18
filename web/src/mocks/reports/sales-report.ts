@@ -29,6 +29,7 @@ import { eceranOf } from "../products/views";
 import {
   byName,
   dayStart,
+  marginPermille,
   nullsLast,
   type Window,
   windowOf,
@@ -45,13 +46,6 @@ const inWindow =
     s.createdAt >= w.start && s.createdAt < w.end;
 
 const sum = (xs: readonly number[]): number => xs.reduce((a, b) => a + b, 0);
-
-/** Permil bertanda (jawaban pemilik Q5); null bila omzet 0. */
-function marginPermille(revenue: number, grossProfit: number): number | null {
-  if (revenue <= 0) return null;
-  const permille = roundHalfUp(Math.abs(grossProfit) * 1000, revenue);
-  return grossProfit < 0 ? -permille : permille;
-}
 
 /** Total penjualan selesai; aturan sama dengan `ownerTodaySummary` (HPP = `costTotal`). */
 function totalsOf(done: readonly MockSale[]): SalesTotals {

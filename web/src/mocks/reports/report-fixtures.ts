@@ -103,6 +103,8 @@ export type CountSpec = {
   at: number;
   diff: number;
   by?: string;
+  /** Id pembuat sesi; bawaan "u-x" (bukan pengguna seed). */
+  byId?: string;
   state?: OpnameItemState;
   reason?: OpnameReason | null;
   /** Bawaan: nilai dari HPP barang sekarang. */
@@ -119,7 +121,7 @@ export function addCount(s: MockState, c: CountSpec): void {
     session = {
       id: c.session,
       scope: { kind: "semua", category: null },
-      createdById: "u-x",
+      createdById: c.byId ?? "u-x",
       createdByName: c.by ?? "Rina",
       submittedAt: c.at,
       finishedAt: c.at,
@@ -196,6 +198,8 @@ export function addReceipt(
   r: {
     id: string;
     by: string;
+    /** Bawaan "u-x" (bukan pengguna seed). */
+    byId?: string;
     at: number;
     product: string;
     status?: "aktif" | "dibatalkan";
@@ -231,7 +235,7 @@ export function addReceipt(
     },
     paid: null,
     status: r.status ?? "aktif",
-    createdById: "u-x",
+    createdById: r.byId ?? "u-x",
     createdByName: r.by,
     createdAt: r.at,
     editedByName: null,

@@ -52,10 +52,12 @@ describe("unsoldReport (K17, P8)", () => {
     });
   });
 
-  test("tidak pernah terjual, stok pertama 1 Okt → 'belum terjual' 35 hari; stok pertama 20 Okt (baru) → tidak ikut", () => {
+  test("tidak pernah terjual, stok pertama 1 Okt → 'belum terjual' 35 hari; pernah terjual 25 Sep → patokan penjualan walau stok pertama 20 Okt", () => {
     const s = blankState([INDOMIE, BIMOLI, KOPI]);
     // Entri negatif (koreksi) lebih dulu bukan stok pertama.
     const p = productNamed(s, INDOMIE);
+    // Stok sekarang = dua kiriman: sebelum 1 Okt stok 0 → barang baru sejak 1 Okt.
+    s.stock[p.id] = 20;
     s.stockEntries.push({
       id: "se-neg",
       productId: p.id,
@@ -72,7 +74,7 @@ describe("unsoldReport (K17, P8)", () => {
     stockedAt(s, INDOMIE, wib("2026-10-01", 8));
     stockedAt(s, INDOMIE, wib("2026-10-25", 8));
     stockedAt(s, BIMOLI, wib("2026-10-20", 8));
-    // Pernah terjual 40 hari lalu, tetapi stok pertamanya baru → tidak ikut.
+    // (ruling pengendali) Pernah terjual → tidak pernah "baru"; patokan = penjualan terakhir.
     soldAt(s, BIMOLI, wib("2026-09-25", 8));
     // KOPI tanpa entri stok → patokan awal katalog.
     const report = unsoldReport(s, NOW, "modal");
@@ -82,12 +84,43 @@ describe("unsoldReport (K17, P8)", () => {
       sinceDate: "2026-10-01",
       days: 35,
     });
-    expect(byName.has(BIMOLI)).toBe(false);
+    expect(byName.get(BIMOLI)).toMatchObject({
+      lastSoldAt: wib("2026-09-25", 8),
+      sinceDate: "2026-09-25",
+      days: 41,
+    });
     expect(byName.get(KOPI)).toMatchObject({
       lastSoldAt: null,
       sinceDate: "2026-09-03",
       days: 63,
     });
+  });
+
+  test("barang seed baru diisi ulang 1 Nov, terakhir terjual 50 hari lalu → ikut (50 hari)", () => {
+    const s = blankState([KOPI]);
+    stockedAt(s, KOPI, wib("2026-11-01", 8));
+    soldAt(s, KOPI, wib("2026-09-16", 9));
+    expect(
+      unsoldReport(s, NOW, "modal").items.map((i) => [i.productName, i.days]),
+    ).toEqual([[KOPI, 50]]);
+  });
+
+  test("barang seed belum pernah terjual, diisi ulang 1 Nov: stok sudah ada sebelumnya → patokan awal katalog", () => {
+    const s = blankState([KOPI]);
+    stockedAt(s, KOPI, wib("2026-11-01", 8));
+    expect(unsoldReport(s, NOW, "modal").items[0]).toMatchObject({
+      productName: KOPI,
+      lastSoldAt: null,
+      sinceDate: "2026-09-03",
+      days: 63,
+    });
+  });
+
+  test("barang baru (stok pertama 10 hari lalu, sebelumnya stok 0), belum pernah terjual → tidak ikut", () => {
+    const s = blankState([KOPI]);
+    s.stock[productNamed(s, KOPI).id] = 10;
+    stockedAt(s, KOPI, wib("2026-10-26", 8), 10);
+    expect(unsoldReport(s, NOW, "modal").items).toEqual([]);
   });
 
   test.each(["nonaktif", "menunggu_harga"] as const)(

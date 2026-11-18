@@ -2,7 +2,7 @@ import { addIsoDays, DAY_MS, jakartaIsoDate } from "@/shared/lib/business-day";
 import { newId } from "@/shared/lib/id";
 import { unitCost } from "@/shared/lib/product-rules";
 import { receiptLineTotal } from "@/shared/lib/receipt-rules";
-import type { MockProduct, MockState } from "../db";
+import type { MockProduct, MockState, MockUser } from "../db";
 import { nextStoreCode } from "../products/build";
 import { key } from "../products/checks";
 import { upsertSupplier } from "../receipts/receive";
@@ -109,66 +109,94 @@ export function applySampleStock(state: MockState, now: number): void {
   const today = jakartaIsoDate(now);
   for (const [id, index, qty, daysAgo, expiryDays] of RECEIPTS) {
     const p = products[index];
-    const eceran = p?.units[0];
-    if (!p || !eceran) throw new Error("Contoh stok tanpa barang");
-    const at = now - daysAgo * DAY_MS;
-    const cost =
-      unitCost(p.cost, eceran.unitSize) ?? PRODUCTS[index]?.cost ?? 0;
-    state.receipts.push({
+    if (!p) throw new Error("Contoh stok tanpa barang");
+    pushSampleReceipt(state, {
       id,
-      supplierId: upsertSupplier(state, SUPPLIER, at).id,
-      notaDate: jakartaIsoDate(at),
-      photoId: null,
-      lines: [
-        {
-          lineId: "l1",
-          productId: p.id,
-          productName: p.name,
-          unitId: eceran.id,
-          unitName: eceran.name,
-          unitSize: eceran.unitSize,
-          qty,
-          unitCost: cost,
-          subtotal: receiptLineTotal(qty, cost),
-          expiryDate: addIsoDays(today, expiryDays),
-          newProduct: false,
-        },
-      ],
-      payment: {
-        timing: "sekarang",
-        method: "transfer",
-        cashSource: null,
-        dueDate: null,
-      },
-      paid: null,
-      status: "aktif",
-      createdById: actor.id,
-      createdByName: actor.name,
-      createdAt: at,
-      editedByName: null,
-      editedAt: null,
-      cancelledAt: null,
-    });
-    state.receiptAudit.push({
-      id: newId(at),
-      receiptId: id,
-      at,
-      actorName: actor.name,
-      action: "buat",
-      changes: [],
-    });
-    state.stockEntries.push({
-      id: newId(at),
-      productId: p.id,
-      at,
-      effectiveAt: at,
-      qtyBase: qty * eceran.unitSize,
-      actorName: actor.name,
-      kind: "masuk",
-      receiptId: id,
-      lineId: "l1",
-      opnameId: null,
-      reason: null,
+      product: p,
+      qty,
+      at: now - daysAgo * DAY_MS,
+      actor,
+      expiryDate: addIsoDays(today, expiryDays),
     });
   }
+}
+
+/**
+ * Nota contoh satu baris (satuan eceran) sebagai riwayat: nota aktif, audit `buat`, dan entri
+ * stok `masuk` pada jam notanya; stok ikut bertambah hanya bila `addStock` (HPP tidak berubah).
+ */
+export function pushSampleReceipt(
+  state: MockState,
+  r: {
+    id: string;
+    product: MockProduct;
+    qty: number;
+    at: number;
+    actor: MockUser;
+    expiryDate: string | null;
+    addStock?: boolean;
+  },
+): void {
+  const { id, product: p, qty, at, actor } = r;
+  const eceran = p.units[0];
+  if (!eceran) throw new Error("Contoh stok tanpa satuan");
+  const cost = unitCost(p.cost, eceran.unitSize) ?? 0;
+  const qtyBase = qty * eceran.unitSize;
+  state.receipts.push({
+    id,
+    supplierId: upsertSupplier(state, SUPPLIER, at).id,
+    notaDate: jakartaIsoDate(at),
+    photoId: null,
+    lines: [
+      {
+        lineId: "l1",
+        productId: p.id,
+        productName: p.name,
+        unitId: eceran.id,
+        unitName: eceran.name,
+        unitSize: eceran.unitSize,
+        qty,
+        unitCost: cost,
+        subtotal: receiptLineTotal(qty, cost),
+        expiryDate: r.expiryDate,
+        newProduct: false,
+      },
+    ],
+    payment: {
+      timing: "sekarang",
+      method: "transfer",
+      cashSource: null,
+      dueDate: null,
+    },
+    paid: null,
+    status: "aktif",
+    createdById: actor.id,
+    createdByName: actor.name,
+    createdAt: at,
+    editedByName: null,
+    editedAt: null,
+    cancelledAt: null,
+  });
+  state.receiptAudit.push({
+    id: newId(at),
+    receiptId: id,
+    at,
+    actorName: actor.name,
+    action: "buat",
+    changes: [],
+  });
+  state.stockEntries.push({
+    id: newId(at),
+    productId: p.id,
+    at,
+    effectiveAt: at,
+    qtyBase,
+    actorName: actor.name,
+    kind: "masuk",
+    receiptId: id,
+    lineId: "l1",
+    opnameId: null,
+    reason: null,
+  });
+  if (r.addStock) state.stock[p.id] = (state.stock[p.id] ?? 0) + qtyBase;
 }
