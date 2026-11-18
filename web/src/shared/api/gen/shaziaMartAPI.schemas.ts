@@ -1138,7 +1138,10 @@ export type KasirLookupSale = Sale & ({
  * pelunasan, paymentId terisi. kasbon_lewat_limit: at = jam jual, kasirName = kasir, amount =
  * kelebihan limit bagian kasbon ini, saleId/saleNumber terisi. customerName = pelanggan (null
  * bila tanpa pelanggan). Untuk selain batal_transaksi fromClosedShift false, refund dan
- * qrisToOwner 0.
+ * qrisToOwner 0. overLimitExcess (batal_transaksi) = kelebihan limit kasbon transaksi yang
+ * dibatalkan (CreditOverLimit.excess yang tercatat), null bila transaksi itu tidak lewat limit;
+ * selain batal_transaksi selalu null. Butir kasbon_lewat_limit transaksi itu tetap hilang
+ * saat transaksinya dibatalkan.
  */
 export interface CashierException {
   id: string;
@@ -1159,6 +1162,11 @@ export interface CashierException {
   fromClosedShift: boolean;
   refund: number;
   qrisToOwner: number;
+  /**
+     * @minimum 1
+     * @nullable
+     */
+  overLimitExcess: number | null;
 }
 
 export interface OwnerExceptionList {

@@ -36,6 +36,7 @@ function saleBased(
     saleId: s.id,
     saleNumber: s.number,
     paymentId: null,
+    overLimitExcess: null,
   };
   if (kind === "kasbon_lewat_limit") {
     const over = s.creditOverLimit;
@@ -66,6 +67,7 @@ function saleBased(
     fromClosedShift: fromClosedShift(state, s),
     refund: r.drawer,
     qrisToOwner: r.qrisSource === "pemilik" ? r.qris : 0,
+    overLimitExcess: s.creditOverLimit?.excess ?? null,
   };
 }
 
@@ -100,6 +102,7 @@ function eventsOf(
             fromClosedShift: false,
             refund: 0,
             qrisToOwner: 0,
+            overLimitExcess: null,
           }),
         );
   }

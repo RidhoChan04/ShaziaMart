@@ -63,6 +63,7 @@ describe("listOwnerExceptions & reviewOwnerExceptions (ruling R9)", () => {
           fromClosedShift: false,
           refund: 0,
           qrisToOwner: 0,
+          overLimitExcess: null,
         },
       ],
     });

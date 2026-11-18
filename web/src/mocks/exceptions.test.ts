@@ -143,6 +143,7 @@ describe("cashierExceptions", () => {
         fromClosedShift: false,
         refund: 0,
         qrisToOwner: 0,
+        overLimitExcess: null,
       },
     ]);
     const [p] = s.creditPayments;
@@ -161,6 +162,7 @@ describe("cashierExceptions", () => {
         fromClosedShift: false,
         refund: 0,
         qrisToOwner: 0,
+        overLimitExcess: null,
       },
     ]);
     const over = s.sales[2];
@@ -179,8 +181,22 @@ describe("cashierExceptions", () => {
         fromClosedShift: false,
         refund: 0,
         qrisToOwner: 0,
+        overLimitExcess: null,
       },
     ]);
+  });
+
+  test("(fix final 10) batal_transaksi membawa kelebihan limit kasbon transaksi itu (creditOverLimit.excess); tanpa lewat limit → null; kasbon lewat limit yang dibatalkan hilang dari daftarnya (K29)", () => {
+    const s = state();
+    s.sales.push(
+      voided(NOW - HOUR, "kasir", {
+        creditOverLimit: { excess: 70_000, reason: "Anak sakit" },
+      }),
+      voided(NOW - HOUR / 2, "kasir"),
+    );
+    const items = cashierExceptions(s, "batal_transaksi");
+    expect(items.map((e) => e.overLimitExcess)).toEqual([null, 70_000]);
+    expect(cashierExceptions(s, "kasbon_lewat_limit")).toEqual([]);
   });
 
   test("(ruling R12, koreksi mockup M1) void kasir transaksi shift lama → batal_transaksi dengan fromClosedShift true, refund = voidRefund.drawer, qrisToOwner = bagian QRIS `pemilik`", () => {

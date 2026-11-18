@@ -3911,8 +3911,11 @@ components:
         pelunasan, paymentId terisi. kasbon_lewat_limit: at = jam jual, kasirName = kasir, amount =
         kelebihan limit bagian kasbon ini, saleId/saleNumber terisi. customerName = pelanggan (null
         bila tanpa pelanggan). Untuk selain batal_transaksi fromClosedShift false, refund dan
-        qrisToOwner 0.
-      required: [id, kind, at, kasirName, amount, reason, customerName, saleId, saleNumber, paymentId, fromClosedShift, refund, qrisToOwner]
+        qrisToOwner 0. overLimitExcess (batal_transaksi) = kelebihan limit kasbon transaksi yang
+        dibatalkan (CreditOverLimit.excess yang tercatat), null bila transaksi itu tidak lewat limit;
+        selain batal_transaksi selalu null. Butir kasbon_lewat_limit transaksi itu tetap hilang
+        saat transaksinya dibatalkan.
+      required: [id, kind, at, kasirName, amount, reason, customerName, saleId, saleNumber, paymentId, fromClosedShift, refund, qrisToOwner, overLimitExcess]
       properties:
         id:
           type: string
@@ -3946,6 +3949,10 @@ components:
           type: integer
         qrisToOwner:
           type: integer
+        overLimitExcess:
+          type: integer
+          nullable: true
+          minimum: 1
     ExceptionAttention:
       type: object
       description: |

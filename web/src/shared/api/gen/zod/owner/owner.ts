@@ -1921,6 +1921,9 @@ export const ListOwnerExceptionsQueryParams = zod.object({
   "kind": zod.enum(['batal_transaksi', 'batal_pelunasan', 'kasbon_lewat_limit'])
 })
 
+
+
+
 export const ListOwnerExceptionsResponse = zod.object({
   "kind": zod.enum(['batal_transaksi', 'batal_pelunasan', 'kasbon_lewat_limit']).describe('Pengecualian kasir (ruling R1/R9): batal_transaksi (penjualan dibatalkan kasir),\nbatal_pelunasan (pelunasan dibatalkan kasir), kasbon_lewat_limit (kasbon melewati limit\ndengan alasan; penjualan yang kemudian dibatalkan tidak ikut).\n'),
   "reviewedAt": zod.int().nullable().describe('Terakhir ditinjau (epoch ms UTC); null bila belum pernah.'),
@@ -1937,8 +1940,9 @@ export const ListOwnerExceptionsResponse = zod.object({
   "paymentId": zod.string().nullable(),
   "fromClosedShift": zod.boolean(),
   "refund": zod.int(),
-  "qrisToOwner": zod.int()
-}).describe('Satu kejadian. batal_transaksi: at = jam batal, kasirName = pembatal, amount = total\ntransaksi, saleId/saleNumber terisi; fromClosedShift = transaksi dari shift yang sudah tutup\n(ruling R12); refund = uang yang keluar dari laci shift yang sedang buka saat itu (0 bila\ntidak ada); qrisToOwner = bagian QRIS yang dipilih Transfer oleh pemilik nanti (pemilik\nharus mentransfer). batal_pelunasan: at = jam batal, kasirName = pembatal, amount = nominal\npelunasan, paymentId terisi. kasbon_lewat_limit: at = jam jual, kasirName = kasir, amount =\nkelebihan limit bagian kasbon ini, saleId/saleNumber terisi. customerName = pelanggan (null\nbila tanpa pelanggan). Untuk selain batal_transaksi fromClosedShift false, refund dan\nqrisToOwner 0.\n')).describe('Kejadian dengan at > reviewedAt, terbaru dulu.')
+  "qrisToOwner": zod.int(),
+  "overLimitExcess": zod.int().min(1).nullable()
+}).describe('Satu kejadian. batal_transaksi: at = jam batal, kasirName = pembatal, amount = total\ntransaksi, saleId/saleNumber terisi; fromClosedShift = transaksi dari shift yang sudah tutup\n(ruling R12); refund = uang yang keluar dari laci shift yang sedang buka saat itu (0 bila\ntidak ada); qrisToOwner = bagian QRIS yang dipilih Transfer oleh pemilik nanti (pemilik\nharus mentransfer). batal_pelunasan: at = jam batal, kasirName = pembatal, amount = nominal\npelunasan, paymentId terisi. kasbon_lewat_limit: at = jam jual, kasirName = kasir, amount =\nkelebihan limit bagian kasbon ini, saleId/saleNumber terisi. customerName = pelanggan (null\nbila tanpa pelanggan). Untuk selain batal_transaksi fromClosedShift false, refund dan\nqrisToOwner 0. overLimitExcess (batal_transaksi) = kelebihan limit kasbon transaksi yang\ndibatalkan (CreditOverLimit.excess yang tercatat), null bila transaksi itu tidak lewat limit;\nselain batal_transaksi selalu null. Butir kasbon_lewat_limit transaksi itu tetap hilang\nsaat transaksinya dibatalkan.\n')).describe('Kejadian dengan at > reviewedAt, terbaru dulu.')
 })
 
 /**
@@ -1951,6 +1955,9 @@ export const ReviewOwnerExceptionsBody = zod.object({
   "kind": zod.enum(['batal_transaksi', 'batal_pelunasan', 'kasbon_lewat_limit']).describe('Pengecualian kasir (ruling R1/R9): batal_transaksi (penjualan dibatalkan kasir),\nbatal_pelunasan (pelunasan dibatalkan kasir), kasbon_lewat_limit (kasbon melewati limit\ndengan alasan; penjualan yang kemudian dibatalkan tidak ikut).\n'),
   "upTo": zod.int().describe('Jam kejadian terbaru yang sudah dilihat pemilik (epoch ms UTC); dijepit ke jam server.')
 })
+
+
+
 
 export const ReviewOwnerExceptionsResponse = zod.object({
   "kind": zod.enum(['batal_transaksi', 'batal_pelunasan', 'kasbon_lewat_limit']).describe('Pengecualian kasir (ruling R1/R9): batal_transaksi (penjualan dibatalkan kasir),\nbatal_pelunasan (pelunasan dibatalkan kasir), kasbon_lewat_limit (kasbon melewati limit\ndengan alasan; penjualan yang kemudian dibatalkan tidak ikut).\n'),
@@ -1968,8 +1975,9 @@ export const ReviewOwnerExceptionsResponse = zod.object({
   "paymentId": zod.string().nullable(),
   "fromClosedShift": zod.boolean(),
   "refund": zod.int(),
-  "qrisToOwner": zod.int()
-}).describe('Satu kejadian. batal_transaksi: at = jam batal, kasirName = pembatal, amount = total\ntransaksi, saleId/saleNumber terisi; fromClosedShift = transaksi dari shift yang sudah tutup\n(ruling R12); refund = uang yang keluar dari laci shift yang sedang buka saat itu (0 bila\ntidak ada); qrisToOwner = bagian QRIS yang dipilih Transfer oleh pemilik nanti (pemilik\nharus mentransfer). batal_pelunasan: at = jam batal, kasirName = pembatal, amount = nominal\npelunasan, paymentId terisi. kasbon_lewat_limit: at = jam jual, kasirName = kasir, amount =\nkelebihan limit bagian kasbon ini, saleId/saleNumber terisi. customerName = pelanggan (null\nbila tanpa pelanggan). Untuk selain batal_transaksi fromClosedShift false, refund dan\nqrisToOwner 0.\n')).describe('Kejadian dengan at > reviewedAt, terbaru dulu.')
+  "qrisToOwner": zod.int(),
+  "overLimitExcess": zod.int().min(1).nullable()
+}).describe('Satu kejadian. batal_transaksi: at = jam batal, kasirName = pembatal, amount = total\ntransaksi, saleId/saleNumber terisi; fromClosedShift = transaksi dari shift yang sudah tutup\n(ruling R12); refund = uang yang keluar dari laci shift yang sedang buka saat itu (0 bila\ntidak ada); qrisToOwner = bagian QRIS yang dipilih Transfer oleh pemilik nanti (pemilik\nharus mentransfer). batal_pelunasan: at = jam batal, kasirName = pembatal, amount = nominal\npelunasan, paymentId terisi. kasbon_lewat_limit: at = jam jual, kasirName = kasir, amount =\nkelebihan limit bagian kasbon ini, saleId/saleNumber terisi. customerName = pelanggan (null\nbila tanpa pelanggan). Untuk selain batal_transaksi fromClosedShift false, refund dan\nqrisToOwner 0. overLimitExcess (batal_transaksi) = kelebihan limit kasbon transaksi yang\ndibatalkan (CreditOverLimit.excess yang tercatat), null bila transaksi itu tidak lewat limit;\nselain batal_transaksi selalu null. Butir kasbon_lewat_limit transaksi itu tetap hilang\nsaat transaksinya dibatalkan.\n')).describe('Kejadian dengan at > reviewedAt, terbaru dulu.')
 })
 
 /**

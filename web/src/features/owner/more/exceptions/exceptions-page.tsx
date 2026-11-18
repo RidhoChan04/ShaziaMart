@@ -52,6 +52,12 @@ function ExceptionRow({
         <span className="shrink-0">{relativeDayTime(e.at, now)}</span>
       </div>
       {drawer && <p className="mt-1 text-[13px] text-muted">{drawer}</p>}
+      {e.overLimitExcess !== null && (
+        <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-warning-soft px-2 py-0.5 text-xs font-semibold whitespace-nowrap text-warning-ink">
+          <TriangleAlert aria-hidden="true" className="size-3" />
+          {`Lewat limit ${formatRupiah(e.overLimitExcess)}`}
+        </span>
+      )}
       {transfer && (
         <p className="mt-2 flex items-start gap-1.5 rounded-md bg-warning-soft px-2.5 py-1.5 text-[13px] font-semibold text-warning-ink">
           <TriangleAlert aria-hidden="true" className="mt-px size-4 shrink-0" />

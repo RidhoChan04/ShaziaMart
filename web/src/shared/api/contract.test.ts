@@ -903,6 +903,7 @@ test("pengecualian & transaksi pemilik: bentuk key lengkap", () => {
     | "fromClosedShift"
     | "refund"
     | "qrisToOwner"
+    | "overLimitExcess"
   >();
   expectTypeOf<Required<CashierException>>().toEqualTypeOf<CashierException>();
   expectTypeOf<keyof SaleVoid>().toEqualTypeOf<

@@ -243,3 +243,31 @@ test("jenis tidak dikenal: 'Halaman tidak ditemukan' dengan tautan ke Beranda", 
     screen.getByRole("link", { name: "Kembali ke Beranda" }),
   ).toHaveAttribute("href", "/owner");
 });
+
+test("(fix final 10) batal transaksi yang kasbonnya lewat limit → tanda oranye 'Lewat limit Rp70.000' (ikon + teks); transaksi lain tanpa tanda; butir kasbon lewat limit hilang", async () => {
+  const over = await sell(
+    gulaBody([{ method: "credit", amount: 450_000 }], {
+      customerId: customerId("Bu Sari"),
+      creditLimitReason: "Anak sakit",
+    }),
+  );
+  await kasirVoid(over, "Salah pelanggan");
+  const plain = await sell(cashSale());
+  await kasirVoid(plain, "Salah scan");
+  await ownerLogin();
+  const { unmount } = renderApp(VOID_PAGE);
+  await screen.findByText("Salah pelanggan");
+  const withLimit = within(rowOf(/Salah pelanggan/));
+  const badge = withLimit.getByText("Lewat limit Rp70.000");
+  expect(badge).toHaveClass("bg-warning-soft", "text-warning-ink");
+  expect(badge.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+  expect(
+    within(rowOf(/Salah scan/)).queryByText(/Lewat limit/),
+  ).not.toBeInTheDocument();
+  unmount();
+
+  renderApp("/owner/pengecualian/kasbon_lewat_limit");
+  expect(
+    await screen.findByText("Tidak ada yang perlu ditinjau"),
+  ).toBeInTheDocument();
+});
