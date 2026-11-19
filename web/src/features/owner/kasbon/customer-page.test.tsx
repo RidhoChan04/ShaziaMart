@@ -612,7 +612,7 @@ async function closeShiftAndOpenAnother() {
   await post("/api/shifts/current/close", { countedCash: 250_000 });
   const { login } = await import("@/mocks/handlers/test-helpers");
   await login("654321", "Budi");
-  await post("/api/shifts", { openingCash: 100_000 });
+  await post("/api/shifts", { openingCash: 100_000, openingNote: "Modal tes" });
 }
 
 test("batal pelunasan Tunai kasir (shift sudah tutup): kalimat pemilik, alasan wajib, tanpa perubahan laci, fokus ke judul", async () => {

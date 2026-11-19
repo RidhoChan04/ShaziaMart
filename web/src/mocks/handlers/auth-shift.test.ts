@@ -94,7 +94,7 @@ describe("auth", () => {
 describe("shift", () => {
   test("shift saat ini terbaca tanpa sesi (layar kunci butuh kasir shift)", async () => {
     await login("123456");
-    await post("/api/shifts", { openingCash: 0 });
+    await post("/api/shifts", { openingCash: 0, openingNote: "Modal tes" });
     await post("/api/auth/logout", {});
     const res = await fetch("/api/shifts/current");
     expect(res.status).toBe(200);
@@ -364,9 +364,14 @@ describe("tutup shift dengan pelunasan kasbon & pengembalian transaksi", () => {
     const closedBefore = mockDb.get().closedShifts;
 
     await login("654321", "Budi");
-    expect((await post("/api/shifts", { openingCash: 100_000 })).status).toBe(
-      201,
-    );
+    expect(
+      (
+        await post("/api/shifts", {
+          openingCash: 100_000,
+          openingNote: "Modal tes",
+        })
+      ).status,
+    ).toBe(201);
     expect((await ownerLogin()).status).toBe(200);
     vi.setSystemTime(NOW + 60_000);
     expect(

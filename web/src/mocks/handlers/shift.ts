@@ -5,9 +5,20 @@ import type {
   ShiftClosure,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { newId } from "@/shared/lib/id";
-import { creditPaymentsOf } from "../credit/payments";
-import { type MockShift, mockDb } from "../db";
-import { supplierPaymentsOf } from "../receipts/cash";
+import { formatRupiah } from "@/shared/lib/money";
+import {
+  drawerTotals,
+  openingSuggestion,
+  pendingBetweenTakes,
+} from "../cash/drawer";
+import { optionalNote } from "../cash/input";
+import {
+  type MockShift,
+  type MockState,
+  type MockUser,
+  mockDb,
+  updateWith,
+} from "../db";
 import { withScenario } from "../scenarios";
 import { invalid, problem, readJson, requireSession } from "./respond";
 
@@ -19,12 +30,62 @@ const toShift = ({
   openingCash,
 }: MockShift): Shift => ({ id, kasirId, kasirName, openedAt, openingCash });
 
-/** Σ `saleRefunds` shift ini (`ShiftClosure.saleRefunds`), tanpa membedakan asal pengembalian. */
-const saleRefundsOf = (shift: MockShift): number =>
-  shift.saleRefunds.reduce((sum, r) => sum + r.amount, 0);
-
 const isMoney = (v: unknown): v is number =>
   typeof v === "number" && Number.isSafeInteger(v) && v >= 0;
+
+const NOTE_MAX = 200;
+
+/**
+ * (S4, K8, K22) Buka shift dengan serah terima modal. Urutan: modal/catatan tidak sah → 422 →
+ * shift sudah buka → 409 → saran (dihitung ulang sekarang) tidak null dan modal ≠ saran tanpa
+ * catatan → 422 OPENING_MISMATCH. Catatan disimpan hanya bila modal berbeda dari saran; semua
+ * pengambilan sela yang masih aktif ditandai terpakai shift baru ini.
+ */
+function openShift(
+  state: MockState,
+  user: MockUser,
+  input: Record<string, unknown> | null,
+  now: number,
+): MockShift | Response {
+  const openingCash = input?.openingCash;
+  if (!isMoney(openingCash)) {
+    return invalid("Modal awal harus bilangan bulat minimal 0");
+  }
+  const note = optionalNote(input?.openingNote, NOTE_MAX);
+  if (note === undefined) return invalid("Alasan maksimal 200 karakter");
+  if (state.shift) {
+    return problem(409, "SHIFT_ALREADY_OPEN", "Shift sudah dibuka");
+  }
+  const { suggestedCash } = openingSuggestion(state);
+  const differs = suggestedCash !== null && openingCash !== suggestedCash;
+  if (differs && note === null) {
+    return problem(
+      422,
+      "OPENING_MISMATCH",
+      `Isi alasan bila modal berbeda dari ${formatRupiah(suggestedCash)}`,
+      { suggestedCash },
+    );
+  }
+  const shift: MockShift = {
+    id: newId(now),
+    kasirId: user.id,
+    kasirName: user.name,
+    openedAt: now,
+    openingCash,
+    suggestedOpening: suggestedCash,
+    openingNote: differs ? note : null,
+    cashSales: 0,
+    salesCount: 0,
+    cashOuts: [],
+    creditCash: [],
+    saleRefunds: [],
+  };
+  for (const take of pendingBetweenTakes(state)) {
+    take.consumedByShiftId = shift.id;
+  }
+  state.shift = shift;
+  return shift;
+}
 
 export const shiftHandlers = [
   http.get(
@@ -37,37 +98,26 @@ export const shiftHandlers = [
       return HttpResponse.json(body);
     }),
   ),
+  http.get(
+    "/api/shifts/opening-suggestion",
+    withScenario(() => {
+      const state = mockDb.get();
+      const user = requireSession(state);
+      if (user instanceof Response) return user;
+      return HttpResponse.json(openingSuggestion(state));
+    }),
+  ),
   http.post(
     "/api/shifts",
     withScenario(async ({ request }) => {
+      // Setelah body dibaca semuanya sinkron: saran dihitung ulang & disimpan atomik.
+      const body = await readJson(request);
       const user = requireSession(mockDb.get());
       if (user instanceof Response) return user;
-      const body = await readJson(request);
-      const openingCash = body?.openingCash;
-      if (!isMoney(openingCash)) {
-        return invalid("Modal awal harus bilangan bulat minimal 0");
-      }
-      if (mockDb.get().shift) {
-        return problem(409, "SHIFT_ALREADY_OPEN", "Shift sudah dibuka");
-      }
-      const shift: MockShift = {
-        id: newId(),
-        kasirId: user.id,
-        kasirName: user.name,
-        openedAt: Date.now(),
-        openingCash,
-        suggestedOpening: null,
-        openingNote: null,
-        cashSales: 0,
-        salesCount: 0,
-        cashOuts: [],
-        creditCash: [],
-        saleRefunds: [],
-      };
-      mockDb.update((s) => {
-        s.shift = shift;
-      });
-      return HttpResponse.json(toShift(shift), { status: 201 });
+      const now = Date.now();
+      const res = updateWith((s) => openShift(s, user, body, now));
+      if (res instanceof Response) return res;
+      return HttpResponse.json(toShift(res), { status: 201 });
     }),
   ),
   http.post(
@@ -85,30 +135,13 @@ export const shiftHandlers = [
       if (!shift) {
         return problem(409, "SHIFT_CLOSED", "Tidak ada shift yang terbuka");
       }
-      // Uang keluar laci ke supplier (barang masuk, koreksi nota, pelunasan) mengurangi kas seharusnya.
-      const supplierPayments = supplierPaymentsOf(shift);
-      // Hanya pelunasan kasbon Tunai shift ini (bukan uang diterima) yang masuk laci.
-      const creditPayments = creditPaymentsOf(shift);
-      // (ruling R12) Tunai yang keluar laci untuk transaksi yang dibatalkan kasir di shift ini.
-      const saleRefunds = saleRefundsOf(shift);
-      const expectedCash =
-        shift.openingCash +
-        shift.cashSales -
-        supplierPayments +
-        creditPayments -
-        saleRefunds;
+      // Rumus laci tunggal (mocks/cash/drawer.ts), sama dengan rincian shift pemilik.
+      const totals = drawerTotals(state, shift);
       const closure: ShiftClosure = {
         shiftId: shift.id,
-        openingCash: shift.openingCash,
-        cashSales: shift.cashSales,
-        supplierPayments,
-        creditPayments,
-        saleRefunds,
-        expenses: 0,
-        ownerTakes: 0,
-        expectedCash,
+        ...totals,
         countedCash,
-        difference: countedCash - expectedCash,
+        difference: countedCash - totals.expectedCash,
         salesCount: shift.salesCount,
       };
       mockDb.update((s) => {

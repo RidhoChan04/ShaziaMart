@@ -312,9 +312,14 @@ describe("shift laci", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(1_793_590_000_000);
     await login("123456");
-    expect((await post("/api/shifts", { openingCash: 1_500_000 })).status).toBe(
-      201,
-    );
+    expect(
+      (
+        await post("/api/shifts", {
+          openingCash: 1_500_000,
+          openingNote: "Modal tes",
+        })
+      ).status,
+    ).toBe(201);
     expect(mockDb.get().shift?.cashOuts).toEqual([]);
     expect(await json<StaffShift>(await get("/api/staff/shift"))).toEqual({
       shift: { kasirName: "Rina", openedAt: 1_793_590_000_000 },
@@ -455,7 +460,10 @@ describe("supplier", () => {
 
 test("respons staf tidak memuat FORBIDDEN_STAFF_KEYS (deepKeys) — users, session, shift, products, suppliers", async () => {
   await login("123456");
-  await post("/api/shifts", { openingCash: 1_500_000 });
+  await post("/api/shifts", {
+    openingCash: 1_500_000,
+    openingNote: "Modal tes",
+  });
   mockDb.update((s) => {
     s.suppliers.push({ id: "s1", name: "CV Sumber Rejeki", lastUsedAt: 1 });
   });

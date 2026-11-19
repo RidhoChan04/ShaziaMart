@@ -287,9 +287,14 @@ describe("cancelCreditPayment (kasir, ruling R2)", () => {
     await pay();
     await closeShift();
     await login("654321", "Budi");
-    expect((await post("/api/shifts", { openingCash: 100_000 })).status).toBe(
-      201,
-    );
+    expect(
+      (
+        await post("/api/shifts", {
+          openingCash: 100_000,
+          openingNote: "Modal tes",
+        })
+      ).status,
+    ).toBe(201);
     const before = mockDb.get();
     const res = await cancel("pel-1");
     expect(res.status).toBe(409);
@@ -341,7 +346,10 @@ describe("listShiftCreditPayments (jawaban pemilik J0)", () => {
     expect(await listShift()).toEqual([]);
 
     await login("654321", "Budi");
-    await post("/api/shifts", { openingCash: 100_000 });
+    await post("/api/shifts", {
+      openingCash: 100_000,
+      openingNote: "Modal tes",
+    });
     vi.setSystemTime(NOW + 3_600_000);
     await pay({
       id: "pel-3",

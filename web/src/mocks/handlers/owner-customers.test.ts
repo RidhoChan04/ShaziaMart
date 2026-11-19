@@ -358,7 +358,10 @@ describe("cancelOwnerCreditPayment", () => {
     await post("/api/shifts/current/close", { countedCash: 250_000 });
     const closedBefore = mockDb.get().closedShifts;
     await login("654321", "Budi");
-    await post("/api/shifts", { openingCash: 100_000 });
+    await post("/api/shifts", {
+      openingCash: 100_000,
+      openingNote: "Modal tes",
+    });
 
     vi.setSystemTime(NOW + 60_000);
     const res = await ownerCancel("pel-1", "  Uang dikembalikan  ");

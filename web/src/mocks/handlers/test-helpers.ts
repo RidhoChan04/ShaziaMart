@@ -105,10 +105,16 @@ export const ownerLogin = (
   password = "pemilik123",
 ): Promise<Response> => post("/api/owner/login", { name, password });
 
-/** Login sebagai Rina lalu buka shift dengan modal awal. */
+/**
+ * Login sebagai Rina lalu buka shift dengan modal awal. (S4) Selalu membawa `openingNote` agar modal
+ * yang berbeda dari saran server tidak ditolak 422 OPENING_MISMATCH; modal sama → catatan disimpan null.
+ */
 export async function loginWithShift(openingCash = 200_000): Promise<void> {
   if ((await login("123456")).status !== 200) throw new Error("login gagal");
-  const res = await post("/api/shifts", { openingCash });
+  const res = await post("/api/shifts", {
+    openingCash,
+    openingNote: "Modal tes",
+  });
   if (res.status !== 201) throw new Error("buka shift gagal");
 }
 

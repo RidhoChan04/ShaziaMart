@@ -499,7 +499,10 @@ describe("(jawaban pemilik J0, ruling R12) listShiftSales & lookupSales", () => 
     await login("654321", "Budi");
     expect(await json<Sale[]>(await get("/api/sales/shift"))).toEqual([]);
     vi.setSystemTime(wib(2026, 11, 4, 13));
-    expect((await post("/api/shifts", { openingCash: 0 })).status).toBe(201);
+    expect(
+      (await post("/api/shifts", { openingCash: 0, openingNote: "Modal tes" }))
+        .status,
+    ).toBe(201);
     vi.setSystemTime(wib(2026, 11, 4, 23, 50));
     const late = await sell(cashSale());
     vi.setSystemTime(wib(2026, 11, 5, 0, 10));
