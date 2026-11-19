@@ -1,7 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import { CircleAlert } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ApiError } from "@/shared/api/fetcher";
 import {
@@ -35,9 +35,13 @@ const DEACTIVATE_NOTE =
 function ActiveToggle({ account }: { account: OwnerKasirAccount }) {
   const client = useQueryClient();
   const [open, setOpen] = useState(false);
+  const wrap = useRef<HTMLDivElement>(null);
+  const toggled = useRef(false);
   const toggle = useUpdateOwnerKasirAccount({
     mutation: {
       onSuccess: async (saved) => {
+        toggled.current = true;
+        setOpen(false);
         await client.invalidateQueries({
           queryKey: getListOwnerKasirAccountsQueryKey(),
         });
@@ -46,6 +50,13 @@ function ActiveToggle({ account }: { account: OwnerKasirAccount }) {
       onSettled: () => setOpen(false),
     },
   });
+  // Tombol pemicu berganti (Nonaktifkan <-> Aktifkan lagi): fokus pindah ke tombol baru, bukan jatuh ke body.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: dipicu oleh berubahnya status akun
+  useEffect(() => {
+    if (!toggled.current) return;
+    toggled.current = false;
+    wrap.current?.querySelector("button")?.focus();
+  }, [account.active]);
   const set = (active: boolean) =>
     toggle.mutate({ userId: account.id, data: { active } });
   const errorText = !toggle.isError
@@ -56,7 +67,7 @@ function ActiveToggle({ account }: { account: OwnerKasirAccount }) {
 
   if (!account.active) {
     return (
-      <div className="grid gap-2">
+      <div ref={wrap} className="grid gap-2">
         <Button
           className="h-12 w-full text-[17px]"
           disabled={toggle.isPending}
@@ -69,7 +80,7 @@ function ActiveToggle({ account }: { account: OwnerKasirAccount }) {
     );
   }
   return (
-    <div className="grid gap-2">
+    <div ref={wrap} className="grid gap-2">
       <Dialog
         open={open}
         onOpenChange={(next) => {

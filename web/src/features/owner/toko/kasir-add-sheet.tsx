@@ -23,7 +23,9 @@ export function KasirAddSheet() {
   const [name, setName] = useState("");
   const pins = usePinFields();
   const create = useCreateOwnerKasirAccount({
+    // gcTime 0: variabel (berisi PIN) tidak tinggal di cache mutasi setelah lembar ditutup.
     mutation: {
+      gcTime: 0,
       onSuccess: async () => {
         await client.invalidateQueries({
           queryKey: getListOwnerKasirAccountsQueryKey(),
@@ -31,6 +33,7 @@ export function KasirAddSheet() {
         toast.success("Kasir ditambahkan");
         pins.clear();
         setOpen(false);
+        create.reset();
       },
     },
   });
@@ -44,7 +47,10 @@ export function KasirAddSheet() {
           setName("");
           pins.clear();
           create.reset();
-        } else pins.clear();
+        } else {
+          pins.clear();
+          create.reset();
+        }
       }}
       trigger={
         <Button className="h-12 w-full text-[17px]">

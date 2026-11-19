@@ -20,7 +20,9 @@ export function KasirPinSheet({ account }: { account: OwnerKasirAccount }) {
   const [open, setOpen] = useState(false);
   const pins = usePinFields();
   const reset = useResetOwnerKasirPin({
+    // gcTime 0: variabel (berisi PIN) tidak tinggal di cache mutasi setelah lembar ditutup.
     mutation: {
+      gcTime: 0,
       onSuccess: async () => {
         await client.invalidateQueries({
           queryKey: getListOwnerKasirAccountsQueryKey(),
@@ -28,6 +30,7 @@ export function KasirPinSheet({ account }: { account: OwnerKasirAccount }) {
         toast.success("PIN diatur ulang");
         pins.clear();
         setOpen(false);
+        reset.reset();
       },
     },
   });
@@ -39,7 +42,7 @@ export function KasirPinSheet({ account }: { account: OwnerKasirAccount }) {
       onOpenChange={(next) => {
         setOpen(next);
         pins.clear();
-        if (next) reset.reset();
+        reset.reset();
       }}
       trigger={<AccountRowTrigger label="Atur ulang PIN" />}
       submitLabel="Simpan"

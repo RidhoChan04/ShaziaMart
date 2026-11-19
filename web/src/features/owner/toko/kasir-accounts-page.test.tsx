@@ -1,3 +1,4 @@
+import type { QueryClient } from "@tanstack/react-query";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http } from "msw";
@@ -234,7 +235,7 @@ test("ubah nama: judul ikut berubah; nama kembar ditolak", async () => {
 
 test("atur ulang PIN: dua kali sama, PIN tersimpan di server dan tidak tampil lagi", async () => {
   const user = userEvent.setup();
-  renderApp(detail("Budi"));
+  const { queryClient } = renderApp(detail("Budi"));
   await screen.findByRole("heading", { level: 1, name: "Budi" });
   await user.click(
     await screen.findByRole("button", { name: "Atur ulang PIN" }),
@@ -256,10 +257,153 @@ test("atur ulang PIN: dua kali sama, PIN tersimpan di server dan tidak tampil la
   await waitFor(() =>
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
   );
-  expect(document.body.textContent).not.toContain("654321");
+  await expectNoPinInMutationCache(queryClient, "654321");
   // Dibuka lagi: isian kosong, PIN lama tidak dimuat.
   await user.click(screen.getByRole("button", { name: "Atur ulang PIN" }));
   const again = await screen.findByRole("dialog", { name: "Atur ulang PIN" });
   expect(within(again).getByLabelText("PIN baru (6 angka)")).toHaveValue("");
   expect(within(again).getByLabelText("Ulangi PIN")).toHaveValue("");
+});
+
+/** Cache mutasi tidak boleh menyimpan PIN (variabel mutasi) setelah lembar ditutup. */
+async function expectNoPinInMutationCache(client: QueryClient, pin: string) {
+  await waitFor(() => {
+    const vars = client
+      .getMutationCache()
+      .getAll()
+      .map((m) => JSON.stringify(m.state.variables ?? null));
+    expect(vars.join("|")).not.toContain(pin);
+  });
+}
+
+test("tambah: Batal mengosongkan nama dan PIN, fokus kembali ke Tambah kasir; PIN tidak tinggal di cache", async () => {
+  const user = userEvent.setup();
+  const { queryClient } = renderApp("/owner/lainnya/kasir");
+  await list();
+  await screen.findByText("Budi");
+  const trigger = screen.getByRole("button", { name: "Tambah kasir" });
+  await user.click(trigger);
+  let dialog = await screen.findByRole("dialog", { name: "Tambah kasir" });
+  await user.type(within(dialog).getByLabelText("Nama"), "Wulan");
+  await user.type(within(dialog).getByLabelText("PIN 6 angka"), "246810");
+  await user.type(within(dialog).getByLabelText("Ulangi PIN"), "246810");
+  await user.click(within(dialog).getByRole("button", { name: "Batal" }));
+  await waitFor(() =>
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+  );
+  expect(trigger).toHaveFocus();
+  await user.click(trigger);
+  dialog = await screen.findByRole("dialog", { name: "Tambah kasir" });
+  expect(within(dialog).getByLabelText("Nama")).toHaveValue("");
+  expect(within(dialog).getByLabelText("PIN 6 angka")).toHaveValue("");
+  expect(within(dialog).getByLabelText("Ulangi PIN")).toHaveValue("");
+  await expectNoPinInMutationCache(queryClient, "246810");
+});
+
+test("tambah: Esc menutup dan mengosongkan isian", async () => {
+  const user = userEvent.setup();
+  renderApp("/owner/lainnya/kasir");
+  await list();
+  await screen.findByText("Budi");
+  const trigger = screen.getByRole("button", { name: "Tambah kasir" });
+  await user.click(trigger);
+  let dialog = await screen.findByRole("dialog", { name: "Tambah kasir" });
+  await user.type(within(dialog).getByLabelText("Nama"), "Wulan");
+  await user.type(within(dialog).getByLabelText("PIN 6 angka"), "246810");
+  await user.keyboard("{Escape}");
+  await waitFor(() =>
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+  );
+  expect(trigger).toHaveFocus();
+  await user.click(trigger);
+  dialog = await screen.findByRole("dialog", { name: "Tambah kasir" });
+  expect(within(dialog).getByLabelText("Nama")).toHaveValue("");
+  expect(within(dialog).getByLabelText("PIN 6 angka")).toHaveValue("");
+});
+
+test("tambah: setelah berhasil, PIN tidak tinggal di cache mutasi", async () => {
+  const user = userEvent.setup();
+  const { queryClient } = renderApp("/owner/lainnya/kasir");
+  await list();
+  await screen.findByText("Budi");
+  await user.click(screen.getByRole("button", { name: "Tambah kasir" }));
+  const dialog = await screen.findByRole("dialog", { name: "Tambah kasir" });
+  await user.type(within(dialog).getByLabelText("Nama"), "Wulan");
+  await user.type(within(dialog).getByLabelText("PIN 6 angka"), "135790");
+  await user.type(within(dialog).getByLabelText("Ulangi PIN"), "135790");
+  await user.click(within(dialog).getByRole("button", { name: "Simpan" }));
+  await screen.findByText("Wulan");
+  await expectNoPinInMutationCache(queryClient, "135790");
+});
+
+test("atur ulang PIN: Batal mengembalikan fokus ke barisnya dan mengosongkan isian", async () => {
+  const user = userEvent.setup();
+  const { queryClient } = renderApp(detail("Budi"));
+  await screen.findByRole("heading", { level: 1, name: "Budi" });
+  const trigger = await screen.findByRole("button", {
+    name: "Atur ulang PIN",
+  });
+  await user.click(trigger);
+  let dialog = await screen.findByRole("dialog", { name: "Atur ulang PIN" });
+  await user.type(
+    within(dialog).getByLabelText("PIN baru (6 angka)"),
+    "112233",
+  );
+  await user.click(within(dialog).getByRole("button", { name: "Batal" }));
+  await waitFor(() =>
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+  );
+  expect(trigger).toHaveFocus();
+  await user.click(trigger);
+  dialog = await screen.findByRole("dialog", { name: "Atur ulang PIN" });
+  expect(within(dialog).getByLabelText("PIN baru (6 angka)")).toHaveValue("");
+  await expectNoPinInMutationCache(queryClient, "112233");
+});
+
+test("atur ulang PIN: 422 PIN harus 6 angka dari server tampil", async () => {
+  server.use(
+    http.post("/api/owner/kasir-accounts/:userId/pin", () =>
+      invalid("PIN harus 6 angka"),
+    ),
+  );
+  const user = userEvent.setup();
+  renderApp(detail("Budi"));
+  await screen.findByRole("heading", { level: 1, name: "Budi" });
+  await user.click(
+    await screen.findByRole("button", { name: "Atur ulang PIN" }),
+  );
+  const dialog = await screen.findByRole("dialog", { name: "Atur ulang PIN" });
+  await user.type(
+    within(dialog).getByLabelText("PIN baru (6 angka)"),
+    "123456",
+  );
+  await user.type(within(dialog).getByLabelText("Ulangi PIN"), "123456");
+  await user.click(within(dialog).getByRole("button", { name: "Simpan" }));
+  expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+    "PIN harus 6 angka",
+  );
+});
+
+test("nonaktifkan: Kembali mengembalikan fokus ke Nonaktifkan; setelah berhasil fokus ke Aktifkan lagi, lalu ke Nonaktifkan", async () => {
+  const user = userEvent.setup();
+  renderApp(detail("Budi"));
+  await screen.findByRole("heading", { level: 1, name: "Budi" });
+  const trigger = await screen.findByRole("button", { name: "Nonaktifkan" });
+  await user.click(trigger);
+  let dialog = await screen.findByRole("alertdialog");
+  await user.click(within(dialog).getByRole("button", { name: "Kembali" }));
+  await waitFor(() =>
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument(),
+  );
+  expect(trigger).toHaveFocus();
+  await user.click(trigger);
+  dialog = await screen.findByRole("alertdialog");
+  await user.click(within(dialog).getByRole("button", { name: "Nonaktifkan" }));
+  const reactivate = await screen.findByRole("button", {
+    name: "Aktifkan lagi",
+  });
+  await waitFor(() => expect(reactivate).toHaveFocus());
+  await user.click(reactivate);
+  const again = await screen.findByRole("button", { name: "Nonaktifkan" });
+  await waitFor(() => expect(again).toHaveFocus());
 });
