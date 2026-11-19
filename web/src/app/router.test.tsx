@@ -174,7 +174,7 @@ test("rute /staff/masuk/baru: draf milik pengguna + langkah=bayar bertahan, lang
   });
 });
 
-test("rute toko pemilik: halaman pengganti terbuka; bagian pengaturan tak dikenal → Halaman tidak ditemukan", async () => {
+test("rute toko pemilik: /owner/lainnya/pengaturan/toko membuka halaman Pengaturan", async () => {
   await ownerLogin();
   renderApp("/owner/lainnya/pengaturan/toko");
   expect(
@@ -188,4 +188,13 @@ test("/owner/lainnya/pengaturan/bukan → Halaman tidak ditemukan", async () => 
   expect(
     await screen.findByText("Halaman tidak ditemukan"),
   ).toBeInTheDocument();
+});
+
+test("/owner/lainnya/shift: tanggal bukan tanggal kalender sah dibuang dari search", async () => {
+  await ownerLogin();
+  renderApp("/owner/lainnya/shift?tanggal=2026-13-45");
+  expect(
+    await screen.findByRole("heading", { level: 1, name: "Shift & kas" }),
+  ).toBeInTheDocument();
+  expect(window.location.search).not.toContain("tanggal");
 });

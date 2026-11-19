@@ -8,6 +8,7 @@ const budgets = [
   { label: "utama", prefix: "index-", max: 130 * KB },
   { label: "kasir", prefix: "kasir-", max: 50 * KB },
   { label: "owner", prefix: "owner-", max: 50 * KB },
+  // Dinamai lewat chunkFileNames di vite.config.ts (bergantung pada nama Rollup "cn").
   { label: "bersama", prefix: "bersama-", max: 35 * KB },
   { label: "laporan", prefix: "laporan-", max: 30 * KB },
   { label: "toko", prefix: "toko-", max: 30 * KB },
@@ -59,11 +60,32 @@ for (const file of files) {
   );
   if (size > max) failures.push(file);
 }
+// Anggaran bernama harus punya chunk; tanpa itu penamaan/pemisahan berubah diam-diam.
+for (const b of budgets) {
+  if (!files.some((f) => f.startsWith(b.prefix))) {
+    console.error(
+      `Tidak ada chunk berawalan "${b.prefix}" (anggaran ${b.label}).`,
+    );
+    failures.push(`${b.label}-hilang`);
+  }
+}
 const roots = files.filter(
   (f) => f.startsWith("index-") || f.startsWith("owner-"),
 );
+for (const prefix of ["index-", "owner-"]) {
+  if (!roots.some((f) => f.startsWith(prefix))) {
+    console.error(`Chunk akar pemilik-awal "${prefix}" tidak ditemukan.`);
+    failures.push(`pemilik-awal-akar-${prefix}`);
+  }
+}
 const pemilik = new Set();
 for (const root of roots) staticDeps(root, pemilik);
+if (pemilik.size <= roots.length) {
+  console.error(
+    "pemilik-awal: tidak ada chunk yang di-import statis oleh index-/owner- — format import berubah? Perbarui regex staticDeps.",
+  );
+  failures.push("pemilik-awal-graf");
+}
 const pemilikAwal = [...pemilik].reduce((n, f) => n + sizes.get(f), 0);
 console.log(
   `pemilik-awal ${(pemilikAwal / KB).toFixed(1)} / ${(PEMILIK_AWAL_MAX / KB).toFixed(1)} KB (${[...pemilik].join(", ")})`,

@@ -4,7 +4,7 @@ import {
   notFound,
   type SearchSchemaInput,
 } from "@tanstack/react-router";
-import { jakartaIsoDate } from "@/shared/lib/business-day";
+import { isIsoDate, jakartaIsoDate } from "@/shared/lib/business-day";
 import {
   type ReportSearch,
   validateReportSearch,
@@ -253,8 +253,7 @@ const ownerShiftRoute = createRoute({
   getParentRoute: () => ownerRoute,
   path: "lainnya/shift",
   validateSearch: (search: Record<string, unknown>): { tanggal?: string } =>
-    typeof search.tanggal === "string" &&
-    /^\d{4}-\d{2}-\d{2}$/.test(search.tanggal)
+    typeof search.tanggal === "string" && isIsoDate(search.tanggal)
       ? { tanggal: search.tanggal }
       : {},
   component: lazyRouteComponent(loadToko, "ShiftsPage"),

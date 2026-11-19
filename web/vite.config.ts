@@ -34,7 +34,8 @@ export default defineConfig(({ command, mode }) => {
       rollupOptions: {
         output: {
           // Chunk bersama yang diturunkan Rollup dari modul `cn` diberi nama stabil
-          // agar punya anggaran sendiri di scripts/check-bundle-size.mjs.
+          // agar punya anggaran sendiri di scripts/check-bundle-size.mjs. Bergantung pada
+          // nama "cn" itu: bila Rollup menamai ulang, check-bundle-size gagal (bukan lolos diam-diam).
           chunkFileNames: (chunk) =>
             chunk.name === "cn"
               ? "assets/bersama-[hash].js"
