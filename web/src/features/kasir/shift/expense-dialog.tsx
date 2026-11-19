@@ -1,10 +1,8 @@
-import { useId, useRef, useState } from "react";
+import { useId, useState } from "react";
 import { useGetSession } from "@/shared/api/gen/auth/auth";
 import { useGetKasirSettings } from "@/shared/api/gen/settings/settings";
 import { useGetCurrentShift } from "@/shared/api/gen/shift/shift";
-import { SCAN_GAP_MS, useScanGuard } from "@/shared/hooks/use-scan-guard";
 import { formatRupiah, parseRupiah } from "@/shared/lib/money";
-import { REASON_MAX } from "@/shared/lib/reason-rules";
 import { Button } from "@/shared/ui/button";
 import {
   Dialog,
@@ -16,6 +14,7 @@ import {
 import { Input } from "@/shared/ui/input";
 import { OwnerPhoneLine } from "../common/owner-phone-line";
 import { ScannedAlert } from "../common/scanned-alert";
+import { useReasonField } from "../common/use-reason-field";
 import { MoneyField } from "../payment/tunai-tab";
 import { focusScanBox } from "../scan/scan-box";
 import { pendingExpenseId } from "./pending-expense-id";
@@ -34,15 +33,11 @@ function ExpenseSession({ onClose }: { onClose: () => void }) {
     useGetKasirSettings({ query: { staleTime: 60_000 } }).data?.ownerPhone ??
     null;
   const [amountText, setAmountText] = useState("");
-  const [reason, setReason] = useState("");
-  // Rentetan scanner + Enter di isian Alasan tidak boleh menjadi alasan (lalu terkirim).
-  const guard = useScanGuard(setReason);
-  // Enter penutup rentetan scanner di elemen mana pun tidak boleh mengirim.
-  const lastDigitAt = useRef(Number.NEGATIVE_INFINITY);
+  const field = useReasonField();
   const expense = useSubmitExpense(onClose);
 
   const amount = parseRupiah(amountText);
-  const trimmed = reason.trim();
+  const trimmed = field.trimmed;
   const ready =
     amount !== null &&
     amount >= 1 &&
@@ -89,17 +84,7 @@ function ExpenseSession({ onClose }: { onClose: () => void }) {
         </DialogHeader>
         <form
           className="grid gap-3"
-          onKeyDownCapture={(e) => {
-            const now = performance.now();
-            if (/^\d$/.test(e.key)) {
-              lastDigitAt.current = now;
-            } else if (
-              e.key === "Enter" &&
-              now - lastDigitAt.current < SCAN_GAP_MS
-            ) {
-              e.preventDefault();
-            }
-          }}
+          {...field.formProps}
           onSubmit={(e) => {
             e.preventDefault();
             submit();
@@ -122,21 +107,14 @@ function ExpenseSession({ onClose }: { onClose: () => void }) {
           </label>
           <Input
             id={reasonId}
-            autoComplete="off"
-            maxLength={REASON_MAX}
+            {...field.inputProps}
             placeholder="Beli es batu"
-            value={reason}
-            onKeyDown={guard.onKeyDown}
-            onChange={(e) => {
-              setReason(e.target.value);
-              guard.reset();
-            }}
           />
           <ScannedAlert
-            show={guard.scanned}
+            show={field.scanned}
             text="Itu hasil scan barcode, bukan alasan"
           />
-          {expense.error && !guard.scanned && (
+          {expense.error && !field.scanned && (
             <p role="alert" className="text-sm font-medium text-danger">
               {expense.error}
             </p>

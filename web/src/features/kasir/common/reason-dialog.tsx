@@ -1,6 +1,4 @@
-import { type ReactNode, type RefObject, useId, useRef, useState } from "react";
-import { SCAN_GAP_MS, useScanGuard } from "@/shared/hooks/use-scan-guard";
-import { REASON_MAX } from "@/shared/lib/reason-rules";
+import { type ReactNode, type RefObject, useId, useRef } from "react";
 import { Button } from "@/shared/ui/button";
 import {
   Dialog,
@@ -13,6 +11,7 @@ import {
 import { Input } from "@/shared/ui/input";
 import { OwnerPhoneLine } from "./owner-phone-line";
 import { ScannedAlert } from "./scanned-alert";
+import { useReasonField } from "./use-reason-field";
 
 type Props = {
   open: boolean;
@@ -48,28 +47,14 @@ function ReasonForm({
   inputRef: RefObject<HTMLInputElement | null>;
 }) {
   const id = useId();
-  const [reason, setReason] = useState("");
-  // Rentetan scanner + Enter di isian yang terfokus tidak boleh menjadi alasan (lalu terkirim).
-  const guard = useScanGuard(setReason);
-  // Enter penutup rentetan scanner di elemen mana pun (radio, tombol) tidak boleh mengirim.
-  const lastDigitAt = useRef(Number.NEGATIVE_INFINITY);
-  const trimmed = reason.trim();
+  const field = useReasonField();
+  const trimmed = field.trimmed;
   const ready = trimmed !== "" && !pending;
 
   return (
     <form
       className="grid gap-3"
-      onKeyDownCapture={(e) => {
-        const now = performance.now();
-        if (/^\d$/.test(e.key)) {
-          lastDigitAt.current = now;
-        } else if (
-          e.key === "Enter" &&
-          now - lastDigitAt.current < SCAN_GAP_MS
-        ) {
-          e.preventDefault();
-        }
-      }}
+      {...field.formProps}
       onSubmit={(e) => {
         e.preventDefault();
         if (ready) onSubmit(trimmed);
@@ -79,23 +64,12 @@ function ReasonForm({
       <label htmlFor={id} className="text-sm font-medium">
         Alasan
       </label>
-      <Input
-        ref={inputRef}
-        id={id}
-        autoComplete="off"
-        maxLength={REASON_MAX}
-        value={reason}
-        onKeyDown={guard.onKeyDown}
-        onChange={(e) => {
-          setReason(e.target.value);
-          guard.reset();
-        }}
-      />
+      <Input ref={inputRef} id={id} {...field.inputProps} />
       <ScannedAlert
-        show={guard.scanned}
+        show={field.scanned}
         text="Itu hasil scan barcode, bukan alasan"
       />
-      {error && !guard.scanned && (
+      {error && !field.scanned && (
         <p role="alert" className="text-sm font-medium text-danger">
           {error}
         </p>
