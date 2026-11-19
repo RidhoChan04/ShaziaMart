@@ -1,8 +1,13 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import { beforeEach, expect, test, vi } from "vitest";
-import { type MockCreditPayment, type MockSale, mockDb } from "@/mocks/db";
-import { loginWithShift } from "@/mocks/handlers/test-helpers";
+import {
+  type MockCreditPayment,
+  type MockDrawerExpense,
+  type MockSale,
+  mockDb,
+} from "@/mocks/db";
+import { loginWithShift, userId } from "@/mocks/handlers/test-helpers";
 import { server } from "@/mocks/node";
 import { setScenario } from "@/mocks/scenarios";
 import type { Sale } from "@/shared/api/gen/shaziaMartAPI.schemas";
@@ -14,6 +19,7 @@ import {
 } from "../credit/pending-repayment-id";
 import { KasirScreen } from "../screen/kasir-screen";
 import { ShiftActions } from "../shift/shift-actions";
+import { clockLabel } from "./clock";
 import { HistorySheet } from "./history-sheet";
 
 /** Shift yang sedang buka (dibuka `loginWithShift`). */
@@ -545,4 +551,165 @@ test("(fix final 1) batal pelunasan lain tidak melepas id tertunda", async () =>
     id: other.id,
     reused: true,
   });
+});
+
+const expenseTime = Date.now() - 6 * 60_000;
+const expClock = clockLabel(expenseTime);
+
+function seedExpense(over: Partial<MockDrawerExpense> = {}) {
+  mockDb.update((s) => {
+    s.drawerExpenses.push({
+      id: "kk-1",
+      at: expenseTime,
+      amount: 15_000,
+      reason: "Beli es batu",
+      shiftId: openShiftId(),
+      createdById: userId("Rina"),
+      createdByName: "Rina",
+      cancelledAt: null,
+      cancelledById: null,
+      cancelledByName: null,
+      cancelledChannel: null,
+      cancelReason: null,
+      ...over,
+    });
+  });
+}
+
+const expenseRow = () =>
+  screen.getByText("Kas keluar · Beli es batu").closest("li") as HTMLElement;
+const cancelExpenseBtn = () =>
+  within(expenseRow()).getByRole("button", {
+    name: `Batalkan kas keluar ${expClock}`,
+  });
+const cancelExpenseDialog = () =>
+  screen.findByRole("dialog", { name: "Batalkan kas keluar Rp15.000?" });
+
+test("(S10) kas keluar tampil berselang-seling menurut jam: judul, jam, nominal; tanpa Cetak ulang", async () => {
+  seedExpense();
+  setup();
+  await screen.findByText("Kas keluar · Beli es batu");
+  const rows = sheetItems().map(
+    (li) =>
+      li.textContent?.match(/20261020-000\d|Kas keluar · Beli es batu/)?.[0],
+  );
+  // Penjualan 8–10 menit lalu; kas keluar 6 menit lalu.
+  expect(rows).toEqual([
+    "Kas keluar · Beli es batu",
+    "20261020-0003",
+    "20261020-0002",
+    "20261020-0001",
+  ]);
+  expect(within(expenseRow()).getByText(expClock)).toBeVisible();
+  expect(within(expenseRow()).getByText("Rp15.000")).toBeVisible();
+  expect(
+    within(expenseRow()).queryByRole("button", { name: /Cetak ulang/ }),
+  ).toBeNull();
+});
+
+test("(S10) batal kas keluar → dialog danger + kalimat laci + R11 → toast, baris Dibatalkan dicoret, tanpa tombol Batalkan", async () => {
+  seedExpense();
+  const { user } = setup();
+  await screen.findByText("Kas keluar · Beli es batu");
+  await user.click(cancelExpenseBtn());
+  const ui = within(await cancelExpenseDialog());
+  expect(
+    ui.getByText("Uang seharusnya di laci kembali bertambah Rp15.000."),
+  ).toBeVisible();
+  expect(
+    ui.getByRole("button", { name: "Batalkan kas keluar" }),
+  ).toHaveAttribute("data-variant", "danger");
+  expect(
+    await ui.findByText("Ragu? Telepon pemilik: 0812-3456-7890"),
+  ).toBeVisible();
+  expect(ui.getByRole("textbox", { name: "Alasan" })).toHaveFocus();
+  await user.type(
+    ui.getByRole("textbox", { name: "Alasan" }),
+    "Tidak jadi{Enter}",
+  );
+  await toasted("Kas keluar dibatalkan");
+  await waitFor(() =>
+    expect(within(expenseRow()).getByText("Dibatalkan")).toBeVisible(),
+  );
+  expect(within(expenseRow()).getByText("Rp15.000")).toHaveClass(
+    "line-through",
+  );
+  expect(
+    within(expenseRow()).queryByRole("button", { name: /Batalkan/ }),
+  ).toBeNull();
+  expect(
+    mockDb.get().drawerExpenses.find((e) => e.id === "kk-1"),
+  ).toMatchObject({
+    cancelledChannel: "kasir",
+    cancelReason: "Tidak jadi",
+  });
+  await waitFor(() =>
+    expect(
+      screen.getByRole("heading", { name: "Riwayat shift ini" }),
+    ).toHaveFocus(),
+  );
+});
+
+test("(S10) 409 OUTSIDE_SHIFT → pesan di dialog, kas keluar tetap aktif", async () => {
+  seedExpense();
+  const { user } = setup();
+  await screen.findByText("Kas keluar · Beli es batu");
+  await user.click(cancelExpenseBtn());
+  const ui = within(await cancelExpenseDialog());
+  mockDb.update((s) => {
+    const e = s.drawerExpenses.find((x) => x.id === "kk-1");
+    if (e) e.shiftId = "shift-lain";
+  });
+  await user.type(ui.getByRole("textbox", { name: "Alasan" }), "x{Enter}");
+  expect(await ui.findByRole("alert")).toHaveTextContent(
+    "Kas keluar dari shift sebelumnya — batalkan dari app pemilik",
+  );
+  expect(
+    mockDb.get().drawerExpenses.find((e) => e.id === "kk-1")?.cancelledAt,
+  ).toBeNull();
+});
+
+test("(S10) kas keluar yang sudah dibatalkan tampil dicoret tanpa tombol Batalkan", async () => {
+  seedExpense({
+    cancelledAt: expenseTime + 1000,
+    cancelledById: userId("Rina"),
+    cancelledByName: "Rina",
+    cancelledChannel: "kasir",
+    cancelReason: "x",
+  });
+  setup();
+  await screen.findByText("Kas keluar · Beli es batu");
+  expect(within(expenseRow()).getByText("Dibatalkan")).toBeVisible();
+  expect(within(expenseRow()).getByText("Rp15.000")).toHaveClass(
+    "line-through",
+  );
+  expect(
+    within(expenseRow()).queryByRole("button", { name: /Batalkan/ }),
+  ).toBeNull();
+});
+
+test("(R11) batal transaksi dan batal pelunasan menampilkan nomor pemilik", async () => {
+  seedPayment();
+  const { user } = setup();
+  await screen.findByText("Pelunasan · Bu Sari");
+  await user.click(cancelBtn());
+  const pay = within(await cancelDialog());
+  expect(
+    await pay.findByText("Ragu? Telepon pemilik: 0812-3456-7890"),
+  ).toBeVisible();
+  await user.click(pay.getByRole("button", { name: "Kembali" }));
+  await waitFor(() =>
+    expect(
+      screen.queryByRole("dialog", { name: /Batalkan pelunasan/ }),
+    ).toBeNull(),
+  );
+  await user.click(
+    within(row(1)).getByRole("button", { name: "Batalkan 20261020-0001" }),
+  );
+  const sale = within(
+    await screen.findByRole("dialog", { name: "Batalkan 20261020-0001?" }),
+  );
+  expect(
+    await sale.findByText("Ragu? Telepon pemilik: 0812-3456-7890"),
+  ).toBeVisible();
 });

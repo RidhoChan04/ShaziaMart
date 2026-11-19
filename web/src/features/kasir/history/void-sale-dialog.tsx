@@ -23,6 +23,8 @@ type Props = {
   onCancel: () => void;
   /** Lihat `ReasonDialog`: ke mana fokus pergi bila baris pemicu sudah hilang. */
   onCloseAutoFocus?: (e: Event) => void;
+  /** (R11) Nomor pemilik; dibaca pemanggil dari pengaturan kasir. */
+  ownerPhone?: string | null;
 };
 
 const amountOf = (sale: Sale, method: "cash" | "qris" | "credit") =>
@@ -86,6 +88,7 @@ export function VoidSaleDialog({
   onSubmit,
   onCancel,
   onCloseAutoFocus,
+  ownerPhone,
 }: Props) {
   const [source, setSource] = useState<QrisSource>("laci");
   const [shownId, setShownId] = useState<string | null>(null);
@@ -115,6 +118,7 @@ export function VoidSaleDialog({
       pending={pending}
       error={error}
       onCancel={onCancel}
+      ownerPhone={ownerPhone ?? null}
       {...(onCloseAutoFocus ? { onCloseAutoFocus } : {})}
       onSubmit={(reason) => onSubmit(reason, qris > 0 ? source : null)}
     >

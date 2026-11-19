@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from "@/shared/ui/dialog";
 import { Input } from "@/shared/ui/input";
+import { OwnerPhoneLine } from "./owner-phone-line";
 import { ScannedAlert } from "./scanned-alert";
 
 type Props = {
@@ -29,6 +30,8 @@ type Props = {
   children?: ReactNode;
   /** Fokus setelah dialog tertutup; bila tidak diisi Radix mengembalikannya ke pemicu semula. */
   onCloseAutoFocus?: (e: Event) => void;
+  /** (R11) Nomor pemilik di bawah isian Alasan; null/kosong = tanpa baris. Tampilan saja, dialog tidak mengambil data. */
+  ownerPhone?: string | null;
 };
 
 function ReasonForm({
@@ -39,6 +42,7 @@ function ReasonForm({
   onSubmit,
   onCancel,
   children,
+  ownerPhone,
   inputRef,
 }: Omit<Props, "open" | "title" | "description" | "onCloseAutoFocus"> & {
   inputRef: RefObject<HTMLInputElement | null>;
@@ -96,6 +100,7 @@ function ReasonForm({
           {error}
         </p>
       )}
+      <OwnerPhoneLine phone={ownerPhone ?? null} />
       <DialogFooter>
         <Button
           type="button"

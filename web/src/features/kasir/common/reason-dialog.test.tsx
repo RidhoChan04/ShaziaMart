@@ -157,3 +157,20 @@ test("dibuka ulang → isian kosong lagi", async () => {
   rerender(<ReasonDialog open {...props} />);
   expect(reason()).toHaveValue("");
 });
+
+test("(R11) ownerPhone terisi → 'Ragu? Telepon pemilik: …' tampil di bawah isian Alasan", () => {
+  setup({ ownerPhone: "0812-3456-7890" });
+  expect(
+    screen.getByText("Ragu? Telepon pemilik: 0812-3456-7890"),
+  ).toBeVisible();
+});
+
+test("(R11) ownerPhone null atau tidak diisi → tidak ada baris telepon", () => {
+  setup({ ownerPhone: null });
+  expect(screen.queryByText(/Telepon pemilik/)).toBeNull();
+});
+
+test("(R11) tanpa prop ownerPhone → tidak ada baris telepon", () => {
+  setup();
+  expect(screen.queryByText(/Telepon pemilik/)).toBeNull();
+});

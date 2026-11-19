@@ -7,6 +7,7 @@ import {
   useLookupSales,
   useVoidSale,
 } from "@/shared/api/gen/sales/sales";
+import { useGetKasirSettings } from "@/shared/api/gen/settings/settings";
 import type { KasirLookupSale } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { useScanGuard } from "@/shared/hooks/use-scan-guard";
 import { pesanError } from "@/shared/lib/error-messages";
@@ -28,6 +29,9 @@ const VALID_Q = /^[0-9-]{1,20}$/;
  */
 export function OldSaleSearch() {
   const client = useQueryClient();
+  const ownerPhone =
+    useGetKasirSettings({ query: { staleTime: 60_000 } }).data?.ownerPhone ??
+    null;
   const inputId = useId();
   const noteId = useId();
   const [input, setInput] = useState("");
@@ -114,6 +118,7 @@ export function OldSaleSearch() {
       <VoidSaleDialog
         sale={voiding}
         fromClosedShift
+        ownerPhone={ownerPhone}
         pending={voidSale.isPending}
         error={voidSale.isError ? pesanError(voidSale.error) : undefined}
         onCancel={cancelVoid}

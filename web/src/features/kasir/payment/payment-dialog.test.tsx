@@ -371,3 +371,22 @@ test("Esc saat request berjalan tidak menutup jendela", async () => {
     "Server tidak tersambung — coba lagi",
   );
 });
+
+test("(R11) dialog 'Kasbon melewati limit' menampilkan nomor pemilik dari pengaturan", async () => {
+  const { user, ui, selesai } = await openPay();
+  await user.click(ui.getByRole("tab", { name: "Kasbon" }));
+  await user.type(
+    ui.getByRole("searchbox", { name: "Cari pelanggan" }),
+    "Joko",
+  );
+  await user.click(
+    await ui.findByRole("button", { name: /Pak Joko · 081234500002/ }),
+  );
+  await user.click(selesai());
+  const dialog = await screen.findByRole("dialog", {
+    name: "Kasbon melewati limit",
+  });
+  expect(
+    await within(dialog).findByText("Ragu? Telepon pemilik: 0812-3456-7890"),
+  ).toBeVisible();
+});

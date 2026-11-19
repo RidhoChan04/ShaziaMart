@@ -13,6 +13,7 @@ import { RepaymentDialog } from "../credit/repayment-dialog";
 import { HistorySheet } from "../history/history-sheet";
 import { focusScanBox } from "../scan/scan-box";
 import { CloseShiftDialog } from "./close-shift-dialog";
+import { ExpenseDialog } from "./expense-dialog";
 import { setSession, syncGate } from "./gate-state";
 import { useIdleLock } from "./use-idle-lock";
 
@@ -38,7 +39,7 @@ export function ShiftInfo({
   );
 }
 
-/** Tombol header saat shift terbuka: Riwayat, Kunci (juga otomatis saat idle), Tutup shift. */
+/** Tombol header saat shift terbuka: Pelunasan kasbon, Kas keluar, Riwayat, Kunci (juga otomatis saat idle), Tutup shift. */
 export function ShiftActions({
   onClosed,
 }: {
@@ -49,6 +50,7 @@ export function ShiftActions({
   const [closing, setClosing] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [repaying, setRepaying] = useState(false);
+  const [spending, setSpending] = useState(false);
   // Kunci tetap berlaku di layar walau server tidak menjawab.
   const logout = useLogout({
     mutation: {
@@ -70,6 +72,10 @@ export function ShiftActions({
         Pelunasan kasbon
       </Button>
       <RepaymentDialog open={repaying} onClose={() => setRepaying(false)} />
+      <Button variant="outline" onClick={() => setSpending(true)}>
+        Kas keluar
+      </Button>
+      <ExpenseDialog open={spending} onClose={() => setSpending(false)} />
       <Button variant="outline" onClick={() => setHistoryOpen(true)}>
         Riwayat
       </Button>

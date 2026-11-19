@@ -183,3 +183,10 @@ test("sale null → tanpa dialog; dibuka lagi untuk transaksi lain → pilihan k
   );
   expect(screen.getByRole("radio", { name: "Tunai dari laci" })).toBeChecked();
 });
+
+test("(R11) prop ownerPhone diteruskan ke dialog alasan", () => {
+  setup({ ownerPhone: "0812-3456-7890" });
+  expect(
+    within(dialog()).getByText("Ragu? Telepon pemilik: 0812-3456-7890"),
+  ).toBeVisible();
+});

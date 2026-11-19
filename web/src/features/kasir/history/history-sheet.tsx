@@ -1,6 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { ApiError } from "@/shared/api/fetcher";
 import {
   getListShiftCreditPaymentsQueryKey,
   getSearchCustomersQueryKey,
@@ -14,10 +15,17 @@ import {
   usePrintSale,
   useVoidSale,
 } from "@/shared/api/gen/sales/sales";
+import { useGetKasirSettings } from "@/shared/api/gen/settings/settings";
 import type {
+  DrawerExpense,
   KasirCreditPayment,
   Sale,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
+import {
+  getListShiftExpensesQueryKey,
+  useCancelShiftExpense,
+  useListShiftExpenses,
+} from "@/shared/api/gen/shift/shift";
 import { pesanError } from "@/shared/lib/error-messages";
 import { formatRupiah } from "@/shared/lib/money";
 import { saleMethodLabel } from "@/shared/lib/payment-labels";
@@ -32,14 +40,25 @@ import {
 import { ReasonDialog } from "../common/reason-dialog";
 import { clearPendingRepaymentId } from "../credit/pending-repayment-id";
 import { focusScanBox } from "../scan/scan-box";
+import { clearPendingExpenseId } from "../shift/pending-expense-id";
 import { BADGE, clockLabel } from "./clock";
 import { CreditPaymentRow } from "./credit-payment-row";
+import { ExpenseRow } from "./expense-row";
 import { OldSaleSearch } from "./old-sale-search";
 import { VoidSaleDialog } from "./void-sale-dialog";
 
 type Entry =
   | { kind: "sale"; at: number; sale: Sale }
-  | { kind: "payment"; at: number; payment: KasirCreditPayment };
+  | { kind: "payment"; at: number; payment: KasirCreditPayment }
+  | { kind: "expense"; at: number; expense: DrawerExpense };
+
+/** OUTSIDE_SHIFT di sini = kas keluar (bukan pelunasan); selebihnya pesan umum. */
+function pesanBatalKasKeluar(err: unknown): string {
+  if (err instanceof ApiError && err.code === "OUTSIDE_SHIFT") {
+    return "Kas keluar dari shift sebelumnya — batalkan dari app pemilik";
+  }
+  return pesanError(err);
+}
 
 /** Pelunasan tunai mengeluarkan uang dari laci saat dibatalkan; QRIS tidak. */
 function cancelNote(p: KasirCreditPayment): string {
@@ -57,6 +76,9 @@ type Props = { open: boolean; onClose: () => void };
  */
 export function HistorySheet({ open, onClose }: Props) {
   const client = useQueryClient();
+  const ownerPhone =
+    useGetKasirSettings({ query: { staleTime: 60_000 } }).data?.ownerPhone ??
+    null;
   const sales = useListShiftSales({ query: { enabled: open } });
   const [voiding, setVoiding] = useState<Sale | null>(null);
   // Setelah batal berhasil tombol `Batalkan` hilang; fokus ke judul, bukan ke body.
@@ -136,6 +158,29 @@ export function HistorySheet({ open, onClose }: Props) {
     setCancelling(null);
   };
 
+  const expenses = useListShiftExpenses({ query: { enabled: open } });
+  const [cancellingExpense, setCancellingExpense] =
+    useState<DrawerExpense | null>(null);
+  const cancelExpense = useCancelShiftExpense({
+    mutation: {
+      onSuccess: (_, { expenseId }) => {
+        // Id tertunda yang sama tidak boleh memutar ulang rekaman yang kini batal.
+        clearPendingExpenseId(expenseId);
+        focusTitleAfterClose.current = true;
+        setCancellingExpense(null);
+        toast.success("Kas keluar dibatalkan");
+        void client.invalidateQueries({
+          queryKey: getListShiftExpensesQueryKey(),
+        });
+      },
+    },
+  });
+  const dismissCancelExpense = () => {
+    if (cancelExpense.isPending) return;
+    cancelExpense.reset();
+    setCancellingExpense(null);
+  };
+
   // Terbaru dulu; urutan stabil, jadi jam yang sama mempertahankan urutan server.
   const entries = useMemo<Entry[]>(
     () =>
@@ -154,10 +199,20 @@ export function HistorySheet({ open, onClose }: Props) {
             payment,
           }),
         ),
+        ...(expenses.data ?? []).map(
+          (expense): Entry => ({
+            kind: "expense",
+            at: expense.at,
+            expense,
+          }),
+        ),
       ].sort((a, b) => b.at - a.at),
-    [sales.data, payments.data],
+    [sales.data, payments.data, expenses.data],
   );
-  const loaded = sales.data !== undefined && payments.data !== undefined;
+  const loaded =
+    sales.data !== undefined &&
+    payments.data !== undefined &&
+    expenses.data !== undefined;
 
   return (
     <>
@@ -189,6 +244,11 @@ export function HistorySheet({ open, onClose }: Props) {
                 {pesanError(payments.error)}
               </p>
             )}
+            {expenses.isError && (
+              <p role="alert" className="text-sm font-medium text-danger">
+                {pesanError(expenses.error)}
+              </p>
+            )}
             {loaded && entries.length === 0 && (
               <p className="text-muted">Belum ada transaksi di shift ini</p>
             )}
@@ -201,6 +261,12 @@ export function HistorySheet({ open, onClose }: Props) {
                     printing={print.isPending}
                     onPrint={() => print.mutate({ saleId: entry.sale.id })}
                     onVoid={() => setVoiding(entry.sale)}
+                  />
+                ) : entry.kind === "expense" ? (
+                  <ExpenseRow
+                    key={`e-${entry.expense.id}`}
+                    expense={entry.expense}
+                    onCancel={() => setCancellingExpense(entry.expense)}
                   />
                 ) : (
                   <CreditPaymentRow
@@ -222,6 +288,7 @@ export function HistorySheet({ open, onClose }: Props) {
       <VoidSaleDialog
         sale={voiding}
         fromClosedShift={false}
+        ownerPhone={ownerPhone}
         pending={voidSale.isPending}
         error={voidSale.isError ? pesanError(voidSale.error) : undefined}
         onCancel={cancelVoid}
@@ -245,6 +312,7 @@ export function HistorySheet({ open, onClose }: Props) {
         description={cancelling ? cancelNote(cancelling) : ""}
         confirmLabel="Batalkan pelunasan"
         confirmTone="danger"
+        ownerPhone={ownerPhone}
         pending={cancelPayment.isPending}
         error={
           cancelPayment.isError ? pesanError(cancelPayment.error) : undefined
@@ -255,6 +323,38 @@ export function HistorySheet({ open, onClose }: Props) {
           if (cancelling) {
             cancelPayment.mutate({
               paymentId: cancelling.id,
+              data: { reason },
+            });
+          }
+        }}
+      />
+      <ReasonDialog
+        open={cancellingExpense !== null}
+        title={
+          cancellingExpense
+            ? `Batalkan kas keluar ${formatRupiah(cancellingExpense.amount)}?`
+            : ""
+        }
+        description={
+          cancellingExpense
+            ? `Uang seharusnya di laci kembali bertambah ${formatRupiah(cancellingExpense.amount)}.`
+            : ""
+        }
+        confirmLabel="Batalkan kas keluar"
+        confirmTone="danger"
+        ownerPhone={ownerPhone}
+        pending={cancelExpense.isPending}
+        error={
+          cancelExpense.isError
+            ? pesanBatalKasKeluar(cancelExpense.error)
+            : undefined
+        }
+        onCancel={dismissCancelExpense}
+        onCloseAutoFocus={settleFocus}
+        onSubmit={(reason) => {
+          if (cancellingExpense) {
+            cancelExpense.mutate({
+              expenseId: cancellingExpense.id,
               data: { reason },
             });
           }

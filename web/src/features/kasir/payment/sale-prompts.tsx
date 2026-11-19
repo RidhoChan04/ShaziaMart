@@ -1,3 +1,4 @@
+import { useGetKasirSettings } from "@/shared/api/gen/settings/settings";
 import type { CreditLimitProblem } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { formatRupiah } from "@/shared/lib/money";
 import { ReasonDialog } from "../common/reason-dialog";
@@ -30,6 +31,9 @@ export function SalePrompts({
   rechoose: () => PaymentChoice | null;
 }) {
   const { prompt } = sale;
+  const ownerPhone =
+    useGetKasirSettings({ query: { staleTime: 60_000 } }).data?.ownerPhone ??
+    null;
   const reason = prompt.kind === "creditReason" ? prompt : null;
   return (
     <>
@@ -45,6 +49,7 @@ export function SalePrompts({
         description={reason ? overLimitText(customerName, reason.problem) : ""}
         confirmLabel="Simpan dengan alasan"
         confirmTone="primary"
+        ownerPhone={ownerPhone}
         onSubmit={sale.confirmReason}
         onCancel={sale.dismissPrompt}
         error={reason?.error ?? undefined}

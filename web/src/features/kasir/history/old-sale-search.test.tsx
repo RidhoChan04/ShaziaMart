@@ -340,3 +340,12 @@ test("batal transaksi lama berhasil → fokus ke kotak Cari nomor struk, bukan b
   await waitFor(() => expect(search()).toHaveFocus());
   expect(document.activeElement).not.toBe(document.body);
 });
+
+test("(R11) dialog batal transaksi lama menampilkan nomor pemilik", async () => {
+  seed(makeSale(OLD));
+  const user = setup();
+  const ui = await openDialog(user);
+  expect(
+    await ui.findByText("Ragu? Telepon pemilik: 0812-3456-7890"),
+  ).toBeVisible();
+});
