@@ -68,6 +68,8 @@ describe("listOwnerExceptions & reviewOwnerExceptions (ruling R9)", () => {
           saleNumber: first.number,
           paymentId: null,
           shiftId: null,
+          shiftOpenedAt: null,
+          shiftClosedAt: null,
           durationMinutes: null,
           fromClosedShift: false,
           refund: 0,

@@ -904,6 +904,8 @@ test("pengecualian & transaksi pemilik: bentuk key lengkap", () => {
     | "saleNumber"
     | "paymentId"
     | "shiftId"
+    | "shiftOpenedAt"
+    | "shiftClosedAt"
     | "durationMinutes"
     | "fromClosedShift"
     | "refund"

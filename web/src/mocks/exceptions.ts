@@ -33,6 +33,9 @@ export const EXCEPTION_KINDS: readonly ExceptionKind[] = [
   "selisih_kecil",
 ];
 
+/** Kejadian sebelum jam buka/tutup shiftnya dipasang (di `cashierExceptions`). */
+type ExceptionEvent = Omit<CashierException, "shiftOpenedAt" | "shiftClosedAt">;
+
 /** Id kasir shift penjualan (buka atau tutup); null bila tidak dikenal. */
 const shiftKasirId = (
   state: Readonly<MockState>,
@@ -52,7 +55,7 @@ function saleBased(
   state: Readonly<MockState>,
   s: MockSale,
   kind: ExceptionKind,
-): CashierException {
+): ExceptionEvent {
   const base = {
     id: s.id,
     kind,
@@ -163,7 +166,7 @@ const shiftEvent = (
   at: number,
   amount: number,
   extra: Partial<Pick<CashierException, "reason" | "durationMinutes">> = {},
-): CashierException => ({
+): ExceptionEvent => ({
   id: shift.id,
   kind,
   at,
@@ -188,7 +191,7 @@ const sumAmounts = (rows: readonly { amount: number }[]): number =>
 function largeExpenseEvents(
   state: Readonly<MockState>,
   rules: AttentionRules,
-): CashierException[] {
+): ExceptionEvent[] {
   const shifts = new Map(shiftViews(state).map((v) => [v.id, v]));
   // Pelaku = kasir shift; kas keluar dari shift yang tidak dikenal memakai pencatatnya.
   const kasirOf = (e: MockDrawerExpense) => {
@@ -201,7 +204,7 @@ function largeExpenseEvents(
   const single = active
     .filter((e) => isLargeExpense(e.amount, rules))
     .map(
-      (e): CashierException => ({
+      (e): ExceptionEvent => ({
         id: e.id,
         kind: "kas_keluar",
         at: e.at,
@@ -217,26 +220,24 @@ function largeExpenseEvents(
   for (const e of active) {
     byShift.set(e.shiftId, [...(byShift.get(e.shiftId) ?? []), e]);
   }
-  const perShift = [...byShift].flatMap(
-    ([shiftId, rows]): CashierException[] => {
-      const at = shiftExpenseCrossing(rows, rules);
-      const [first] = rows;
-      if (at === null || !first) return [];
-      return [
-        {
-          id: `${SHIFT_EXPENSE_PREFIX}${shiftId}`,
-          kind: "kas_keluar",
-          at,
-          ...kasirOf(first),
-          amount: sumAmounts(rows),
-          reason: null,
-          shiftId,
-          durationMinutes: null,
-          ...NO_SALE,
-        },
-      ];
-    },
-  );
+  const perShift = [...byShift].flatMap(([shiftId, rows]): ExceptionEvent[] => {
+    const at = shiftExpenseCrossing(rows, rules);
+    const [first] = rows;
+    if (at === null || !first) return [];
+    return [
+      {
+        id: `${SHIFT_EXPENSE_PREFIX}${shiftId}`,
+        kind: "kas_keluar",
+        at,
+        ...kasirOf(first),
+        amount: sumAmounts(rows),
+        reason: null,
+        shiftId,
+        durationMinutes: null,
+        ...NO_SALE,
+      },
+    ];
+  });
   return [...single, ...perShift];
 }
 
@@ -265,7 +266,7 @@ function eventsOf(
   state: Readonly<MockState>,
   kind: ExceptionKind,
   now: number,
-): CashierException[] {
+): ExceptionEvent[] {
   const rules = state.attentionRules;
   switch (kind) {
     case "batal_transaksi":
@@ -280,7 +281,7 @@ function eventsOf(
       return state.creditPayments
         .filter((p) => p.cancelledChannel === "kasir")
         .map(
-          (p): CashierException => ({
+          (p): ExceptionEvent => ({
             id: p.id,
             kind,
             at: p.cancelledAt ?? p.at,
@@ -304,7 +305,7 @@ function eventsOf(
       return state.drawerExpenses
         .filter((e) => e.cancelledChannel === "kasir")
         .map(
-          (e): CashierException => ({
+          (e): ExceptionEvent => ({
             id: e.id,
             kind,
             at: e.cancelledAt ?? e.at,
@@ -379,17 +380,27 @@ function eventsOf(
  * Kejadian Perlu perhatian satu jenis (K29, K2–K7, K22), terbaru dulu — tampilan turunan dari
  * rekaman yang menyimpan pelaku/alasan, dihitung dengan ambang `attentionRules` saat ini (K7). Semua
  * umur kecuali selisih_kecil (7 hari sebelum `now`); shift_lama shift buka diukur sampai `now`.
- * Pembatalan oleh pemilik sendiri bukan kejadian.
+ * Pembatalan oleh pemilik sendiri bukan kejadian. shiftOpenedAt/shiftClosedAt dari rekaman shift
+ * (tutup atau yang sedang buka); null bila tanpa shift atau shift tidak dikenal.
  */
 export function cashierExceptions(
   state: Readonly<MockState>,
   kind: ExceptionKind,
   now: number,
 ): CashierException[] {
+  const shifts = new Map(shiftViews(state).map((v) => [v.id, v]));
   // Dibalik dulu agar kejadian dengan jam sama tetap terbaru (tercatat belakangan) dulu.
   return eventsOf(state, kind, now)
     .reverse()
-    .sort((a, b) => b.at - a.at);
+    .sort((a, b) => b.at - a.at)
+    .map((e) => {
+      const shift = e.shiftId === null ? undefined : shifts.get(e.shiftId);
+      return {
+        ...e,
+        shiftOpenedAt: shift?.openedAt ?? null,
+        shiftClosedAt: shift?.closedAt ?? null,
+      };
+    });
 }
 
 /** Terakhir ditinjau; selisih_kecil memakai penanda per kasir (K18), null tanpa kasir. */

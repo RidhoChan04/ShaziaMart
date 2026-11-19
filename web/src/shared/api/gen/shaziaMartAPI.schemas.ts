@@ -1362,7 +1362,10 @@ export type KasirLookupSale = Sale & ({
  * suggestedOpening (bertanda), reason = openingNote. shift_lama: id = shiftId, at = openedAt +
  * shiftMaxHours jam, amount 0, durationMinutes = menit penuh (closedAt ?? jam server) −
  * openedAt, reason null. selisih_kecil: id = shiftId, at = closedAt, amount = difference (< 0),
- * reason null. shiftId = shift kejadian (null untuk tiga jenis F3c-1); durationMinutes hanya
+ * reason null. shiftId = shift kejadian (null untuk tiga jenis F3c-1); shiftOpenedAt /
+ * shiftClosedAt = jam buka/tutup shift itu (rentang baris tanpa alasan di halaman tinjau, tanpa
+ * memuat shift per baris); keduanya null bila shiftId null, shiftClosedAt null selama shift
+ * masih buka; durationMinutes hanya
  * shift_lama (selain itu null); kasirId = id kasir pelaku (pembatal untuk jenis batal; null
  * bila rekaman tidak menyimpannya). customerName, saleId, saleNumber, paymentId null untuk
  * jenis F3c-2a.
@@ -1383,6 +1386,16 @@ export interface CashierException {
   reason: string | null;
   /** @nullable */
   shiftId: string | null;
+  /**
+     * Jam buka shift kejadian (epoch ms UTC); null bila shiftId null.
+     * @nullable
+     */
+  shiftOpenedAt: number | null;
+  /**
+     * Jam tutup shift kejadian (epoch ms UTC); null bila shiftId null atau shift masih buka.
+     * @nullable
+     */
+  shiftClosedAt: number | null;
   /**
      * Hanya shift_lama; lama shift dalam menit penuh.
      * @nullable

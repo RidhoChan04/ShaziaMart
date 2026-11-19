@@ -272,6 +272,12 @@ test("ExceptionKind: tiga jenis F3c-1 di depan, lalu enam jenis baru (K2)", () =
     number | null
   >();
   expectTypeOf<CashierException["kasirId"]>().toEqualTypeOf<string | null>();
+  expectTypeOf<CashierException["shiftOpenedAt"]>().toEqualTypeOf<
+    number | null
+  >();
+  expectTypeOf<CashierException["shiftClosedAt"]>().toEqualTypeOf<
+    number | null
+  >();
   expectTypeOf<Required<CashierException>>().toEqualTypeOf<CashierException>();
   expectTypeOf<keyof ExceptionAttention>().toEqualTypeOf<
     | "kind"

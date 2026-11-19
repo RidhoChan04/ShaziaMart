@@ -5,7 +5,8 @@ import { toast } from "sonner";
 import {
   getGetOwnerTodaySummaryQueryKey,
   getListOwnerExceptionsQueryKey,
-  useGetOwnerShift,
+  useGetOwnerSettings,
+  useGetOwnerTodaySummary,
   useListOwnerExceptions,
   useReviewOwnerExceptions,
 } from "@/shared/api/gen/owner/owner";
@@ -13,6 +14,7 @@ import type {
   CashierException,
   ExceptionKind,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
+import { useBusinessDay } from "@/shared/hooks/use-business-day";
 import { relativeDayTime } from "@/shared/lib/business-day";
 import { pesanError } from "@/shared/lib/error-messages";
 import { formatRupiah } from "@/shared/lib/money";
@@ -27,8 +29,9 @@ import {
   isShiftEventKind,
   newestAt,
   reviewedEyebrow,
+  shiftEventDetail,
   shiftEventValue,
-  shiftSpanText,
+  smallShortageCard,
   transferTask,
 } from "./exceptions-model";
 
@@ -72,7 +75,7 @@ function ExceptionRow({
   );
 }
 
-/** Baris kejadian F3c-2a: `{kasir}` kanan nilai; bawah `{alasan}` atau rentang shift + jam kejadian. Bisa diketuk bila membawa shift. */
+/** Baris kejadian F3c-2a: `{kasir}` kanan nilai; bawah `{alasan}` atau jam shift + jam kejadian. Bisa diketuk bila membawa shift. */
 function ShiftEventRow({
   exception: e,
   now,
@@ -80,31 +83,19 @@ function ShiftEventRow({
   exception: CashierException;
   now: number;
 }) {
-  const needSpan = e.reason === null && e.shiftId !== null;
-  const shift = useGetOwnerShift(e.shiftId ?? "", {
-    query: { enabled: needSpan },
-  });
-  const span = shift.data
-    ? shiftSpanText(shift.data.openedAt, shift.data.closedAt)
-    : "Shift";
-  const detail =
-    e.reason ??
-    (e.kind === "kas_keluar" ? `Total kas keluar ${span.toLowerCase()}` : span);
   const body = (
-    <>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-baseline justify-between gap-3">
-          <span className="min-w-0 text-base break-words">{e.kasirName}</span>
-          <span className="shrink-0 text-[15px] font-semibold tabular-nums">
-            {shiftEventValue(e)}
-          </span>
-        </div>
-        <div className="flex items-baseline justify-between gap-3 text-[13px] text-muted">
-          <span className="min-w-0 break-words">{detail}</span>
-          <span className="shrink-0">{relativeDayTime(e.at, now)}</span>
-        </div>
+    <div className="min-w-0 flex-1">
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="min-w-0 text-base break-words">{e.kasirName}</span>
+        <span className="shrink-0 text-[15px] font-semibold tabular-nums">
+          {shiftEventValue(e)}
+        </span>
       </div>
-    </>
+      <div className="flex items-baseline justify-between gap-3 text-[13px] text-muted">
+        <span className="min-w-0 break-words">{shiftEventDetail(e)}</span>
+        <span className="shrink-0">{relativeDayTime(e.at, now)}</span>
+      </div>
+    </div>
   );
   return (
     <li>
@@ -124,6 +115,45 @@ function ShiftEventRow({
         <div className="flex px-4 py-3">{body}</div>
       )}
     </li>
+  );
+}
+
+/** Kartu atas Selisih kecil berulang: total & jumlah shift dari butir Beranda, batas dari Pengaturan. */
+function SmallShortageCard({
+  kasirId,
+  kasirName,
+}: {
+  kasirId: string;
+  kasirName: string;
+}) {
+  const { date } = useBusinessDay();
+  // Kunci sama dengan Beranda: butir yang sudah dimuat dipakai ulang.
+  const summary = useGetOwnerTodaySummary({
+    query: { queryKey: [...getGetOwnerTodaySummaryQueryKey(), date] },
+  });
+  const settings = useGetOwnerSettings();
+  const item = summary.data?.attention.exceptions.find(
+    (a) => a.kind === "selisih_kecil" && a.kasirId === kasirId,
+  );
+  const card = smallShortageCard(
+    kasirName,
+    item,
+    settings.data?.attention.smallShortageWeekMax,
+  );
+  return (
+    <div className="rounded-lg bg-surface px-4 py-3.5">
+      <p className="text-[13px] font-semibold break-words text-muted">
+        {card.label}
+      </p>
+      {card.amount !== null && (
+        <p className="mt-0.5 text-[30px] leading-tight font-bold tracking-[-0.025em] whitespace-nowrap tabular-nums">
+          {card.amount}
+        </p>
+      )}
+      {card.meta !== null && (
+        <p className="mt-1 text-[13px] text-muted">{card.meta}</p>
+      )}
+    </div>
   );
 }
 
@@ -185,6 +215,12 @@ function ExceptionsList({
             </p>
           ) : (
             <>
+              {kind === "selisih_kecil" && kasirId && items[0] && (
+                <SmallShortageCard
+                  kasirId={kasirId}
+                  kasirName={items[0].kasirName}
+                />
+              )}
               <div className="overflow-hidden rounded-lg bg-surface">
                 <RowList>
                   {items.map((e) =>

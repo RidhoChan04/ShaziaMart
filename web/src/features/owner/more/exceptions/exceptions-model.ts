@@ -1,5 +1,6 @@
 import type {
   CashierException,
+  ExceptionAttention,
   ExceptionKind,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { formatDateLong, jakartaTime } from "@/shared/lib/business-day";
@@ -29,7 +30,7 @@ export const EXCEPTION_TITLE: Record<ExceptionKind, string> = {
   batal_kas_keluar: "Kas keluar dibatalkan kasir",
   selisih_kas: "Selisih kas",
   kas_keluar: "Kas keluar besar",
-  serah_terima: "Modal berbeda saat serah terima",
+  serah_terima: "Modal awal berbeda",
   shift_lama: "Shift kelamaan buka",
   selisih_kecil: "Selisih kecil berulang",
 };
@@ -94,10 +95,40 @@ export function shiftEventValue(e: CashierException): string {
   }
 }
 
-/** `Shift 15.00–22.04`; shift masih buka: `Shift 15.00–sekarang`. */
-export function shiftSpanText(
-  openedAt: number,
-  closedAt: number | null,
-): string {
-  return `Shift ${jakartaTime(openedAt)}–${closedAt === null ? "sekarang" : jakartaTime(closedAt)}`;
+/**
+ * Kiri bawah baris kejadian F3c-2a (§12g): `{alasan}`; tanpa alasan `Shift 15.00–22.04` (shift masih
+ * buka: `Shift sejak 15.00`), untuk kas keluar per shift `Total kas keluar shift …`. Jam shift dari
+ * kejadian itu sendiri; tanpa jam (shift tidak dikenal) cukup `Shift`.
+ */
+export function shiftEventDetail(e: CashierException): string {
+  if (e.reason !== null) return e.reason;
+  const span =
+    e.shiftOpenedAt === null
+      ? null
+      : e.shiftClosedAt === null
+        ? `sejak ${jakartaTime(e.shiftOpenedAt)}`
+        : `${jakartaTime(e.shiftOpenedAt)}–${jakartaTime(e.shiftClosedAt)}`;
+  const label = e.kind === "kas_keluar" ? "Total kas keluar shift" : "Shift";
+  return span === null ? label : `${label} ${span}`;
+}
+
+/**
+ * Kartu atas Selisih kecil berulang (§12g, mockup layar 8): `Kurang dalam 7 hari · {kasir}` /
+ * `{Rp}` / `{n} shift · batas {Rp}`. Angka dari butir server dan Pengaturan, tidak dijumlah di sini;
+ * bagian yang datanya tidak ada tidak ditulis.
+ */
+export function smallShortageCard(
+  kasirName: string,
+  item: ExceptionAttention | undefined,
+  limit: number | undefined,
+): { label: string; amount: string | null; meta: string | null } {
+  const meta = [
+    item ? `${item.count} shift` : null,
+    limit === undefined ? null : `batas ${formatRupiah(limit)}`,
+  ].filter((part) => part !== null);
+  return {
+    label: `Kurang dalam 7 hari · ${item?.kasirName ?? kasirName}`,
+    amount: item ? formatRupiah(-item.shortage) : null,
+    meta: meta.length > 0 ? meta.join(" · ") : null,
+  };
 }

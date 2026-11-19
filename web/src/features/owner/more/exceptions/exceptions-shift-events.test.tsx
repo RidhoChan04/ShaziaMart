@@ -1,10 +1,21 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { HttpResponse, http } from "msw";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import type { MockClosedShift, MockDrawerExpense, MockState } from "@/mocks/db";
+import type {
+  MockClosedShift,
+  MockDrawerExpense,
+  MockShift,
+  MockState,
+} from "@/mocks/db";
 import { mockDb } from "@/mocks/db";
 import { ownerLogin } from "@/mocks/handlers/test-helpers";
-import type { ExceptionKind } from "@/shared/api/gen/shaziaMartAPI.schemas";
+import { server } from "@/mocks/node";
+import type {
+  CashierException,
+  ExceptionKind,
+  OwnerExceptionList,
+} from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { renderApp } from "@/test/render-app";
 import { EXC_NOW } from "@/test/seed-exceptions";
 
@@ -51,6 +62,31 @@ function closed(
   return c;
 }
 
+function openShift(
+  s: MockState,
+  name: string,
+  over: Partial<MockShift> = {},
+): MockShift {
+  const u = userOf(s, name);
+  const shift: MockShift = {
+    id: "sh-t9b-buka",
+    kasirId: u.id,
+    kasirName: u.name,
+    openedAt: EXC_NOW - 13 * HOUR,
+    openingCash: 200_000,
+    suggestedOpening: null,
+    openingNote: null,
+    cashSales: 0,
+    salesCount: 0,
+    cashOuts: [],
+    creditCash: [],
+    saleRefunds: [],
+    ...over,
+  };
+  s.shift = shift;
+  return shift;
+}
+
 function expense(
   s: MockState,
   shiftId: string,
@@ -95,7 +131,14 @@ beforeEach(() => {
 
 afterEach(() => vi.useRealTimers());
 
-test("selisih kas: judul, baris '{kasir}' ±Rp, 'Shift {buka}–{tutup}' tanpa alasan, ketuk membuka rincian shift", async () => {
+test("selisih kas: judul, baris '{kasir}' ±Rp, 'Shift {buka}–{tutup}' tanpa alasan, ketuk membuka rincian shift; jam shift dari kejadian (tanpa memuat shift per baris)", async () => {
+  const shiftFetches: string[] = [];
+  const onRequest = ({ request }: { request: Request }) => {
+    if (new URL(request.url).pathname.startsWith("/api/owner/shifts/")) {
+      shiftFetches.push(request.url);
+    }
+  };
+  server.events.on("request:start", onRequest);
   let shiftId = "";
   mockDb.update((s) => {
     const c = closed(s, "Rina", { difference: -12_000 });
@@ -121,6 +164,73 @@ test("selisih kas: judul, baris '{kasir}' ±Rp, 'Shift {buka}–{tutup}' tanpa a
     `/owner/lainnya/shift/${shiftId}`,
   );
   expect(screen.getByText("+Rp6.000")).toBeInTheDocument();
+  server.events.removeListener("request:start", onRequest);
+  expect(shiftFetches).toEqual([]);
+});
+
+test("shift masih buka: 'Shift sejak {HH.MM}' (§12g), bukan rentang", async () => {
+  mockDb.update((s) => {
+    openShift(s, "Rina");
+  });
+  await ownerLogin();
+  renderApp("/owner/pengecualian/shift_lama");
+  const r = within(rowFor(await screen.findByText("13 jam")));
+  expect(r.getByText("Shift sejak 01.00")).toBeInTheDocument();
+  expect(r.getByRole("link")).toHaveAttribute(
+    "href",
+    "/owner/lainnya/shift/sh-t9b-buka",
+  );
+});
+
+test("kas keluar per shift di shift yang masih buka: 'Total kas keluar shift sejak {HH.MM}'", async () => {
+  mockDb.update((s) => {
+    const sh = openShift(s, "Rina", { openedAt: EXC_NOW - 5 * HOUR });
+    for (const [i, amount] of [50_000, 50_000, 50_000, 10_000].entries()) {
+      expense(s, sh.id, EXC_NOW - (4 - i) * HOUR, amount, `Belanja ${i}`);
+    }
+  });
+  await ownerLogin();
+  renderApp("/owner/pengecualian/kas_keluar");
+  const r = within(
+    rowFor(await screen.findByText("Total kas keluar shift sejak 09.00")),
+  );
+  expect(r.getByText("Rp160.000")).toBeInTheDocument();
+});
+
+test("kejadian tanpa shiftId: baris bukan tautan dan tanpa ›", async () => {
+  const row: CashierException = {
+    id: "kk-tanpa-shift",
+    kind: "batal_kas_keluar",
+    at: EXC_NOW - HOUR,
+    kasirId: null,
+    kasirName: "Rina",
+    amount: 35_000,
+    reason: "Salah catat",
+    customerName: null,
+    saleId: null,
+    saleNumber: null,
+    paymentId: null,
+    shiftId: null,
+    shiftOpenedAt: null,
+    shiftClosedAt: null,
+    durationMinutes: null,
+    fromClosedShift: false,
+    refund: 0,
+    qrisToOwner: 0,
+    overLimitExcess: null,
+  };
+  const list: OwnerExceptionList = {
+    kind: "batal_kas_keluar",
+    reviewedAt: null,
+    items: [row],
+  };
+  server.use(http.get("/api/owner/exceptions", () => HttpResponse.json(list)));
+  await ownerLogin();
+  renderApp("/owner/pengecualian/batal_kas_keluar");
+  const li = rowFor(await screen.findByText("Salah catat"));
+  expect(within(li).getByText("Rina")).toBeInTheDocument();
+  expect(within(li).queryByRole("link")).toBeNull();
+  expect(li.querySelector("svg")).toBeNull();
 });
 
 test("kas keluar besar: kas keluar tunggal pakai alasan; kejadian per shift 'Total kas keluar shift …' kanan Σ", async () => {
@@ -164,7 +274,7 @@ test("serah terima: alasan modal berbeda di baris, selisih bertanda kanan", asyn
   expect(
     await screen.findByRole("heading", {
       level: 1,
-      name: "Modal berbeda saat serah terima",
+      name: "Modal awal berbeda",
     }),
   ).toBeInTheDocument();
   const r = within(
@@ -250,6 +360,10 @@ test("selisih kecil: hanya kasir dari kasirId; 'Tandai sudah ditinjau' mengirim 
   expect(screen.getByText("−Rp3.000")).toBeInTheDocument();
   expect(screen.queryByText("−Rp2.000")).toBeNull();
   expect(screen.queryByText("Rina")).toBeNull();
+  // Σ 7.000 di bawah batas: tidak ada butir server → kartu tanpa total dan jumlah shift.
+  expect(screen.getByText("Kurang dalam 7 hari · Budi")).toBeInTheDocument();
+  expect(await screen.findByText("batas Rp20.000")).toBeInTheDocument();
+  expect(screen.queryByText(/ shift · batas /)).toBeNull();
   await user.click(
     screen.getByRole("button", { name: "Tandai sudah ditinjau" }),
   );
@@ -259,6 +373,30 @@ test("selisih kecil: hanya kasir dari kasirId; 'Tandai sudah ditinjau' mengirim 
   expect(mockDb.get().smallShortageReviews[rinaId] ?? null).toBeNull();
   expect(
     await screen.findByText("Tidak ada yang perlu ditinjau"),
+  ).toBeInTheDocument();
+});
+
+test("selisih kecil: kartu 'Kurang dalam 7 hari · {kasir}' / total butir server / '{n} shift · batas {Rp}'", async () => {
+  let budiId = "";
+  mockDb.update((s) => {
+    budiId = userOf(s, "Budi").id;
+    for (let i = 0; i < 6; i++) {
+      const closedAt = EXC_NOW - i * 24 * HOUR - HOUR;
+      closed(s, "Budi", {
+        openedAt: closedAt - 6 * HOUR,
+        closedAt,
+        difference: -4_000,
+      });
+    }
+  });
+  await ownerLogin();
+  renderApp(`/owner/pengecualian/selisih_kecil?kasirId=${budiId}`);
+  expect(
+    await screen.findByText("Kurang dalam 7 hari · Budi"),
+  ).toBeInTheDocument();
+  expect(await screen.findByText("Rp24.000")).toBeInTheDocument();
+  expect(
+    await screen.findByText("6 shift · batas Rp20.000"),
   ).toBeInTheDocument();
 });
 

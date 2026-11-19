@@ -153,6 +153,8 @@ describe("cashierExceptions", () => {
         saleNumber: batal?.number,
         paymentId: null,
         shiftId: null,
+        shiftOpenedAt: null,
+        shiftClosedAt: null,
         durationMinutes: null,
         fromClosedShift: false,
         refund: 0,
@@ -175,6 +177,8 @@ describe("cashierExceptions", () => {
         saleNumber: null,
         paymentId: p?.id,
         shiftId: null,
+        shiftOpenedAt: null,
+        shiftClosedAt: null,
         durationMinutes: null,
         fromClosedShift: false,
         refund: 0,
@@ -198,6 +202,8 @@ describe("cashierExceptions", () => {
         saleNumber: over?.number,
         paymentId: null,
         shiftId: null,
+        shiftOpenedAt: null,
+        shiftClosedAt: null,
         durationMinutes: null,
         fromClosedShift: false,
         refund: 0,
@@ -502,6 +508,8 @@ describe("(T4) kejadian F3c-2a dari state: ambang Pengaturan, butir, tinjau", ()
       Partial<CashierException>,
   ): CashierException => ({
     reason: null,
+    shiftOpenedAt: null,
+    shiftClosedAt: null,
     customerName: null,
     saleId: null,
     saleNumber: null,
@@ -588,6 +596,8 @@ describe("(T4) kejadian F3c-2a dari state: ambang Pengaturan, butir, tinjau", ()
         kasirName: "Budi",
         amount: 6_000,
         shiftId: today.shiftId,
+        shiftOpenedAt: today.openedAt,
+        shiftClosedAt: today.closedAt,
       }),
       event({
         id: old.shiftId,
@@ -597,6 +607,8 @@ describe("(T4) kejadian F3c-2a dari state: ambang Pengaturan, butir, tinjau", ()
         kasirName: "Rina",
         amount: -12_000,
         shiftId: old.shiftId,
+        shiftOpenedAt: old.openedAt,
+        shiftClosedAt: old.closedAt,
       }),
     ]);
     const item = butir({
@@ -645,6 +657,8 @@ describe("(T4) kejadian F3c-2a dari state: ambang Pengaturan, butir, tinjau", ()
         kasirName: "Rina",
         amount: -4_000,
         shiftId: s.closedShifts[0]?.shiftId ?? "",
+        shiftOpenedAt: s.closedShifts[0]?.openedAt ?? null,
+        shiftClosedAt: s.closedShifts[0]?.closedAt ?? null,
       }),
     );
     const budiItem = butir({
@@ -740,6 +754,8 @@ describe("(T4) kejadian F3c-2a dari state: ambang Pengaturan, butir, tinjau", ()
         kasirName: "Rina",
         amount: 160_000,
         shiftId: a.shiftId,
+        shiftOpenedAt: a.openedAt,
+        shiftClosedAt: a.closedAt,
       }),
       event({
         id: e60.id,
@@ -750,6 +766,8 @@ describe("(T4) kejadian F3c-2a dari state: ambang Pengaturan, butir, tinjau", ()
         amount: 60_000,
         reason: "Beli gas elpiji",
         shiftId: a.shiftId,
+        shiftOpenedAt: a.openedAt,
+        shiftClosedAt: a.closedAt,
       }),
     ]);
     expect(items(s, "kas_keluar")).toEqual([
@@ -786,6 +804,8 @@ describe("(T4) kejadian F3c-2a dari state: ambang Pengaturan, butir, tinjau", ()
         kasirName: "Budi",
         amount: 160_000,
         shiftId: b.shiftId,
+        shiftOpenedAt: b.openedAt,
+        shiftClosedAt: b.closedAt,
       }),
     ]);
     expect(items(s, "kas_keluar")).toEqual([
@@ -834,6 +854,8 @@ describe("(T4) kejadian F3c-2a dari state: ambang Pengaturan, butir, tinjau", ()
         amount: 60_000,
         reason: "Salah catat nominal",
         shiftId: sh.id,
+        shiftOpenedAt: sh.openedAt,
+        shiftClosedAt: null,
       }),
     ]);
     expect(cashierExceptions(s, "kas_keluar", NOW)).toEqual([]);
@@ -870,6 +892,8 @@ describe("(T4) kejadian F3c-2a dari state: ambang Pengaturan, butir, tinjau", ()
         amount: 5_000,
         reason: "Tambah uang receh",
         shiftId: sh.id,
+        shiftOpenedAt: sh.openedAt,
+        shiftClosedAt: null,
       }),
       event({
         id: c.shiftId,
@@ -880,6 +904,8 @@ describe("(T4) kejadian F3c-2a dari state: ambang Pengaturan, butir, tinjau", ()
         amount: -10_000,
         reason: "Salah hitung kemarin",
         shiftId: c.shiftId,
+        shiftOpenedAt: c.openedAt,
+        shiftClosedAt: c.closedAt,
       }),
     ]);
     expect(items(s, "serah_terima")).toEqual([
@@ -915,6 +941,8 @@ describe("(T4) kejadian F3c-2a dari state: ambang Pengaturan, butir, tinjau", ()
         kasirName: "Rina",
         amount: 0,
         shiftId: sh.id,
+        shiftOpenedAt: sh.openedAt,
+        shiftClosedAt: null,
         durationMinutes: 780,
       }),
       event({
@@ -925,6 +953,8 @@ describe("(T4) kejadian F3c-2a dari state: ambang Pengaturan, butir, tinjau", ()
         kasirName: "Budi",
         amount: 0,
         shiftId: long.shiftId,
+        shiftOpenedAt: long.openedAt,
+        shiftClosedAt: long.closedAt,
         durationMinutes: 870,
       }),
     ]);
