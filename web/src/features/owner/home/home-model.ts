@@ -7,7 +7,7 @@ import type {
   OpnameFlag,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { formatIsoDate, formatIsoDayMonth } from "@/shared/lib/business-day";
-import { formatRupiah } from "@/shared/lib/money";
+import { formatRupiah, formatSignedRupiah } from "@/shared/lib/money";
 import { roundHalfUp } from "@/shared/lib/quantity";
 import { scopeLabel } from "@/shared/lib/stock-rules";
 
@@ -67,6 +67,12 @@ export type AttentionLink =
   | { to: "/owner/barang"; search: { menunggu: true } }
   | { to: "/owner/pengecualian/$kind"; params: { kind: ExceptionKind } }
   | {
+      to: "/owner/pengecualian/$kind";
+      params: { kind: ExceptionKind };
+      search: { kasirId: string };
+    }
+  | { to: "/owner/lainnya/qris" }
+  | {
       to: "/owner/barang/$productId";
       params: { productId: string };
       search: { lembar: "harga" | "habis" };
@@ -90,8 +96,18 @@ export type AttentionItem = {
     | "opname-held"
     | "exception-void"
     | "exception-repay"
-    | "exception-limit";
+    | "exception-limit"
+    | "exception-cash-void"
+    | "cash-expense"
+    | "handover"
+    | "long-shift"
+    | "small-shortage"
+    | "qris";
   link: AttentionLink;
+  /** Butir kejadian: tombol `Tandai sudah ditinjau` di halaman Lihat semua (S8). */
+  review?: { kind: ExceptionKind; kasirId: string | null; upTo: number };
+  /** Butir QRIS: tombol `Cocokkan` membuka lembar pencocokan (S11). */
+  reconcileQris?: true;
 };
 
 /** Butir `Harga modal {nama} naik|turun {Rp}`; selisih eceran di bawah Rp1 tidak pernah ditulis "Rp0". */
@@ -210,76 +226,113 @@ export function exceptionRange(from: string, to: string): string {
   return `${formatIsoDayMonth(from)}–${formatIsoDayMonth(to)}`;
 }
 
-const EXCEPTION_COPY: Record<
-  ExceptionKind,
-  {
-    icon: "exception-void" | "exception-repay" | "exception-limit" | "cash";
-    title: (n: number) => string;
-    amount: (rupiah: string) => string;
-  }
-> = {
+type ExceptionCopy = {
+  icon: AttentionItem["icon"];
+  title: (e: ExceptionAttention) => string;
+  /** Bagian uang/keterangan sesudah rentang tanggal (teks final §12g). */
+  amount: (e: ExceptionAttention) => string;
+  tone?: (e: ExceptionAttention) => AttentionItem["tone"];
+};
+
+/** `−Rp12.000 · +Rp6.000`: bagian 0 tidak ditulis; kurang = `shortage`, lebih = sisanya dari `total`. */
+function cashDifference(e: ExceptionAttention): string {
+  const over = e.total - e.shortage;
+  return [
+    ...(e.shortage < 0 ? [formatSignedRupiah(e.shortage)] : []),
+    ...(over > 0 ? [formatSignedRupiah(over)] : []),
+  ].join(" · ");
+}
+
+const plain = (e: ExceptionAttention) => formatRupiah(e.total);
+
+const EXCEPTION_COPY: Record<ExceptionKind, ExceptionCopy> = {
   batal_transaksi: {
     icon: "exception-void",
-    title: (n) => `${n} transaksi dibatalkan kasir`,
-    amount: (r) => r,
+    title: (e) => `${e.count} transaksi dibatalkan kasir`,
+    amount: plain,
   },
   batal_pelunasan: {
     icon: "exception-repay",
-    title: (n) => `${n} pelunasan dibatalkan kasir`,
-    amount: (r) => r,
+    title: (e) => `${e.count} pelunasan dibatalkan kasir`,
+    amount: plain,
   },
   kasbon_lewat_limit: {
     icon: "exception-limit",
-    title: (n) => `${n} kasbon lewat limit`,
-    amount: (r) => `lewat ${r}`,
+    title: (e) => `${e.count} kasbon lewat limit`,
+    amount: (e) => `lewat ${formatRupiah(e.total)}`,
   },
-  // Jenis F3c-2a: teks sementara; teks & ikon akhir mengikuti mockup (§12g).
   batal_kas_keluar: {
-    icon: "cash",
-    title: (n) => `${n} kas keluar dibatalkan kasir`,
-    amount: (r) => r,
+    icon: "exception-cash-void",
+    title: (e) => `${e.count} kas keluar dibatalkan kasir`,
+    amount: plain,
   },
   selisih_kas: {
     icon: "cash",
-    title: (n) => `${n} selisih kas`,
-    amount: (r) => r,
+    title: (e) => `${e.count} selisih kas`,
+    amount: cashDifference,
+    tone: (e) => (e.shortage < 0 ? "critical" : "warning"),
   },
   kas_keluar: {
-    icon: "cash",
-    title: (n) => `${n} kas keluar besar`,
-    amount: (r) => r,
+    icon: "cash-expense",
+    title: (e) => `${e.count} kas keluar besar`,
+    amount: plain,
   },
   serah_terima: {
-    icon: "cash",
-    title: (n) => `${n} modal berbeda saat serah terima`,
-    amount: (r) => r,
+    icon: "handover",
+    title: (e) => `${e.count} modal awal berbeda`,
+    amount: (e) => formatSignedRupiah(e.total),
   },
   shift_lama: {
-    icon: "cash",
-    title: (n) => `${n} shift kelamaan buka`,
-    amount: (r) => r,
+    icon: "long-shift",
+    title: (e) => `${e.count} shift kelamaan buka`,
+    amount: (e) => `terlama ${Math.floor((e.longestMinutes ?? 0) / 60)} jam`,
   },
   selisih_kecil: {
-    icon: "cash",
-    title: () => "Selisih kecil berulang",
-    amount: (r) => r,
+    icon: "small-shortage",
+    title: (e) => `Selisih kecil berulang · ${e.kasirName ?? ""}`,
+    amount: (e) => `${e.count} shift · ${formatSignedRupiah(e.shortage)}`,
   },
 };
 
-/** Butir pengecualian kasir (ruling R9): menumpuk sejak terakhir ditinjau, dengan rentang tanggalnya. */
+/** Butir pengecualian kasir (ruling R9): menumpuk sejak terakhir ditinjau, dengan rentang tanggalnya. Selisih kecil satu butir per kasir. */
 function exceptionItem(e: ExceptionAttention): AttentionItem {
   const copy = EXCEPTION_COPY[e.kind];
+  const perKasir = e.kind === "selisih_kecil" && e.kasirId !== null;
   return {
-    key: `exception-${e.kind}`,
-    title: copy.title(e.count),
-    detail: `${exceptionRange(e.from, e.to)} · ${copy.amount(formatRupiah(e.total))}`,
-    tone: "warning",
+    key: perKasir ? `exception-${e.kind}-${e.kasirId}` : `exception-${e.kind}`,
+    title: copy.title(e),
+    detail: `${exceptionRange(e.from, e.to)} · ${copy.amount(e)}`,
+    tone: copy.tone?.(e) ?? "warning",
     icon: copy.icon,
-    link: { to: "/owner/pengecualian/$kind", params: { kind: e.kind } },
+    link:
+      perKasir && e.kasirId !== null
+        ? {
+            to: "/owner/pengecualian/$kind",
+            params: { kind: e.kind },
+            search: { kasirId: e.kasirId },
+          }
+        : { to: "/owner/pengecualian/$kind", params: { kind: e.kind } },
+    review: { kind: e.kind, kasirId: e.kasirId, upTo: e.latestAt },
   };
 }
 
-/** Urutan (mockup pengecualian disetujui): pengecualian kasir (batal transaksi, batal pelunasan, kasbon lewat limit), stok minus, kedaluwarsa, selisih opname besar, opname tertahan diganti, utang lewat, perubahan modal, barang baru menunggu harga, opname menunggu persetujuan, stok menipis, segera kedaluwarsa, utang segera, barang habis, kasbon > 30 hari. Selisih kas kini kejadian di `exceptions` (S6). */
+/** Butir `QRIS belum dicocokkan: {n} hari` (S7); hanya bila ada hari yang perlu dicocokkan. */
+function qrisItems(q: Attention["qrisUnreconciled"]): AttentionItem[] {
+  if (q === null) return [];
+  return [
+    {
+      key: "qris-unreconciled",
+      title: `QRIS belum dicocokkan: ${q.count} hari`,
+      detail: exceptionRange(q.from, q.to),
+      tone: "warning",
+      icon: "qris",
+      link: { to: "/owner/lainnya/qris" },
+      reconcileQris: true,
+    },
+  ];
+}
+
+/** Urutan (mockup pengecualian disetujui): pengecualian kasir (batal transaksi, batal pelunasan, kasbon lewat limit), stok minus, kedaluwarsa, selisih opname besar, opname tertahan diganti, utang lewat, perubahan modal, barang baru menunggu harga, opname menunggu persetujuan, QRIS belum dicocokkan (M-2a), stok menipis, segera kedaluwarsa, utang segera, barang habis, kasbon > 30 hari. Selisih kas kini kejadian di `exceptions` (S6). */
 export function attentionItems(a: Attention): AttentionItem[] {
   const items: AttentionItem[] = [...a.exceptions.map(exceptionItem)];
   if (a.negativeStockCount > 0) {
@@ -311,6 +364,7 @@ export function attentionItems(a: Attention): AttentionItem[] {
     });
   }
   items.push(...opnameHeldItems(a.opnameHeldCount));
+  items.push(...qrisItems(a.qrisUnreconciled));
   if (a.lowStockCount > 0) {
     items.push({
       key: "low-stock",

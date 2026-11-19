@@ -20,6 +20,11 @@ import { server } from "@/mocks/node";
 import { ownerTodaySummary } from "@/mocks/owner-summary";
 import { setScenario } from "@/mocks/scenarios";
 import { getGetOwnerTodaySummaryQueryKey } from "@/shared/api/gen/owner/owner";
+import type {
+  Attention,
+  ExceptionAttention,
+  ExceptionKind,
+} from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { newId } from "@/shared/lib/id";
 import { renderApp } from "@/test/render-app";
 import { stubWidth } from "@/test/resize-observer";
@@ -71,6 +76,8 @@ async function sellAndCloseShiftShort() {
 }
 
 test("omzet, perbandingan, grafik, tile, dan perlu perhatian tampil dari mock", async () => {
+  // (K20) Contoh seed F3c-2a ditinjau sampai sesaat sebelum selisih kas kasir ini.
+  mockDb.update((s) => reviewSeedSamples(s, Date.now() - 1));
   await sellAndCloseShiftShort();
   await ownerLogin();
   renderApp("/owner");
@@ -100,9 +107,13 @@ test("omzet, perbandingan, grafik, tile, dan perlu perhatian tampil dari mock", 
   expect(card("Kasbon baru").getByText("Rp0")).toBeInTheDocument();
   expect(card("Rata-rata / struk").getByText("Rp36.000")).toBeInTheDocument();
 
+  // Pengganti butir selisih kas lama (keputusan S6): kejadian selisih_kas dengan nilai bertanda.
   expect(
-    screen.getByRole("heading", { name: "Perlu perhatian" }),
+    screen.getByRole("heading", { name: "Perlu perhatian · 4" }),
   ).toBeInTheDocument();
+  expect(
+    screen.getByRole("link", { name: /^1 selisih kas\s17 Okt · −Rp5\.000$/ }),
+  ).toHaveAttribute("href", "/owner/pengecualian/selisih_kas");
   expect(
     screen.getByRole("link", { name: /^Stok menipis\s7 barang$/ }),
   ).toHaveAttribute("href", "/owner/barang");
@@ -302,6 +313,8 @@ test("perlu perhatian: butir modal berubah dan barang habis membuka lembar di de
     b.status = "tidak_diambil";
     b.stockCounted = true;
     s.stock[beras] = 0;
+    // (K20) Contoh seed F3c-2a sudah ditinjau agar butir buatan tes ini tidak terdorong lewat enam.
+    reviewSeedSamples(s, Date.now());
   });
   await ownerLogin();
   renderApp("/owner");
@@ -316,4 +329,229 @@ test("perlu perhatian: butir modal berubah dan barang habis membuka lembar di de
       name: /^Beras Pandan Wangi 5 kg habis\sTidak diambil lagi$/,
     }),
   ).toHaveAttribute("href", `/owner/barang/${beras}?lembar=habis`);
+});
+
+// --- Perlu perhatian: maksimal enam baris, judul berjumlah, Lihat semua (S6, S8) ---
+
+const ex = (
+  kind: ExceptionKind,
+  patch: Partial<ExceptionAttention>,
+): ExceptionAttention => ({
+  kind,
+  count: 1,
+  total: 0,
+  shortage: 0,
+  from: "2026-10-16",
+  to: "2026-10-16",
+  latestAt: 0,
+  kasirId: null,
+  kasirName: null,
+  longestMinutes: null,
+  ...patch,
+});
+
+function baseAttention(): Attention {
+  return {
+    ...ownerTodaySummary(mockDb.get(), Date.now()).attention,
+    lowStockCount: 0,
+    negativeStockCount: 0,
+    overdueCredit: { count: 0, total: 0 },
+    costChanges: [],
+    stockOuts: [],
+    awaitingPriceCount: 0,
+    opnameHeldCount: 0,
+    opnameFlags: [],
+    opnameReplacedHeld: 0,
+    expiry: { expiredCount: 0, soonCount: 0, soonDays: 30 },
+    supplierDebts: {
+      overdueCount: 0,
+      overdueTotal: 0,
+      dueSoonCount: 0,
+      dueSoonTotal: 0,
+    },
+    qrisUnreconciled: null,
+    exceptions: [],
+  };
+}
+
+/** Sembilan butir seperti mockup: enam kejadian, Stok minus, QRIS, Stok menipis. */
+function nine(): Attention {
+  return {
+    ...baseAttention(),
+    lowStockCount: 7,
+    negativeStockCount: 3,
+    qrisUnreconciled: { count: 3, from: "2026-10-13", to: "2026-10-15" },
+    exceptions: [
+      ex("batal_kas_keluar", { total: 35_000 }),
+      ex("selisih_kas", { count: 2, total: -6_000, shortage: -12_000 }),
+      ex("kas_keluar", { count: 2, total: 157_000 }),
+      ex("serah_terima", { total: -20_000 }),
+      ex("shift_lama", { longestMinutes: 13 * 60 }),
+      ex("selisih_kecil", {
+        count: 5,
+        total: -21_500,
+        shortage: -21_500,
+        kasirId: "u-budi",
+        kasirName: "Budi",
+      }),
+    ],
+  };
+}
+
+function serveAttention(get: () => Attention) {
+  server.use(
+    http.get("/api/owner/summary/today", () =>
+      HttpResponse.json({
+        ...ownerTodaySummary(mockDb.get(), Date.now()),
+        attention: get(),
+      }),
+    ),
+  );
+}
+
+const attentionSection = async () =>
+  within(
+    (await screen.findByRole("heading", { name: /^Perlu perhatian/ })).closest(
+      "section",
+    ) as HTMLElement,
+  );
+
+const rowTitles = (section: ReturnType<typeof within>) =>
+  section
+    .getAllByRole("link")
+    .map((a: HTMLElement) => a.textContent?.replace(/\s+/g, " ").trim() ?? "");
+
+test("sembilan butir: judul berjumlah, enam baris pertama, lalu Lihat semua (9) ke /owner/perhatian", async () => {
+  serveAttention(nine);
+  await ownerLogin();
+  renderApp("/owner");
+
+  const section = await attentionSection();
+  expect(
+    screen.getByRole("heading", { name: "Perlu perhatian · 9" }),
+  ).toBeInTheDocument();
+  expect(rowTitles(section)).toEqual([
+    "1 kas keluar dibatalkan kasir 16 Okt · Rp35.000",
+    "2 selisih kas 16 Okt · −Rp12.000 · +Rp6.000",
+    "2 kas keluar besar 16 Okt · Rp157.000",
+    "1 modal awal berbeda 16 Okt · −Rp20.000",
+    "1 shift kelamaan buka 16 Okt · terlama 13 jam",
+    "Selisih kecil berulang · Budi 16 Okt · 5 shift · −Rp21.500",
+    "Lihat semua (9)",
+  ]);
+  expect(
+    section.getByRole("link", { name: "Lihat semua (9)" }),
+  ).toHaveAttribute("href", "/owner/perhatian");
+  // Baris Beranda tetap tautan: tanpa tombol tinjau.
+  expect(section.queryByRole("button")).toBeNull();
+});
+
+test("enam butir atau kurang: tanpa tautan Lihat semua, judul tetap memuat jumlah", async () => {
+  serveAttention(() => ({
+    ...nine(),
+    qrisUnreconciled: null,
+    lowStockCount: 0,
+    negativeStockCount: 0,
+  }));
+  await ownerLogin();
+  renderApp("/owner");
+
+  const section = await attentionSection();
+  expect(
+    screen.getByRole("heading", { name: "Perlu perhatian · 6" }),
+  ).toBeInTheDocument();
+  expect(section.getAllByRole("link")).toHaveLength(6);
+  expect(section.queryByText(/Lihat semua/)).toBeNull();
+});
+
+test("tanpa butir: judul Perlu perhatian tanpa angka dan Semua aman hari ini", async () => {
+  serveAttention(baseAttention);
+  await ownerLogin();
+  renderApp("/owner");
+
+  expect(
+    await screen.findByRole("heading", { name: "Perlu perhatian" }),
+  ).toBeInTheDocument();
+  expect(screen.getByText("Semua aman hari ini")).toBeInTheDocument();
+  expect(screen.queryByText(/Lihat semua/)).toBeNull();
+});
+
+test("butir ke-7 naik ke baris keenam setelah butir di atasnya ditinjau (S8)", async () => {
+  let attention = nine();
+  serveAttention(() => attention);
+  await ownerLogin();
+  const { queryClient } = renderApp("/owner");
+  const before = await attentionSection();
+  expect(rowTitles(before)).not.toContain("Stok minus 3 barang");
+
+  // Selisih kas ditinjau dari halaman Lihat semua: ringkasan dimuat ulang tanpa butir itu.
+  attention = {
+    ...attention,
+    exceptions: attention.exceptions.filter((e) => e.kind !== "selisih_kas"),
+  };
+  await act(() => queryClient.invalidateQueries({ queryKey: SUMMARY_KEY }));
+
+  const after = await attentionSection();
+  await waitFor(() =>
+    expect(
+      screen.getByRole("heading", { name: "Perlu perhatian · 8" }),
+    ).toBeInTheDocument(),
+  );
+  const titles = rowTitles(after);
+  expect(titles[5]).toBe("Stok minus 3 barang");
+  expect(titles.at(-1)).toBe("Lihat semua (8)");
+});
+
+test("selisih kas hanya lebih: nada peringatan; ada kurang: nada kritis", async () => {
+  serveAttention(() => ({
+    ...baseAttention(),
+    exceptions: [
+      ex("selisih_kas", { count: 2, total: -6_000, shortage: -12_000 }),
+      ex("serah_terima", { total: 5_000 }),
+    ],
+  }));
+  await ownerLogin();
+  renderApp("/owner");
+
+  const section = await attentionSection();
+  const box = (name: RegExp) =>
+    section.getByRole("link", { name }).querySelector("span[aria-hidden]");
+  expect(box(/selisih kas/)).toHaveClass("bg-danger");
+  expect(box(/modal awal berbeda/)).toHaveClass("bg-warning");
+  expect(
+    section.getByRole("link", { name: /modal awal berbeda/ }),
+  ).toHaveTextContent("+Rp5.000");
+});
+
+test("nama kasir panjang di butir Selisih kecil berulang: judul membungkus, rincian satu baris, tidak ada gulir samping", async () => {
+  const longName = "Maria Magdalena Setiawati Kusumawardhani";
+  serveAttention(() => ({
+    ...baseAttention(),
+    exceptions: [
+      ex("selisih_kecil", {
+        count: 5,
+        total: -21_500,
+        shortage: -21_500,
+        kasirId: "u-panjang",
+        kasirName: longName,
+      }),
+    ],
+  }));
+  await ownerLogin();
+  renderApp("/owner");
+
+  const section = await attentionSection();
+  const link = section.getByRole("link", {
+    name: new RegExp(`Selisih kecil berulang · ${longName}`),
+  });
+  const [title, detail] = Array.from(link.querySelectorAll("span.block"));
+  // Judul membungkus (nama utuh terbaca); rincian bergaya satu baris.
+  expect(title).not.toHaveClass("truncate");
+  expect(title).toHaveTextContent(longName);
+  expect(detail).toHaveClass("truncate");
+  expect(link.querySelector("span.min-w-0")).not.toBeNull();
+  expect(link).toHaveAttribute(
+    "href",
+    "/owner/pengecualian/selisih_kecil?kasirId=u-panjang",
+  );
 });

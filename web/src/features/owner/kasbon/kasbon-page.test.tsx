@@ -2,6 +2,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { reviewSeedSamples } from "@/mocks/attention-fixtures";
 import { mockDb } from "@/mocks/db";
 import { customerId, ownerLogin } from "@/mocks/handlers/test-helpers";
 import { appendCredit } from "@/mocks/ledger";
@@ -230,6 +231,8 @@ test("nominal besar di kartu total mengecil, tidak dipotong", async () => {
 
 test("butir Beranda Kasbon > 30 hari membuka halaman ini", async () => {
   const user = userEvent.setup();
+  // (K20) Contoh kejadian seed F3c-2a ditinjau agar butir ini tetap di enam baris Beranda.
+  mockDb.update((s) => reviewSeedSamples(s, Date.now()));
   renderApp("/owner");
   await user.click(
     await screen.findByRole("link", { name: /^Kasbon > 30 hari/ }),

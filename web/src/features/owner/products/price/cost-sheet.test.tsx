@@ -158,7 +158,7 @@ test("Pakai harga ini -> eceran 3500, grosir 3000, dus 116500; butir hilang dari
   expect(await within(harga).findByText("Rp3.500")).toBeInTheDocument();
 
   await router.navigate({ to: "/owner" });
-  await screen.findByRole("heading", { name: "Perlu perhatian" });
+  await screen.findByRole("heading", { name: /^Perlu perhatian/ });
   await waitFor(() =>
     expect(
       screen.queryByRole("link", { name: /^Harga modal Indomie/ }),
@@ -264,7 +264,7 @@ test("Harga tetap -> butir hilang, harga tidak berubah", async () => {
     { eceran: 112000, tiers: [] },
   ]);
   await router.navigate({ to: "/owner" });
-  await screen.findByRole("heading", { name: "Perlu perhatian" });
+  await screen.findByRole("heading", { name: /^Perlu perhatian/ });
   await waitFor(() =>
     expect(
       screen.queryByRole("link", { name: /^Harga modal Indomie/ }),
