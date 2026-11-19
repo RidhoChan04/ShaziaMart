@@ -268,3 +268,33 @@ test("saleRefunds 0 → tidak ada baris 'Pengembalian transaksi'", () => {
   expect(ui.getByText("Uang seharusnya")).toBeVisible();
   expect(ui.queryByText("Pengembalian transaksi")).toBeNull();
 });
+
+test("(S2, S5) expenses 30.000 dan ownerTakes 100.000 → 'Kas keluar' '-Rp30.000' dan 'Diambil pemilik' '-Rp100.000' di bawah 'Pengembalian transaksi'; 0 → tidak tampil", () => {
+  const { labels, row } = showClosure(
+    closureFixture({
+      saleRefunds: 30_000,
+      expenses: 30_000,
+      ownerTakes: 100_000,
+      expectedCash: 215_000,
+      countedCash: 215_000,
+    }),
+  );
+  expect(labels()).toEqual([
+    "Pelunasan kasbon",
+    "Bayar supplier",
+    "Pengembalian transaksi",
+    "Kas keluar",
+    "Diambil pemilik",
+    "Uang seharusnya",
+    "Uang fisik",
+    "Selisih",
+  ]);
+  expect(within(row("Kas keluar")).getByText("-Rp30.000")).toBeVisible();
+  expect(within(row("Diambil pemilik")).getByText("-Rp100.000")).toBeVisible();
+});
+
+test("expenses 0 dan ownerTakes 0 → tanpa baris Kas keluar / Diambil pemilik", () => {
+  const { ui } = showClosure(closureFixture());
+  expect(ui.queryByText("Kas keluar")).toBeNull();
+  expect(ui.queryByText("Diambil pemilik")).toBeNull();
+});

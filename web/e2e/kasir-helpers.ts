@@ -22,6 +22,16 @@ export function scanBox(page: Page) {
   return page.getByLabel("Scan barcode / ketik nama atau kode");
 }
 
+/**
+ * Isi `Modal awal di laci` (terisi dari saran server; `fill` menimpanya). Bila angkanya berbeda
+ * dari saran, isian `Alasan modal berbeda` muncul dan wajib diisi.
+ */
+export async function fillOpeningCash(page: Page, opening: string) {
+  await page.getByRole("textbox", { name: "Modal awal di laci" }).fill(opening);
+  const reason = page.getByRole("textbox", { name: "Alasan modal berbeda" });
+  if (await reason.isVisible()) await reason.fill("Tes");
+}
+
 /** Buka /kasir lalu buka shift: pilih kasir, PIN, modal awal. */
 export async function openShift(
   page: Page,
@@ -31,9 +41,7 @@ export async function openShift(
   await page.goto(opts.path ?? "/kasir");
   await page.getByRole("button", { name: opts.kasir }).click();
   await typePin(page, opts.pin);
-  await page
-    .getByRole("textbox", { name: "Modal awal di laci" })
-    .fill(opts.opening);
+  await fillOpeningCash(page, opts.opening);
   await page.getByRole("button", { name: "Buka shift" }).click();
   await expect(scanBox(page)).toBeVisible();
 }

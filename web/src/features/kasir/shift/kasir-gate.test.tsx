@@ -47,6 +47,7 @@ test("tanpa shift → Buka shift: Rina → PIN 123456 → modal 200.000 → laya
   const modal = await screen.findByRole("textbox", {
     name: "Modal awal di laci",
   });
+  await user.clear(modal);
   await user.type(modal, "200.000");
   await user.click(screen.getByRole("button", { name: "Buka shift" }));
 

@@ -55,6 +55,8 @@ function ClosureResult({
     creditPayments,
     supplierPayments,
     saleRefunds,
+    expenses,
+    ownerTakes,
     expectedCash,
     countedCash,
     difference,
@@ -81,6 +83,17 @@ function ClosureResult({
           <ResultRow
             label="Pengembalian transaksi"
             value={signedRupiah(-saleRefunds)}
+          />
+        )}
+        {expenses !== 0 && (
+          // Uang laci yang dipakai kasir untuk keperluan toko (S2).
+          <ResultRow label="Kas keluar" value={signedRupiah(-expenses)} />
+        )}
+        {ownerTakes !== 0 && (
+          // Uang yang diambil pemilik dari laci saat shift ini buka (S5).
+          <ResultRow
+            label="Diambil pemilik"
+            value={signedRupiah(-ownerTakes)}
           />
         )}
         <ResultRow label="Uang seharusnya" value={formatRupiah(expectedCash)} />

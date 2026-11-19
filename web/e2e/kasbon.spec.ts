@@ -3,6 +3,7 @@ import { expect, expectNoA11yViolations, test } from "./fixtures.ts";
 import {
   addBerasNominal,
   closeShift,
+  fillOpeningCash,
   firstSaleNumber,
   openShift,
   payCash,
@@ -42,9 +43,7 @@ async function switchShift(
   await expect(page.getByRole("heading", { name: "Buka shift" })).toBeVisible();
   await page.getByRole("button", { name: next.kasir }).click();
   await typePin(page, next.pin);
-  await page
-    .getByRole("textbox", { name: "Modal awal di laci" })
-    .fill(next.opening);
+  await fillOpeningCash(page, next.opening);
   await page.getByRole("button", { name: "Buka shift" }).click();
   await expect(scanBox(page)).toBeVisible();
 }
@@ -407,9 +406,7 @@ test("QRIS dikembalikan tunai dari laci, struk lama tunai, dan QRIS yang ditrans
   await closedB.getByRole("button", { name: "Selesai" }).click();
   await page.getByRole("button", { name: "Rina" }).click();
   await typePin(page, RINA.pin);
-  await page
-    .getByRole("textbox", { name: "Modal awal di laci" })
-    .fill("100.000");
+  await fillOpeningCash(page, "100.000");
   await page.getByRole("button", { name: "Buka shift" }).click();
   await expect(scanBox(page)).toBeVisible();
   await voidOldSale(page, cashNumber, "Pembeli batal beli");

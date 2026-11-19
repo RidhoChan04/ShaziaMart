@@ -1,17 +1,22 @@
 import { Outlet } from "@tanstack/react-router";
 import { useState } from "react";
+import { useGetKasirSettings } from "@/shared/api/gen/settings/settings";
 import type { ShiftClosure } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { ServerDownBar } from "@/shared/components/server-down-bar";
 import { ServerStatus } from "@/shared/components/server-status";
 import { useServerHealth } from "@/shared/hooks/use-server-health";
 import { useGateState } from "./shift/gate-state";
 import { ShiftActions, ShiftInfo } from "./shift/shift-actions";
+import { ShiftAgeBanner } from "./shift/shift-age-banner";
 import { ShiftClosureDialog } from "./shift/shift-closure-dialog";
 
 export function KasirLayout() {
   const { online, checking } = useServerHealth();
   const offline = !online && !checking;
   const gate = useGateState();
+  const shiftMaxHours = useGetKasirSettings({
+    query: { enabled: gate.status === "open" },
+  }).data?.shiftMaxHours;
   // Di luar cabang gerbang agar hasil tutup shift bertahan sampai `Selesai`.
   const [closure, setClosure] = useState<ShiftClosure | null>(null);
 
@@ -27,6 +32,12 @@ export function KasirLayout() {
           {gate.status === "open" && <ShiftActions onClosed={setClosure} />}
         </div>
       </header>
+      {gate.status === "open" && shiftMaxHours !== undefined && (
+        <ShiftAgeBanner
+          openedAt={gate.shift.openedAt}
+          maxHours={shiftMaxHours}
+        />
+      )}
       {offline && <ServerDownBar />}
       <Outlet />
       <ShiftClosureDialog closure={closure} onDone={() => setClosure(null)} />
