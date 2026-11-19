@@ -8,6 +8,7 @@ import {
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { reviewSeedSamples } from "@/mocks/attention-fixtures";
 import { mockDb } from "@/mocks/db";
 import {
   loginWithShift,
@@ -155,6 +156,8 @@ test("tanpa penjualan dan tanpa perhatian: belum ada pembanding dan semua aman",
     s.minStock = {};
     s.creditLedger = [];
     for (const c of s.customers) c.balance = 0;
+    // (K20) Contoh seed F3c-2a sudah ditinjau.
+    reviewSeedSamples(s, Date.now());
   });
   await ownerLogin();
   renderApp("/owner");

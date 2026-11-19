@@ -37,7 +37,8 @@ const sum = (xs: readonly number[]): number => xs.reduce((a, b) => a + b, 0);
 
 /**
  * (S6) Selisih kas tidak lagi berupa daftar hari ini: menjadi kejadian `selisih_kas` /
- * `selisih_kecil` di `exceptions` (aturannya di T4). `qrisUnreconciled` diisi T6.
+ * `selisih_kecil` di `exceptions`, bersama kejadian kas laci F3c-2a lain (K2), dengan ambang
+ * `attentionRules` saat ini. `qrisUnreconciled` diisi T6.
  */
 function attention(state: Readonly<MockState>, now: number): Attention {
   const alerts = state.products.map((p) => stockAlertOf(state, p));
@@ -68,7 +69,7 @@ function attention(state: Readonly<MockState>, now: number): Attention {
     ).length,
     expiry: expiryAttention(state, now),
     ...opnameAttention(state),
-    exceptions: exceptionAttention(state),
+    exceptions: exceptionAttention(state, now),
     qrisUnreconciled: null,
   };
 }

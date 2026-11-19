@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { reviewSeedSamples } from "@/mocks/attention-fixtures";
 import { mockDb } from "@/mocks/db";
 import {
   cashSale,
@@ -195,6 +196,8 @@ test("'Tandai sudah ditinjau' mengirim upTo = jam kejadian terbaru yang tampil (
 
 test("kejadian yang masuk setelah daftar dimuat tidak ikut ditandai: tetap di daftar dan di butir Beranda", async () => {
   const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+  // (K20) Contoh seed F3c-2a sudah ditinjau; butir Beranda hanya dari tes ini.
+  mockDb.update((s) => reviewSeedSamples(s, EXC_NOW));
   const first = await sell(cashSale());
   await kasirVoid(first, "Pertama");
   await ownerLogin();

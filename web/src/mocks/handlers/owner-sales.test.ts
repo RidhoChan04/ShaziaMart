@@ -212,7 +212,9 @@ describe("voidOwnerSale (jawaban pemilik Q1: laci tidak pernah dikoreksi)", () =
     });
     expect((await detail(sale.id)).voided?.channel).toBe("pemilik");
     // Pembatalan oleh pemilik bukan pengecualian kasir.
-    expect(cashierExceptions(mockDb.get(), "batal_transaksi")).toEqual([]);
+    expect(
+      cashierExceptions(mockDb.get(), "batal_transaksi", Date.now()),
+    ).toEqual([]);
   });
 
   test("void pemilik penjualan shift buka → 409 IN_OPEN_SHIFT; alasan kosong → 422; void ulang → 200", async () => {

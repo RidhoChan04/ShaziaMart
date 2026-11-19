@@ -5,6 +5,9 @@ import type {
   Problem,
   Sale,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
+import { DAY_MS, HOUR_MS } from "@/shared/lib/business-day";
+import { reviewSeedSamples } from "../attention-fixtures";
+import { type MockClosedShift, mockDb } from "../db";
 import {
   cashSale,
   customerId,
@@ -13,6 +16,7 @@ import {
   loginWithShift,
   ownerLogin,
   post,
+  userId,
   voidSale,
 } from "./test-helpers";
 
@@ -29,6 +33,8 @@ const attention = async () =>
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(NOW);
+  // (K20) Contoh seed F3c-2a sudah ditinjau: tes di sini hanya melihat butir buatannya.
+  mockDb.update((s) => reviewSeedSamples(s, NOW));
 });
 
 describe("listOwnerExceptions & reviewOwnerExceptions (ruling R9)", () => {
@@ -148,5 +154,101 @@ describe("listOwnerExceptions & reviewOwnerExceptions (ruling R9)", () => {
     expect((await review({ kind: "batal_transaksi" })).status).toBe(422);
     const res = await review({ kind: "batal_pelunasan", upTo: NOW + 99 * MIN });
     expect((await json<OwnerExceptionList>(res)).reviewedAt).toBe(NOW);
+  });
+});
+
+describe("(T4, K18) selisih_kecil per kasir lewat endpoint", () => {
+  /** Shift tutup kasir `name` dengan selisih −4.000, `back` hari lalu. */
+  const smallShort = (name: string, back: number): MockClosedShift => ({
+    shiftId: `sk-${name}-${back}`,
+    kasirId: userId(name),
+    kasirName: name,
+    openedAt: NOW - back * DAY_MS - 9 * HOUR_MS,
+    closedAt: NOW - back * DAY_MS - HOUR_MS,
+    openingCash: 200_000,
+    suggestedOpening: null,
+    openingNote: null,
+    cashSales: 0,
+    supplierPayments: 0,
+    creditPayments: 0,
+    saleRefunds: 0,
+    expenses: 0,
+    ownerTakes: 0,
+    expectedCash: 200_000,
+    countedCash: 196_000,
+    difference: -4_000,
+    salesCount: 0,
+  });
+
+  test("kasirId wajib untuk selisih_kecil (list & review → 422, juga kasir tak dikenal); review hanya memajukan penanda kasir itu; jenis lain mengabaikan kasirId", async () => {
+    const rina = userId("Rina");
+    const budi = userId("Budi");
+    mockDb.update((s) => {
+      s.closedShifts = [0, 1, 2, 3, 4, 5].flatMap((back) => [
+        smallShort("Rina", back),
+        smallShort("Budi", back),
+      ]);
+      s.smallShortageReviews = {};
+    });
+    await ownerLogin();
+    const small = async () =>
+      (await attention()).filter((a) => a.kind === "selisih_kecil");
+    expect((await small()).map((a) => a.kasirName)).toEqual(["Budi", "Rina"]);
+
+    for (const query of ["", "&kasirId=", "&kasirId=u-tidak-ada"]) {
+      const res = await get(`/api/owner/exceptions?kind=selisih_kecil${query}`);
+      expect(res.status).toBe(422);
+      expect((await json<Problem>(res)).code).toBe("VALIDATION");
+    }
+    for (const kasirId of [undefined, null, "", "u-tidak-ada"]) {
+      const res = await review({ kind: "selisih_kecil", upTo: NOW, kasirId });
+      expect(res.status).toBe(422);
+    }
+
+    const listed = await json<OwnerExceptionList>(
+      await get(`/api/owner/exceptions?kind=selisih_kecil&kasirId=${rina}`),
+    );
+    expect(listed.reviewedAt).toBeNull();
+    expect(listed.items).toHaveLength(6);
+    expect(new Set(listed.items.map((e) => e.kasirId))).toEqual(
+      new Set([rina]),
+    );
+
+    const res = await review({
+      kind: "selisih_kecil",
+      upTo: listed.items[0]?.at,
+      kasirId: rina,
+    });
+    expect(res.status).toBe(200);
+    expect(await json<OwnerExceptionList>(res)).toEqual({
+      kind: "selisih_kecil",
+      reviewedAt: NOW - HOUR_MS,
+      items: [],
+    });
+    expect(mockDb.get().smallShortageReviews).toEqual({
+      [rina]: NOW - HOUR_MS,
+    });
+    expect(await small()).toMatchObject([
+      { kasirId: budi, kasirName: "Budi", count: 6, total: -24_000 },
+    ]);
+    const others = await json<OwnerExceptionList>(
+      await get(`/api/owner/exceptions?kind=selisih_kecil&kasirId=${budi}`),
+    );
+    expect([others.reviewedAt, others.items.length]).toEqual([null, 6]);
+
+    // Jenis lain: kasirId diabaikan (boleh ada, boleh tidak dikenal).
+    const other = await review({
+      kind: "batal_pelunasan",
+      upTo: NOW,
+      kasirId: "u-tidak-ada",
+    });
+    expect(other.status).toBe(200);
+    expect(
+      (
+        await get(
+          "/api/owner/exceptions?kind=batal_pelunasan&kasirId=u-tidak-ada",
+        )
+      ).status,
+    ).toBe(200);
   });
 });

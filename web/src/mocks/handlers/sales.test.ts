@@ -6,6 +6,7 @@ import type {
   Sale,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { newId } from "@/shared/lib/id";
+import { reviewSeedSamples } from "../attention-fixtures";
 import { mockDb } from "../db";
 import { exceptionAttention } from "../exceptions";
 import { appendCredit } from "../ledger";
@@ -556,6 +557,8 @@ describe("kasbon lewat limit dengan alasan (ruling R3)", () => {
     await loginWithShift();
     const sari = customerId("Bu Sari");
     mockDb.update((s) => {
+      // (K20) Contoh seed F3c-2a sudah ditinjau; tes ini hanya melihat butir buatannya.
+      reviewSeedSamples(s, Date.now());
       appendCredit(s, {
         customerId: sari,
         amount: 370_000,
@@ -577,7 +580,7 @@ describe("kasbon lewat limit dengan alasan (ruling R3)", () => {
     expect(ids.map((id) => stored(id)?.creditOverLimit?.excess)).toEqual([
       10_000, 20_000,
     ]);
-    expect(exceptionAttention(mockDb.get())).toEqual([
+    expect(exceptionAttention(mockDb.get(), Date.now())).toEqual([
       {
         kind: "kasbon_lewat_limit",
         count: 2,

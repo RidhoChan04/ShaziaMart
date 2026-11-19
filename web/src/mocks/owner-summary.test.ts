@@ -4,7 +4,9 @@ import type {
   StockAlert,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { businessDay, DAY_MS, HOUR_MS } from "@/shared/lib/business-day";
+import { reviewSeedSamples } from "./attention-fixtures";
 import type {
+  MockClosedShift,
   MockOpnameItem,
   MockOpnameSession,
   MockSale,
@@ -313,6 +315,8 @@ describe("Perlu perhatian: stok (K5), modal berubah, dan habis", () => {
 describe("Perlu perhatian: pengecualian kasir (ruling R9)", () => {
   test("seed tanpa pengecualian → exceptions []; setelah batal kasir → satu butir batal_transaksi; butir lama tidak berubah", () => {
     const s = fresh();
+    // (K20) Contoh seed F3c-2a sudah ditinjau; tes ini hanya melihat butir buatannya.
+    reviewSeedSamples(s, NOW);
     const before = ownerTodaySummary(s, NOW).attention;
     expect(before.exceptions).toEqual([]);
     addSale(s, at(TODAY, 9), 42_000, {
@@ -342,6 +346,85 @@ describe("Perlu perhatian: pengecualian kasir (ruling R9)", () => {
     const { exceptions: _a, ...oldAfter } = after;
     const { exceptions: _b, ...oldBefore } = before;
     expect(oldAfter).toEqual(oldBefore);
+  });
+});
+
+describe("Perlu perhatian: selisih kas (berubah karena keputusan S6; pengganti cashDifferences)", () => {
+  const closedShift = (
+    s: MockState,
+    closedAt: number,
+    difference: number,
+  ): MockClosedShift => {
+    const rina = s.users.find((u) => u.name === "Rina");
+    if (!rina) throw new Error("seed tanpa Rina");
+    const c: MockClosedShift = {
+      shiftId: `cs-${closedAt}`,
+      kasirId: rina.id,
+      kasirName: rina.name,
+      openedAt: closedAt - 6 * HOUR_MS,
+      closedAt,
+      openingCash: 200_000,
+      suggestedOpening: null,
+      openingNote: null,
+      cashSales: 0,
+      supplierPayments: 0,
+      creditPayments: 0,
+      saleRefunds: 0,
+      expenses: 0,
+      ownerTakes: 0,
+      expectedCash: 200_000,
+      countedCash: 200_000 + difference,
+      difference,
+      salesCount: 0,
+    };
+    s.closedShifts.push(c);
+    return c;
+  };
+
+  test("shift tutup −4.999 → bukan butir; −5.000 → butir selisih_kas di exceptions (bukan daftar hari ini); tetap ada keesokan hari sampai ditinjau; butir lain tidak berubah", () => {
+    const s = fresh();
+    reviewSeedSamples(s, TODAY);
+    const before = ownerTodaySummary(s, NOW).attention;
+    expect(before.exceptions).toEqual([]);
+    expect(before).not.toHaveProperty("cashDifferences");
+    closedShift(s, at(TODAY, 13), -4_999);
+    expect(ownerTodaySummary(s, NOW).attention.exceptions).toEqual([]);
+    closedShift(s, at(TODAY, 14), -5_000);
+    const item = {
+      kind: "selisih_kas",
+      count: 1,
+      total: -5_000,
+      shortage: -5_000,
+      from: "2026-10-23",
+      to: "2026-10-23",
+      latestAt: at(TODAY, 14),
+      kasirId: null,
+      kasirName: null,
+      longestMinutes: null,
+    };
+    const after = ownerTodaySummary(s, NOW).attention;
+    expect(after.exceptions).toEqual([item]);
+    expect(ownerTodaySummary(s, NOW + DAY_MS).attention.exceptions).toEqual([
+      item,
+    ]);
+    const { exceptions: _a, ...restAfter } = after;
+    const { exceptions: _b, ...restBefore } = before;
+    expect(restAfter).toEqual(restBefore);
+  });
+
+  test("(K20) seed contoh menampilkan kejadian F3c-2a terbaru di Beranda tanpa banjir riwayat lama", () => {
+    const kinds = ownerTodaySummary(fresh(), NOW).attention.exceptions.map(
+      (a) => (a.kasirName === null ? a.kind : `${a.kind}:${a.kasirName}`),
+    );
+    expect(kinds).toEqual(
+      expect.arrayContaining([
+        "kas_keluar",
+        "serah_terima",
+        "shift_lama",
+        "selisih_kecil:Rina",
+      ]),
+    );
+    expect(kinds).not.toContain("batal_kas_keluar");
   });
 });
 

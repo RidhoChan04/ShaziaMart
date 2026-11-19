@@ -347,7 +347,11 @@ describe("(ruling R12) void kasir transaksi shift lama ≤ 7 hari", () => {
     await voidSale(pemilik.id, { reason: "b", qrisRefundSource: "pemilik" });
     expect(refunds()).toEqual([50_000, 30_000]);
     expect(stored(pemilik.id)?.voidRefund?.drawer).toBe(30_000);
-    const items = cashierExceptions(mockDb.get(), "batal_transaksi");
+    const items = cashierExceptions(
+      mockDb.get(),
+      "batal_transaksi",
+      Date.now(),
+    );
     expect(items.find((e) => e.saleId === pemilik.id)).toMatchObject({
       fromClosedShift: true,
       refund: 30_000,
