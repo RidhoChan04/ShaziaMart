@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useListOwnerQrisDays } from "@/shared/api/gen/owner/owner";
 import type { QrisDay } from "@/shared/api/gen/shaziaMartAPI.schemas";
@@ -34,7 +34,7 @@ function Row({
   onList: () => void;
 }) {
   return (
-    <li className="grid gap-2 px-4 py-3">
+    <li data-day={day.date} className="grid gap-2 px-4 py-3">
       <div className="flex items-center justify-between gap-3">
         <span className="font-semibold">{qrisDayLabel(day.date)}</span>
         <Button
@@ -96,11 +96,41 @@ export function QrisReconcileSheet({
   const [markDate, setMarkDate] = useState<string | null>(null);
   const [listDate, setListDate] = useState<string | null>(null);
   const items = query.data?.items;
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+  // Hari yang baru ditandai dan baris tujuan fokus (baris berikutnya, atau judul bila habis).
+  const focusAfter = useRef<{ marked: string; next: string | null } | null>(
+    null,
+  );
+  const armFocus = (date: string) => {
+    const list = items ?? [];
+    const at = list.findIndex((d) => d.date === date);
+    focusAfter.current = {
+      marked: date,
+      next: list[at + 1]?.date ?? list[at - 1]?.date ?? null,
+    };
+  };
   const empty = query.isSuccess && !query.isFetching && items?.length === 0;
 
   useEffect(() => {
     if (open && empty) onClose();
   }, [open, empty, onClose]);
+
+  // Baris yang ditandai hilang dari daftar: fokus pindah ke baris berikutnya (bukan ke body).
+  useEffect(() => {
+    const pending = focusAfter.current;
+    if (!pending || !items || items.some((d) => d.date === pending.marked)) {
+      return;
+    }
+    focusAfter.current = null;
+    const next = pending.next
+      ? listRef.current?.querySelector<HTMLElement>(
+          `[data-day="${pending.next}"] button`,
+        )
+      : null;
+    // Setelah Radix selesai mengembalikan fokus dari lembar anak (ke tombol yang sudah hilang).
+    setTimeout(() => (next ?? titleRef.current)?.focus(), 0);
+  }, [items]);
 
   const count = items?.length ?? 0;
   return (
@@ -111,7 +141,11 @@ export function QrisReconcileSheet({
           showCloseButton={false}
           className="max-h-[90dvh] gap-3 overflow-y-auto rounded-t-lg p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] lg:mx-auto lg:max-w-md"
         >
-          <SheetTitle className="text-[20px] font-bold">
+          <SheetTitle
+            ref={titleRef}
+            tabIndex={-1}
+            className="text-[20px] font-bold outline-none"
+          >
             Cocokkan QRIS
           </SheetTitle>
           <SheetDescription>
@@ -132,6 +166,7 @@ export function QrisReconcileSheet({
           )}
           {items && items.length > 0 && (
             <ul
+              ref={listRef}
               // biome-ignore lint/a11y/noRedundantRoles: Safari/VoiceOver membuang semantik daftar bila list-style none
               role="list"
               aria-label="Hari belum dicocokkan"
@@ -147,7 +182,12 @@ export function QrisReconcileSheet({
                   onCocok={() =>
                     mark.mutate(
                       { date: day.date, data: { status: "cocok" } },
-                      { onSuccess: () => toast.success("QRIS ditandai") },
+                      {
+                        onSuccess: () => {
+                          armFocus(day.date);
+                          toast.success("QRIS ditandai");
+                        },
+                      },
                     )
                   }
                 />
@@ -161,10 +201,15 @@ export function QrisReconcileSheet({
           </SheetClose>
         </SheetContent>
       </Sheet>
-      {markDate !== null && (
-        <QrisMarkSheet date={markDate} open onClose={() => setMarkDate(null)} />
+      {open && markDate !== null && (
+        <QrisMarkSheet
+          date={markDate}
+          open
+          onClose={() => setMarkDate(null)}
+          onMarked={() => armFocus(markDate)}
+        />
       )}
-      {listDate !== null && (
+      {open && listDate !== null && (
         <QrisDayDetail date={listDate} open onClose={() => setListDate(null)} />
       )}
     </>

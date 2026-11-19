@@ -1,9 +1,10 @@
 import {
   Ban,
+  CircleAlert,
   CircleCheck,
   CircleDashed,
+  Clock,
   type LucideIcon,
-  TriangleAlert,
 } from "lucide-react";
 import { useGetOwnerQrisDay } from "@/shared/api/gen/owner/owner";
 import type {
@@ -58,7 +59,7 @@ const MARKS: Record<
 > = {
   belum: {
     label: "Belum dicocokkan",
-    Icon: CircleDashed,
+    Icon: Clock,
     tone: "bg-warning-soft text-warning-ink",
   },
   cocok: {
@@ -68,7 +69,7 @@ const MARKS: Record<
   },
   tidak_cocok: {
     label: "Tidak cocok",
-    Icon: TriangleAlert,
+    Icon: CircleAlert,
     tone: "bg-danger-soft text-danger-ink",
   },
 };
@@ -76,6 +77,7 @@ const MARKS: Record<
 /** Tanda pencocokan = ikon + teks; hari ini tidak punya tanda. */
 export function QrisStatusMark({ day }: { day: QrisDay }) {
   if (!day.closed) {
+    // §12g tidak menetapkan ikon untuk hari ini; ikon netral.
     return (
       <span className="inline-flex items-center gap-1 text-[13px] font-medium text-muted">
         <CircleDashed aria-hidden="true" className="size-3.5" />

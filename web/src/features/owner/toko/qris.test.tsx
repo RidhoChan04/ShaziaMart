@@ -1,9 +1,12 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { HttpResponse, http } from "msw";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { type MockCreditPayment, type MockSale, mockDb } from "@/mocks/db";
 import { customerId, ownerLogin } from "@/mocks/handlers/test-helpers";
+import { server } from "@/mocks/node";
+import { getGetOwnerTodaySummaryQueryKey } from "@/shared/api/gen/owner/owner";
 import { renderApp, renderWithQuery } from "@/test/render-app";
 import { QrisReconcileSheet } from "./qris-reconcile-sheet";
 
@@ -195,6 +198,18 @@ describe("QrisPage", () => {
     ).toBeInTheDocument();
   });
 
+  test("nama aksesibel baris memuat tanda, rincian, dan keterangan total berubah", async () => {
+    plant();
+    renderApp("/owner/lainnya/qris");
+    const row = await dayRow(/Sel, 17 Nov/);
+    expect(row).toHaveAccessibleName(/Rp775\.500/);
+    expect(row).toHaveAccessibleName(/Belum dicocokkan/);
+    expect(row).toHaveAccessibleName(/Total berubah setelah ditandai/);
+    expect(row).toHaveAccessibleName(/Penjualan Rp775\.500/);
+    expect(await dayRow(/Min, 15 Nov/)).toHaveAccessibleName(/Cocok/);
+    expect(await dayRow(/Sab, 14 Nov/)).toHaveAccessibleName(/Tidak cocok/);
+  });
+
   test("bulan sebelumnya dimuat dari URL dan tombol bulan berikutnya aktif", async () => {
     plant();
     renderApp("/owner/lainnya/qris?bulan=2026-10");
@@ -240,8 +255,9 @@ describe("QrisPage", () => {
       status: "tidak_cocok",
       note: "Mutasi bank hanya Rp730.000",
     });
-    const keys = invalidate.mock.calls.map((c) => JSON.stringify(c[0]));
-    expect(keys.some((k) => k.includes("summary"))).toBe(true);
+    expect(invalidate).toHaveBeenCalledWith({
+      queryKey: getGetOwnerTodaySummaryQueryKey(),
+    });
     const row = (await dayRow(/Rab, 18 Nov/)).closest("li") as HTMLElement;
     await waitFor(() =>
       expect(within(row).getByText("Tidak cocok")).toBeInTheDocument(),
@@ -374,5 +390,100 @@ describe("QrisReconcileSheet", () => {
     );
     const list = await screen.findByRole("list", { name: "Transaksi QRIS" });
     expect(within(list).getAllByRole("listitem")).toHaveLength(4);
+  });
+
+  test("fokus pindah ke baris berikutnya setelah Cocok, dan ke baris berikutnya juga setelah lembar Tidak cocok", async () => {
+    plant();
+    const user = userEvent.setup();
+    renderWithQuery(<Harness />);
+    await screen.findByRole("dialog", { name: "Cocokkan QRIS" });
+    await user.click(
+      await screen.findByRole("button", { name: "Cocok Sen, 16 Nov" }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Lihat transaksi Sel, 17 Nov" }),
+      ).toHaveFocus(),
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Tidak cocok Sel, 17 Nov" }),
+    );
+    const mark = await screen.findByRole("dialog", {
+      name: "QRIS Sel, 17 Nov",
+    });
+    await user.type(within(mark).getByLabelText("Catatan"), "Selisih");
+    await user.click(within(mark).getByRole("button", { name: "Tidak cocok" }));
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Lihat transaksi Rab, 18 Nov" }),
+      ).toHaveFocus(),
+    );
+  });
+
+  test("hari terakhir ditandai: fokus ke judul lembar sebelum lembar menutup sendiri tidak jatuh ke body", async () => {
+    plant();
+    mockDb.update((s) => {
+      s.qrisDays["2026-11-16"] = {
+        date: "2026-11-16",
+        status: "cocok",
+        note: null,
+        markedById: "u-owner",
+        markedByName: "Pak Ahmad",
+        markedAt: NOW,
+        markedTotal: 853_000,
+      };
+      s.qrisDays["2026-11-17"] = {
+        date: "2026-11-17",
+        status: "cocok",
+        note: null,
+        markedById: "u-owner",
+        markedByName: "Pak Ahmad",
+        markedAt: NOW,
+        markedTotal: 775_500,
+      };
+    });
+    const user = userEvent.setup();
+    renderWithQuery(<Harness />);
+    await user.click(
+      await screen.findByRole("button", { name: "Cocok Rab, 18 Nov" }),
+    );
+    await waitFor(() =>
+      expect(screen.getByText("tertutup")).toBeInTheDocument(),
+    );
+  });
+
+  test("dibuka dengan daftar kosong: menutup sendiri", async () => {
+    plant();
+    mockDb.update((s) => {
+      s.qrisSince = "2026-11-19";
+    });
+    renderWithQuery(<Harness />);
+    await waitFor(() =>
+      expect(screen.getByText("tertutup")).toBeInTheDocument(),
+    );
+  });
+
+  test("galat memuat: pesan dan Coba lagi memulihkan daftar", async () => {
+    plant();
+    server.use(
+      http.get(
+        "/api/owner/qris-days",
+        () =>
+          HttpResponse.json(
+            { code: "SERVER", message: "Gagal" },
+            { status: 500 },
+          ),
+        { once: true },
+      ),
+    );
+    const user = userEvent.setup();
+    renderWithQuery(<Harness />);
+    const sheet = await screen.findByRole("dialog", { name: "Cocokkan QRIS" });
+    await user.click(
+      await within(sheet).findByRole("button", { name: "Coba lagi" }),
+    );
+    expect(
+      await within(sheet).findByRole("list", { name: "Hari belum dicocokkan" }),
+    ).toBeInTheDocument();
   });
 });

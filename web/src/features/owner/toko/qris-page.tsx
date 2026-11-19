@@ -70,7 +70,6 @@ function DayRow({ day, onOpen }: { day: QrisDay; onOpen: () => void }) {
         <button
           type="button"
           onClick={onOpen}
-          aria-label={`${qrisDayLabel(day.date)}, ${formatRupiah(day.total)}`}
           className={`${rowClass} hover:bg-bg focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary`}
         >
           {body}

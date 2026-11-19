@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   getGetOwnerTodaySummaryQueryKey,
@@ -187,14 +187,19 @@ export function QrisMarkSheet({
   date,
   open,
   onClose,
+  onMarked,
 }: {
   date: string;
   open: boolean;
   onClose: () => void;
+  /** Dipanggil setelah hari berhasil ditandai, sebelum lembar ditutup. */
+  onMarked?: () => void;
 }) {
   const query = useGetOwnerQrisDay(date, { query: { enabled: open } });
   const mark = useMarkQrisDay();
   const [listOpen, setListOpen] = useState(false);
+  // Setelah berhasil ditandai pemanggil yang mengatur fokus (pemicunya mungkin sudah hilang).
+  const handlesFocus = useRef(false);
   const day = query.data;
 
   return (
@@ -210,6 +215,9 @@ export function QrisMarkSheet({
         <SheetContent
           side="bottom"
           showCloseButton={false}
+          onCloseAutoFocus={(e) => {
+            if (handlesFocus.current) e.preventDefault();
+          }}
           className="max-h-[90dvh] gap-3 overflow-y-auto rounded-t-lg p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] lg:mx-auto lg:max-w-md"
         >
           <SheetTitle className="text-[20px] font-bold">
@@ -239,6 +247,8 @@ export function QrisMarkSheet({
                   {
                     onSuccess: () => {
                       toast.success("QRIS ditandai");
+                      handlesFocus.current = onMarked !== undefined;
+                      onMarked?.();
                       onClose();
                     },
                   },
