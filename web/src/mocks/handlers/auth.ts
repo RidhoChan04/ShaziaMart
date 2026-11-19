@@ -81,7 +81,8 @@ export const authHandlers = [
     withScenario(({ request }) =>
       pinLogin(request, {
         failures: "pinFailures",
-        canLogin: () => true,
+        // Realm kasir hanya untuk akun kasir: id pemilik → PIN_INVALID tanpa hitungan kunci.
+        canLogin: (u) => u.role === "kasir",
         startSession: (s, userId) => {
           s.session = { userId };
         },

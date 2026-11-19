@@ -49,14 +49,16 @@ export function problem(
 }
 
 /**
- * Pengguna sesi aktif, atau respons 401 UNAUTHORIZED. (K22) Pengguna nonaktif ditolak walau sesinya
- * masih tersimpan.
+ * Pengguna sesi kasir (akun kasir aktif), atau respons 401 UNAUTHORIZED. (K22) Pengguna nonaktif
+ * ditolak walau sesinya masih tersimpan; sesi kasir ber-id pemilik juga tidak berlaku.
  */
 export function requireSession(
   state: Readonly<MockState>,
 ): MockUser | Response {
   const userId = state.session?.userId;
-  const user = state.users.find((u) => u.id === userId && u.active);
+  const user = state.users.find(
+    (u) => u.id === userId && u.role === "kasir" && u.active,
+  );
   return user ?? problem(401, "UNAUTHORIZED", "Sesi tidak ditemukan");
 }
 

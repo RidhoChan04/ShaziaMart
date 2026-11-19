@@ -324,6 +324,54 @@ describe("updateOwnerKasirAccount (K12, K22)", () => {
       active: true,
     });
   });
+
+  test("ganti nama saat kasir memegang shift buka: salinan kasirName shift tetap nama lama, akun memakai nama baru", async () => {
+    await loginWithShift();
+    expect((await ownerLogin()).status).toBe(200);
+    const rina = userId("Rina");
+    const res = await patchAccount(rina, { name: "Rini" });
+    expect(res.status).toBe(200);
+    expect(await json<OwnerKasirAccount>(res)).toMatchObject({
+      name: "Rini",
+      onShift: true,
+    });
+    expect(mockDb.get().shift).toMatchObject({
+      kasirId: rina,
+      kasirName: "Rina",
+    });
+    expect((await accounts()).find((a) => a.id === rina)?.name).toBe("Rini");
+    // Sesi kasir tetap berlaku (bukan penonaktifan).
+    expect((await get("/api/auth/session")).status).toBe(200);
+  });
+});
+
+describe("realm kasir (PC) hanya untuk akun kasir", () => {
+  test("id pemilik + PIN benar → 401 PIN_INVALID tanpa sesi kasir", async () => {
+    const res = await login("999999", "Pak Ahmad");
+    expect(res.status).toBe(401);
+    expect(await codeOf(res)).toBe("PIN_INVALID");
+    const s = mockDb.get();
+    expect(s.session).toBeNull();
+    expect(s.pinFailures[userId("Pak Ahmad")]).toBeUndefined();
+  });
+
+  test("id pemilik + PIN salah berulang → 401, hitungan kunci pemilik tidak bertambah", async () => {
+    const owner = userId("Pak Ahmad");
+    for (let i = 0; i < MAX_FAILURES + 1; i++) {
+      const res = await login("000000", "Pak Ahmad");
+      expect(res.status).toBe(401);
+      expect(await codeOf(res)).toBe("PIN_INVALID");
+    }
+    expect(mockDb.get().pinFailures[owner]).toBeUndefined();
+  });
+
+  test("sesi kasir tersimpan ber-id pemilik ditolak requireSession", async () => {
+    mockDb.update((s) => {
+      s.session = { userId: userId("Pak Ahmad") };
+    });
+    expect((await get("/api/auth/session")).status).toBe(401);
+    expect((await get("/api/sales/shift")).status).toBe(401);
+  });
 });
 
 describe("resetOwnerKasirPin (K12)", () => {
