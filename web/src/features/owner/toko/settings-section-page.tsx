@@ -37,7 +37,7 @@ export function SettingsSectionPage() {
       <SubPageHeader
         title={SECTION_TITLES[section]}
         eyebrow="Pengaturan"
-        back={{ label: "Pengaturan", fallback: "/owner/lainnya" }}
+        back={{ label: "Pengaturan", fallback: "/owner/lainnya/pengaturan" }}
       />
       {settings ? (
         <Section

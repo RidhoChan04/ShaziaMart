@@ -17,6 +17,9 @@ type BackFallback =
   | "/owner/lainnya/barang-masuk"
   | "/owner/lainnya/kedaluwarsa"
   | "/owner/lainnya/opname"
+  | "/owner/lainnya/shift"
+  | "/owner/lainnya/kasir"
+  | "/owner/lainnya/pengaturan"
   | "/owner/laporan"
   | "/owner/laporan/selisih-opname";
 

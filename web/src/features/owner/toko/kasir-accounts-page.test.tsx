@@ -407,3 +407,12 @@ test("nonaktifkan: Kembali mengembalikan fokus ke Nonaktifkan; setelah berhasil 
   const again = await screen.findByRole("button", { name: "Nonaktifkan" });
   await waitFor(() => expect(again).toHaveFocus());
 });
+
+test("detail dibuka langsung: tombol kembali menuju daftar Akun kasir", async () => {
+  renderApp(detail("Budi"));
+  await screen.findByRole("heading", { level: 1, name: "Budi" });
+  expect(screen.getByRole("link", { name: "Akun kasir" })).toHaveAttribute(
+    "href",
+    "/owner/lainnya/kasir",
+  );
+});

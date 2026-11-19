@@ -350,3 +350,12 @@ test("409 lalu muat ulang gagal: pesan galat dan tombol batal hilang (tidak diam
     within(sheet).queryByRole("button", { name: "Batalkan kas keluar" }),
   ).not.toBeInTheDocument();
 });
+
+test("rincian dibuka langsung: tombol kembali menuju daftar Shift & kas", async () => {
+  const { rina } = await seedDay();
+  await openShift(rina, "Shift Rina");
+  expect(screen.getByRole("link", { name: "Shift & kas" })).toHaveAttribute(
+    "href",
+    "/owner/lainnya/shift",
+  );
+});

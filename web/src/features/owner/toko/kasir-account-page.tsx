@@ -148,7 +148,7 @@ export function KasirAccountPage() {
     <div className="lg:max-w-2xl">
       <SubPageHeader
         title={account?.name ?? "Akun kasir"}
-        back={{ label: "Akun kasir", fallback: "/owner/lainnya" }}
+        back={{ label: "Akun kasir", fallback: "/owner/lainnya/kasir" }}
       />
       {account ? (
         <div className="grid gap-4">

@@ -414,3 +414,12 @@ test("Kasir: memilih barang curah cepat dan sakelar masuk ke PATCH kasir", async
   expect(body.kasir.quickCurahProductIds).toHaveLength(boxes.length - 1);
   expect(before.autoPrint).toBe(false);
 });
+
+test("bagian dibuka langsung: tombol kembali menuju daftar Pengaturan", async () => {
+  renderApp("/owner/lainnya/pengaturan/kasbon");
+  await screen.findByLabelText("Limit kasbon pelanggan baru");
+  expect(screen.getByRole("link", { name: "Pengaturan" })).toHaveAttribute(
+    "href",
+    "/owner/lainnya/pengaturan",
+  );
+});

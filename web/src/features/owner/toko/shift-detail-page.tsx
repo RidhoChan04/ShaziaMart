@@ -181,7 +181,7 @@ export function ShiftDetailPage() {
       <div className="pb-24 lg:pb-8">
         <SubPageHeader
           title="Shift"
-          back={{ label: "Shift & kas", fallback: "/owner/lainnya" }}
+          back={{ label: "Shift & kas", fallback: "/owner/lainnya/shift" }}
         />
         {query.isError ? (
           <div className="grid justify-items-start gap-3">
@@ -216,7 +216,7 @@ export function ShiftDetailPage() {
       <SubPageHeader
         title={`Shift ${d.kasirName}`}
         eyebrow={`${saleDayLabel(jakartaIsoDate(d.openedAt))} · ${times}`}
-        back={{ label: "Shift & kas", fallback: "/owner/lainnya" }}
+        back={{ label: "Shift & kas", fallback: "/owner/lainnya/shift" }}
       />
       <div className="grid gap-5 lg:max-w-2xl">
         {open && (
