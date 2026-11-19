@@ -1,4 +1,5 @@
 import { useParams } from "@tanstack/react-router";
+import { useState } from "react";
 import { useGetOwnerSettings } from "@/shared/api/gen/owner/owner";
 import { pesanError } from "@/shared/lib/error-messages";
 import { Button } from "@/shared/ui/button";
@@ -29,6 +30,8 @@ export function SettingsSectionPage() {
   const Section = SECTIONS[section];
   const query = useGetOwnerSettings();
   const settings = query.data;
+  // Naik tiap Simpan berhasil: isian dimulai lagi dari nilai yang dinormalkan server.
+  const [saves, setSaves] = useState(0);
   return (
     <div className="grid gap-2 pb-[calc(7rem+env(safe-area-inset-bottom))]">
       <SubPageHeader
@@ -37,8 +40,11 @@ export function SettingsSectionPage() {
         back={{ label: "Pengaturan", fallback: "/owner/lainnya" }}
       />
       {settings ? (
-        // Kunci per kelompok: isian dimulai dari nilai tersimpan setiap kali bagian dibuka.
-        <Section key={section} settings={settings} />
+        <Section
+          key={`${section}-${saves}`}
+          settings={settings}
+          onSaved={() => setSaves((n) => n + 1)}
+        />
       ) : query.isError ? (
         <div className="grid justify-items-start gap-3">
           <p role="alert" className="text-sm font-medium text-danger">

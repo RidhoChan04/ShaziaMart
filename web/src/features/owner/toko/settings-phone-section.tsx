@@ -1,17 +1,22 @@
 import { useId, useState } from "react";
-import type { OwnerSettings } from "@/shared/api/gen/shaziaMartAPI.schemas";
-import { SectionForm, TextField, useSaveSection } from "./settings-fields";
+import {
+  SectionForm,
+  type SectionProps,
+  TextField,
+  useSaveSection,
+} from "./settings-fields";
 
 /** Nomor telepon pemilik; dikosongkan dikirim `null` (baris Ragu? Telepon pemilik tidak tampil di kasir). */
-export function PhoneSection({ settings }: { settings: OwnerSettings }) {
+export function PhoneSection({ settings, onSaved }: SectionProps) {
   const [phone, setPhone] = useState(settings.ownerPhone ?? "");
-  const { save, pending, serverError } = useSaveSection();
+  const { save, pending, serverError, reset } = useSaveSection(onSaved);
   const errorId = useId();
   return (
     <SectionForm
       pending={pending}
       error={serverError}
       errorId={errorId}
+      onEdit={reset}
       onSubmit={() => {
         const trimmed = phone.trim();
         save({ ownerPhone: trimmed === "" ? null : trimmed });

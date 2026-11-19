@@ -17,6 +17,7 @@ import { formatRupiah } from "@/shared/lib/money";
 import { Button } from "@/shared/ui/button";
 import { SubPageHeader } from "../common/sub-page-header";
 import { RowList } from "../products/detail/section";
+import { formatPercent } from "./settings-format";
 import {
   SECTION_TITLES,
   SETTINGS_SECTIONS,
@@ -33,10 +34,6 @@ const ICONS: Record<SettingsSection, LucideIcon> = {
   telepon: Phone,
 };
 
-/** Persen dari permil: 100 → 10, 125 → 12,5. */
-const percent = (permille: number): string =>
-  String(permille / 10).replace(".", ",");
-
 /** Ringkasan nilai sekarang per kelompok (teks kecil di bawah judul baris). */
 function summaryOf(section: SettingsSection, s: OwnerSettings): string {
   switch (section) {
@@ -49,7 +46,7 @@ function summaryOf(section: SettingsSection, s: OwnerSettings): string {
     case "stok":
       return `Kedaluwarsa ${s.stock.expirySoonDays} hari · opname ${formatRupiah(s.stock.opnameItemLimit)}`;
     case "laporan":
-      return `Untung tipis ${percent(s.report.thinMarginPermille)}% · tidak terjual ${s.report.unsoldDays} hari`;
+      return `Untung tipis ${formatPercent(s.report.thinMarginPermille)}% · tidak terjual ${s.report.unsoldDays} hari`;
     case "perhatian":
       return `Selisih kas ${formatRupiah(s.attention.cashDiffMin)} · QRIS harian ${s.attention.qrisDailyReconcile ? "menyala" : "mati"}`;
     case "telepon":

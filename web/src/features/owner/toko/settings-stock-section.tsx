@@ -1,20 +1,24 @@
 import { useId, useState } from "react";
-import type { OwnerSettings } from "@/shared/api/gen/shaziaMartAPI.schemas";
-import { formatAngka } from "@/shared/lib/money";
 import {
   NumberField,
+  numberOf,
   SectionForm,
-  toInt,
+  type SectionProps,
   useSaveSection,
 } from "./settings-fields";
+import { formatNumber } from "./settings-format";
 
 /** Stok: batas segera kedaluwarsa dan batas selisih opname. */
-export function StockSection({ settings }: { settings: OwnerSettings }) {
+export function StockSection({ settings, onSaved }: SectionProps) {
   const { stock } = settings;
-  const [days, setDays] = useState(formatAngka(stock.expirySoonDays));
-  const [item, setItem] = useState(formatAngka(stock.opnameItemLimit));
-  const [session, setSession] = useState(formatAngka(stock.opnameSessionLimit));
-  const { save, pending, serverError } = useSaveSection();
+  const [days, setDays] = useState(formatNumber("plain", stock.expirySoonDays));
+  const [item, setItem] = useState(
+    formatNumber("money", stock.opnameItemLimit),
+  );
+  const [session, setSession] = useState(
+    formatNumber("money", stock.opnameSessionLimit),
+  );
+  const { save, pending, serverError, reset } = useSaveSection(onSaved);
   const errorId = useId();
   const invalid = serverError !== null;
   const describedBy = invalid ? errorId : undefined;
@@ -23,10 +27,11 @@ export function StockSection({ settings }: { settings: OwnerSettings }) {
       pending={pending}
       error={serverError}
       errorId={errorId}
+      onEdit={reset}
       onSubmit={() => {
-        const d = toInt(days);
-        const i = toInt(item);
-        const s = toInt(session);
+        const d = numberOf("plain", days);
+        const i = numberOf("money", item);
+        const s = numberOf("money", session);
         if (d === null || i === null || s === null) return;
         save({
           stock: {
@@ -39,6 +44,7 @@ export function StockSection({ settings }: { settings: OwnerSettings }) {
     >
       <NumberField
         label="Segera kedaluwarsa dalam"
+        kind="plain"
         suffix="hari"
         value={days}
         onChange={setDays}
@@ -47,6 +53,7 @@ export function StockSection({ settings }: { settings: OwnerSettings }) {
       />
       <NumberField
         label="Tahan selisih per barang di atas"
+        kind="money"
         prefix="Rp"
         value={item}
         onChange={setItem}
@@ -55,6 +62,7 @@ export function StockSection({ settings }: { settings: OwnerSettings }) {
       />
       <NumberField
         label="Tandai selisih per sesi opname di atas"
+        kind="money"
         prefix="Rp"
         value={session}
         onChange={setSession}

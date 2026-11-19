@@ -1,15 +1,19 @@
 import { useId, useState } from "react";
-import type { OwnerSettings } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { QrisUpload } from "./qris-upload";
-import { SectionForm, TextField, useSaveSection } from "./settings-fields";
+import {
+  SectionForm,
+  type SectionProps,
+  TextField,
+  useSaveSection,
+} from "./settings-fields";
 
 /** Toko & struk: nama, alamat, catatan kaki struk (satu PATCH `store`) dan gambar QRIS (unggah sendiri). */
-export function StoreSection({ settings }: { settings: OwnerSettings }) {
+export function StoreSection({ settings, onSaved }: SectionProps) {
   const { store } = settings;
   const [name, setName] = useState(store.name);
   const [address, setAddress] = useState(store.address);
   const [footer, setFooter] = useState(store.receiptFooter);
-  const { save, pending, serverError } = useSaveSection();
+  const { save, pending, serverError, reset } = useSaveSection(onSaved);
   const errorId = useId();
   const invalid = serverError !== null;
   return (
@@ -18,6 +22,7 @@ export function StoreSection({ settings }: { settings: OwnerSettings }) {
         pending={pending}
         error={serverError}
         errorId={errorId}
+        onEdit={reset}
         onSubmit={() =>
           save({ store: { name, address, receiptFooter: footer } })
         }

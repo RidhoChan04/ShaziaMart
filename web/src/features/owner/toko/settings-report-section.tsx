@@ -1,14 +1,14 @@
-import { keepPreviousData } from "@tanstack/react-query";
 import { useEffect, useId, useState } from "react";
 import { useGetOwnerThinMarginPreview } from "@/shared/api/gen/owner/owner";
-import type { OwnerSettings } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { formatAngka } from "@/shared/lib/money";
 import {
   NumberField,
+  numberOf,
   SectionForm,
-  toInt,
+  type SectionProps,
   useSaveSection,
 } from "./settings-fields";
+import { formatNumber, formatPercent } from "./settings-format";
 
 const DEBOUNCE_MS = 300;
 
@@ -22,38 +22,25 @@ function useDebounced<T>(value: T, ms: number): T {
   return settled;
 }
 
-/** Persen untuk isian: permil / 10, koma bila tidak bulat (nilai lama). */
-const percentText = (permille: number): string =>
-  permille % 10 === 0
-    ? String(permille / 10)
-    : String(permille / 10).replace(".", ",");
-
 /** Laporan: batas untung tipis (persen ↔ permil, pratinjau dari server) dan hari tidak terjual. */
-export function ReportSection({ settings }: { settings: OwnerSettings }) {
+export function ReportSection({ settings, onSaved }: SectionProps) {
   const { report } = settings;
-  const initialText = percentText(report.thinMarginPermille);
-  const [percent, setPercent] = useState(initialText);
-  const [unsold, setUnsold] = useState(formatAngka(report.unsoldDays));
-  const { save, pending, serverError } = useSaveSection();
+  const [percent, setPercent] = useState(
+    formatNumber("percent", report.thinMarginPermille),
+  );
+  const [unsold, setUnsold] = useState(
+    formatNumber("plain", report.unsoldDays),
+  );
+  const { save, pending, serverError, reset } = useSaveSection(onSaved);
   const errorId = useId();
 
-  // Persen bulat → permil (15 → 150); nilai lama yang tidak bulat dipertahankan bila tidak diubah.
-  const percentInt = toInt(percent);
-  const permille =
-    percent === initialText
-      ? report.thinMarginPermille
-      : percentInt === null
-        ? null
-        : percentInt * 10;
+  // Persen → permil (15 → 150, 12,5 → 125); tidak sah = tanpa pratinjau.
+  const permille = numberOf("percent", percent);
   const debounced = useDebounced(permille, DEBOUNCE_MS);
+  // Tanpa data lama yang dipertahankan: angka yang tampil selalu milik batas di labelnya.
   const preview = useGetOwnerThinMarginPreview(
     { permille: debounced ?? 0 },
-    {
-      query: {
-        enabled: debounced !== null,
-        placeholderData: keepPreviousData,
-      },
-    },
+    { query: { enabled: debounced !== null } },
   );
 
   return (
@@ -61,8 +48,9 @@ export function ReportSection({ settings }: { settings: OwnerSettings }) {
       pending={pending}
       error={serverError}
       errorId={errorId}
+      onEdit={reset}
       onSubmit={() => {
-        const u = toInt(unsold);
+        const u = numberOf("plain", unsold);
         if (permille === null || u === null) return;
         save({ report: { thinMarginPermille: permille, unsoldDays: u } });
       }}
@@ -70,6 +58,7 @@ export function ReportSection({ settings }: { settings: OwnerSettings }) {
       <div className="grid gap-1.5">
         <NumberField
           label="Batas untung tipis"
+          kind="percent"
           suffix="%"
           value={percent}
           onChange={setPercent}
@@ -78,7 +67,7 @@ export function ReportSection({ settings }: { settings: OwnerSettings }) {
         />
         <p role="status" className="min-h-5 text-[13px] text-muted">
           {preview.data && debounced !== null
-            ? `Dengan batas ${percentText(debounced)}%: ${formatAngka(preview.data.flagged)} dari ${formatAngka(preview.data.total)} barang tertandai`
+            ? `Dengan batas ${formatPercent(debounced)}%: ${formatAngka(preview.data.flagged)} dari ${formatAngka(preview.data.total)} barang tertandai`
             : preview.isError
               ? "Pratinjau belum bisa dimuat"
               : ""}
@@ -86,6 +75,7 @@ export function ReportSection({ settings }: { settings: OwnerSettings }) {
       </div>
       <NumberField
         label="Tidak terjual setelah"
+        kind="plain"
         suffix="hari"
         value={unsold}
         onChange={setUnsold}

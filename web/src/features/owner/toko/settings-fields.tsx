@@ -1,44 +1,38 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { type ReactNode, useId } from "react";
+import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   getGetOwnerSettingsQueryKey,
   useUpdateOwnerSettings,
 } from "@/shared/api/gen/owner/owner";
-import type { OwnerSettingsPatch } from "@/shared/api/gen/shaziaMartAPI.schemas";
+import type {
+  OwnerSettings,
+  OwnerSettingsPatch,
+} from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { cn } from "@/shared/lib/cn";
 import { pesanError } from "@/shared/lib/error-messages";
-import { formatAngka } from "@/shared/lib/money";
 import { Button } from "@/shared/ui/button";
+import { formatNumber, type NumberKind, parseNumber } from "./settings-format";
 
-export const NUMBER_ERROR = "Isi dengan bilangan bulat";
+/** Properti bersama semua bagian: nilai tersimpan dan penanda "sudah tersimpan" (isian dimulai ulang dari respons server). */
+export type SectionProps = { settings: OwnerSettings; onSaved: () => void };
 
-/** Bilangan bulat dari ketikan (titik ribuan boleh); selain itu `null`. */
-export function toInt(text: string): number | null {
-  const s = text.trim().replaceAll(".", "");
-  if (!/^\d{1,15}$/.test(s)) return null;
-  return Number(s);
-}
-
-/** Semua ketikan jadi bilangan bulat, atau `null` bila ada yang bukan. */
-export function toInts(texts: readonly string[]): number[] | null {
-  const out: number[] = [];
-  for (const text of texts) {
-    const n = toInt(text);
-    if (n === null) return null;
-    out.push(n);
-  }
-  return out;
+/** Nilai angka dari ketikan, atau `null` bila tidak sah untuk jenisnya. */
+export function numberOf(kind: NumberKind, text: string): number | null {
+  const parsed = parseNumber(kind, text);
+  return "value" in parsed ? parsed.value : null;
 }
 
 /** Simpan satu bagian: kirim hanya bagian itu, ganti cache Pengaturan, tampilkan pesan atau galat server. */
-export function useSaveSection() {
+export function useSaveSection(onSaved: () => void) {
   const queryClient = useQueryClient();
   const mutation = useUpdateOwnerSettings({
     mutation: {
       onSuccess: (saved) => {
         queryClient.setQueryData(getGetOwnerSettingsQueryKey(), saved);
         toast.success("Pengaturan disimpan");
+        // Isian dimulai lagi dari nilai yang dinormalkan server.
+        onSaved();
       },
     },
   });
@@ -52,26 +46,42 @@ export function useSaveSection() {
   };
 }
 
-/** Bentuk satu bagian: kartu isian, galat server di dalam kartu, tombol Simpan sendiri. */
+/** Bentuk satu bagian: kartu isian, galat server di dalam kartu, tombol Simpan sendiri. Setelah Simpan yang galat, fokus pindah ke isian bertanda galat pertama. */
 export function SectionForm({
   onSubmit,
+  onEdit,
   pending,
   error,
   errorId,
   children,
 }: {
   onSubmit: () => void;
+  /** Dipanggil saat pengguna mengubah isian (menghapus galat server yang lama). */
+  onEdit: () => void;
   pending: boolean;
   error: string | null;
   errorId: string;
   children: ReactNode;
 }) {
+  const form = useRef<HTMLFormElement>(null);
+  const [attempt, setAttempt] = useState(0);
+  const focusedAttempt = useRef(0);
+  useEffect(() => {
+    if (attempt === 0) return;
+    // Hanya sesudah Simpan atau saat galat server baru tiba; tidak saat pengguna mengetik.
+    if (error === null && focusedAttempt.current === attempt) return;
+    focusedAttempt.current = attempt;
+    form.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
+  }, [attempt, error]);
   return (
     <form
+      ref={form}
       noValidate
       className="grid gap-4 lg:max-w-2xl"
+      onChange={onEdit}
       onSubmit={(e) => {
         e.preventDefault();
+        setAttempt((n) => n + 1);
         onSubmit();
       }}
     >
@@ -101,9 +111,10 @@ export function SectionForm({
 const inputClass =
   "h-11 min-w-0 flex-1 rounded-md border border-border bg-transparent px-3 text-right text-[17px] tabular-nums outline-none placeholder:text-muted/70 focus-visible:ring-2 focus-visible:ring-primary aria-invalid:border-danger aria-invalid:text-danger";
 
-/** Isian angka dengan awalan (Rp) atau akhiran (jam, %, hari). */
+/** Isian angka dengan awalan (Rp) atau akhiran (jam, %, hari); galat lokal di bawah isian. */
 export function NumberField({
   label,
+  kind,
   value,
   onChange,
   prefix,
@@ -112,6 +123,7 @@ export function NumberField({
   describedBy,
 }: {
   label: string;
+  kind: NumberKind;
   value: string;
   onChange: (next: string) => void;
   prefix?: string;
@@ -120,7 +132,9 @@ export function NumberField({
   describedBy?: string | undefined;
 }) {
   const id = useId();
-  const localInvalid = toInt(value) === null;
+  const parsed = parseNumber(kind, value);
+  const localError = "error" in parsed ? parsed.error : null;
+  const errorId = useId();
   return (
     <div className="grid gap-1.5">
       <label htmlFor={id} className="text-[15px] font-semibold">
@@ -130,22 +144,29 @@ export function NumberField({
         {prefix && <span className="text-[15px] text-muted">{prefix}</span>}
         <input
           id={id}
-          inputMode="numeric"
+          inputMode={kind === "percent" ? "decimal" : "numeric"}
           autoComplete="off"
           value={value}
-          aria-invalid={invalid || localInvalid ? true : undefined}
-          aria-describedby={describedBy}
+          aria-invalid={invalid || localError !== null ? true : undefined}
+          aria-describedby={
+            [localError !== null ? errorId : undefined, describedBy]
+              .filter(Boolean)
+              .join(" ") || undefined
+          }
           onChange={(e) => onChange(e.target.value)}
           onBlur={() => {
-            const n = toInt(value);
-            if (n !== null) onChange(formatAngka(n));
+            if (kind === "money" && "value" in parsed) {
+              onChange(formatNumber("money", parsed.value));
+            }
           }}
           className={cn(inputClass)}
         />
         {suffix && <span className="text-[15px] text-muted">{suffix}</span>}
       </div>
-      {localInvalid && (
-        <p className="text-[13px] font-medium text-danger">{NUMBER_ERROR}</p>
+      {localError !== null && (
+        <p id={errorId} className="text-[13px] font-medium text-danger">
+          {localError}
+        </p>
       )}
     </div>
   );
