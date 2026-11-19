@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Akun kasir dan Pengaturan v1 (angka contoh)</title>
+<style>
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+/* ===== Token (salinan styles.css + :root[data-app="owner"]) ===== */
+:root{
+  --primary:#1f7a4d;--primary-fg:#fff;--primary-deep:#155c3b;--primary-soft:#e6f2ea;
+  --bg:#f2f2f7;--surface:#fff;--text:#1c2421;--muted:#6e6e73;--border:#e5e5ea;
+  --danger:#b42318;--danger-soft:#fde8e6;--danger-ink:#9b1c12;
+  --warning:#b26b00;--warning-soft:#fff0d9;--warning-ink:#8a4b00;
+  --chart-1:#1f7a4d;--chart-1-now:#2e9a62;--chart-2:#d1d1d6;
+  --glass:rgb(255 255 255 / .72);--radius-lg:20px;--radius-md:8px;
+}
+/* ===== Halaman galeri (di luar HP) ===== */
+body{margin:0;padding:24px;background:#e9ece9;font-family:Inter,system-ui,sans-serif;color:#1c2421}
+.g-title{margin:0 0 4px;font-size:20px}.g-sub{margin:0 0 18px;color:#5e6b65;font-size:14px;max-width:980px}
+.g-row{display:flex;gap:40px;flex-wrap:wrap;justify-content:center;align-items:flex-start}
+.g-col{display:flex;flex-direction:column;align-items:center;gap:10px}
+.g-col>h3{margin:14px 0 0;font-size:15px}.g-col>p{margin:0;max-width:340px;text-align:center;font-size:13px;opacity:.8}
+/* ===== HP 360 px ===== */
+.k-phone{width:360px;height:740px;border-radius:44px;overflow:hidden;position:relative;background:var(--bg);color:var(--text);
+  box-shadow:0 0 0 10px #1d1d1f,0 24px 60px rgba(0,0,0,.28);font-family:Inter,-apple-system,system-ui,sans-serif;
+  font-size:16px;letter-spacing:-.01em;line-height:1.3}
+.k-phone *{box-sizing:border-box}
+.k-num{font-variant-numeric:tabular-nums}
+svg.k-i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none;display:block}
+/* Header tab (PageHeader): px-4 pt-4 pb-3 */
+.k-header{padding:16px 16px 12px}
+.k-date{font-size:13px;font-weight:600;color:var(--muted)}
+.k-titlerow{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.k-h1{margin:0;font-size:32px;line-height:1.25;font-weight:700;letter-spacing:-.025em}
+.k-status{display:inline-flex;align-items:center;gap:6px;border-radius:99px;padding:4px 10px;font-size:13px;font-weight:600;background:var(--primary-soft);color:var(--primary);flex:none}
+.k-status::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--primary)}
+.k-status.off{background:rgb(180 35 24 / .1);color:var(--danger)}.k-status.off::before{background:var(--danger)}
+/* Isi (main): px-4 pt-1, ruang bawah 7rem untuk tab bar */
+.k-main{padding:4px 16px 112px}
+.k-stack{display:grid;gap:12px}
+.k-stack>*{min-width:0}
+/* Sub-halaman (SubPageHeader) */
+.k-subheader{padding:12px 0 12px}
+.k-back{display:inline-flex;height:44px;align-items:center;gap:2px;border-radius:99px;background:var(--surface);padding:0 16px 0 10px;font-size:15px;font-weight:600;color:var(--primary);box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.k-eyebrow{margin:12px 0 0;font-size:13px;font-weight:600;color:var(--muted)}
+.k-h1sub{margin:12px 0 0;font-size:28px;line-height:1.2;font-weight:700;letter-spacing:-.025em}
+/* Bar judul kaca saat digulir (CompactTitle) */
+.k-compact{position:absolute;top:0;left:0;right:0;height:52px;z-index:20;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:600}
+/* Kaca: hanya tab bar, sidebar, bar judul */
+.k-glass{background:var(--glass);backdrop-filter:blur(22px) saturate(180%);-webkit-backdrop-filter:blur(22px) saturate(180%);border:.5px solid rgb(255 255 255 / .7);box-shadow:0 1px 12px rgb(0 0 0 / .06)}
+/* Tab bar (TabNav): fixed 12px dari tepi, rounded-full p-1, tab min-h-12 */
+.k-tabbar{position:absolute;left:12px;right:12px;bottom:12px;z-index:30;border-radius:99px;padding:4px}
+.k-tabbar ul{display:flex;gap:4px;margin:0;padding:0;list-style:none}
+.k-tabbar li{flex:1}
+.k-tab{display:flex;min-height:48px;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:0 4px;border-radius:99px;font-size:12px;color:var(--text)}
+.k-tab.on{background:var(--primary-soft);color:var(--primary);font-weight:600}
+/* Kartu */
+.k-card{background:var(--surface);border-radius:var(--radius-lg);overflow:hidden}
+.k-pad{padding:14px 16px}
+/* Angka kunci 2×2 (KpiTiles): kartu terpisah, gap 8 */
+.k-tiles{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.k-tile{background:var(--surface);border-radius:var(--radius-lg);padding:12px 14px;min-width:0}
+.k-tile dt{font-size:13px;font-weight:600;color:var(--muted)}
+.k-tile dd{margin:0;font-weight:700;font-size:21px;white-space:nowrap}
+.k-tile dd.fit-19{font-size:19px}.k-tile dd.fit-17{font-size:17px}
+/* Pita omzet C4 */
+.k-band{background:linear-gradient(155deg,var(--primary),var(--primary-deep));color:var(--primary-fg);padding:16px 16px 14px}
+.k-band .lbl{font-size:13px;font-weight:600}
+.k-band .big{margin-top:2px;font-size:34px;line-height:1.25;font-weight:700;letter-spacing:-.03em;white-space:nowrap}
+.k-band .pill{display:inline-flex;margin-top:8px;border-radius:99px;background:rgb(255 255 255 / .12);padding:4px 10px;font-size:13px;font-weight:600}
+.k-chartsec{padding:14px 16px 16px}
+.k-chartsec h2{margin:0 0 4px;font-size:13px;font-weight:600;color:var(--muted)}
+.k-lead{margin:0 0 6px;font-size:13px;color:var(--muted)}.k-lead b{color:var(--text)}
+.k-legend{display:flex;gap:14px;margin-top:8px;font-size:12px;color:var(--muted)}
+.k-legend span{display:inline-flex;align-items:center;gap:6px}.k-legend i{width:10px;height:10px;border-radius:3px;display:inline-block}
+/* Section + RowList */
+.k-section-h{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:0 4px;margin-bottom:8px}
+.k-section-h h2{margin:0;font-size:20px;font-weight:700;letter-spacing:-.02em}
+.k-section-h span{font-size:15px;font-weight:600;color:var(--muted)}
+.k-section-h a{font-size:15px;font-weight:500;color:var(--primary)}
+.k-rows{list-style:none;margin:0;padding:0}
+.k-rows li+li{border-top:.5px solid var(--border)}
+.k-rows.inset li+li{border-top:0;position:relative}
+.k-rows.inset li+li::before{content:"";position:absolute;top:0;left:58px;right:0;border-top:.5px solid var(--border)}
+.k-rowl{display:flex;min-height:56px;align-items:center;gap:12px;padding:8px 16px;font-size:17px}
+.k-rowl.sm{font-size:16px}
+.k-rowl .t{flex:1;min-width:0}
+.k-rowl .t small{display:block;font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.k-rowl .r{flex:none;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap;font-size:15px}
+.k-rowl .v{flex:none;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;font-size:15px}
+.k-rowl .chev{width:16px;height:16px;color:var(--muted)}
+.k-box{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;flex:none;background:var(--primary);color:var(--primary-fg)}
+.k-box svg.k-i{width:18px;height:18px}
+/* StatusBadge: ikon + teks, selalu */
+.k-badge{display:inline-flex;align-items:center;gap:4px;border-radius:99px;padding:2px 8px;font-size:12px;font-weight:600;white-space:nowrap}
+.k-badge svg.k-i{width:12px;height:12px;stroke-width:2.4}
+.k-badge.warn{background:var(--warning-soft);color:var(--warning-ink)}
+.k-badge.bad{background:var(--danger-soft);color:var(--danger-ink)}
+.k-badge.neutral{background:var(--border);color:var(--text)}
+/* Tombol */
+.k-btn{display:inline-flex;height:44px;align-items:center;justify-content:center;gap:8px;border-radius:12px;padding:0 16px;font-size:16px;font-weight:600;background:var(--primary);color:var(--primary-fg)}
+.k-btn.outline{background:var(--surface);color:var(--text);border:1px solid var(--border)}
+/* Segmented control (bila perlu) */
+.k-seg{display:flex;background:#e3e3e8;border-radius:9px;padding:2px}
+.k-seg span{flex:1;display:grid;place-items:center;min-height:32px;font-size:13px;font-weight:600;border-radius:7px;color:#3a3a3c}
+.k-seg span.on{background:var(--surface);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+</style>
+<style>
+.x-tot .lbl{font-size:13px;font-weight:600;color:var(--muted)}
+.x-tot .big{font-size:30px;font-weight:700;letter-spacing:-.025em;margin-top:2px;white-space:nowrap}
+.x-tot .meta{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:13px;color:var(--muted);margin-top:4px}
+.k-btn.bad{background:var(--danger)}
+.k-btn.full{width:100%;height:48px;font-size:17px}
+.k-btn.sm{height:44px;font-size:15px;padding:0 14px}
+.k-btn.outline.badt{color:var(--danger-ink)}
+.k-btn.off{opacity:.5}
+.x-strike{text-decoration:line-through;color:var(--muted)}
+.x-dim{position:absolute;inset:0;background:rgba(0,0,0,.36);z-index:40}
+.x-dim.two{z-index:42}
+.x-sheet{position:absolute;left:0;right:0;bottom:0;z-index:41;background:var(--surface);border-radius:20px 20px 0 0;padding:16px 16px 28px;display:grid;gap:12px}
+.x-sheet.tall{top:56px;align-content:start;overflow:hidden}
+.x-sheet.top2{z-index:43}
+.x-sheet .sh{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.x-sheet .sh small{display:block;font-size:13px;color:var(--muted);font-weight:500;margin-top:2px}
+.x-close{width:44px;height:44px;margin:-10px -10px 0 0;display:grid;place-items:center;color:var(--muted);flex:none}
+.x-dlg{position:absolute;left:16px;right:16px;top:50%;transform:translateY(-50%);z-index:41;background:var(--surface);border-radius:20px;padding:18px 16px 16px;display:grid;gap:12px}
+.x-sheet h2,.x-dlg h2{margin:0;font-size:20px;font-weight:700;letter-spacing:-.02em}
+.x-dlg p{margin:0;font-size:15px;line-height:1.35}
+.x-kv{background:var(--bg);border-radius:var(--radius-lg);padding:12px;display:grid;gap:6px;font-size:15px}
+.x-kv div{display:flex;justify-content:space-between;gap:12px}.x-kv span:first-child{color:var(--muted)}.x-kv b{font-variant-numeric:tabular-nums;white-space:nowrap}
+.x-kv div.tot span:first-child{color:var(--text);font-weight:600}
+.x-leg{font-size:15px;font-weight:600;margin-bottom:6px}
+.x-field{display:flex;align-items:center;height:52px;border-radius:12px;border:2px solid var(--primary);padding:0 12px;font-size:20px;font-weight:700;font-variant-numeric:tabular-nums;background:var(--surface)}
+.x-field i{font-style:normal;color:var(--muted);font-weight:500;margin-right:8px}
+.x-field.plain{border:1px solid var(--border);font-size:16px;font-weight:500;height:48px}
+.x-field.plain.focus{border:2px solid var(--primary)}
+.x-field.err{border:2px solid var(--danger)}
+.x-field .ph{color:var(--muted);font-weight:400}
+.x-field .u{margin-left:auto;color:var(--muted);font-weight:500}
+.x-help{font-size:13px;color:var(--muted);margin:6px 0 0}
+.x-help.t{color:var(--text);font-size:15px;margin:0}
+.x-errt{display:flex;gap:6px;align-items:center;margin:6px 0 0;font-size:13px;font-weight:600;color:var(--danger-ink)}
+.x-errt svg.k-i{width:16px;height:16px}
+.x-warnt{display:flex;gap:6px;align-items:center;font-size:13px;font-weight:600;color:var(--warning-ink)}
+.x-warnt svg.k-i{width:16px;height:16px}
+.x-btnrow{display:flex;gap:8px}.x-btnrow .k-btn{flex:1}
+.x-btnrow.col{flex-direction:column}.x-btnrow.col .k-btn{flex:none;width:100%}
+.x-per{display:flex;align-items:center;background:var(--surface);border-radius:14px;height:48px}
+.x-per .pb{width:48px;height:48px;display:grid;place-items:center;color:var(--primary)}
+.x-per .pb.off{color:#c7c7cc}
+.x-per span.l{flex:1;text-align:center;font-weight:600}
+.k-tile small{display:block;font-size:12px;color:var(--muted);font-weight:500;white-space:nowrap}
+.x-note{font-size:13px;color:var(--muted);margin:8px 4px 0}
+.x-toast{position:absolute;left:50%;transform:translateX(-50%);bottom:84px;z-index:50;background:#1c2421;color:#fff;border-radius:99px;padding:10px 16px;font-size:14px;font-weight:600;white-space:nowrap}
+.x-toast.hi{bottom:auto;top:16px}
+.x-box2{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;flex:none;color:#fff}
+.x-box2 svg.k-i{width:18px;height:18px}
+.x-box2.w{background:var(--warning)}.x-box2.d{background:var(--danger)}
+.x-att .t{font-size:16px}
+.x-act{padding:0 16px 12px 58px;margin-top:-4px;display:flex;gap:8px}
+.x-more{color:var(--primary);font-weight:500;padding-left:58px}
+.x-hr{flex:1;min-width:0;display:grid;gap:1px}
+.x-hr .l1{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.x-hr .l1 .ti{font-size:16px;min-width:0}
+.x-hr .l1 .v{font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.x-hr .l2{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px;color:var(--muted);min-height:18px}
+.x-hr .l2>span:first-child{min-width:0}
+.x-hr .l2>span:last-child{flex:none;white-space:nowrap}
+.x-hr .l3{margin-top:3px}
+.x-pay{padding:12px 16px;font-size:16px;display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+.x-pay+.x-pay{border-top:.5px solid var(--border)}
+.x-pay>span:last-child{font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.x-pay>span:first-child{color:var(--muted);min-width:0}
+.x-pay small{display:block;font-size:13px;color:var(--muted);margin-top:2px}
+.x-pay.strong>span{color:var(--text);font-weight:700}
+.x-pay.strong>span:last-child{font-size:16px}
+.x-card2{padding:14px 16px;display:grid;gap:6px}
+.x-card2 .why{font-size:15px}
+.k-badge.ok{background:var(--primary-soft);color:var(--primary)}
+.x-empty{padding:18px 16px;font-size:16px;color:var(--muted);text-align:center}
+.x-day{padding:12px 16px;display:grid;gap:8px}
+.x-day+.x-day{border-top:.5px solid var(--border)}
+.x-day .h{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.x-day .h b{font-size:16px;font-weight:600}
+.x-day .h a{display:inline-flex;align-items:center;min-height:44px;margin:-12px 0;font-size:15px;font-weight:600;color:var(--primary)}
+.x-day .amt{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.x-day small{font-size:13px;color:var(--muted)}
+.x-list{border-radius:14px;background:var(--bg);overflow:hidden}
+.x-callout{display:flex;gap:8px;align-items:flex-start;border-radius:12px;background:var(--warning-soft);color:var(--warning-ink);padding:10px 12px;font-size:14px;font-weight:600}
+.x-callout svg.k-i{width:18px;height:18px;margin-top:1px}
+.x-mark{font-size:13px;color:var(--muted)}
+.nw{white-space:nowrap}
+</style>
+</head><body>
+<h1 class="g-title">Akun kasir dan Pengaturan v1 (angka contoh)</h1>
+<p class="g-sub">Dibangun di atas _kerangka-pemilik.html. 1–5 Akun kasir (daftar, tambah, detail nonaktif, nonaktifkan, kasir yang sedang shift), 6–9 Pengaturan (daftar kelompok, Perlu perhatian, Laporan dengan pratinjau, nomor telepon pemilik).</p>
+<div class="g-row">
+<div class="g-col"><div class="k-phone"><main class="k-main"><div class="k-subheader"><span class="k-back"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>Lainnya</span><h1 class="k-h1sub">Akun kasir</h1></div><div class="k-stack"><div class="k-card"><ul class="k-rows"><li><span class="k-rowl sm"><span class="x-hr"><span class="l1"><span class="ti">Budi</span><span class="v"></span></span><span class="l3"><span class="k-badge ok"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="12" r="10"/></svg>Sedang shift</span></span></span><svg class="k-i chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></li><li><span class="k-rowl sm"><span class="x-hr"><span class="l1"><span class="ti">Rina</span><span class="v"></span></span><span class="l3"><span class="k-badge warn"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Terkunci sampai 20.45</span></span></span><svg class="k-i chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></li><li><span class="k-rowl sm"><span class="x-hr"><span class="l1"><span class="ti">Sari</span><span class="v"></span></span><span class="l2"><span>Aktif</span><span></span></span></span><svg class="k-i chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></li><li><span class="k-rowl sm"><span class="x-hr"><span class="l1"><span class="ti">Dedi</span><span class="v"></span></span><span class="l3"><span class="k-badge neutral"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="17" x2="22" y1="8" y2="13"/><line x1="22" x2="17" y1="8" y2="13"/></svg>Nonaktif</span></span></span><svg class="k-i chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></li></ul></div><span class="k-btn full"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg>Tambah kasir</span></div></main><nav class="k-tabbar k-glass" aria-label="Navigasi utama"><ul><li><span class="k-tab"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Beranda</span></li><li><span class="k-tab"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><polyline points="3.29 7 12 12 20.71 7"/><path d="m7.5 4.27 9 5.15"/></svg>Barang</span></li><li><span class="k-tab"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>Laporan</span></li><li><span class="k-tab"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"/><path d="M2 6h4"/><path d="M2 10h4"/><path d="M2 14h4"/><path d="M2 18h4"/><path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/></svg>Kasbon</span></li><li><span class="k-tab on"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>Lainnya</span></li></ul></nav></div><h3>1 · Akun kasir</h3><p>Semua akun kasir, yang nonaktif di bawah. Status selalu ikon + teks: Sedang shift, Terkunci sampai jam tertentu (PIN salah berulang), Aktif, Nonaktif.</p></div>
+<div class="g-col"><div class="k-phone"><main class="k-main"><div class="k-subheader"><span class="k-back"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>Lainnya</span><h1 class="k-h1sub">Akun kasir</h1></div><div class="k-stack"><div class="k-card"><ul class="k-rows"><li><span class="k-rowl sm"><span class="x-hr"><span class="l1"><span class="ti">Budi</span><span class="v"></span></span><span class="l3"><span class="k-badge ok"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="12" r="10"/></svg>Sedang shift</span></span></span><svg class="k-i chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></li><li><span class="k-rowl sm"><span class="x-hr"><span class="l1"><span class="ti">Rina</span><span class="v"></span></span><span class="l3"><span class="k-badge warn"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Terkunci sampai 20.45</span></span></span><svg class="k-i chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></li><li><span class="k-rowl sm"><span class="x-hr"><span class="l1"><span class="ti">Sari</span><span class="v"></span></span><span class="l2"><span>Aktif</span><span></span></span></span><svg class="k-i chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></li><li><span class="k-rowl sm"><span class="x-hr"><span class="l1"><span class="ti">Dedi</span><span class="v"></span></span><span class="l3"><span class="k-badge neutral"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="17" x2="22" y1="8" y2="13"/><line x1="22" x2="17" y1="8" y2="13"/></svg>Nonaktif</span></span></span><svg class="k-i chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></li></ul></div><span class="k-btn full"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg>Tambah kasir</span></div></main><div class="x-dim"></div><div class="x-sheet"><h2>Tambah kasir</h2><div><div class="x-leg">Nama</div><div class="x-field plain">Wulan</div></div><div><div class="x-leg">PIN 6 angka</div><div class="x-field plain">••••••</div></div><div><div class="x-leg">Ulangi PIN</div><div class="x-field plain focus err">••••••</div><p class="x-errt"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>PIN tidak sama</p></div><span class="k-btn full">Simpan</span></div></div><h3>2 · Tambah kasir</h3><p>Nama unik (tanpa beda huruf besar/kecil) dan PIN 6 angka yang diketik dua kali. PIN dipakai untuk masuk di kasir dan HP toko.</p></div>
+<div class="g-col"><div class="k-phone"><main class="k-main"><div class="k-subheader"><span class="k-back"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>Akun kasir</span><h1 class="k-h1sub">Dedi</h1></div><div class="k-stack"><div class="k-card x-card2"><div><span class="k-badge neutral"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="17" x2="22" y1="8" y2="13"/><line x1="22" x2="17" y1="8" y2="13"/></svg>Nonaktif</span></div><div class="why">Tidak bisa masuk di kasir maupun HP toko. Riwayat tetap tersimpan.</div></div><div class="k-card"><ul class="k-rows"><li><span class="k-rowl"><span class="t">Ubah nama</span><svg class="k-i chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></li><li><span class="k-rowl"><span class="t">Atur ulang PIN</span><svg class="k-i chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></li></ul></div><span class="k-btn full">Aktifkan lagi</span></div></main><nav class="k-tabbar k-glass" aria-label="Navigasi utama"><ul><li><span class="k-tab"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Beranda</span></li><li><span class="k-tab"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><polyline points="3.29 7 12 12 20.71 7"/><path d="m7.5 4.27 9 5.15"/></svg>Barang</span></li><li><span class="k-tab"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>Laporan</span></li><li><span class="k-tab"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"/><path d="M2 6h4"/><path d="M2 10h4"/><path d="M2 14h4"/><path d="M2 18h4"/><path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/></svg>Kasbon</span></li><li><span class="k-tab on"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>Lainnya</span></li></ul></nav></div><h3>3 · Detail kasir nonaktif</h3><p>Akun nonaktif tidak tampil di pilih kasir maupun HP toko, dan sesinya langsung putus. Nama tetap di riwayat transaksi dan shift.</p></div>
+<div class="g-col"><div class="k-phone"><main class="k-main"><div class="k-subheader"><span class="k-back"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>Akun kasir</span><h1 class="k-h1sub">Sari</h1></div><div class="k-stack"><div class="k-card x-card2"><div><span class="k-badge neutral" style="background:none;padding:0;color:var(--muted);font-weight:500;font-size:15px">Aktif</span></div></div><div class="k-card"><ul class="k-rows"><li><span class="k-rowl"><span class="t">Ubah nama</span><svg class="k-i chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></li><li><span class="k-rowl"><span class="t">Atur ulang PIN</span><svg class="k-i chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></li></ul></div><span class="k-btn full outline badt">Nonaktifkan</span></div></main><div class="x-dim"></div><div class="x-dlg"><h2>Nonaktifkan Sari?</h2><p>Tidak bisa masuk di kasir maupun HP toko. Riwayat tetap tersimpan.</p><div class="x-btnrow col"><span class="k-btn bad">Nonaktifkan</span><span class="k-btn outline">Kembali</span></div></div></div><h3>4 · Nonaktifkan kasir</h3><p>Konfirmasi dulu sebelum menonaktifkan.</p></div>
+<div class="g-col"><div class="k-phone"><main class="k-main"><div class="k-subheader"><span class="k-back"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>Akun kasir</span><h1 class="k-h1sub">Budi</h1></div><div class="k-stack"><div class="k-card x-card2"><div><span class="k-badge ok"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="12" r="10"/></svg>Sedang shift</span></div></div><div class="k-card"><ul class="k-rows"><li><span class="k-rowl"><span class="t">Ubah nama</span><svg class="k-i chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></li><li><span class="k-rowl"><span class="t">Atur ulang PIN</span><svg class="k-i chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></li></ul></div><div><span class="k-btn full outline badt">Nonaktifkan</span><p class="x-errt"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>Tutup shift Budi dulu</p></div></div></main><nav class="k-tabbar k-glass" aria-label="Navigasi utama"><ul><li><span class="k-tab"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Beranda</span></li><li><span class="k-tab"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><polyline points="3.29 7 12 12 20.71 7"/><path d="m7.5 4.27 9 5.15"/></svg>Barang</span></li><li><span class="k-tab"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>Laporan</span></li><li><span class="k-tab"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"/><path d="M2 6h4"/><path d="M2 10h4"/><path d="M2 14h4"/><path d="M2 18h4"/><path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/></svg>Kasbon</span></li><li><span class="k-tab on"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>Lainnya</span></li></ul></nav></div><h3>5 · Kasir yang sedang shift</h3><p>Kasir yang sedang shift tidak bisa dinonaktifkan; pesan muncul setelah tombol ditekan.</p></div>
+<div class="g-col"><div class="k-phone"><main class="k-main"><div class="k-subheader"><span class="k-back"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>Lainnya</span><h1 class="k-h1sub">Pengaturan</h1></div><div class="k-stack"><div class="k-card"><ul class="k-rows inset"><li><span class="k-rowl"><span class="k-box"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 21v-5a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v5"/><path d="M17.774 10.31a1.12 1.12 0 0 0-1.549 0 2.5 2.5 0 0 1-3.451 0 1.12 1.12 0 0 0-1.548 0 2.5 2.5 0 0 1-3.452 0 1.12 1.12 0 0 0-1.549 0 2.5 2.5 0 0 1-3.77-3.248l2.889-4.184A2 2 0 0 1 7 2h10a2 2 0 0 1 1.653.873l2.895 4.192a2.5 2.5 0 0 1-3.774 3.244"/><path d="M4 10.95V19a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8.05"/></svg></span><span class="t">Toko &amp; struk<small>Nama, alamat, struk, gambar QRIS</small></span><svg class="k-i chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></li><li><span class="k-rowl"><span class="k-box"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M8 7v10"/><path d="M12 7v10"/><path d="M17 7v10"/></svg></span><span class="t">Kasir<small>Stok minus dan curah</small></span><svg class="k-i chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></li><li><span class="k-rowl"><span class="k-box"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"/><path d="M2 6h4"/><path d="M2 10h4"/><path d="M2 14h4"/><path d="M2 18h4"/><path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/></svg></span><span class="t">Kasbon<small>Limit pelanggan baru</small></span><svg class="k-i chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></li><li><span class="k-rowl"><span class="k-box"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><polyline points="3.29 7 12 12 20.71 7"/><path d="m7.5 4.27 9 5.15"/></svg></span><span class="t">Stok<small>Kedaluwarsa, batas opname</small></span><svg class="k-i chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></li><li><span class="k-rowl"><span class="k-box"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg></span><span class="t">Laporan<small>Untung tipis, tidak terjual</small></span><svg class="k-i chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></li><li><span class="k-rowl"><span class="k-box"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span><span class="t">Perlu perhatian<small>Batas selisih kas, kas keluar, shift</small></span><svg class="k-i chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></li></ul></div><div class="k-card"><ul class="k-rows inset"><li><span class="k-rowl"><span class="k-box"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384"/></svg></span><span class="t">Nomor telepon pemilik<small>0812-3456-7890</small></span><svg class="k-i chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></li></ul></div></div></main><nav class="k-tabbar k-glass" aria-label="Navigasi utama"><ul><li><span class="k-tab"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Beranda</span></li><li><span class="k-tab"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><polyline points="3.29 7 12 12 20.71 7"/><path d="m7.5 4.27 9 5.15"/></svg>Barang</span></li><li><span class="k-tab"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>Laporan</span></li><li><span class="k-tab"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"/><path d="M2 6h4"/><path d="M2 10h4"/><path d="M2 14h4"/><path d="M2 18h4"/><path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/></svg>Kasbon</span></li><li><span class="k-tab on"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>Lainnya</span></li></ul></nav></div><h3>6 · Pengaturan</h3><p>Satu baris per kelompok; isi kelompok ditulis kecil di bawahnya. Tiap kelompok dibuka dan disimpan sendiri.</p></div>
+<div class="g-col"><div class="k-phone"><main class="k-main"><div class="k-subheader"><span class="k-back"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>Pengaturan</span><h1 class="k-h1sub">Perlu perhatian</h1></div><div class="k-stack"><div><div class="x-leg">Abaikan selisih kas di bawah</div><div class="x-field plain"><i>Rp</i>5.000</div></div><div><div class="x-leg">Selisih kecil berulang per kasir dalam 7 hari di atas</div><div class="x-field plain"><i>Rp</i>20.000</div></div><div><div class="x-leg">Kas keluar sekali di atas</div><div class="x-field plain"><i>Rp</i>50.000</div></div><div><div class="x-leg">Total kas keluar per shift di atas</div><div class="x-field plain"><i>Rp</i>150.000</div></div><div><div class="x-leg">Shift dianggap kelamaan setelah</div><div class="x-field plain">12<span class="u">jam</span></div></div><span class="k-btn full">Simpan</span></div></main><nav class="k-tabbar k-glass" aria-label="Navigasi utama"><ul><li><span class="k-tab"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Beranda</span></li><li><span class="k-tab"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><polyline points="3.29 7 12 12 20.71 7"/><path d="m7.5 4.27 9 5.15"/></svg>Barang</span></li><li><span class="k-tab"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>Laporan</span></li><li><span class="k-tab"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"/><path d="M2 6h4"/><path d="M2 10h4"/><path d="M2 14h4"/><path d="M2 18h4"/><path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/></svg>Kasbon</span></li><li><span class="k-tab on"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>Lainnya</span></li></ul></nav></div><h3>7 · Pengaturan Perlu perhatian</h3><p>Batas untuk butir Perlu perhatian. Mengubah batas langsung mengubah butir yang tampil, termasuk kejadian lama.</p></div>
+<div class="g-col"><div class="k-phone"><main class="k-main"><div class="k-subheader"><span class="k-back"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>Pengaturan</span><h1 class="k-h1sub">Laporan</h1></div><div class="k-stack"><div><div class="x-leg">Batas untung tipis</div><div class="x-field plain focus">12<span class="u">%</span></div><p class="x-help">Dengan batas 12%: 31 dari 412 barang tertandai</p></div><div><div class="x-leg">Tidak terjual setelah</div><div class="x-field plain">30<span class="u">hari</span></div></div><span class="k-btn full">Simpan</span></div></main><nav class="k-tabbar k-glass" aria-label="Navigasi utama"><ul><li><span class="k-tab"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Beranda</span></li><li><span class="k-tab"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><polyline points="3.29 7 12 12 20.71 7"/><path d="m7.5 4.27 9 5.15"/></svg>Barang</span></li><li><span class="k-tab"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>Laporan</span></li><li><span class="k-tab"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"/><path d="M2 6h4"/><path d="M2 10h4"/><path d="M2 14h4"/><path d="M2 18h4"/><path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/></svg>Kasbon</span></li><li><span class="k-tab on"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>Lainnya</span></li></ul></nav></div><h3>8 · Pengaturan Laporan, dengan pratinjau</h3><p>Saat batas untung tipis diubah, pratinjau langsung menghitung berapa barang yang akan tertandai sebelum disimpan.</p></div>
+<div class="g-col"><div class="k-phone"><main class="k-main"><div class="k-subheader"><span class="k-back"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>Pengaturan</span><h1 class="k-h1sub">Nomor telepon pemilik</h1></div><div class="k-stack"><div><div class="x-leg">Nomor telepon pemilik</div><div class="x-field plain">0812-3456-7890</div><p class="x-help">Tampil di dialog alasan kasir.</p></div><span class="k-btn full">Simpan</span></div></main><nav class="k-tabbar k-glass" aria-label="Navigasi utama"><ul><li><span class="k-tab"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Beranda</span></li><li><span class="k-tab"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><polyline points="3.29 7 12 12 20.71 7"/><path d="m7.5 4.27 9 5.15"/></svg>Barang</span></li><li><span class="k-tab"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>Laporan</span></li><li><span class="k-tab"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"/><path d="M2 6h4"/><path d="M2 10h4"/><path d="M2 14h4"/><path d="M2 18h4"/><path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/></svg>Kasbon</span></li><li><span class="k-tab on"><svg class="k-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>Lainnya</span></li></ul></nav><div class="x-toast">Pengaturan disimpan</div></div><h3>9 · Nomor telepon pemilik</h3><p>Nomor ini tampil sebagai baris Ragu? Telepon pemilik di setiap dialog alasan kasir. Dikosongkan = baris itu tidak tampil.</p></div>
+</div></body></html>

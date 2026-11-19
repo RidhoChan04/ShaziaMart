@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Kas keluar, buka shift, dan R11 — layar kasir gaya sekarang v1 (angka contoh)</title>
+<style>
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
+body{margin:0;padding:24px;background:#e9ece9;font-family:Inter,system-ui,sans-serif;color:#1c2421;font-size:14px}
+.g-title{margin:0 0 4px;font-size:20px}.g-sub{margin:0 0 18px;color:#5e6b65;font-size:14px;max-width:1000px}
+.g-row{display:flex;gap:32px;flex-wrap:wrap;justify-content:center;align-items:flex-start}
+.g-col{display:flex;flex-direction:column;align-items:center;gap:10px}
+.g-col>h3{margin:10px 0 0;font-size:15px}.g-col>p{margin:0;max-width:520px;text-align:center;font-size:13px;opacity:.8}
+.scr{width:560px;background:rgba(28,36,33,.45);padding:22px;border-radius:12px;box-sizing:border-box}
+.scr.tall{height:800px;padding:0;position:relative;display:flex;justify-content:flex-end;overflow:hidden}
+.sheet{width:512px;height:100%;background:#fff;box-sizing:border-box;display:flex;flex-direction:column;overflow:hidden}
+.sh-h{padding:16px 16px 12px}.sh-h b{display:block;font-size:18px}.sh-h span{color:#5e6b65;font-size:14px}
+.sh-b{padding:0 16px 16px;display:grid;gap:8px;align-content:start;overflow:hidden}
+.dlg{background:#fff;border-radius:12px;overflow:hidden}
+.dh{display:flex;justify-content:space-between;align-items:baseline;padding:14px 18px;border-bottom:1px solid #eef1ef;gap:12px}
+.dh b{font-size:18px}.dh span{color:#5e6b65}
+.bd{padding:12px 18px 16px;display:grid;gap:10px}
+.lbl{color:#5e6b65;font-size:11px;margin-bottom:4px;letter-spacing:.02em}
+.inp{border:2px solid #1f7a4d;border-radius:8px;padding:8px 12px;font-size:22px;font-weight:700;font-variant-numeric:tabular-nums}
+.inp.plain{border:1px solid #e3e7e4;font-size:15px;font-weight:500;padding:10px 12px;color:#1c2421}
+.inp.focus{border:2px solid #1f7a4d;font-size:15px;font-weight:500;padding:9px 11px}
+.inp.err{border-color:#b42318}
+.cust{border:1px solid #1f7a4d;background:#e6f2ea;border-radius:8px;padding:9px 12px}
+.cust b{display:block;font-weight:600}.cust span{color:#5e6b65;font-size:13px}
+.tabs{display:flex;gap:6px}.tabs span{border:1px solid #e3e7e4;border-radius:6px;padding:8px 16px}
+.tabs span.on{background:#1f7a4d;color:#fff;border-color:#1f7a4d;font-weight:600}
+.q{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center}
+.q span{border:1px solid #e3e7e4;border-radius:6px;padding:9px;font-variant-numeric:tabular-nums}
+.q span.on{background:#e6f2ea;border-color:#1f7a4d;color:#1f7a4d;font-weight:600}
+.chg{display:flex;justify-content:space-between;align-items:center;background:#f0f8f3;border-radius:8px;padding:12px 14px}
+.chg span{font-weight:600;color:#1f7a4d}.chg b{font-size:32px;font-weight:800;color:#1f7a4d;font-variant-numeric:tabular-nums}
+.row{display:flex;justify-content:space-between;font-variant-numeric:tabular-nums}.row span{color:#5e6b65}
+.foot{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.foot .acts{display:flex;gap:8px;align-items:center}
+.btn{background:#1f7a4d;color:#fff;border-radius:8px;padding:12px 24px;font-weight:700;font-size:14px;white-space:nowrap}
+.btn.out{background:#fff;color:#1c2421;border:1px solid #e3e7e4;font-weight:600}
+.btn.sm{padding:8px 12px;font-size:14px;font-weight:600}
+.btn.danger{background:#b42318}
+.btn.off{opacity:.5}
+.box{display:inline-flex;align-items:center;gap:8px;color:#5e6b65}.box i{width:18px;height:18px;border:1.5px solid #8a948f;border-radius:4px;display:inline-block;box-sizing:border-box}
+.box i.ck{background:#1f7a4d;border-color:#1f7a4d;position:relative}
+.box i.ck::after{content:"";position:absolute;left:5px;top:1px;width:4px;height:9px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg)}
+.errt{color:#b42318;font-size:13px;font-weight:500;display:flex;gap:6px;align-items:center}
+.warnt{color:#b26b00;font-size:14px;font-weight:500}
+.qris{display:grid;justify-items:center;gap:6px;text-align:center}
+.qris .img{width:180px;height:180px;border-radius:8px;background:repeating-conic-gradient(#1c2421 0 25%,#fff 0 50%) 0 0/15px 15px;border:6px solid #fff;outline:1px solid #e3e7e4;box-sizing:border-box}
+.hdr{width:560px;background:#fff;border-radius:10px;display:flex;align-items:center;gap:8px;padding:10px 12px;border:1px solid #e3e7e4;box-sizing:border-box}
+.hdr .who{font-weight:500;margin-right:auto;white-space:nowrap}
+.hdr span.b{border:1px solid #e3e7e4;border-radius:8px;padding:8px 10px;font-weight:500;white-space:nowrap}
+.hdr span.b.new{border-color:#1f7a4d;color:#1f7a4d;font-weight:600;background:#e6f2ea}
+.rw{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid #e3e7e4;border-radius:6px;padding:12px}
+.rw .l{min-width:0;flex:1;display:grid;gap:2px}
+.rw .l1{display:flex;justify-content:space-between;gap:8px;font-weight:500}
+.rw .l2{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:14px;color:#5e6b65}
+.rw .acts{display:flex;gap:8px;flex:none}
+.mut{color:#5e6b65;font-weight:400}.num{font-variant-numeric:tabular-nums}.strike{text-decoration:line-through}
+.badge{font-size:11px;font-weight:600;background:#eef1ef;color:#1c2421;border-radius:99px;padding:2px 8px;white-space:nowrap}
+.sec{margin-top:8px;padding-top:12px;border-top:1px solid #e3e7e4;display:grid;gap:8px}
+.sec b{font-size:15px}.sec small{color:#5e6b65;font-size:13px}
+.p{margin:0;font-size:14px;line-height:1.4}
+.struk{width:240px;background:#fff;padding:14px 12px;font-family:ui-monospace,Consolas,monospace;font-size:12px;line-height:1.5;box-shadow:0 4px 14px rgba(0,0,0,.15)}
+.struk .c{text-align:center}.struk .r{display:flex;justify-content:space-between}.struk hr{border:0;border-top:1px dashed #999;margin:6px 0}
+.chk{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:#1f7a4d;color:#fff;font-size:14px;margin-right:8px;vertical-align:1px}
+</style>
+<style>
+.gate{width:560px;background:#f6f7f5;border-radius:12px;overflow:hidden;border:1px solid #e3e7e4;box-sizing:border-box}
+.gbar{display:flex;justify-content:space-between;align-items:center;background:#fff;border-bottom:1px solid #e3e7e4;padding:10px 16px}
+.gbar b{font-size:18px;color:#1f7a4d}.gbar span{color:#1f7a4d;font-size:15px}
+.gwrap{display:flex;justify-content:center;padding:28px 24px}
+.gcard{width:384px;box-sizing:border-box;background:#fff;border:1px solid #e3e7e4;border-radius:12px;box-shadow:0 1px 2px rgba(0,0,0,.05);padding:24px;display:grid;gap:14px;font-size:15px}
+.gcard h1{margin:0;text-align:center;font-size:24px}
+.gcard .who{text-align:center;font-size:18px;font-weight:600}
+.mlbl{color:#5e6b65;font-size:12px;margin-bottom:4px}
+.money{display:flex;align-items:center;height:56px;border:2px solid #1f7a4d;border-radius:8px;padding:0 12px;font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;box-sizing:border-box}
+.money i{font-style:normal;color:#5e6b65;font-weight:400;font-size:15px;margin-right:12px}
+.money.empty{color:transparent}
+.hint{margin:6px 0 0;color:#5e6b65;font-size:14px;line-height:1.4;font-variant-numeric:tabular-nums}
+.hint+.hint{margin-top:2px}
+.warnl{display:flex;gap:6px;align-items:center;margin:6px 0 0;color:#8a4b00;font-size:14px;font-weight:600;font-variant-numeric:tabular-nums}
+.r11{display:flex;gap:6px;align-items:center;color:#5e6b65;font-size:13px;font-variant-numeric:tabular-nums}
+.flbl{font-size:14px;font-weight:500;margin-bottom:6px}
+.inp .ph{color:#8a948f;font-weight:400}
+.inp.focus,.inp.plain{min-height:44px;box-sizing:border-box}
+.btnlg{background:#1f7a4d;color:#fff;border-radius:8px;height:56px;display:grid;place-items:center;font-weight:600;font-size:16px}
+.btnlg.off{opacity:.5}
+.ghost{justify-self:center;padding:10px 16px;font-weight:500}
+.errl{display:flex;gap:6px;align-items:center;color:#b42318;font-size:14px;font-weight:500}
+.full{width:847px;height:476px;overflow:hidden;border-radius:10px;box-shadow:0 4px 18px rgba(0,0,0,.18);background:#f6f7f5}
+.full .in{width:1366px;height:768px;transform:scale(.62);transform-origin:0 0;display:flex;flex-direction:column;font-size:15px}
+.khdr{display:flex;align-items:center;justify-content:space-between;gap:16px;background:#fff;border-bottom:1px solid #e3e7e4;padding:8px 16px}
+.khdr .brand{font-size:18px;font-weight:700;color:#1f7a4d}
+.khdr .rt{display:flex;align-items:center;gap:12px}
+.khdr .who{font-weight:500;font-variant-numeric:tabular-nums}
+.khdr .srv{color:#1f7a4d}
+.ob{display:inline-flex;align-items:center;height:44px;padding:0 16px;border:1px solid #e3e7e4;border-radius:8px;background:#fff;font-weight:500;white-space:nowrap}
+.ob.new{border-color:#1f7a4d;color:#1f7a4d;background:#e6f2ea;font-weight:600}
+.ribbon{display:flex;align-items:center;gap:8px;background:#fff0d9;color:#8a4b00;padding:8px 16px;font-weight:500;border-bottom:1px solid #f3dfbd}
+.kmain{display:flex;gap:12px;padding:12px;flex:1;min-height:0}
+.kleft{flex:1;display:flex;flex-direction:column;gap:8px;min-width:0}
+.scan{height:56px;border:2px solid #1f7a4d;border-radius:8px;background:#fff;display:flex;align-items:center;padding:0 14px;color:#8a948f;font-size:17px}
+.curah{display:flex;gap:8px}.curah span{height:44px;display:inline-flex;align-items:center;padding:0 16px;border-radius:8px;background:#e6f2ea;color:#1f7a4d;font-weight:600}
+.cart{flex:1;background:#fff;border:1px solid #e3e7e4;border-radius:8px;overflow:hidden}
+.cart table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+.cart th{height:36px;text-align:left;font-size:12px;color:#5e6b65;font-weight:500;padding:0 12px;border-bottom:1px solid #e3e7e4}
+.cart td{height:44px;padding:0 12px;border-bottom:1px solid #eef1ef}
+.cart td.r,.cart th.r{text-align:right}.cart td.b{font-weight:700}
+.kright{width:300px;display:flex;flex-direction:column;gap:8px}
+.tot{background:#fff;border:1px solid #e3e7e4;border-radius:8px;padding:12px}
+.tot p{margin:0}.tot .l{font-size:12px;color:#5e6b65}.tot .n{font-size:30px;font-weight:700;font-variant-numeric:tabular-nums}
+.opt{background:#fff;border:1px solid #e3e7e4;border-radius:8px;padding:8px;display:grid;gap:8px}
+.opt .ck{display:flex;align-items:center;gap:8px;height:44px;padding:0 4px}
+.opt .ck i{width:20px;height:20px;border-radius:4px;background:#1f7a4d;display:inline-block}
+.pay{margin-top:auto;height:56px;border-radius:8px;background:#1f7a4d;color:#fff;display:grid;place-items:center;font-size:16px;font-weight:600}
+.dlg .x{color:#5e6b65}
+.rw .acts .ghostbtn{visibility:hidden}
+</style></head><body>
+<h1 class="g-title">Kas keluar, buka shift, dan R11 — layar kasir gaya sekarang v1 (angka contoh)</h1>
+<p class="g-sub">Mengikuti gaya kasir yang sekarang (bukan gaya C). 1–4 buka shift dengan modal terisi, 5 layar penuh dengan tombol Kas keluar dan pita shift lama, 6–8 kas keluar dan batalnya, 9 baris telepon pemilik di dialog alasan, 10 pelunasan dobel, 11 tutup shift. Hari ini Kamis, 19 Nov 2026; kasir Rina dan Budi.</p>
+<div class="g-row">
+<div class="g-col"><div class="gate"><div class="gbar"><b>ShaziaMart</b><span>● Server tersambung</span></div><div class="gwrap"><div class="gcard"><h1>Buka shift</h1><div class="who">Kasir Rina</div><div><div class="mlbl">Modal awal di laci</div><div class="money"><i>Rp</i>200.000</div><p class="hint">Hitungan tutup shift Budi kemarin pukul 22.04: Rp1.242.000</p><p class="hint">Diambil pemilik setelahnya: -Rp1.042.000</p></div><div class="btnlg">Buka shift</div><div class="ghost">Ganti kasir</div></div></div></div><h3>1 · Buka shift: modal terisi dari tutup shift sebelumnya</h3><p>Modal awal terisi otomatis = uang fisik tutup shift sebelumnya dikurangi uang yang diambil pemilik setelahnya. Bila angkanya tidak diubah, tidak perlu alasan.</p></div>
+<div class="g-col"><div class="gate"><div class="gbar"><b>ShaziaMart</b><span>● Server tersambung</span></div><div class="gwrap"><div class="gcard"><h1>Buka shift</h1><div class="who">Kasir Budi</div><div><div class="mlbl">Modal awal di laci</div><div class="money"><i>Rp</i>181.500</div><p class="hint">Hitungan tutup shift Rina pukul 14.58: Rp201.500</p><p class="warnl"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>Kurang Rp20.000 dari hitungan sebelumnya</p></div><div><div class="flbl">Alasan modal berbeda</div><div class="inp focus">Dihitung ulang bersama Rina, kurang Rp20.000</div></div><div class="r11"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none"><path d="M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384"/></svg>Ragu? Telepon pemilik: 0812-3456-7890</div><div class="btnlg">Buka shift</div><div class="ghost">Ganti kasir</div></div></div></div><h3>2 · Buka shift: modal diubah</h3><p>Bila angka diubah, muncul selisihnya dan isian Alasan modal berbeda (wajib). Tercatat dan menjadi butir Perlu perhatian sampai ditinjau pemilik.</p></div>
+<div class="g-col"><div class="gate"><div class="gbar"><b>ShaziaMart</b><span>● Server tersambung</span></div><div class="gwrap"><div class="gcard"><h1>Buka shift</h1><div class="who">Kasir Budi</div><div><div class="mlbl">Modal awal di laci</div><div class="money"><i>Rp</i>201.500</div><p class="hint">Hitungan tutup shift Rina pukul 14.58: Rp201.500</p><p class="hint">Diambil pemilik setelahnya: -Rp150.000</p><p class="warnl"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>Lebih Rp150.000 dari hitungan sebelumnya</p></div><div><div class="flbl">Alasan modal berbeda</div><div class="inp focus err"></div></div><p class="errl" style="margin:-6px 0 0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>Isi alasan bila modal berbeda dari Rp51.500</p><div class="r11"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none"><path d="M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384"/></svg>Ragu? Telepon pemilik: 0812-3456-7890</div><div class="btnlg off">Buka shift</div><div class="ghost">Ganti kasir</div></div></div></div><h3>3 · Buka shift: saran berubah saat layar terbuka</h3><p>Pemilik mengambil uang dari laci saat layar ini terbuka. Server menolak, layar memuat saran baru, dan kasir diminta mengisi alasan bila tetap memakai angka lama.</p></div>
+<div class="g-col"><div class="gate"><div class="gbar"><b>ShaziaMart</b><span>● Server tersambung</span></div><div class="gwrap"><div class="gcard"><h1>Buka shift</h1><div class="who">Kasir Rina</div><div><div class="mlbl">Modal awal di laci</div><div class="money empty"><i>Rp</i>0</div></div><div class="btnlg off">Buka shift</div><div class="ghost">Ganti kasir</div></div></div></div><h3>4 · Buka shift: belum ada shift sebelumnya</h3><p>Toko baru (belum pernah tutup shift): isian kosong seperti sekarang, tanpa keterangan dan tanpa alasan.</p></div>
+<div class="g-col"><div class="full"><div class="in"><div class="khdr"><span class="brand">ShaziaMart</span><div class="rt"><span class="who">Rina · Shift 07.00</span><span class="srv">● Server tersambung</span><span class="ob">Pelunasan kasbon</span><span class="ob new">Kas keluar</span><span class="ob">Riwayat</span><span class="ob">Kunci</span><span class="ob">Tutup shift</span></div></div>
+<div class="ribbon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>Shift sudah buka 13 jam — tutup shift saat gantian</div>
+<div class="kmain"><div class="kleft"><div class="scan">Scan barcode / ketik nama atau kode…</div><div class="curah"><span>Gula Pasir</span><span>Beras Medium</span><span>Telur Ayam</span><span>Minyak Curah</span></div>
+<div class="cart"><table><tr><th>NO.</th><th>BARANG</th><th>QTY</th><th>HARGA</th><th class="r">SUBTOTAL</th></tr><tr><td style="color:#5e6b65;width:40px">1</td><td>Indomie Goreng</td><td>5 pcs</td><td>3.200</td><td class="r b">16.000</td></tr><tr><td style="color:#5e6b65;width:40px">2</td><td>Minyak Bimoli 2 L</td><td>1 pcs</td><td>38.000</td><td class="r b">38.000</td></tr><tr><td style="color:#5e6b65;width:40px">3</td><td>Gula Pasir <i style='color:#5e6b65'>curah</i></td><td>1,5 kg</td><td>18.000/kg</td><td class="r b">27.000</td></tr></table></div></div>
+<div class="kright"><div class="tot"><p class="l">3 BARANG · TOTAL</p><p class="n">Rp81.000</p></div><div class="opt"><span class="ck"><i></i>Cetak struk</span><span class="ob" style="justify-content:center">Tahan transaksi</span></div><div class="pay">Bayar</div></div></div></div></div><h3>5 · Layar kasir 1366×768 (diperkecil): tombol Kas keluar dan pita shift lama</h3><p>Tombol Kas keluar di header setelah Pelunasan kasbon, hanya saat shift buka. Shift yang sudah buka lebih dari 12 jam (batas di Pengaturan) memunculkan pita kecil di bawah header; kasir tetap bisa bekerja seperti biasa.</p></div>
+<div class="g-col"><div class="scr"><div class="dlg"><div class="dh"><b>Kas keluar dari laci</b><span class="x">✕</span></div><div class="bd"><div><div class="lbl">Nominal</div><div class="inp">Rp15.000</div><p class="hint">Uang seharusnya di laci berkurang Rp15.000.</p></div><div><div class="flbl">Alasan</div><div class="inp focus">Beli es batu</div></div><div class="r11"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none"><path d="M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384"/></svg>Ragu? Telepon pemilik: 0812-3456-7890</div><div class="foot" style="justify-content:flex-end"><div class="acts"><span class="btn out">Kembali</span><span class="btn">Catat kas keluar</span></div></div></div></div></div><h3>6 · Kas keluar dari laci</h3><p>Untuk uang laci yang dipakai keperluan toko. Alasan wajib (contoh di isian kosong: Beli es batu). Uang seharusnya di laci turun sebesar nominal. Kas keluar di atas batas Pengaturan menjadi butir Perlu perhatian. Setelah tersimpan: pesan Kas keluar tercatat, fokus kembali ke kolom scan.</p></div>
+<div class="g-col"><div class="scr tall"><div class="sheet"><div class="sh-h"><b>Riwayat shift ini</b><span>Cetak ulang struk atau batalkan transaksi.</span></div><div class="sh-b"><div class="rw"><div class="l"><div class="l1"><span><span class="num">20261119-0201 · <span class="mut">19.52</span></span></span><span class="num"></span></div><div class="l2"><span class="num">Tunai <span style="color:#1c2421">Rp42.000</span></span></div></div><div class="acts"><span class="btn out sm">Cetak ulang</span><span class="btn out sm">Batalkan</span></div></div><div class="rw"><div class="l"><div class="l1"><span>Kas keluar · Beli es batu</span><span class="num">Rp15.000</span></div><div class="l2"><span class="num">18.40</span></div></div><div class="acts"><span class="btn out sm ghostbtn">Cetak ulang</span><span class="btn out sm">Batalkan</span></div></div><div class="rw"><div class="l"><div class="l1"><span><span class="num">20261119-0188 · <span class="mut">18.05</span></span></span><span class="num"></span></div><div class="l2"><span class="num">QRIS <span style="color:#1c2421">Rp36.000</span></span></div></div><div class="acts"><span class="btn out sm">Cetak ulang</span><span class="btn out sm">Batalkan</span></div></div><div class="rw"><div class="l"><div class="l1"><span><span class="num">20261119-0172 · <span class="mut">17.31</span></span></span><span class="num"></span></div><div class="l2"><span class="num">Tunai <span style="color:#1c2421">Rp58.500</span></span></div></div><div class="acts"><span class="btn out sm">Cetak ulang</span><span class="btn out sm">Batalkan</span></div></div><div class="rw"><div class="l"><div class="l1"><span>Kas keluar · Beli galon</span><span class="num strike">Rp35.000</span></div><div class="l2"><span class="num">16.10</span><span class="badge">Dibatalkan</span></div></div><div class="acts"><span class="btn out sm ghostbtn">Cetak ulang</span><span class="btn out sm ghostbtn">Batalkan</span></div></div><div class="sec"><b>Transaksi shift sebelumnya</b><div class="inp plain" style="color:#5e6b65">Cari nomor struk</div><small>Maksimal 7 hari ke belakang</small></div></div></div></div><h3>7 · Riwayat shift ini dengan kas keluar</h3><p>Kas keluar shift ini tampil berselang-seling dengan transaksi dan pelunasan, terbaru di atas. Kas keluar tidak punya struk, jadi hanya tombol Batalkan. Yang sudah dibatalkan dicoret dan bertanda Dibatalkan.</p></div>
+<div class="g-col"><div class="scr"><div class="dlg"><div class="dh"><b>Batalkan kas keluar Rp15.000?</b><span class="x">✕</span></div><div class="bd"><p class="p">Uang seharusnya di laci kembali bertambah Rp15.000.</p><div><div class="flbl">Alasan</div><div class="inp focus">Es batu tidak jadi dibeli</div></div><div class="r11"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none"><path d="M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384"/></svg>Ragu? Telepon pemilik: 0812-3456-7890</div><div class="foot" style="justify-content:flex-end"><div class="acts"><span class="btn out">Kembali</span><span class="btn danger">Batalkan kas keluar</span></div></div></div></div></div><h3>8 · Batalkan kas keluar</h3><p>Hanya kas keluar shift yang sedang buka. Alasan wajib; tercatat (siapa, jam, nominal, alasan) dan menjadi butir Perlu perhatian. Setelah shift tutup hanya pemilik yang bisa membatalkan. Pesan setelahnya: Kas keluar dibatalkan.</p></div>
+<div class="g-col"><div class="scr"><div class="dlg"><div class="dh"><b>Batalkan 20261119-0188?</b><span class="x">✕</span></div><div class="bd"><p class="p num">QRIS · Rp36.000</p><div><div class="lbl">PENGEMBALIAN QRIS Rp36.000</div><div class="tabs"><span class="on">Tunai dari laci</span><span>Transfer oleh pemilik nanti</span></div></div><div><div class="flbl">Alasan</div><div class="inp focus">Pelanggan batal beli</div></div><div class="r11"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none"><path d="M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384"/></svg>Ragu? Telepon pemilik: 0812-3456-7890</div><div class="foot" style="justify-content:flex-end"><div class="acts"><span class="btn out">Kembali</span><span class="btn danger">Batalkan transaksi</span></div></div></div></div></div><h3>9 · Baris Ragu? Telepon pemilik di semua dialog alasan</h3><p>Baris kecil di bawah isian Alasan pada batal transaksi, batal pelunasan, kasbon melewati limit, kas keluar, batal kas keluar, dan alasan modal. Nomor dari Pengaturan pemilik; bila kosong, baris tidak tampil.</p></div>
+<div class="g-col"><div class="scr"><div class="dlg"><div class="dh"><b>Pelunasan mungkin dobel</b><span class="x">✕</span></div><div class="bd"><p class="p num">Pelunasan Rp100.000 untuk Mbak Dewi sudah tercatat pukul 13.20 — tetap simpan lagi?</p><div class="foot" style="justify-content:flex-end"><div class="acts"><span class="btn out">Kembali</span><span class="btn">Tetap simpan</span></div></div></div></div></div><h3>10 · Peringatan pelunasan dobel</h3><p>Muncul sebelum menyimpan bila pelanggan yang sama dengan nominal yang sama sudah dilunasi dalam 60 menit terakhir. Kembali tidak menyimpan; Tetap simpan menyimpan pelunasan baru.</p></div>
+<div class="g-col"><div class="scr" style="width:460px"><div class="dlg"><div class="dh"><b>Tutup shift</b><span>Shift sudah ditutup.</span></div><div class="bd" style="font-size:16px">
+<div class="row"><span>Pelunasan kasbon</span><b>+Rp100.000</b></div>
+<div class="row"><span>Bayar supplier</span><b>-Rp450.000</b></div>
+<div class="row"><span>Pengembalian transaksi</span><b>-Rp24.000</b></div>
+<div class="row"><span>Kas keluar</span><b>-Rp35.000</b></div>
+<div class="row"><span>Diambil pemilik</span><b>-Rp1.000.000</b></div>
+<div class="row"><span>Uang seharusnya</span><b>Rp203.000</b></div>
+<div class="row"><span>Uang fisik</span><b>Rp201.500</b></div>
+<div class="row"><span>Selisih</span><b style="color:#b42318;font-size:18px">-Rp1.500</b></div>
+<div class="foot" style="justify-content:flex-end"><span class="btn">Selesai</span></div></div></div></div><h3>11 · Ringkasan tutup shift</h3><p>Baris Kas keluar dan Diambil pemilik di bawah Pengembalian transaksi, tanda minus seperti Bayar supplier; masing-masing tidak tampil bila nol. Hitung buta tidak berubah.</p></div>
+</div></body></html>
