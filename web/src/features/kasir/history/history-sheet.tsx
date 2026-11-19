@@ -84,11 +84,20 @@ export function HistorySheet({ open, onClose }: Props) {
   // Setelah batal berhasil tombol `Batalkan` hilang; fokus ke judul, bukan ke body.
   const titleRef = useRef<HTMLHeadingElement>(null);
   const focusTitleAfterClose = useRef(false);
+  // Dialog dibuka dari baris di dalam lembar, bukan dari Trigger: Radix tidak tahu ke mana kembali.
+  const opener = useRef<HTMLElement | null>(null);
+  const rememberOpener = () => {
+    opener.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+  };
   const settleFocus = (e: Event) => {
-    if (!focusTitleAfterClose.current) return;
-    focusTitleAfterClose.current = false;
     e.preventDefault();
-    titleRef.current?.focus();
+    const succeeded = focusTitleAfterClose.current;
+    focusTitleAfterClose.current = false;
+    const target = succeeded ? titleRef.current : opener.current;
+    if (target?.isConnected) target.focus();
   };
   const refresh = () =>
     client.invalidateQueries({ queryKey: getListShiftSalesQueryKey() });
@@ -260,13 +269,19 @@ export function HistorySheet({ open, onClose }: Props) {
                     sale={entry.sale}
                     printing={print.isPending}
                     onPrint={() => print.mutate({ saleId: entry.sale.id })}
-                    onVoid={() => setVoiding(entry.sale)}
+                    onVoid={() => {
+                      rememberOpener();
+                      setVoiding(entry.sale);
+                    }}
                   />
                 ) : entry.kind === "expense" ? (
                   <ExpenseRow
                     key={`e-${entry.expense.id}`}
                     expense={entry.expense}
-                    onCancel={() => setCancellingExpense(entry.expense)}
+                    onCancel={() => {
+                      rememberOpener();
+                      setCancellingExpense(entry.expense);
+                    }}
                   />
                 ) : (
                   <CreditPaymentRow
@@ -276,7 +291,10 @@ export function HistorySheet({ open, onClose }: Props) {
                     onPrint={() =>
                       printPayment.mutate({ paymentId: entry.payment.id })
                     }
-                    onCancel={() => setCancelling(entry.payment)}
+                    onCancel={() => {
+                      rememberOpener();
+                      setCancelling(entry.payment);
+                    }}
                   />
                 ),
               )}

@@ -713,3 +713,48 @@ test("(R11) batal transaksi dan batal pelunasan menampilkan nomor pemilik", asyn
     await sale.findByText("Ragu? Telepon pemilik: 0812-3456-7890"),
   ).toBeVisible();
 });
+
+// (fokus final) Kembali / Esc pada dialog alasan mengembalikan fokus ke tombol pemicunya.
+const triggers = {
+  "batal transaksi": {
+    seed: () => undefined,
+    wait: "20261020-0001",
+    trigger: () =>
+      within(row(1)).getByRole("button", { name: "Batalkan 20261020-0001" }),
+    dialog: () =>
+      screen.findByRole("dialog", { name: "Batalkan 20261020-0001?" }),
+  },
+  "batal pelunasan": {
+    seed: seedPayment,
+    wait: "Pelunasan · Bu Sari",
+    trigger: () => cancelBtn(),
+    dialog: () => cancelDialog(),
+  },
+  "batal kas keluar": {
+    seed: () => seedExpense(),
+    wait: "Kas keluar · Beli es batu",
+    trigger: () => cancelExpenseBtn(),
+    dialog: () => cancelExpenseDialog(),
+  },
+} as const;
+
+for (const [name, c] of Object.entries(triggers)) {
+  for (const how of ["Kembali", "Esc"] as const) {
+    test(`(fokus) ${name}: ${how} mengembalikan fokus ke tombol pemicu`, async () => {
+      c.seed();
+      const { user } = setup();
+      await screen.findByText(new RegExp(c.wait));
+      const trigger = c.trigger();
+      await user.click(trigger);
+      const dialog = await c.dialog();
+      if (how === "Kembali") {
+        await user.click(
+          within(dialog).getByRole("button", { name: "Kembali" }),
+        );
+      } else {
+        await user.keyboard("{Escape}");
+      }
+      await waitFor(() => expect(trigger).toHaveFocus());
+    });
+  }
+}
