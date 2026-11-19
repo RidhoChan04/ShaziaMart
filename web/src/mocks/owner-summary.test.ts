@@ -167,40 +167,6 @@ describe("ownerTodaySummary", () => {
       negativeStockCount: 1,
     });
   });
-
-  test("cashDifferences: hanya hari ini, tidak nol, terbaru dulu", () => {
-    const s = fresh();
-    const shift = (id: string, closedAt: number, difference: number) => ({
-      shiftId: id,
-      kasirName: id,
-      openedAt: closedAt - 1,
-      closedAt,
-      difference,
-      openingCash: 0,
-      cashSales: 0,
-      supplierPayments: 0,
-      creditPayments: 0,
-      saleRefunds: 0,
-      expectedCash: 0,
-      countedCash: 0,
-      salesCount: 0,
-    });
-    s.closedShifts.push(
-      shift("lama", at(TODAY - DAY_MS, 21), -9_000),
-      shift("pagi", at(TODAY, 13), -5_000),
-      shift("pas", at(TODAY, 14), 0),
-      shift("sore", at(TODAY, 14, 10), 2_000),
-    );
-    expect(
-      ownerTodaySummary(s, NOW).attention.cashDifferences.map((c) => [
-        c.shiftId,
-        c.difference,
-      ]),
-    ).toEqual([
-      ["sore", 2_000],
-      ["pagi", -5_000],
-    ]);
-  });
 });
 
 describe("Perlu perhatian: stok (K5), modal berubah, dan habis", () => {
@@ -364,8 +330,12 @@ describe("Perlu perhatian: pengecualian kasir (ruling R9)", () => {
         kind: "batal_transaksi",
         count: 1,
         total: 42_000,
+        shortage: 0,
         from: "2026-10-23",
         to: "2026-10-23",
+        latestAt: at(TODAY, 10),
+        kasirId: null,
+        kasirName: null,
       },
     ]);
     const { exceptions: _a, ...oldAfter } = after;

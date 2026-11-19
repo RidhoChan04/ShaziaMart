@@ -5,6 +5,7 @@ import type {
 import { formatDateLong, jakartaTime } from "@/shared/lib/business-day";
 import { formatRupiah } from "@/shared/lib/money";
 
+/** Jenis yang halaman tinjaunya sudah ada (F3c-1); jenis F3c-2a menyusul. */
 const KINDS: readonly ExceptionKind[] = [
   "batal_transaksi",
   "batal_pelunasan",
@@ -19,6 +20,13 @@ export const EXCEPTION_TITLE: Record<ExceptionKind, string> = {
   batal_transaksi: "Transaksi dibatalkan kasir",
   batal_pelunasan: "Pelunasan dibatalkan kasir",
   kasbon_lewat_limit: "Kasbon lewat limit",
+  // Jenis F3c-2a: judul sementara (Teks UI rencana); halamannya dibuka setelah aturan & mockup siap.
+  batal_kas_keluar: "Kas keluar dibatalkan kasir",
+  selisih_kas: "Selisih kas",
+  kas_keluar: "Kas keluar besar",
+  serah_terima: "Modal berbeda saat serah terima",
+  shift_lama: "Shift kelamaan buka",
+  selisih_kecil: "Selisih kecil berulang",
 };
 
 /** `Sejak ditinjau 5 Nov 2026 14.30` / `Belum pernah ditinjau`. */

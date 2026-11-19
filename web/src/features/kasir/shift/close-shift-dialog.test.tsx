@@ -195,6 +195,8 @@ const closureFixture = (patch: Partial<ShiftClosure> = {}): ShiftClosure => ({
   supplierPayments: 50_000,
   creditPayments: 75_000,
   saleRefunds: 0,
+  expenses: 0,
+  ownerTakes: 0,
   expectedCash: 375_000,
   countedCash: 375_000,
   difference: 0,

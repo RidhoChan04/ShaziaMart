@@ -56,6 +56,8 @@ export const shiftHandlers = [
         kasirName: user.name,
         openedAt: Date.now(),
         openingCash,
+        suggestedOpening: null,
+        openingNote: null,
         cashSales: 0,
         salesCount: 0,
         cashOuts: [],
@@ -102,6 +104,8 @@ export const shiftHandlers = [
         supplierPayments,
         creditPayments,
         saleRefunds,
+        expenses: 0,
+        ownerTakes: 0,
         expectedCash,
         countedCash,
         difference: countedCash - expectedCash,
@@ -110,9 +114,12 @@ export const shiftHandlers = [
       mockDb.update((s) => {
         s.closedShifts.push({
           ...closure,
+          kasirId: shift.kasirId,
           kasirName: shift.kasirName,
           openedAt: shift.openedAt,
           closedAt: Date.now(),
+          suggestedOpening: shift.suggestedOpening,
+          openingNote: shift.openingNote,
         });
         s.shift = null;
         s.session = null;

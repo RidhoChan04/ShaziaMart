@@ -13,6 +13,16 @@ import { formatSaleNumber } from "./sale-number";
 import { saleLineCosts, sumLineCosts } from "./sale-rules";
 import { KIND, makeId, rng } from "./seed";
 import { appendSeedRepayment } from "./seed-customers";
+import {
+  closeSeedShift,
+  createDrawerSeed,
+  type DrawerSeed,
+  openSeedShift,
+  seedClosedAt,
+  seedDifference,
+  seedQrisDays,
+  seedShiftCash,
+} from "./seed-drawer";
 
 /** (K11) Panjang riwayat contoh; dijaga agar state tersimpan jauh di bawah kuota localStorage. */
 export const HISTORY_DAYS = 63;
@@ -29,7 +39,6 @@ const SLOW_SOLD_BACK: readonly (readonly number[])[] = [
   [62, 51],
   [61, 57],
 ];
-const OPENING_CASH = 200_000;
 const SHIFT_DIFFS = [0, 0, 0, -5000, 2000];
 /** Kasbon riwayat hanya Mbak Dewi; saldonya dijaga jauh di bawah limit Rp500.000. */
 const CREDIT_CUSTOMER = "Mbak Dewi";
@@ -117,6 +126,8 @@ type Ctx = {
   credits: Omit<CreditEntry, "id" | "paymentId">[];
   saleN: number;
   shiftN: number;
+  /** Laci F3c-2a: serah terima, kas keluar, ambil uang pemilik (`seed-drawer.ts`). */
+  drawer: DrawerSeed;
 };
 
 /** Pembayaran satu penjualan: 80% tunai, 15% QRIS, 5% kasbon (Mbak Dewi bila muat). */
@@ -214,13 +225,19 @@ function shiftIdsFor(ctx: Ctx): Record<"Rina" | "Budi", string> {
   return { Rina: ids[0] ?? "", Budi: ids[1] ?? "" };
 }
 
-/** Shift pagi & sore ditutup dengan selisih acak; isinya = penjualan yang menunjuk shift itu. */
+/**
+ * Shift pagi & sore ditutup dengan selisih acak (contoh selisih kecil S6 menggantikannya); isinya =
+ * penjualan yang menunjuk shift itu, ditambah serah terima modal, kas keluar, dan ambil uang pemilik
+ * (`seed-drawer.ts`). Satu rumus laci: modal + tunai − kas keluar − ambil uang.
+ */
 function closeShifts(
   ctx: Ctx,
   day: BusinessDay,
+  back: number,
   sales: readonly MockSale[],
   shiftIds: Readonly<Record<"Rina" | "Budi", string>>,
 ) {
+  const { state, drawer } = ctx;
   for (const [kasirName, openHour, closeHour] of SHIFTS) {
     const shiftId = shiftIds[kasirName];
     const own = sales.filter((s) => s.shiftId === shiftId);
@@ -228,23 +245,45 @@ function closeShifts(
       (a, s) => a + (s.payments.find((p) => p.method === "cash")?.amount ?? 0),
       0,
     );
-    const expectedCash = OPENING_CASH + cashSales;
-    const difference = pick(SHIFT_DIFFS, ctx.rand);
-    ctx.state.closedShifts.push({
+    const openedAt = day.start + openHour * HOUR_MS;
+    const closedAt = seedClosedAt(back, kasirName, openedAt, day, closeHour);
+    const opening = openSeedShift(drawer, back, kasirName, shiftId);
+    const { expenses, ownerTakes } = seedShiftCash(state, drawer, {
+      back,
+      day,
+      kasirName,
       shiftId,
-      openingCash: OPENING_CASH,
+      openedAt,
+      closedAt,
+      cashBefore: opening.openingCash + cashSales,
+    });
+    const expectedCash =
+      opening.openingCash + cashSales - expenses - ownerTakes;
+    // Selisih acak selalu diambil agar urutan pengacak riwayat tetap sama.
+    const randomDiff = pick(SHIFT_DIFFS, ctx.rand);
+    const difference = seedDifference(back, kasirName) ?? randomDiff;
+    const countedCash = expectedCash + difference;
+    state.closedShifts.push({
+      shiftId,
+      openingCash: opening.openingCash,
       cashSales,
       supplierPayments: 0,
       creditPayments: 0,
       saleRefunds: 0,
+      expenses,
+      ownerTakes,
       expectedCash,
-      countedCash: expectedCash + difference,
+      countedCash,
       difference,
       salesCount: own.length,
+      kasirId: drawer.kasir[kasirName].id,
       kasirName,
-      openedAt: day.start + openHour * HOUR_MS,
-      closedAt: day.start + closeHour * HOUR_MS + 5 * 60_000,
+      openedAt,
+      closedAt,
+      suggestedOpening: opening.suggestedOpening,
+      openingNote: opening.openingNote,
     });
+    closeSeedShift(state, drawer, countedCash, closedAt);
   }
 }
 
@@ -299,7 +338,8 @@ function slowSalesByDay(slow: readonly Product[]): Map<number, Product[]> {
 /**
  * Isi penjualan selesai `HISTORY_DAYS` hari sebelum hari bisnis `now` (hari ini sengaja kosong),
  * lengkap dengan HPP per baris, shift tertutup, stok, dan kasbon Mbak Dewi yang lunas 1-7 hari
- * kemudian. `slowCandidates` = id barang yang boleh dijadikan barang lambat (bukan fixture).
+ * kemudian, serta laci F3c-2a (serah terima, kas keluar, ambil uang pemilik, QRIS harian).
+ * `slowCandidates` = id barang yang boleh dijadikan barang lambat (bukan fixture).
  * Pengacak sendiri yang hanya bergantung pada tanggal bisnis.
  */
 export function generateHistory(
@@ -326,6 +366,7 @@ export function generateHistory(
     credits: [],
     saleN: 0,
     shiftN: 0,
+    drawer: createDrawerSeed(state, today),
   };
   for (let back = HISTORY_DAYS; back >= 1; back--) {
     const day = daysBefore(today, back);
@@ -336,8 +377,9 @@ export function generateHistory(
     );
     state.sales.push(...sales);
     state.saleSeq[day.key] = sales.length;
-    closeShifts(ctx, day, sales, shiftIds);
+    closeShifts(ctx, day, back, sales, shiftIds);
   }
+  seedQrisDays(state, today, ctx.drawer.owner);
   // Pelunasan Mbak Dewi = rekaman pelunasan seed (Tunai jalur kasir oleh Rina, tanpa shift).
   const rina = state.users.find((u) => u.name === "Rina");
   if (!rina) throw new Error("Seed tanpa Rina");

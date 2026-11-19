@@ -24,6 +24,8 @@ function openShift(id: string): MockShift {
     kasirName: rina.name,
     openedAt: NOW - 3_600_000,
     openingCash: 200_000,
+    suggestedOpening: null,
+    openingNote: null,
     cashSales: 0,
     salesCount: 0,
     cashOuts: [],

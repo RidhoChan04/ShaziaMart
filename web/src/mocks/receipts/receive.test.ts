@@ -66,6 +66,8 @@ function openShift(): void {
     kasirName: "Rina",
     openedAt: NOW - 3_600_000,
     openingCash: 1_500_000,
+    suggestedOpening: null,
+    openingNote: null,
     cashSales: 0,
     salesCount: 0,
     cashOuts: [],

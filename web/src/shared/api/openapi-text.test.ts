@@ -388,3 +388,195 @@ test("(label pemilik) urutan laporan stok di server, bawaan modal", () => {
     'sort tidak dikenal → 422 VALIDATION "Urutan tidak valid"',
   );
 });
+
+/** Endpoint F3c-2a: [path, method]. */
+const KAS_TOKO_KASIR_OPS: readonly [string, string][] = [
+  ["/api/shifts/opening-suggestion", "get"],
+  ["/api/shifts/current/expenses", "get"],
+  ["/api/shifts/current/expenses", "post"],
+  ["/api/shifts/current/expenses/{expenseId}/cancel", "post"],
+];
+const KAS_TOKO_OWNER_OPS: readonly [string, string][] = [
+  ["/api/owner/settings", "get"],
+  ["/api/owner/settings", "patch"],
+  ["/api/owner/settings/thin-margin-preview", "get"],
+  ["/api/owner/settings/qris-image", "put"],
+  ["/api/owner/kasir-accounts", "get"],
+  ["/api/owner/kasir-accounts", "post"],
+  ["/api/owner/kasir-accounts/{userId}", "patch"],
+  ["/api/owner/kasir-accounts/{userId}/pin", "post"],
+  ["/api/owner/shifts", "get"],
+  ["/api/owner/shifts/{shiftId}", "get"],
+  ["/api/owner/cash-takes", "post"],
+  ["/api/owner/cash-takes/{takeId}/cancel", "post"],
+  ["/api/owner/expenses/{expenseId}/cancel", "post"],
+  ["/api/owner/qris-days", "get"],
+  ["/api/owner/qris-days/{date}", "get"],
+  ["/api/owner/qris-days/{date}", "put"],
+];
+
+test("(F3c-2a) endpoint kasir baru: tag shift, sesi kasir, 401; endpoint pemilik baru: tag owner, sesi pemilik, 401", () => {
+  for (const [path, method] of KAS_TOKO_KASIR_OPS) {
+    const text = op(path, method);
+    expect(text, `${method} ${path}`).toContain("tags: [shift]");
+    expect(text, `${method} ${path}`).toContain("- cookieAuth: []");
+    expect(text, `${method} ${path}`).toMatch(
+      /"401":\n\s+\$ref: "#\/components\/responses\/Unauthorized"/,
+    );
+  }
+  for (const [path, method] of KAS_TOKO_OWNER_OPS) {
+    const text = op(path, method);
+    expect(text, `${method} ${path}`).toContain("tags: [owner]");
+    expect(text, `${method} ${path}`).toContain("- ownerCookieAuth: []");
+    expect(text, `${method} ${path}`).toMatch(
+      /"401":\n\s+\$ref: "#\/components\/responses\/Unauthorized"/,
+    );
+  }
+});
+
+test("satu rumus laci: tutup shift kasir dan rincian shift pemilik", () => {
+  const formula =
+    "expectedCash = openingCash + cashSales − supplierPayments + creditPayments − saleRefunds − expenses − ownerTakes";
+  expect(prose(schema("ShiftClosure"))).toContain(formula);
+  expect(prose(field("ShiftClosure", "saleRefunds"))).toContain(formula);
+  expect(prose(schema("OwnerShiftDetail"))).toContain(formula);
+  expect(prose(op("/api/owner/shifts/{shiftId}", "get"))).toContain(formula);
+});
+
+test("(K10) kas keluar kasir: urutan cek idempoten sesi → id → replay/ID_TAKEN → isi → shift", () => {
+  const create = prose(op("/api/shifts/current/expenses", "post"));
+  expect(create).toContain(
+    "Urutan pemeriksaan: sesi → id kosong atau > 64 karakter → 422 VALIDATION → id sudah dipakai: milik pengguna ini → 200 rekaman tersimpan apa adanya tanpa kas keluar kedua (isi body baru diabaikan), milik pengguna lain → 409 ID_TAKEN tanpa isi rekaman → amount bukan bilangan bulat ≥ 1, atau reason kosong (setelah trim) atau > 200 karakter → 422 VALIDATION → tanpa shift buka → 409 SHIFT_CLOSED",
+  );
+  expect(create).toContain("Idempoten menurut (pembuat, id)");
+  expect(create).toContain(
+    "Replay id yang sudah dibatalkan mengembalikan 200 dengan rekaman berstatus dibatalkan",
+  );
+  expect(create).toContain(
+    "klien wajib memperlakukannya sebagai belum tersimpan",
+  );
+});
+
+test("(S10) batal kas keluar: kasir di shift buka; pemilik tanpa menyentuh laci", () => {
+  const kasir = prose(
+    op("/api/shifts/current/expenses/{expenseId}/cancel", "post"),
+  );
+  expect(kasir).toContain(
+    "sesi → id tidak dikenal → 404 → sudah dibatalkan → 200 rekaman apa adanya tanpa perubahan → reason kosong (setelah trim) atau > 200 karakter → 422 VALIDATION → tanpa shift buka → 409 SHIFT_CLOSED → shiftId kas keluar bukan shift yang sedang buka → 409 OUTSIDE_SHIFT",
+  );
+  expect(kasir).toContain("kejadian Perlu perhatian batal_kas_keluar");
+  const owner = prose(op("/api/owner/expenses/{expenseId}/cancel", "post"));
+  expect(owner).toContain("tidak pernah menyentuh laci");
+  expect(owner).toContain("409 IN_OPEN_SHIFT");
+  expect(owner).toContain("bukan kejadian Perlu perhatian");
+  expect(prose(op("/api/shifts/current/expenses", "get"))).toContain(
+    "tanpa data pembatal",
+  );
+});
+
+test("(S4, K8, K22) buka shift: saran dihitung ulang, OPENING_MISMATCH membawa suggestedCash, catatan saat modal sama disimpan null", () => {
+  const open = prose(op("/api/shifts", "post"));
+  expect(open).toContain(
+    "Server menghitung ulang saran modal saat request ini",
+  );
+  expect(open).toContain("422 OPENING_MISMATCH");
+  expect(open).toContain(
+    "catatan yang terkirim padahal modal sama dengan saran disimpan null",
+  );
+  expect(open).toContain("ditandai terpakai oleh shift baru ini");
+  expect(open).toContain("OpeningMismatchProblem");
+  const suggestion = prose(op("/api/shifts/opening-suggestion", "get"));
+  expect(suggestion).toContain(
+    "suggestedCash = max(0, lastCountedCash − ownerTakes)",
+  );
+  expect(suggestion).toContain("Tanpa shift tutup sebelumnya");
+});
+
+test("(S5, K9) ambil uang pemilik: idempoten, batal hanya bila bisa dibalik, selain itu CASH_TAKE_LOCKED", () => {
+  const create = prose(op("/api/owner/cash-takes", "post"));
+  expect(create).toContain("Idempoten menurut (pembuat, id)");
+  expect(create).toContain("milik pengguna lain → 409 ID_TAKEN");
+  expect(create).toContain("Bukan kejadian Perlu perhatian");
+  const cancel = prose(op("/api/owner/cash-takes/{takeId}/cancel", "post"));
+  expect(cancel).toContain(
+    "id tidak dikenal → 404; sudah dibatalkan → 200 rekaman apa adanya tanpa perubahan; reason kosong (setelah trim) atau > 200 karakter → 422 VALIDATION; tidak bisa dibalik lagi → 409 CASH_TAKE_LOCKED tanpa mengubah angka apa pun",
+  );
+  expect(cancel).toContain(
+    "Bisa dibalik bila shiftId ≠ null dan shift itu masih buka",
+  );
+  expect(cancel).toContain("shiftId null dan belum terpakai shift berikutnya");
+});
+
+test("(K19) pengaturan kasir publik: nomor pemilik hanya dengan sesi kasir; shiftMaxHours satu sumber", () => {
+  const kasir = prose(op("/api/settings/kasir", "get"));
+  expect(kasir).toContain("tanpa sesi kasir → null");
+  expect(kasir).toContain("shiftMaxHours = AttentionRules.shiftMaxHours");
+  const patch = prose(op("/api/owner/settings", "patch"));
+  expect(patch).toContain(
+    "store.name sekaligus menjadi KasirSettings.storeName",
+  );
+  expect(patch).toContain("bagian yang dikirim harus utuh");
+  for (const rule of [
+    "store.name 1..40 karakter setelah trim",
+    "kasir.curahFractions 1..8 angka unik naik 1..100.000",
+    "kasir.quickCurahProductIds ≤ 12 id barang curah aktif",
+    "credit.defaultCreditLimit 0..100.000.000",
+    "stock.expirySoonDays 1..90",
+    "opnameItemLimit ≤ opnameSessionLimit",
+    "report.thinMarginPermille 0..1000",
+    "report.unsoldDays 7..365",
+    "shiftMaxHours 1..24",
+    "ownerPhone null atau 8..16 karakter ^[0-9+ -]+$",
+  ])
+    expect(patch).toContain(rule);
+});
+
+test("(K2–K7, K18, K22) kejadian Perlu perhatian: ambang saat ini, aturan per jenis, kasirId selisih kecil", () => {
+  const list = prose(op("/api/owner/exceptions", "get"));
+  expect(list).toContain("ambang dibaca dari AttentionRules saat ini (K7)");
+  expect(list).toContain("id = kas_keluar_shift-{shiftId}");
+  expect(list).toContain("|difference| ≥ cashDiffMin");
+  expect(list).toContain("−cashDiffMin < difference < 0");
+  expect(list).toContain("kasirId wajib untuk selisih_kecil (tanpa → 422)");
+  expect(list).toContain(
+    "suggestedOpening ≠ null dan openingCash ≠ suggestedOpening",
+  );
+  expect(prose(schema("ExceptionAttention"))).toContain(
+    "kas_keluar = Σ kas keluar unik yang tercakup",
+  );
+  expect(prose(field("Attention", "exceptions"))).toContain(
+    "batal_transaksi, batal_pelunasan, kasbon_lewat_limit, batal_kas_keluar, selisih_kas, kas_keluar, serah_terima, shift_lama, selisih_kecil",
+  );
+  expect(prose(op("/api/owner/exceptions/review", "post"))).toContain(
+    "kasirId wajib (tanpa → 422 VALIDATION)",
+  );
+});
+
+test("(S7, K11, K21) QRIS harian: total per tanggal WIB, tanda basi kembali belum, hari ini tidak bisa ditandai", () => {
+  const list = prose(op("/api/owner/qris-days", "get"));
+  expect(list).toContain("Hari = tanggal Asia/Jakarta createdAt");
+  expect(list).toContain(
+    "total sekarang ≠ total saat ditandai → belum dengan changedAfterMark true",
+  );
+  expect(list).toContain("lintas bulan, terlama dulu");
+  const mark = prose(op("/api/owner/qris-days/{date}", "put"));
+  expect(mark).toContain("hari ini, atau sesudahnya → 422 VALIDATION");
+  expect(mark).toContain("tidak_cocok wajib note");
+  expect(mark).toContain("Tidak ada tandai semua");
+  expect(prose(op("/api/owner/qris-days/{date}", "get"))).toContain(
+    "Σ amount items aktif = total",
+  );
+});
+
+test("(K12) akun kasir: nama unik, nonaktif memutus sesi kedua realm, PIN tidak dikirim balik", () => {
+  expect(prose(op("/api/owner/kasir-accounts", "post"))).toContain(
+    "409 NAME_TAKEN",
+  );
+  const patch = prose(op("/api/owner/kasir-accounts/{userId}", "patch"));
+  expect(patch).toContain("409 KASIR_ON_SHIFT");
+  expect(patch).toContain("tanpa menambah hitungan kunci");
+  expect(patch).toContain("sesi kasir dan sesi HP toko orang itu dihapus");
+  expect(prose(op("/api/owner/kasir-accounts/{userId}/pin", "post"))).toContain(
+    "PIN tidak pernah dikirim balik",
+  );
+});

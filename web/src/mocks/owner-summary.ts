@@ -1,6 +1,5 @@
 import type {
   Attention,
-  CashDifference,
   CostChangeItem,
   HourBucket,
   OwnerTodaySummary,
@@ -36,20 +35,12 @@ const MINUTE_MS = 60_000;
 
 const sum = (xs: readonly number[]): number => xs.reduce((a, b) => a + b, 0);
 
+/**
+ * (S6) Selisih kas tidak lagi berupa daftar hari ini: menjadi kejadian `selisih_kas` /
+ * `selisih_kecil` di `exceptions` (aturannya di T4). `qrisUnreconciled` diisi T6.
+ */
 function attention(state: Readonly<MockState>, now: number): Attention {
-  const today = businessDay(now);
   const alerts = state.products.map((p) => stockAlertOf(state, p));
-  const cashDifferences: CashDifference[] = state.closedShifts
-    .filter(
-      (c) => c.difference !== 0 && businessDay(c.closedAt).key === today.key,
-    )
-    .sort((a, b) => b.closedAt - a.closedAt)
-    .map(({ shiftId, kasirName, closedAt, difference }) => ({
-      shiftId,
-      kasirName,
-      closedAt,
-      difference,
-    }));
   const overdue = state.customers.filter((c) => {
     const oldest = oldestUnpaidAt(state, c.id);
     return c.balance > 0 && oldest !== null && now - oldest > OVERDUE_MS;
@@ -57,7 +48,6 @@ function attention(state: Readonly<MockState>, now: number): Attention {
   return {
     lowStockCount: alerts.filter((a) => a === "menipis").length,
     negativeStockCount: alerts.filter((a) => a === "minus").length,
-    cashDifferences,
     overdueCredit: {
       count: overdue.length,
       total: sum(overdue.map((c) => c.balance)),
@@ -79,6 +69,7 @@ function attention(state: Readonly<MockState>, now: number): Attention {
     expiry: expiryAttention(state, now),
     ...opnameAttention(state),
     exceptions: exceptionAttention(state),
+    qrisUnreconciled: null,
   };
 }
 

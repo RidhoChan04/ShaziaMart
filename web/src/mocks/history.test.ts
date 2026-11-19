@@ -244,11 +244,18 @@ describe("riwayat 63 hari", () => {
     }
   });
 
-  test("2 shift tertutup per hari (Rina, Budi) dengan selisih dari {0,-5000,+2000}", () => {
+  test("2 shift tertutup per hari (Rina, Budi) dengan selisih dari {0,-5000,+2000}; (S6) Rina 6 hari terakhir −4.000", () => {
     expect(state.closedShifts).toHaveLength(2 * 63);
     for (const c of state.closedShifts) {
-      expect([0, -5000, 2000]).toContain(c.difference);
-      expect(c.expectedCash).toBe(c.openingCash + c.cashSales);
+      const back = daysAgo(c.openedAt);
+      if (c.kasirName === "Rina" && back <= 6) {
+        expect(c.difference).toBe(-4_000);
+      } else {
+        expect([0, -5000, 2000]).toContain(c.difference);
+      }
+      expect(c.expectedCash).toBe(
+        c.openingCash + c.cashSales - c.expenses - c.ownerTakes,
+      );
       expect(c.countedCash).toBe(c.expectedCash + c.difference);
       expect(["Rina", "Budi"]).toContain(c.kasirName);
     }
@@ -264,7 +271,8 @@ describe("riwayat 63 hari", () => {
 
   test("closedShifts: openedAt Rina 06.00, Budi 13.00, < closedAt; pelunasan & pengembalian 0; invarian uang seharusnya", () => {
     for (const c of state.closedShifts) {
-      const day = businessDay(c.closedAt);
+      // (S3) Contoh shift kelamaan Budi tutup lewat tengah malam: hari buka, bukan hari tutup.
+      const day = businessDay(c.openedAt);
       expect(c.openedAt).toBe(
         day.start + (c.kasirName === "Rina" ? 6 : 13) * HOUR_MS,
       );
@@ -275,7 +283,9 @@ describe("riwayat 63 hari", () => {
           c.cashSales -
           c.supplierPayments +
           c.creditPayments -
-          c.saleRefunds,
+          c.saleRefunds -
+          c.expenses -
+          c.ownerTakes,
       );
     }
   });

@@ -213,7 +213,7 @@ export function exceptionRange(from: string, to: string): string {
 const EXCEPTION_COPY: Record<
   ExceptionKind,
   {
-    icon: "exception-void" | "exception-repay" | "exception-limit";
+    icon: "exception-void" | "exception-repay" | "exception-limit" | "cash";
     title: (n: number) => string;
     amount: (rupiah: string) => string;
   }
@@ -233,6 +233,37 @@ const EXCEPTION_COPY: Record<
     title: (n) => `${n} kasbon lewat limit`,
     amount: (r) => `lewat ${r}`,
   },
+  // Jenis F3c-2a: teks sementara; teks & ikon akhir mengikuti mockup (§12g).
+  batal_kas_keluar: {
+    icon: "cash",
+    title: (n) => `${n} kas keluar dibatalkan kasir`,
+    amount: (r) => r,
+  },
+  selisih_kas: {
+    icon: "cash",
+    title: (n) => `${n} selisih kas`,
+    amount: (r) => r,
+  },
+  kas_keluar: {
+    icon: "cash",
+    title: (n) => `${n} kas keluar besar`,
+    amount: (r) => r,
+  },
+  serah_terima: {
+    icon: "cash",
+    title: (n) => `${n} modal berbeda saat serah terima`,
+    amount: (r) => r,
+  },
+  shift_lama: {
+    icon: "cash",
+    title: (n) => `${n} shift kelamaan buka`,
+    amount: (r) => r,
+  },
+  selisih_kecil: {
+    icon: "cash",
+    title: () => "Selisih kecil berulang",
+    amount: (r) => r,
+  },
 };
 
 /** Butir pengecualian kasir (ruling R9): menumpuk sejak terakhir ditinjau, dengan rentang tanggalnya. */
@@ -248,7 +279,7 @@ function exceptionItem(e: ExceptionAttention): AttentionItem {
   };
 }
 
-/** Urutan (mockup pengecualian disetujui): pengecualian kasir (batal transaksi, batal pelunasan, kasbon lewat limit), stok minus, kedaluwarsa, selisih opname besar, opname tertahan diganti, utang lewat, perubahan modal, barang baru menunggu harga, opname menunggu persetujuan, stok menipis, segera kedaluwarsa, utang segera, barang habis, selisih kas, kasbon > 30 hari. */
+/** Urutan (mockup pengecualian disetujui): pengecualian kasir (batal transaksi, batal pelunasan, kasbon lewat limit), stok minus, kedaluwarsa, selisih opname besar, opname tertahan diganti, utang lewat, perubahan modal, barang baru menunggu harga, opname menunggu persetujuan, stok menipis, segera kedaluwarsa, utang segera, barang habis, kasbon > 30 hari. Selisih kas kini kejadian di `exceptions` (S6). */
 export function attentionItems(a: Attention): AttentionItem[] {
   const items: AttentionItem[] = [...a.exceptions.map(exceptionItem)];
   if (a.negativeStockCount > 0) {
@@ -306,21 +337,6 @@ export function attentionItems(a: Attention): AttentionItem[] {
         params: { productId: s.productId },
         search: { lembar: "habis" },
       },
-    });
-  }
-  for (const c of a.cashDifferences) {
-    if (c.difference === 0) continue;
-    const signed =
-      c.difference > 0
-        ? `+${formatRupiah(c.difference)}`
-        : formatRupiah(c.difference);
-    items.push({
-      key: `cash-${c.shiftId}`,
-      title: `Selisih kas ${signed}`,
-      detail: `Shift ${c.kasirName}`,
-      tone: c.difference < 0 ? "critical" : "warning",
-      icon: "cash",
-      link: { to: "/owner/lainnya" },
     });
   }
   if (a.overdueCredit.count > 0) {

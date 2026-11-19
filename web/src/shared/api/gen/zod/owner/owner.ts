@@ -82,6 +82,9 @@ export const getOwnerTodaySummaryResponseHourlyMin = 24;
 export const getOwnerTodaySummaryResponseHourlyMax = 24;
 
 
+export const getOwnerTodaySummaryResponseAttentionExceptionsItemShortageMax = 0;
+
+
 
 
 export const GetOwnerTodaySummaryResponse = zod.object({
@@ -101,12 +104,6 @@ export const GetOwnerTodaySummaryResponse = zod.object({
   "attention": zod.object({
   "lowStockCount": zod.int().describe('Jumlah barang dengan stockAlert menipis (0 <= stok < minStock). Aturan penanda diam:\ntidak termasuk barang stockCounted false, Sedang langka (scarce), tidak_diambil, atau nonaktif.\n'),
   "negativeStockCount": zod.int().describe('Jumlah barang dengan stockAlert minus (stok < 0); dihitung terpisah, tidak termasuk di\nlowStockCount. Aturan penanda diam: tidak termasuk barang stockCounted false atau\nnonaktif; Sedang langka (scarce) dan tidak_diambil tetap dihitung.\n'),
-  "cashDifferences": zod.array(zod.object({
-  "shiftId": zod.string(),
-  "kasirName": zod.string(),
-  "closedAt": zod.int().describe('Waktu shift ditutup (epoch ms UTC).'),
-  "difference": zod.int().describe('Uang fisik dikurangi uang seharusnya (rupiah); tidak nol.')
-})).describe('Shift yang sudah ditutup dengan selisih kas tidak nol, dengan closedAt jatuh pada hari ini (Asia/Jakarta); terbaru dulu.'),
   "overdueCredit": zod.object({
   "count": zod.int().describe('Jumlah pelanggan bersaldo kasbon > 0 yang entri kasbon belum lunas tertuanya lebih dari 30 hari.'),
   "total": zod.int().describe('Jumlah saldo kasbon seluruh pelanggan tersebut (rupiah).')
@@ -149,13 +146,22 @@ export const GetOwnerTodaySummaryResponse = zod.object({
 }).describe('Sesi opname bertanda selisih besar yang belum ditinjau.')).describe('Sesi opname flagged yang belum ditinjau (reviewOpnameSession); terbaru dulu (finishedAt).'),
   "opnameReplacedHeld": zod.int().describe('Jumlah barang opname yang dulu ditahan lalu diganti hitungan baru (replacedByName ≠ null),\ndi sesi yang belum ditinjau (reviewedAt null; reviewOpnameSession menghapusnya).\n'),
   "exceptions": zod.array(zod.object({
-  "kind": zod.enum(['batal_transaksi', 'batal_pelunasan', 'kasbon_lewat_limit']).describe('Pengecualian kasir (ruling R1/R9): batal_transaksi (penjualan dibatalkan kasir),\nbatal_pelunasan (pelunasan dibatalkan kasir), kasbon_lewat_limit (kasbon melewati limit\ndengan alasan; penjualan yang kemudian dibatalkan tidak ikut).\n'),
+  "kind": zod.enum(['batal_transaksi', 'batal_pelunasan', 'kasbon_lewat_limit', 'batal_kas_keluar', 'selisih_kas', 'kas_keluar', 'serah_terima', 'shift_lama', 'selisih_kecil']).describe('Jenis kejadian Perlu perhatian (ruling R1/R9, K2), urutan tetap: batal_transaksi (penjualan\ndibatalkan kasir), batal_pelunasan (pelunasan dibatalkan kasir), kasbon_lewat_limit (kasbon\nmelewati limit dengan alasan; penjualan yang kemudian dibatalkan tidak ikut),\nbatal_kas_keluar (kas keluar dibatalkan kasir, S10), selisih_kas (|selisih tutup shift| ≥\ncashDiffMin, S6), kas_keluar (kas keluar besar, S2/K4), serah_terima (modal berbeda dari\nsaran, S4), shift_lama (shift buka > shiftMaxHours jam, S3), selisih_kecil (Σ selisih\nkurang kecil satu kasir dalam 7 hari > smallShortageWeekMax, S6/K18).\n'),
   "count": zod.int().min(1),
   "total": zod.int(),
+  "shortage": zod.int().max(getOwnerTodaySummaryResponseAttentionExceptionsItemShortageMax),
+  "from": zod.iso.date(),
+  "to": zod.iso.date(),
+  "latestAt": zod.int(),
+  "kasirId": zod.string().nullable(),
+  "kasirName": zod.string().nullable()
+}).describe('Butir Perlu perhatian satu jenis (selisih_kecil: satu kasir): semua kejadian dengan at >\nreviewedAt (tanpa batas umur kecuali selisih_kecil 7 hari). total = Σ amount, kecuali\nkas_keluar = Σ kas keluar unik yang tercakup (kejadian satuan dan kejadian shift di shift\nyang sama tidak dijumlah dua kali, K22); shortage = Σ amount yang < 0 (≤ 0); from/to =\ntanggal Asia/Jakarta kejadian tertua/terbaru; latestAt = at kejadian terbaru (dipakai upTo\nsaat ditinjau langsung, S8). selisih_kecil muncul hanya bila Σ |amount| >\nsmallShortageWeekMax (ketat). kasirId/kasirName hanya selisih_kecil (kunci butir UI\nexception-selisih_kecil-{kasirId}); jenis lain null.\n')).describe('Butir kejadian yang menumpuk sejak terakhir ditinjau (ruling R9, S6), satu per jenis\n(selisih_kecil: satu per kasir), hanya dengan count > 0. Urutan tetap (K2):\nbatal_transaksi, batal_pelunasan, kasbon_lewat_limit, batal_kas_keluar, selisih_kas,\nkas_keluar, serah_terima, shift_lama, selisih_kecil (per kasir, urut nama kasir).\n'),
+  "qrisUnreconciled": zod.union([zod.object({
+  "count": zod.int().min(1),
   "from": zod.iso.date(),
   "to": zod.iso.date()
-}).describe('Butir Perlu perhatian satu jenis: semua kejadian dengan at > reviewedAt (tanpa batas umur).\ntotal = Σ amount; from/to = tanggal Asia/Jakarta kejadian tertua/terbaru.\n')).describe('Pengecualian kasir yang menumpuk sejak terakhir ditinjau (ruling R9), tanpa batas umur;\nhanya jenis dengan count > 0, urutan tetap batal_transaksi, batal_pelunasan,\nkasbon_lewat_limit.\n')
-})
+}).describe('(S7, K11) Butir QRIS belum dicocokkan: hari sejak QRIS harian mulai dipakai dan sebelum hari\nini dengan total QRIS > 0 yang statusnya belum (termasuk yang totalnya berubah setelah\nditandai, K21). Hari tanpa QRIS tidak dihitung. from/to = tanggal Asia/Jakarta hari\ntertua/terbaru.\n'),zod.null()]).describe('Butir QRIS belum dicocokkan (S7); null bila tidak ada hari yang perlu dicocokkan.')
+}).describe('Selisih kas shift tidak lagi berupa daftar hari ini: menjadi kejadian selisih_kas dan\nselisih_kecil di exceptions (S6, menumpuk sampai ditinjau).\n')
 }).describe('Semua uang integer rupiah. revenue, grossProfit, newCredit, dan avgTicket hanya menghitung\npenjualan berstatus selesai (semua field bertipe omzet hanya menghitung penjualan selesai). avgTicket = round_half_up(revenue / salesCount), 0 bila tidak ada penjualan.\n')
 
 /**
@@ -1911,29 +1917,53 @@ export const VoidOwnerSaleResponse = zod.object({
 
 /**
  * Kejadian jenis kind dengan at > reviewedAt (semua kejadian bila belum pernah ditinjau),
- * tanpa batas umur, terbaru dulu. batal_transaksi = penjualan yang dibatalkan kasir (amount =
- * total transaksi); batal_pelunasan = pelunasan yang dibatalkan kasir (amount = nominal
- * pelunasan); kasbon_lewat_limit = penjualan kasbon lewat limit yang tidak dibatalkan (amount =
- * kelebihan limit). Pembatalan oleh pemilik bukan pengecualian. kind tidak dikenal → 422.
- * @summary Pengecualian kasir satu jenis sejak terakhir ditinjau
+ * tanpa batas umur kecuali selisih_kecil, terbaru dulu. Kejadian adalah tampilan turunan dari
+ * rekaman (penjualan, pelunasan, shift tutup dan buka, kas keluar, catatan modal); ambang
+ * dibaca dari AttentionRules saat ini (K7), bukan salinan saat kejadian, jadi mengubah
+ * Pengaturan langsung mengubah daftar. Semua ambang dibandingkan ketat. batal_transaksi =
+ * penjualan yang dibatalkan kasir (amount = total transaksi); batal_pelunasan = pelunasan
+ * yang dibatalkan kasir (amount = nominal pelunasan); kasbon_lewat_limit = penjualan kasbon
+ * lewat limit yang tidak dibatalkan (amount = kelebihan limit); batal_kas_keluar = kas keluar
+ * yang dibatalkan kasir (S10; at = jam batal, amount = nominal, reason = alasan batal,
+ * kasirName = pembatal); selisih_kas = shift tutup dengan |difference| ≥ cashDiffMin (at =
+ * closedAt, amount = difference bertanda, reason null); kas_keluar (K4) = (a) tiap kas keluar
+ * aktif dengan amount > expenseSingleMax (id = id kas keluar, at = jam catat, amount =
+ * nominal, reason = alasannya) dan (b) tiap shift yang Σ kas keluar aktifnya >
+ * expenseShiftMax, satu kejadian per shift (id = kas_keluar_shift-{shiftId}, at = jam kas
+ * keluar yang pertama membuat Σ lewat, amount = Σ shift saat ini, reason null), keduanya bisa
+ * muncul untuk shift yang sama; serah_terima (K22) = shift dengan suggestedOpening ≠ null dan
+ * openingCash ≠ suggestedOpening (at = openedAt, amount = openingCash − suggestedOpening,
+ * reason = openingNote); shift_lama (K5) = shift tutup atau buka dengan (closedAt ?? jam
+ * server) − openedAt > shiftMaxHours jam (at = openedAt + shiftMaxHours jam, amount 0,
+ * durationMinutes = menit penuh sampai tutup atau sampai jam server, reason null);
+ * selisih_kecil (K6, K18) = shift tutup milik kasirId dengan −cashDiffMin < difference < 0 dan
+ * closedAt > jam server − 7 hari dan closedAt > reviewedAt kasir itu (amount = difference,
+ * reason null); kasirId wajib untuk selisih_kecil (tanpa → 422) dan diabaikan jenis lain.
+ * Kas keluar yang dibatalkan tidak ikut kas_keluar. Pembatalan oleh pemilik bukan kejadian.
+ * kind tidak dikenal → 422.
+ * @summary Kejadian Perlu perhatian satu jenis sejak terakhir ditinjau
  */
 export const ListOwnerExceptionsQueryParams = zod.object({
-  "kind": zod.enum(['batal_transaksi', 'batal_pelunasan', 'kasbon_lewat_limit'])
+  "kind": zod.enum(['batal_transaksi', 'batal_pelunasan', 'kasbon_lewat_limit', 'batal_kas_keluar', 'selisih_kas', 'kas_keluar', 'serah_terima', 'shift_lama', 'selisih_kecil']),
+  "kasirId": zod.string().optional().describe('Wajib untuk selisih_kecil (penanda tinjau per kasir, K18); diabaikan jenis lain.')
 })
 
 
 
 
 export const ListOwnerExceptionsResponse = zod.object({
-  "kind": zod.enum(['batal_transaksi', 'batal_pelunasan', 'kasbon_lewat_limit']).describe('Pengecualian kasir (ruling R1/R9): batal_transaksi (penjualan dibatalkan kasir),\nbatal_pelunasan (pelunasan dibatalkan kasir), kasbon_lewat_limit (kasbon melewati limit\ndengan alasan; penjualan yang kemudian dibatalkan tidak ikut).\n'),
-  "reviewedAt": zod.int().nullable().describe('Terakhir ditinjau (epoch ms UTC); null bila belum pernah.'),
+  "kind": zod.enum(['batal_transaksi', 'batal_pelunasan', 'kasbon_lewat_limit', 'batal_kas_keluar', 'selisih_kas', 'kas_keluar', 'serah_terima', 'shift_lama', 'selisih_kecil']).describe('Jenis kejadian Perlu perhatian (ruling R1/R9, K2), urutan tetap: batal_transaksi (penjualan\ndibatalkan kasir), batal_pelunasan (pelunasan dibatalkan kasir), kasbon_lewat_limit (kasbon\nmelewati limit dengan alasan; penjualan yang kemudian dibatalkan tidak ikut),\nbatal_kas_keluar (kas keluar dibatalkan kasir, S10), selisih_kas (|selisih tutup shift| ≥\ncashDiffMin, S6), kas_keluar (kas keluar besar, S2/K4), serah_terima (modal berbeda dari\nsaran, S4), shift_lama (shift buka > shiftMaxHours jam, S3), selisih_kecil (Σ selisih\nkurang kecil satu kasir dalam 7 hari > smallShortageWeekMax, S6/K18).\n'),
+  "reviewedAt": zod.int().nullable().describe('Terakhir ditinjau (epoch ms UTC; selisih_kecil = penanda kasir itu); null bila belum pernah.'),
   "items": zod.array(zod.object({
   "id": zod.string(),
-  "kind": zod.enum(['batal_transaksi', 'batal_pelunasan', 'kasbon_lewat_limit']).describe('Pengecualian kasir (ruling R1/R9): batal_transaksi (penjualan dibatalkan kasir),\nbatal_pelunasan (pelunasan dibatalkan kasir), kasbon_lewat_limit (kasbon melewati limit\ndengan alasan; penjualan yang kemudian dibatalkan tidak ikut).\n'),
+  "kind": zod.enum(['batal_transaksi', 'batal_pelunasan', 'kasbon_lewat_limit', 'batal_kas_keluar', 'selisih_kas', 'kas_keluar', 'serah_terima', 'shift_lama', 'selisih_kecil']).describe('Jenis kejadian Perlu perhatian (ruling R1/R9, K2), urutan tetap: batal_transaksi (penjualan\ndibatalkan kasir), batal_pelunasan (pelunasan dibatalkan kasir), kasbon_lewat_limit (kasbon\nmelewati limit dengan alasan; penjualan yang kemudian dibatalkan tidak ikut),\nbatal_kas_keluar (kas keluar dibatalkan kasir, S10), selisih_kas (|selisih tutup shift| ≥\ncashDiffMin, S6), kas_keluar (kas keluar besar, S2/K4), serah_terima (modal berbeda dari\nsaran, S4), shift_lama (shift buka > shiftMaxHours jam, S3), selisih_kecil (Σ selisih\nkurang kecil satu kasir dalam 7 hari > smallShortageWeekMax, S6/K18).\n'),
   "at": zod.int().describe('Jam server kejadian (epoch ms UTC).'),
+  "kasirId": zod.string().nullable(),
   "kasirName": zod.string(),
   "amount": zod.int(),
-  "reason": zod.string(),
+  "reason": zod.string().nullable().describe('Alasan dari kasir; null untuk selisih_kas, shift_lama, selisih_kecil, dan kas_keluar per shift.'),
+  "shiftId": zod.string().nullable(),
+  "durationMinutes": zod.int().nullable().describe('Hanya shift_lama; lama shift dalam menit penuh.'),
   "customerName": zod.string().nullable(),
   "saleId": zod.string().nullable(),
   "saleNumber": zod.string().nullable(),
@@ -1942,33 +1972,40 @@ export const ListOwnerExceptionsResponse = zod.object({
   "refund": zod.int(),
   "qrisToOwner": zod.int(),
   "overLimitExcess": zod.int().min(1).nullable()
-}).describe('Satu kejadian. batal_transaksi: at = jam batal, kasirName = pembatal, amount = total\ntransaksi, saleId/saleNumber terisi; fromClosedShift = transaksi dari shift yang sudah tutup\n(ruling R12); refund = uang yang keluar dari laci shift yang sedang buka saat itu (0 bila\ntidak ada); qrisToOwner = bagian QRIS yang dipilih Transfer oleh pemilik nanti (pemilik\nharus mentransfer). batal_pelunasan: at = jam batal, kasirName = pembatal, amount = nominal\npelunasan, paymentId terisi. kasbon_lewat_limit: at = jam jual, kasirName = kasir, amount =\nkelebihan limit bagian kasbon ini, saleId/saleNumber terisi. customerName = pelanggan (null\nbila tanpa pelanggan). Untuk selain batal_transaksi fromClosedShift false, refund dan\nqrisToOwner 0. overLimitExcess (batal_transaksi) = kelebihan limit kasbon transaksi yang\ndibatalkan (CreditOverLimit.excess yang tercatat), null bila transaksi itu tidak lewat limit;\nselain batal_transaksi selalu null. Butir kasbon_lewat_limit transaksi itu tetap hilang\nsaat transaksinya dibatalkan.\n')).describe('Kejadian dengan at > reviewedAt, terbaru dulu.')
+}).describe('Satu kejadian. batal_transaksi: at = jam batal, kasirName = pembatal, amount = total\ntransaksi, saleId/saleNumber terisi; fromClosedShift = transaksi dari shift yang sudah tutup\n(ruling R12); refund = uang yang keluar dari laci shift yang sedang buka saat itu (0 bila\ntidak ada); qrisToOwner = bagian QRIS yang dipilih Transfer oleh pemilik nanti (pemilik\nharus mentransfer). batal_pelunasan: at = jam batal, kasirName = pembatal, amount = nominal\npelunasan, paymentId terisi. kasbon_lewat_limit: at = jam jual, kasirName = kasir, amount =\nkelebihan limit bagian kasbon ini, saleId/saleNumber terisi. customerName = pelanggan (null\nbila tanpa pelanggan). Untuk selain batal_transaksi fromClosedShift false, refund dan\nqrisToOwner 0. overLimitExcess (batal_transaksi) = kelebihan limit kasbon transaksi yang\ndibatalkan (CreditOverLimit.excess yang tercatat), null bila transaksi itu tidak lewat limit;\nselain batal_transaksi selalu null. Butir kasbon_lewat_limit transaksi itu tetap hilang\nsaat transaksinya dibatalkan.\nJenis F3c-2a (K3, K4, K5, K22): batal_kas_keluar: id = id kas keluar, at = jam batal,\nkasirName = pembatal, amount = nominal, reason = alasan batal. selisih_kas: id = shiftId, at\n= closedAt, kasirName = kasir shift, amount = difference (bertanda), reason null.\nkas_keluar: (a) id = id kas keluar, at = jam catat, amount = nominal, reason = alasannya;\n(b) id = kas_keluar_shift-{shiftId}, at = jam kas keluar yang membuat Σ shift lewat, amount =\nΣ kas keluar aktif shift saat ini, reason null; kasirName = kasir shift. serah_terima: id =\nshiftId, at = openedAt, kasirName = kasir yang membuka, amount = openingCash −\nsuggestedOpening (bertanda), reason = openingNote. shift_lama: id = shiftId, at = openedAt +\nshiftMaxHours jam, amount 0, durationMinutes = menit penuh (closedAt ?? jam server) −\nopenedAt, reason null. selisih_kecil: id = shiftId, at = closedAt, amount = difference (< 0),\nreason null. shiftId = shift kejadian (null untuk tiga jenis F3c-1); durationMinutes hanya\nshift_lama (selain itu null); kasirId = id kasir pelaku (pembatal untuk jenis batal; null\nbila rekaman tidak menyimpannya). customerName, saleId, saleNumber, paymentId null untuk\njenis F3c-2a.\n')).describe('Kejadian dengan at > reviewedAt, terbaru dulu.')
 })
 
 /**
  * reviewedAt = max(reviewedAt lama, min(upTo, jam server)); idempoten dan tidak pernah
- * mundur. upTo = jam kejadian terbaru yang dilihat pemilik, sehingga kejadian yang masuk
- * setelah daftar dimuat tetap muncul. Respons = daftar jenis itu setelah ditinjau.
- * @summary Tandai pengecualian satu jenis sudah ditinjau
+ * mundur. upTo = jam kejadian terbaru yang dilihat pemilik (ExceptionAttention.latestAt saat
+ * ditinjau langsung dari daftar Perlu perhatian, S8), sehingga kejadian yang masuk setelah
+ * daftar dimuat tetap muncul. selisih_kecil memakai penanda per kasir (K18): kasirId wajib
+ * (tanpa → 422 VALIDATION) dan hanya penanda kasir itu yang maju; jenis lain mengabaikan
+ * kasirId. Respons = daftar jenis itu (untuk selisih_kecil: kasir itu) setelah ditinjau.
+ * @summary Tandai kejadian satu jenis sudah ditinjau
  */
 export const ReviewOwnerExceptionsBody = zod.object({
-  "kind": zod.enum(['batal_transaksi', 'batal_pelunasan', 'kasbon_lewat_limit']).describe('Pengecualian kasir (ruling R1/R9): batal_transaksi (penjualan dibatalkan kasir),\nbatal_pelunasan (pelunasan dibatalkan kasir), kasbon_lewat_limit (kasbon melewati limit\ndengan alasan; penjualan yang kemudian dibatalkan tidak ikut).\n'),
-  "upTo": zod.int().describe('Jam kejadian terbaru yang sudah dilihat pemilik (epoch ms UTC); dijepit ke jam server.')
+  "kind": zod.enum(['batal_transaksi', 'batal_pelunasan', 'kasbon_lewat_limit', 'batal_kas_keluar', 'selisih_kas', 'kas_keluar', 'serah_terima', 'shift_lama', 'selisih_kecil']).describe('Jenis kejadian Perlu perhatian (ruling R1/R9, K2), urutan tetap: batal_transaksi (penjualan\ndibatalkan kasir), batal_pelunasan (pelunasan dibatalkan kasir), kasbon_lewat_limit (kasbon\nmelewati limit dengan alasan; penjualan yang kemudian dibatalkan tidak ikut),\nbatal_kas_keluar (kas keluar dibatalkan kasir, S10), selisih_kas (|selisih tutup shift| ≥\ncashDiffMin, S6), kas_keluar (kas keluar besar, S2/K4), serah_terima (modal berbeda dari\nsaran, S4), shift_lama (shift buka > shiftMaxHours jam, S3), selisih_kecil (Σ selisih\nkurang kecil satu kasir dalam 7 hari > smallShortageWeekMax, S6/K18).\n'),
+  "upTo": zod.int().describe('Jam kejadian terbaru yang sudah dilihat pemilik (epoch ms UTC); dijepit ke jam server.'),
+  "kasirId": zod.string().nullish().describe('Wajib untuk selisih_kecil (penanda per kasir, K18; tanpa → 422); diabaikan jenis lain.')
 })
 
 
 
 
 export const ReviewOwnerExceptionsResponse = zod.object({
-  "kind": zod.enum(['batal_transaksi', 'batal_pelunasan', 'kasbon_lewat_limit']).describe('Pengecualian kasir (ruling R1/R9): batal_transaksi (penjualan dibatalkan kasir),\nbatal_pelunasan (pelunasan dibatalkan kasir), kasbon_lewat_limit (kasbon melewati limit\ndengan alasan; penjualan yang kemudian dibatalkan tidak ikut).\n'),
-  "reviewedAt": zod.int().nullable().describe('Terakhir ditinjau (epoch ms UTC); null bila belum pernah.'),
+  "kind": zod.enum(['batal_transaksi', 'batal_pelunasan', 'kasbon_lewat_limit', 'batal_kas_keluar', 'selisih_kas', 'kas_keluar', 'serah_terima', 'shift_lama', 'selisih_kecil']).describe('Jenis kejadian Perlu perhatian (ruling R1/R9, K2), urutan tetap: batal_transaksi (penjualan\ndibatalkan kasir), batal_pelunasan (pelunasan dibatalkan kasir), kasbon_lewat_limit (kasbon\nmelewati limit dengan alasan; penjualan yang kemudian dibatalkan tidak ikut),\nbatal_kas_keluar (kas keluar dibatalkan kasir, S10), selisih_kas (|selisih tutup shift| ≥\ncashDiffMin, S6), kas_keluar (kas keluar besar, S2/K4), serah_terima (modal berbeda dari\nsaran, S4), shift_lama (shift buka > shiftMaxHours jam, S3), selisih_kecil (Σ selisih\nkurang kecil satu kasir dalam 7 hari > smallShortageWeekMax, S6/K18).\n'),
+  "reviewedAt": zod.int().nullable().describe('Terakhir ditinjau (epoch ms UTC; selisih_kecil = penanda kasir itu); null bila belum pernah.'),
   "items": zod.array(zod.object({
   "id": zod.string(),
-  "kind": zod.enum(['batal_transaksi', 'batal_pelunasan', 'kasbon_lewat_limit']).describe('Pengecualian kasir (ruling R1/R9): batal_transaksi (penjualan dibatalkan kasir),\nbatal_pelunasan (pelunasan dibatalkan kasir), kasbon_lewat_limit (kasbon melewati limit\ndengan alasan; penjualan yang kemudian dibatalkan tidak ikut).\n'),
+  "kind": zod.enum(['batal_transaksi', 'batal_pelunasan', 'kasbon_lewat_limit', 'batal_kas_keluar', 'selisih_kas', 'kas_keluar', 'serah_terima', 'shift_lama', 'selisih_kecil']).describe('Jenis kejadian Perlu perhatian (ruling R1/R9, K2), urutan tetap: batal_transaksi (penjualan\ndibatalkan kasir), batal_pelunasan (pelunasan dibatalkan kasir), kasbon_lewat_limit (kasbon\nmelewati limit dengan alasan; penjualan yang kemudian dibatalkan tidak ikut),\nbatal_kas_keluar (kas keluar dibatalkan kasir, S10), selisih_kas (|selisih tutup shift| ≥\ncashDiffMin, S6), kas_keluar (kas keluar besar, S2/K4), serah_terima (modal berbeda dari\nsaran, S4), shift_lama (shift buka > shiftMaxHours jam, S3), selisih_kecil (Σ selisih\nkurang kecil satu kasir dalam 7 hari > smallShortageWeekMax, S6/K18).\n'),
   "at": zod.int().describe('Jam server kejadian (epoch ms UTC).'),
+  "kasirId": zod.string().nullable(),
   "kasirName": zod.string(),
   "amount": zod.int(),
-  "reason": zod.string(),
+  "reason": zod.string().nullable().describe('Alasan dari kasir; null untuk selisih_kas, shift_lama, selisih_kecil, dan kas_keluar per shift.'),
+  "shiftId": zod.string().nullable(),
+  "durationMinutes": zod.int().nullable().describe('Hanya shift_lama; lama shift dalam menit penuh.'),
   "customerName": zod.string().nullable(),
   "saleId": zod.string().nullable(),
   "saleNumber": zod.string().nullable(),
@@ -1977,8 +2014,864 @@ export const ReviewOwnerExceptionsResponse = zod.object({
   "refund": zod.int(),
   "qrisToOwner": zod.int(),
   "overLimitExcess": zod.int().min(1).nullable()
-}).describe('Satu kejadian. batal_transaksi: at = jam batal, kasirName = pembatal, amount = total\ntransaksi, saleId/saleNumber terisi; fromClosedShift = transaksi dari shift yang sudah tutup\n(ruling R12); refund = uang yang keluar dari laci shift yang sedang buka saat itu (0 bila\ntidak ada); qrisToOwner = bagian QRIS yang dipilih Transfer oleh pemilik nanti (pemilik\nharus mentransfer). batal_pelunasan: at = jam batal, kasirName = pembatal, amount = nominal\npelunasan, paymentId terisi. kasbon_lewat_limit: at = jam jual, kasirName = kasir, amount =\nkelebihan limit bagian kasbon ini, saleId/saleNumber terisi. customerName = pelanggan (null\nbila tanpa pelanggan). Untuk selain batal_transaksi fromClosedShift false, refund dan\nqrisToOwner 0. overLimitExcess (batal_transaksi) = kelebihan limit kasbon transaksi yang\ndibatalkan (CreditOverLimit.excess yang tercatat), null bila transaksi itu tidak lewat limit;\nselain batal_transaksi selalu null. Butir kasbon_lewat_limit transaksi itu tetap hilang\nsaat transaksinya dibatalkan.\n')).describe('Kejadian dengan at > reviewedAt, terbaru dulu.')
+}).describe('Satu kejadian. batal_transaksi: at = jam batal, kasirName = pembatal, amount = total\ntransaksi, saleId/saleNumber terisi; fromClosedShift = transaksi dari shift yang sudah tutup\n(ruling R12); refund = uang yang keluar dari laci shift yang sedang buka saat itu (0 bila\ntidak ada); qrisToOwner = bagian QRIS yang dipilih Transfer oleh pemilik nanti (pemilik\nharus mentransfer). batal_pelunasan: at = jam batal, kasirName = pembatal, amount = nominal\npelunasan, paymentId terisi. kasbon_lewat_limit: at = jam jual, kasirName = kasir, amount =\nkelebihan limit bagian kasbon ini, saleId/saleNumber terisi. customerName = pelanggan (null\nbila tanpa pelanggan). Untuk selain batal_transaksi fromClosedShift false, refund dan\nqrisToOwner 0. overLimitExcess (batal_transaksi) = kelebihan limit kasbon transaksi yang\ndibatalkan (CreditOverLimit.excess yang tercatat), null bila transaksi itu tidak lewat limit;\nselain batal_transaksi selalu null. Butir kasbon_lewat_limit transaksi itu tetap hilang\nsaat transaksinya dibatalkan.\nJenis F3c-2a (K3, K4, K5, K22): batal_kas_keluar: id = id kas keluar, at = jam batal,\nkasirName = pembatal, amount = nominal, reason = alasan batal. selisih_kas: id = shiftId, at\n= closedAt, kasirName = kasir shift, amount = difference (bertanda), reason null.\nkas_keluar: (a) id = id kas keluar, at = jam catat, amount = nominal, reason = alasannya;\n(b) id = kas_keluar_shift-{shiftId}, at = jam kas keluar yang membuat Σ shift lewat, amount =\nΣ kas keluar aktif shift saat ini, reason null; kasirName = kasir shift. serah_terima: id =\nshiftId, at = openedAt, kasirName = kasir yang membuka, amount = openingCash −\nsuggestedOpening (bertanda), reason = openingNote. shift_lama: id = shiftId, at = openedAt +\nshiftMaxHours jam, amount 0, durationMinutes = menit penuh (closedAt ?? jam server) −\nopenedAt, reason null. selisih_kecil: id = shiftId, at = closedAt, amount = difference (< 0),\nreason null. shiftId = shift kejadian (null untuk tiga jenis F3c-1); durationMinutes hanya\nshift_lama (selain itu null); kasirId = id kasir pelaku (pembatal untuk jenis batal; null\nbila rekaman tidak menyimpannya). customerName, saleId, saleNumber, paymentId null untuk\njenis F3c-2a.\n')).describe('Kejadian dengan at > reviewedAt, terbaru dulu.')
 })
+
+/**
+ * Satu sumber nilai (K19): store.name = KasirSettings.storeName, attention.shiftMaxHours =
+ * KasirSettings.shiftMaxHours, stock = batas opname & kedaluwarsa (J8), report = batas
+ * laporan stok, credit.defaultCreditLimit = limit pelanggan baru dari kasir.
+ * @summary Pengaturan toko pemilik (semua bagian)
+ */
+export const getOwnerSettingsResponseStoreNameMax = 40;
+
+export const getOwnerSettingsResponseStoreAddressMax = 120;
+
+export const getOwnerSettingsResponseStoreReceiptFooterMax = 120;
+
+export const getOwnerSettingsResponseKasirCurahFractionsItemMax = 100000;
+
+export const getOwnerSettingsResponseKasirCurahFractionsMax = 8;
+
+export const getOwnerSettingsResponseKasirQuickCurahProductIdsMax = 12;
+
+export const getOwnerSettingsResponseCreditDefaultCreditLimitMin = 0;
+export const getOwnerSettingsResponseCreditDefaultCreditLimitMax = 100000000;
+
+export const getOwnerSettingsResponseStockExpirySoonDaysMax = 90;
+
+export const getOwnerSettingsResponseStockOpnameItemLimitMin = 0;
+export const getOwnerSettingsResponseStockOpnameItemLimitMax = 10000000;
+
+export const getOwnerSettingsResponseStockOpnameSessionLimitMin = 0;
+export const getOwnerSettingsResponseStockOpnameSessionLimitMax = 10000000;
+
+export const getOwnerSettingsResponseReportThinMarginPermilleMin = 0;
+export const getOwnerSettingsResponseReportThinMarginPermilleMax = 1000;
+
+export const getOwnerSettingsResponseReportUnsoldDaysMin = 7;
+export const getOwnerSettingsResponseReportUnsoldDaysMax = 365;
+
+export const getOwnerSettingsResponseAttentionCashDiffMinMin = 0;
+export const getOwnerSettingsResponseAttentionCashDiffMinMax = 10000000;
+
+export const getOwnerSettingsResponseAttentionSmallShortageWeekMaxMin = 0;
+export const getOwnerSettingsResponseAttentionSmallShortageWeekMaxMax = 10000000;
+
+export const getOwnerSettingsResponseAttentionExpenseSingleMaxMin = 0;
+export const getOwnerSettingsResponseAttentionExpenseSingleMaxMax = 10000000;
+
+export const getOwnerSettingsResponseAttentionExpenseShiftMaxMin = 0;
+export const getOwnerSettingsResponseAttentionExpenseShiftMaxMax = 10000000;
+
+export const getOwnerSettingsResponseAttentionShiftMaxHoursMax = 24;
+
+export const getOwnerSettingsResponseOwnerPhoneMin = 8;
+export const getOwnerSettingsResponseOwnerPhoneMax = 16;
+
+
+export const getOwnerSettingsResponseOwnerPhoneRegExp = new RegExp('^[0-9+ -]+$');
+
+
+export const GetOwnerSettingsResponse = zod.object({
+  "store": zod.object({
+  "name": zod.string().min(1).max(getOwnerSettingsResponseStoreNameMax),
+  "address": zod.string().max(getOwnerSettingsResponseStoreAddressMax),
+  "receiptFooter": zod.string().max(getOwnerSettingsResponseStoreReceiptFooterMax),
+  "qrisImageUrl": zod.string().describe('Diubah hanya lewat putOwnerQrisImage.')
+}).describe('Identitas toko & struk (K13); name = KasirSettings.storeName.'),
+  "kasir": zod.object({
+  "autoPrint": zod.boolean(),
+  "allowNegativeStock": zod.boolean(),
+  "curahFractions": zod.array(zod.int().min(1).max(getOwnerSettingsResponseKasirCurahFractionsItemMax)).min(1).max(getOwnerSettingsResponseKasirCurahFractionsMax).describe('Pecahan curah dalam qtyBase; 1..8 angka unik, naik, masing-masing 1..100.000.'),
+  "quickCurahProductIds": zod.array(zod.string()).max(getOwnerSettingsResponseKasirQuickCurahProductIdsMax).describe('Paling banyak 12 id barang curah yang aktif.')
+}).describe('Perilaku layar kasir; nilainya menjadi KasirSettings dengan nama field yang sama.'),
+  "credit": zod.object({
+  "defaultCreditLimit": zod.int().min(getOwnerSettingsResponseCreditDefaultCreditLimitMin).max(getOwnerSettingsResponseCreditDefaultCreditLimitMax).describe('Limit kasbon pelanggan baru yang dibuat dari kasir (createCustomer).')
+}),
+  "stock": zod.object({
+  "expirySoonDays": zod.int().min(1).max(getOwnerSettingsResponseStockExpirySoonDaysMax),
+  "opnameItemLimit": zod.int().min(getOwnerSettingsResponseStockOpnameItemLimitMin).max(getOwnerSettingsResponseStockOpnameItemLimitMax).describe('Tahan selisih opname per barang di atas nilai ini (rupiah).'),
+  "opnameSessionLimit": zod.int().min(getOwnerSettingsResponseStockOpnameSessionLimitMin).max(getOwnerSettingsResponseStockOpnameSessionLimitMax).describe('Tandai sesi opname dengan total selisih di atas nilai ini (rupiah).')
+}).describe('Batas stok (J8); opnameItemLimit ≤ opnameSessionLimit (selain itu 422).'),
+  "report": zod.object({
+  "thinMarginPermille": zod.int().min(getOwnerSettingsResponseReportThinMarginPermilleMin).max(getOwnerSettingsResponseReportThinMarginPermilleMax).describe('Batas untung tipis dalam permil (UI persen bulat × 10).'),
+  "unsoldDays": zod.int().min(getOwnerSettingsResponseReportUnsoldDaysMin).max(getOwnerSettingsResponseReportUnsoldDaysMax)
+}),
+  "attention": zod.object({
+  "cashDiffMin": zod.int().min(getOwnerSettingsResponseAttentionCashDiffMinMin).max(getOwnerSettingsResponseAttentionCashDiffMinMax),
+  "smallShortageWeekMax": zod.int().min(getOwnerSettingsResponseAttentionSmallShortageWeekMaxMin).max(getOwnerSettingsResponseAttentionSmallShortageWeekMaxMax),
+  "expenseSingleMax": zod.int().min(getOwnerSettingsResponseAttentionExpenseSingleMaxMin).max(getOwnerSettingsResponseAttentionExpenseSingleMaxMax),
+  "expenseShiftMax": zod.int().min(getOwnerSettingsResponseAttentionExpenseShiftMaxMin).max(getOwnerSettingsResponseAttentionExpenseShiftMaxMax),
+  "shiftMaxHours": zod.int().min(1).max(getOwnerSettingsResponseAttentionShiftMaxHoursMax)
+}).describe('Ambang Perlu perhatian (S2, S3, S6, K7), semua dibandingkan ketat dan dibaca saat ini (bukan\nsalinan saat kejadian). Selisih kas |d| ≥ cashDiffMin = kejadian selisih_kas; −cashDiffMin <\nd < 0 = selisih kecil, butir bila Σ satu kasir dalam 7 hari > smallShortageWeekMax; kas\nkeluar > expenseSingleMax atau Σ satu shift > expenseShiftMax = kas_keluar; shift buka >\nshiftMaxHours jam = shift_lama. Aturan murni yang sama dipakai app (shared/lib/attention-rules).\n'),
+  "ownerPhone": zod.string().min(getOwnerSettingsResponseOwnerPhoneMin).max(getOwnerSettingsResponseOwnerPhoneMax).regex(getOwnerSettingsResponseOwnerPhoneRegExp).nullable().describe('Ditampilkan di dialog alasan kasir (R11) lewat KasirSettings.ownerPhone.')
+}).describe('Pengaturan lengkap pemilik; hanya di /api/owner.')
+
+/**
+ * (K13) Satu PATCH per bagian: setiap bagian opsional, tetapi bagian yang dikirim harus utuh;
+ * bagian yang tidak dikirim tidak berubah. ownerPhone tidak dikirim = tidak berubah, null =
+ * dihapus. Validasi (galat → 422 VALIDATION dengan detail berbahasa Indonesia, tanpa menyimpan
+ * bagian mana pun): store.name 1..40 karakter setelah trim; store.address dan
+ * store.receiptFooter 0..120 karakter setelah trim; kasir.curahFractions 1..8 angka unik naik
+ * 1..100.000; kasir.quickCurahProductIds ≤ 12 id barang curah aktif; credit.defaultCreditLimit
+ * 0..100.000.000; stock.expirySoonDays 1..90; stock.opnameItemLimit dan
+ * stock.opnameSessionLimit 0..10.000.000 dengan opnameItemLimit ≤ opnameSessionLimit;
+ * report.thinMarginPermille 0..1000; report.unsoldDays 7..365; attention: batas uang
+ * 0..10.000.000 dan shiftMaxHours 1..24; ownerPhone null atau 8..16 karakter ^[0-9+ -]+$.
+ * store.name sekaligus menjadi KasirSettings.storeName (K19); attention.shiftMaxHours menjadi
+ * KasirSettings.shiftMaxHours. Ambang baru langsung berlaku untuk butir Perlu perhatian (K7)
+ * dan batas stok/laporan. Identitas toko dan catatan kaki dipakai struk yang dicetak server.
+ * Respons = OwnerSettings lengkap.
+ * @summary Ubah satu bagian Pengaturan
+ */
+export const updateOwnerSettingsBodyStoreNameMax = 40;
+
+export const updateOwnerSettingsBodyStoreAddressMax = 120;
+
+export const updateOwnerSettingsBodyStoreReceiptFooterMax = 120;
+
+export const updateOwnerSettingsBodyKasirCurahFractionsItemMax = 100000;
+
+export const updateOwnerSettingsBodyKasirCurahFractionsMax = 8;
+
+export const updateOwnerSettingsBodyKasirQuickCurahProductIdsMax = 12;
+
+export const updateOwnerSettingsBodyCreditDefaultCreditLimitMin = 0;
+export const updateOwnerSettingsBodyCreditDefaultCreditLimitMax = 100000000;
+
+export const updateOwnerSettingsBodyStockExpirySoonDaysMax = 90;
+
+export const updateOwnerSettingsBodyStockOpnameItemLimitMin = 0;
+export const updateOwnerSettingsBodyStockOpnameItemLimitMax = 10000000;
+
+export const updateOwnerSettingsBodyStockOpnameSessionLimitMin = 0;
+export const updateOwnerSettingsBodyStockOpnameSessionLimitMax = 10000000;
+
+export const updateOwnerSettingsBodyReportThinMarginPermilleMin = 0;
+export const updateOwnerSettingsBodyReportThinMarginPermilleMax = 1000;
+
+export const updateOwnerSettingsBodyReportUnsoldDaysMin = 7;
+export const updateOwnerSettingsBodyReportUnsoldDaysMax = 365;
+
+export const updateOwnerSettingsBodyAttentionCashDiffMinMin = 0;
+export const updateOwnerSettingsBodyAttentionCashDiffMinMax = 10000000;
+
+export const updateOwnerSettingsBodyAttentionSmallShortageWeekMaxMin = 0;
+export const updateOwnerSettingsBodyAttentionSmallShortageWeekMaxMax = 10000000;
+
+export const updateOwnerSettingsBodyAttentionExpenseSingleMaxMin = 0;
+export const updateOwnerSettingsBodyAttentionExpenseSingleMaxMax = 10000000;
+
+export const updateOwnerSettingsBodyAttentionExpenseShiftMaxMin = 0;
+export const updateOwnerSettingsBodyAttentionExpenseShiftMaxMax = 10000000;
+
+export const updateOwnerSettingsBodyAttentionShiftMaxHoursMax = 24;
+
+export const updateOwnerSettingsBodyOwnerPhoneMin = 8;
+export const updateOwnerSettingsBodyOwnerPhoneMax = 16;
+
+
+export const updateOwnerSettingsBodyOwnerPhoneRegExp = new RegExp('^[0-9+ -]+$');
+
+
+export const UpdateOwnerSettingsBody = zod.object({
+  "store": zod.object({
+  "name": zod.string().min(1).max(updateOwnerSettingsBodyStoreNameMax),
+  "address": zod.string().max(updateOwnerSettingsBodyStoreAddressMax),
+  "receiptFooter": zod.string().max(updateOwnerSettingsBodyStoreReceiptFooterMax)
+}).optional().describe('Bagian store pada PATCH (tanpa qrisImageUrl); teks di-trim server.'),
+  "kasir": zod.object({
+  "autoPrint": zod.boolean(),
+  "allowNegativeStock": zod.boolean(),
+  "curahFractions": zod.array(zod.int().min(1).max(updateOwnerSettingsBodyKasirCurahFractionsItemMax)).min(1).max(updateOwnerSettingsBodyKasirCurahFractionsMax).describe('Pecahan curah dalam qtyBase; 1..8 angka unik, naik, masing-masing 1..100.000.'),
+  "quickCurahProductIds": zod.array(zod.string()).max(updateOwnerSettingsBodyKasirQuickCurahProductIdsMax).describe('Paling banyak 12 id barang curah yang aktif.')
+}).optional().describe('Perilaku layar kasir; nilainya menjadi KasirSettings dengan nama field yang sama.'),
+  "credit": zod.object({
+  "defaultCreditLimit": zod.int().min(updateOwnerSettingsBodyCreditDefaultCreditLimitMin).max(updateOwnerSettingsBodyCreditDefaultCreditLimitMax).describe('Limit kasbon pelanggan baru yang dibuat dari kasir (createCustomer).')
+}).optional(),
+  "stock": zod.object({
+  "expirySoonDays": zod.int().min(1).max(updateOwnerSettingsBodyStockExpirySoonDaysMax),
+  "opnameItemLimit": zod.int().min(updateOwnerSettingsBodyStockOpnameItemLimitMin).max(updateOwnerSettingsBodyStockOpnameItemLimitMax).describe('Tahan selisih opname per barang di atas nilai ini (rupiah).'),
+  "opnameSessionLimit": zod.int().min(updateOwnerSettingsBodyStockOpnameSessionLimitMin).max(updateOwnerSettingsBodyStockOpnameSessionLimitMax).describe('Tandai sesi opname dengan total selisih di atas nilai ini (rupiah).')
+}).optional().describe('Batas stok (J8); opnameItemLimit ≤ opnameSessionLimit (selain itu 422).'),
+  "report": zod.object({
+  "thinMarginPermille": zod.int().min(updateOwnerSettingsBodyReportThinMarginPermilleMin).max(updateOwnerSettingsBodyReportThinMarginPermilleMax).describe('Batas untung tipis dalam permil (UI persen bulat × 10).'),
+  "unsoldDays": zod.int().min(updateOwnerSettingsBodyReportUnsoldDaysMin).max(updateOwnerSettingsBodyReportUnsoldDaysMax)
+}).optional(),
+  "attention": zod.object({
+  "cashDiffMin": zod.int().min(updateOwnerSettingsBodyAttentionCashDiffMinMin).max(updateOwnerSettingsBodyAttentionCashDiffMinMax),
+  "smallShortageWeekMax": zod.int().min(updateOwnerSettingsBodyAttentionSmallShortageWeekMaxMin).max(updateOwnerSettingsBodyAttentionSmallShortageWeekMaxMax),
+  "expenseSingleMax": zod.int().min(updateOwnerSettingsBodyAttentionExpenseSingleMaxMin).max(updateOwnerSettingsBodyAttentionExpenseSingleMaxMax),
+  "expenseShiftMax": zod.int().min(updateOwnerSettingsBodyAttentionExpenseShiftMaxMin).max(updateOwnerSettingsBodyAttentionExpenseShiftMaxMax),
+  "shiftMaxHours": zod.int().min(1).max(updateOwnerSettingsBodyAttentionShiftMaxHoursMax)
+}).optional().describe('Ambang Perlu perhatian (S2, S3, S6, K7), semua dibandingkan ketat dan dibaca saat ini (bukan\nsalinan saat kejadian). Selisih kas |d| ≥ cashDiffMin = kejadian selisih_kas; −cashDiffMin <\nd < 0 = selisih kecil, butir bila Σ satu kasir dalam 7 hari > smallShortageWeekMax; kas\nkeluar > expenseSingleMax atau Σ satu shift > expenseShiftMax = kas_keluar; shift buka >\nshiftMaxHours jam = shift_lama. Aturan murni yang sama dipakai app (shared/lib/attention-rules).\n'),
+  "ownerPhone": zod.string().min(updateOwnerSettingsBodyOwnerPhoneMin).max(updateOwnerSettingsBodyOwnerPhoneMax).regex(updateOwnerSettingsBodyOwnerPhoneRegExp).nullish()
+}).describe('Satu bagian per PATCH (K13): setiap bagian opsional, bagian yang dikirim harus utuh.\nownerPhone tidak dikirim = tidak berubah; null = dihapus.\n')
+
+export const updateOwnerSettingsResponseStoreNameMax = 40;
+
+export const updateOwnerSettingsResponseStoreAddressMax = 120;
+
+export const updateOwnerSettingsResponseStoreReceiptFooterMax = 120;
+
+export const updateOwnerSettingsResponseKasirCurahFractionsItemMax = 100000;
+
+export const updateOwnerSettingsResponseKasirCurahFractionsMax = 8;
+
+export const updateOwnerSettingsResponseKasirQuickCurahProductIdsMax = 12;
+
+export const updateOwnerSettingsResponseCreditDefaultCreditLimitMin = 0;
+export const updateOwnerSettingsResponseCreditDefaultCreditLimitMax = 100000000;
+
+export const updateOwnerSettingsResponseStockExpirySoonDaysMax = 90;
+
+export const updateOwnerSettingsResponseStockOpnameItemLimitMin = 0;
+export const updateOwnerSettingsResponseStockOpnameItemLimitMax = 10000000;
+
+export const updateOwnerSettingsResponseStockOpnameSessionLimitMin = 0;
+export const updateOwnerSettingsResponseStockOpnameSessionLimitMax = 10000000;
+
+export const updateOwnerSettingsResponseReportThinMarginPermilleMin = 0;
+export const updateOwnerSettingsResponseReportThinMarginPermilleMax = 1000;
+
+export const updateOwnerSettingsResponseReportUnsoldDaysMin = 7;
+export const updateOwnerSettingsResponseReportUnsoldDaysMax = 365;
+
+export const updateOwnerSettingsResponseAttentionCashDiffMinMin = 0;
+export const updateOwnerSettingsResponseAttentionCashDiffMinMax = 10000000;
+
+export const updateOwnerSettingsResponseAttentionSmallShortageWeekMaxMin = 0;
+export const updateOwnerSettingsResponseAttentionSmallShortageWeekMaxMax = 10000000;
+
+export const updateOwnerSettingsResponseAttentionExpenseSingleMaxMin = 0;
+export const updateOwnerSettingsResponseAttentionExpenseSingleMaxMax = 10000000;
+
+export const updateOwnerSettingsResponseAttentionExpenseShiftMaxMin = 0;
+export const updateOwnerSettingsResponseAttentionExpenseShiftMaxMax = 10000000;
+
+export const updateOwnerSettingsResponseAttentionShiftMaxHoursMax = 24;
+
+export const updateOwnerSettingsResponseOwnerPhoneMin = 8;
+export const updateOwnerSettingsResponseOwnerPhoneMax = 16;
+
+
+export const updateOwnerSettingsResponseOwnerPhoneRegExp = new RegExp('^[0-9+ -]+$');
+
+
+export const UpdateOwnerSettingsResponse = zod.object({
+  "store": zod.object({
+  "name": zod.string().min(1).max(updateOwnerSettingsResponseStoreNameMax),
+  "address": zod.string().max(updateOwnerSettingsResponseStoreAddressMax),
+  "receiptFooter": zod.string().max(updateOwnerSettingsResponseStoreReceiptFooterMax),
+  "qrisImageUrl": zod.string().describe('Diubah hanya lewat putOwnerQrisImage.')
+}).describe('Identitas toko & struk (K13); name = KasirSettings.storeName.'),
+  "kasir": zod.object({
+  "autoPrint": zod.boolean(),
+  "allowNegativeStock": zod.boolean(),
+  "curahFractions": zod.array(zod.int().min(1).max(updateOwnerSettingsResponseKasirCurahFractionsItemMax)).min(1).max(updateOwnerSettingsResponseKasirCurahFractionsMax).describe('Pecahan curah dalam qtyBase; 1..8 angka unik, naik, masing-masing 1..100.000.'),
+  "quickCurahProductIds": zod.array(zod.string()).max(updateOwnerSettingsResponseKasirQuickCurahProductIdsMax).describe('Paling banyak 12 id barang curah yang aktif.')
+}).describe('Perilaku layar kasir; nilainya menjadi KasirSettings dengan nama field yang sama.'),
+  "credit": zod.object({
+  "defaultCreditLimit": zod.int().min(updateOwnerSettingsResponseCreditDefaultCreditLimitMin).max(updateOwnerSettingsResponseCreditDefaultCreditLimitMax).describe('Limit kasbon pelanggan baru yang dibuat dari kasir (createCustomer).')
+}),
+  "stock": zod.object({
+  "expirySoonDays": zod.int().min(1).max(updateOwnerSettingsResponseStockExpirySoonDaysMax),
+  "opnameItemLimit": zod.int().min(updateOwnerSettingsResponseStockOpnameItemLimitMin).max(updateOwnerSettingsResponseStockOpnameItemLimitMax).describe('Tahan selisih opname per barang di atas nilai ini (rupiah).'),
+  "opnameSessionLimit": zod.int().min(updateOwnerSettingsResponseStockOpnameSessionLimitMin).max(updateOwnerSettingsResponseStockOpnameSessionLimitMax).describe('Tandai sesi opname dengan total selisih di atas nilai ini (rupiah).')
+}).describe('Batas stok (J8); opnameItemLimit ≤ opnameSessionLimit (selain itu 422).'),
+  "report": zod.object({
+  "thinMarginPermille": zod.int().min(updateOwnerSettingsResponseReportThinMarginPermilleMin).max(updateOwnerSettingsResponseReportThinMarginPermilleMax).describe('Batas untung tipis dalam permil (UI persen bulat × 10).'),
+  "unsoldDays": zod.int().min(updateOwnerSettingsResponseReportUnsoldDaysMin).max(updateOwnerSettingsResponseReportUnsoldDaysMax)
+}),
+  "attention": zod.object({
+  "cashDiffMin": zod.int().min(updateOwnerSettingsResponseAttentionCashDiffMinMin).max(updateOwnerSettingsResponseAttentionCashDiffMinMax),
+  "smallShortageWeekMax": zod.int().min(updateOwnerSettingsResponseAttentionSmallShortageWeekMaxMin).max(updateOwnerSettingsResponseAttentionSmallShortageWeekMaxMax),
+  "expenseSingleMax": zod.int().min(updateOwnerSettingsResponseAttentionExpenseSingleMaxMin).max(updateOwnerSettingsResponseAttentionExpenseSingleMaxMax),
+  "expenseShiftMax": zod.int().min(updateOwnerSettingsResponseAttentionExpenseShiftMaxMin).max(updateOwnerSettingsResponseAttentionExpenseShiftMaxMax),
+  "shiftMaxHours": zod.int().min(1).max(updateOwnerSettingsResponseAttentionShiftMaxHoursMax)
+}).describe('Ambang Perlu perhatian (S2, S3, S6, K7), semua dibandingkan ketat dan dibaca saat ini (bukan\nsalinan saat kejadian). Selisih kas |d| ≥ cashDiffMin = kejadian selisih_kas; −cashDiffMin <\nd < 0 = selisih kecil, butir bila Σ satu kasir dalam 7 hari > smallShortageWeekMax; kas\nkeluar > expenseSingleMax atau Σ satu shift > expenseShiftMax = kas_keluar; shift buka >\nshiftMaxHours jam = shift_lama. Aturan murni yang sama dipakai app (shared/lib/attention-rules).\n'),
+  "ownerPhone": zod.string().min(updateOwnerSettingsResponseOwnerPhoneMin).max(updateOwnerSettingsResponseOwnerPhoneMax).regex(updateOwnerSettingsResponseOwnerPhoneRegExp).nullable().describe('Ditampilkan di dialog alasan kasir (R11) lewat KasirSettings.ownerPhone.')
+}).describe('Pengaturan lengkap pemilik; hanya di /api/owner.')
+
+/**
+ * Hitungan sama dengan laporan stok untung tipis pada batas permille ini, tanpa menyimpan
+ * apa pun: flagged = barang aktif ber-HPP dengan harga eceran > 0 yang (harga − modal) × 1000 <
+ * permille × harga; total = semua barang aktif ber-HPP dengan harga eceran > 0. permille di
+ * luar 0..1000 atau bukan bilangan bulat → 422 VALIDATION.
+ * @summary Pratinjau jumlah barang untung tipis pada batas tertentu
+ */
+export const getOwnerThinMarginPreviewQueryPermilleMin = 0;
+export const getOwnerThinMarginPreviewQueryPermilleMax = 1000;
+
+
+
+export const GetOwnerThinMarginPreviewQueryParams = zod.object({
+  "permille": zod.int().min(getOwnerThinMarginPreviewQueryPermilleMin).max(getOwnerThinMarginPreviewQueryPermilleMax).describe('Batas margin eceran dalam permil (UI persen bulat × 10).')
+})
+
+export const getOwnerThinMarginPreviewResponseFlaggedMin = 0;
+
+export const getOwnerThinMarginPreviewResponseTotalMin = 0;
+
+
+
+export const GetOwnerThinMarginPreviewResponse = zod.object({
+  "flagged": zod.int().min(getOwnerThinMarginPreviewResponseFlaggedMin).describe('Barang yang tertandai untung tipis pada batas yang diminta.'),
+  "total": zod.int().min(getOwnerThinMarginPreviewResponseTotalMin).describe('Barang yang dinilai (aktif, ber-HPP, harga eceran > 0).')
+})
+
+/**
+ * PNG atau JPEG (Content-Type sesuai berkas; server memeriksa isi berkas), paling besar 1 MB;
+ * selain itu 422 VALIDATION. Gambar lama diganti; URL baru
+ * (getQrisImage) menjadi store.qrisImageUrl dan KasirSettings.qrisImageUrl. Respons =
+ * OwnerSettings lengkap.
+ * @summary Unggah gambar QRIS toko
+ */
+export const putOwnerQrisImageResponseStoreNameMax = 40;
+
+export const putOwnerQrisImageResponseStoreAddressMax = 120;
+
+export const putOwnerQrisImageResponseStoreReceiptFooterMax = 120;
+
+export const putOwnerQrisImageResponseKasirCurahFractionsItemMax = 100000;
+
+export const putOwnerQrisImageResponseKasirCurahFractionsMax = 8;
+
+export const putOwnerQrisImageResponseKasirQuickCurahProductIdsMax = 12;
+
+export const putOwnerQrisImageResponseCreditDefaultCreditLimitMin = 0;
+export const putOwnerQrisImageResponseCreditDefaultCreditLimitMax = 100000000;
+
+export const putOwnerQrisImageResponseStockExpirySoonDaysMax = 90;
+
+export const putOwnerQrisImageResponseStockOpnameItemLimitMin = 0;
+export const putOwnerQrisImageResponseStockOpnameItemLimitMax = 10000000;
+
+export const putOwnerQrisImageResponseStockOpnameSessionLimitMin = 0;
+export const putOwnerQrisImageResponseStockOpnameSessionLimitMax = 10000000;
+
+export const putOwnerQrisImageResponseReportThinMarginPermilleMin = 0;
+export const putOwnerQrisImageResponseReportThinMarginPermilleMax = 1000;
+
+export const putOwnerQrisImageResponseReportUnsoldDaysMin = 7;
+export const putOwnerQrisImageResponseReportUnsoldDaysMax = 365;
+
+export const putOwnerQrisImageResponseAttentionCashDiffMinMin = 0;
+export const putOwnerQrisImageResponseAttentionCashDiffMinMax = 10000000;
+
+export const putOwnerQrisImageResponseAttentionSmallShortageWeekMaxMin = 0;
+export const putOwnerQrisImageResponseAttentionSmallShortageWeekMaxMax = 10000000;
+
+export const putOwnerQrisImageResponseAttentionExpenseSingleMaxMin = 0;
+export const putOwnerQrisImageResponseAttentionExpenseSingleMaxMax = 10000000;
+
+export const putOwnerQrisImageResponseAttentionExpenseShiftMaxMin = 0;
+export const putOwnerQrisImageResponseAttentionExpenseShiftMaxMax = 10000000;
+
+export const putOwnerQrisImageResponseAttentionShiftMaxHoursMax = 24;
+
+export const putOwnerQrisImageResponseOwnerPhoneMin = 8;
+export const putOwnerQrisImageResponseOwnerPhoneMax = 16;
+
+
+export const putOwnerQrisImageResponseOwnerPhoneRegExp = new RegExp('^[0-9+ -]+$');
+
+
+export const PutOwnerQrisImageResponse = zod.object({
+  "store": zod.object({
+  "name": zod.string().min(1).max(putOwnerQrisImageResponseStoreNameMax),
+  "address": zod.string().max(putOwnerQrisImageResponseStoreAddressMax),
+  "receiptFooter": zod.string().max(putOwnerQrisImageResponseStoreReceiptFooterMax),
+  "qrisImageUrl": zod.string().describe('Diubah hanya lewat putOwnerQrisImage.')
+}).describe('Identitas toko & struk (K13); name = KasirSettings.storeName.'),
+  "kasir": zod.object({
+  "autoPrint": zod.boolean(),
+  "allowNegativeStock": zod.boolean(),
+  "curahFractions": zod.array(zod.int().min(1).max(putOwnerQrisImageResponseKasirCurahFractionsItemMax)).min(1).max(putOwnerQrisImageResponseKasirCurahFractionsMax).describe('Pecahan curah dalam qtyBase; 1..8 angka unik, naik, masing-masing 1..100.000.'),
+  "quickCurahProductIds": zod.array(zod.string()).max(putOwnerQrisImageResponseKasirQuickCurahProductIdsMax).describe('Paling banyak 12 id barang curah yang aktif.')
+}).describe('Perilaku layar kasir; nilainya menjadi KasirSettings dengan nama field yang sama.'),
+  "credit": zod.object({
+  "defaultCreditLimit": zod.int().min(putOwnerQrisImageResponseCreditDefaultCreditLimitMin).max(putOwnerQrisImageResponseCreditDefaultCreditLimitMax).describe('Limit kasbon pelanggan baru yang dibuat dari kasir (createCustomer).')
+}),
+  "stock": zod.object({
+  "expirySoonDays": zod.int().min(1).max(putOwnerQrisImageResponseStockExpirySoonDaysMax),
+  "opnameItemLimit": zod.int().min(putOwnerQrisImageResponseStockOpnameItemLimitMin).max(putOwnerQrisImageResponseStockOpnameItemLimitMax).describe('Tahan selisih opname per barang di atas nilai ini (rupiah).'),
+  "opnameSessionLimit": zod.int().min(putOwnerQrisImageResponseStockOpnameSessionLimitMin).max(putOwnerQrisImageResponseStockOpnameSessionLimitMax).describe('Tandai sesi opname dengan total selisih di atas nilai ini (rupiah).')
+}).describe('Batas stok (J8); opnameItemLimit ≤ opnameSessionLimit (selain itu 422).'),
+  "report": zod.object({
+  "thinMarginPermille": zod.int().min(putOwnerQrisImageResponseReportThinMarginPermilleMin).max(putOwnerQrisImageResponseReportThinMarginPermilleMax).describe('Batas untung tipis dalam permil (UI persen bulat × 10).'),
+  "unsoldDays": zod.int().min(putOwnerQrisImageResponseReportUnsoldDaysMin).max(putOwnerQrisImageResponseReportUnsoldDaysMax)
+}),
+  "attention": zod.object({
+  "cashDiffMin": zod.int().min(putOwnerQrisImageResponseAttentionCashDiffMinMin).max(putOwnerQrisImageResponseAttentionCashDiffMinMax),
+  "smallShortageWeekMax": zod.int().min(putOwnerQrisImageResponseAttentionSmallShortageWeekMaxMin).max(putOwnerQrisImageResponseAttentionSmallShortageWeekMaxMax),
+  "expenseSingleMax": zod.int().min(putOwnerQrisImageResponseAttentionExpenseSingleMaxMin).max(putOwnerQrisImageResponseAttentionExpenseSingleMaxMax),
+  "expenseShiftMax": zod.int().min(putOwnerQrisImageResponseAttentionExpenseShiftMaxMin).max(putOwnerQrisImageResponseAttentionExpenseShiftMaxMax),
+  "shiftMaxHours": zod.int().min(1).max(putOwnerQrisImageResponseAttentionShiftMaxHoursMax)
+}).describe('Ambang Perlu perhatian (S2, S3, S6, K7), semua dibandingkan ketat dan dibaca saat ini (bukan\nsalinan saat kejadian). Selisih kas |d| ≥ cashDiffMin = kejadian selisih_kas; −cashDiffMin <\nd < 0 = selisih kecil, butir bila Σ satu kasir dalam 7 hari > smallShortageWeekMax; kas\nkeluar > expenseSingleMax atau Σ satu shift > expenseShiftMax = kas_keluar; shift buka >\nshiftMaxHours jam = shift_lama. Aturan murni yang sama dipakai app (shared/lib/attention-rules).\n'),
+  "ownerPhone": zod.string().min(putOwnerQrisImageResponseOwnerPhoneMin).max(putOwnerQrisImageResponseOwnerPhoneMax).regex(putOwnerQrisImageResponseOwnerPhoneRegExp).nullable().describe('Ditampilkan di dialog alasan kasir (R11) lewat KasirSettings.ownerPhone.')
+}).describe('Pengaturan lengkap pemilik; hanya di /api/owner.')
+
+/**
+ * Semua pengguna ber-role kasir, urut nama; pemilik tidak pernah ada di daftar. PIN tidak
+ * pernah dikirim. onShift = orang itu memegang shift yang sedang buka. lockedUntil = jam
+ * berakhirnya kunci PIN yang masih berlaku, yang terlama dari dua realm (PIN kasir di PC dan
+ * PIN HP toko); null bila tidak terkunci.
+ * @summary Akun kasir (aktif dan nonaktif)
+ */
+export const ListOwnerKasirAccountsResponseItem = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "active": zod.boolean().describe('false = tidak bisa masuk di kasir maupun HP toko; riwayat tetap.'),
+  "onShift": zod.boolean().describe('Memegang shift yang sedang buka (tidak bisa dinonaktifkan).'),
+  "lockedUntil": zod.int().nullable().describe('Akhir kunci PIN yang masih berlaku (terlama dari dua realm); null bila tidak terkunci.')
+}).describe('Akun kasir untuk pemilik; tanpa PIN.')
+export const ListOwnerKasirAccountsResponse = zod.array(ListOwnerKasirAccountsResponseItem)
+
+/**
+ * (K12) name 1..30 karakter setelah trim, unik tanpa beda huruf besar/kecil di semua pengguna
+ * termasuk pemilik → 409 NAME_TAKEN; pin tepat 6 angka → selain itu 422 VALIDATION. Akun baru
+ * aktif, role kasir, langsung muncul di listKasirUsers (PC) dan listStaffUsers (HP toko).
+ * Klik ganda aman: permintaan kedua dengan nama sama → 409 NAME_TAKEN.
+ * @summary Tambah akun kasir
+ */
+export const createOwnerKasirAccountBodyNameMax = 30;
+
+export const createOwnerKasirAccountBodyPinRegExp = new RegExp('^\\d{6}$');
+
+
+export const CreateOwnerKasirAccountBody = zod.object({
+  "name": zod.string().min(1).max(createOwnerKasirAccountBodyNameMax).describe('1..30 karakter setelah trim; unik tanpa beda huruf besar/kecil.'),
+  "pin": zod.string().regex(createOwnerKasirAccountBodyPinRegExp)
+})
+
+export const CreateOwnerKasirAccountResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "active": zod.boolean().describe('false = tidak bisa masuk di kasir maupun HP toko; riwayat tetap.'),
+  "onShift": zod.boolean().describe('Memegang shift yang sedang buka (tidak bisa dinonaktifkan).'),
+  "lockedUntil": zod.int().nullable().describe('Akhir kunci PIN yang masih berlaku (terlama dari dua realm); null bila tidak terkunci.')
+}).describe('Akun kasir untuk pemilik; tanpa PIN.')
+
+/**
+ * (K12) Urutan pemeriksaan: id tidak dikenal atau bukan kasir → 404; name (bila dikirim) 1..30
+ * karakter setelah trim → 422 VALIDATION, dipakai pengguna lain (tanpa beda huruf besar/kecil)
+ * → 409 NAME_TAKEN; active false saat orang itu memegang shift yang sedang buka → 409
+ * KASIR_ON_SHIFT. Nonaktif: hilang dari listKasirUsers dan listStaffUsers, login PIN di kedua
+ * realm → 401 PIN_INVALID tanpa menambah hitungan kunci, sesi kasir dan sesi HP toko orang itu
+ * dihapus (request berikutnya 401; requireSession menolak pengguna nonaktif, K22). Riwayat
+ * tetap tersimpan. Ganti nama tidak mengubah salinan nama lama (shift, penjualan, nota).
+ * Mengaktifkan lagi → bisa login dengan PIN lama.
+ * @summary Ubah nama atau aktif/nonaktifkan akun kasir
+ */
+export const UpdateOwnerKasirAccountParams = zod.object({
+  "userId": zod.string()
+})
+
+export const updateOwnerKasirAccountBodyNameMax = 30;
+
+
+
+export const UpdateOwnerKasirAccountBody = zod.object({
+  "name": zod.string().min(1).max(updateOwnerKasirAccountBodyNameMax).optional(),
+  "active": zod.boolean().optional()
+}).describe('Field yang tidak dikirim tidak berubah.')
+
+export const UpdateOwnerKasirAccountResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "active": zod.boolean().describe('false = tidak bisa masuk di kasir maupun HP toko; riwayat tetap.'),
+  "onShift": zod.boolean().describe('Memegang shift yang sedang buka (tidak bisa dinonaktifkan).'),
+  "lockedUntil": zod.int().nullable().describe('Akhir kunci PIN yang masih berlaku (terlama dari dua realm); null bila tidak terkunci.')
+}).describe('Akun kasir untuk pemilik; tanpa PIN.')
+
+/**
+ * (K12) pin tepat 6 angka → selain itu 422 VALIDATION; id tidak dikenal atau bukan kasir → 404.
+ * Sekaligus mengosongkan hitungan PIN salah dan kunci orang itu di kedua realm (PC kasir dan
+ * HP toko). PIN tidak pernah dikirim balik.
+ * @summary Atur ulang PIN kasir
+ */
+export const ResetOwnerKasirPinParams = zod.object({
+  "userId": zod.string()
+})
+
+export const resetOwnerKasirPinBodyPinRegExp = new RegExp('^\\d{6}$');
+
+
+export const ResetOwnerKasirPinBody = zod.object({
+  "pin": zod.string().regex(resetOwnerKasirPinBodyPinRegExp)
+})
+
+export const ResetOwnerKasirPinResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "active": zod.boolean().describe('false = tidak bisa masuk di kasir maupun HP toko; riwayat tetap.'),
+  "onShift": zod.boolean().describe('Memegang shift yang sedang buka (tidak bisa dinonaktifkan).'),
+  "lockedUntil": zod.int().nullable().describe('Akhir kunci PIN yang masih berlaku (terlama dari dua realm); null bila tidak terkunci.')
+}).describe('Akun kasir untuk pemilik; tanpa PIN.')
+
+/**
+ * items = shift yang openedAt-nya jatuh pada tanggal Asia/Jakarta date (bawaan hari ini),
+ * ditambah shift yang sedang buka bila date = hari ini walau dibuka kemarin; urut openedAt
+ * terbaru dulu. Shift buka: closedAt, countedCash, dan difference null. takes = pengambilan
+ * uang pemilik di sela shift (shiftId null) dengan at pada tanggal itu, termasuk yang
+ * dibatalkan, terbaru dulu (pengambilan di dalam shift ada di rincian shift itu).
+ * openKasirName = kasir shift yang sedang buka sekarang (apa pun tanggalnya), null bila tidak
+ * ada; dipakai keterangan lembar Ambil uang dari laci. date bukan tanggal YYYY-MM-DD yang sah →
+ * 422 VALIDATION.
+ * @summary Shift satu hari (Lainnya > Shift & kas)
+ */
+export const ListOwnerShiftsQueryParams = zod.object({
+  "date": zod.iso.date().optional().describe('Tanggal Asia/Jakarta YYYY-MM-DD; bawaan hari ini.')
+})
+
+
+
+
+export const ListOwnerShiftsResponse = zod.object({
+  "date": zod.iso.date(),
+  "items": zod.array(zod.object({
+  "id": zod.string(),
+  "kasirName": zod.string(),
+  "openedAt": zod.int(),
+  "closedAt": zod.int().nullable().describe('null = shift sedang buka.'),
+  "countedCash": zod.int().nullable().describe('Uang fisik saat tutup; null bila shift buka.'),
+  "difference": zod.int().nullable().describe('Selisih tutup shift; null bila shift buka.')
+})).describe('Shift tanggal itu, openedAt terbaru dulu.'),
+  "takes": zod.array(zod.object({
+  "id": zod.string(),
+  "at": zod.int().describe('Jam server saat dicatat (epoch ms UTC).'),
+  "amount": zod.int().min(1),
+  "note": zod.string().nullable(),
+  "shiftId": zod.string().nullable().describe('Shift yang sedang buka saat diambil (masuk ownerTakes shift itu); null = diambil di sela shift.'),
+  "shiftKasirName": zod.string().nullable().describe('Kasir shift shiftId; null bila shiftId null.'),
+  "consumedByKasirName": zod.string().nullable().describe('Pengambilan sela yang sudah terpakai modal shift berikutnya → kasir shift itu; selain itu null.'),
+  "cancelled": zod.union([zod.object({
+  "at": zod.int().describe('Jam server saat dibatalkan (epoch ms UTC).'),
+  "byName": zod.string(),
+  "reason": zod.string()
+}),zod.null()]),
+  "cancellable": zod.boolean()
+}).describe('Pengambilan uang dari laci oleh pemilik (S5). cancellable = bisa dibatalkan sekarang (K9):\nbelum dibatalkan dan (shiftId ≠ null dan shift itu masih buka, atau shiftId null dan belum\nterpakai). Keterangan terkunci di UI: consumedByKasirName ≠ null → sudah dipakai modal shift\nkasir itu; shiftId ≠ null → shift tempatnya sudah tutup.\n')).describe('Pengambilan uang pemilik di sela shift (shiftId null) pada tanggal itu, terbaru dulu.'),
+  "openKasirName": zod.string().nullable().describe('Kasir shift yang sedang buka sekarang; null bila tidak ada.')
+})
+
+/**
+ * Shift tutup: angka closure tersimpan apa adanya (tidak pernah dihitung ulang). Shift buka:
+ * angka laci sekarang dari rumus laci yang sama dengan tutup shift, countedCash dan difference
+ * null. Satu rumus: expectedCash = openingCash + cashSales − supplierPayments + creditPayments −
+ * saleRefunds − expenses − ownerTakes. expenseItems = semua kas keluar shift itu termasuk yang
+ * dibatalkan, urut jam; ownerTakeItems = pengambilan uang pemilik di dalam shift itu (shiftId
+ * = shift ini) termasuk yang dibatalkan, urut jam. qrisSales = Σ bagian QRIS penjualan shift
+ * ini yang tidak dibatalkan; qrisRepayments = Σ pelunasan kasir QRIS shift ini yang tidak
+ * dibatalkan (keduanya tidak masuk laci). id tidak dikenal → 404.
+ * @summary Rincian laci satu shift
+ */
+export const GetOwnerShiftParams = zod.object({
+  "shiftId": zod.string()
+})
+
+
+
+
+
+export const GetOwnerShiftResponse = zod.object({
+  "shiftId": zod.string(),
+  "openingCash": zod.int(),
+  "cashSales": zod.int(),
+  "supplierPayments": zod.int(),
+  "creditPayments": zod.int(),
+  "saleRefunds": zod.int(),
+  "expenses": zod.int(),
+  "ownerTakes": zod.int(),
+  "expectedCash": zod.int(),
+  "countedCash": zod.int().nullable(),
+  "difference": zod.int().nullable(),
+  "salesCount": zod.int(),
+  "kasirName": zod.string(),
+  "openedAt": zod.int(),
+  "closedAt": zod.int().nullable(),
+  "suggestedOpening": zod.int().nullable().describe('Saran modal saat shift dibuka (S4); null bila tanpa saran.'),
+  "openingNote": zod.string().nullable().describe('Alasan modal berbeda dari saran; null bila modal sama atau tanpa saran.'),
+  "expenseItems": zod.array(zod.object({
+  "id": zod.string(),
+  "at": zod.int().describe('Jam server saat dicatat (epoch ms UTC).'),
+  "amount": zod.int().min(1),
+  "reason": zod.string(),
+  "kasirName": zod.string().describe('Nama pencatat (salinan saat dicatat).'),
+  "shiftId": zod.string(),
+  "status": zod.enum(['aktif', 'dibatalkan'])
+}).describe('Kas keluar dari laci (S2) untuk kasir; hanya key ini (tanpa data pembatal: siapa, jam, atau\nalasan batal).\n').and(zod.object({
+  "cancelled": zod.union([zod.object({
+  "at": zod.int().describe('Jam server saat dibatalkan (epoch ms UTC).'),
+  "byName": zod.string().describe('Nama pembatal (boleh beda dari pencatat).'),
+  "reason": zod.string(),
+  "channel": zod.enum(['kasir', 'pemilik']).describe('kasir = dibatalkan di shift yang buka (kejadian batal_kas_keluar); pemilik = dari app pemilik, laci tidak disentuh.')
+}),zod.null()]),
+  "cancellable": zod.boolean()
+})).describe('Kas keluar untuk pemilik: DrawerExpense + data pembatalan. cancellable = pemilik boleh\nmembatalkan (shift tempatnya sudah tutup dan belum dibatalkan); kas keluar shift yang masih\nbuka hanya bisa dibatalkan dari kasir.\n')).describe('Semua kas keluar shift ini termasuk yang dibatalkan, urut jam.'),
+  "ownerTakeItems": zod.array(zod.object({
+  "id": zod.string(),
+  "at": zod.int().describe('Jam server saat dicatat (epoch ms UTC).'),
+  "amount": zod.int().min(1),
+  "note": zod.string().nullable(),
+  "shiftId": zod.string().nullable().describe('Shift yang sedang buka saat diambil (masuk ownerTakes shift itu); null = diambil di sela shift.'),
+  "shiftKasirName": zod.string().nullable().describe('Kasir shift shiftId; null bila shiftId null.'),
+  "consumedByKasirName": zod.string().nullable().describe('Pengambilan sela yang sudah terpakai modal shift berikutnya → kasir shift itu; selain itu null.'),
+  "cancelled": zod.union([zod.object({
+  "at": zod.int().describe('Jam server saat dibatalkan (epoch ms UTC).'),
+  "byName": zod.string(),
+  "reason": zod.string()
+}),zod.null()]),
+  "cancellable": zod.boolean()
+}).describe('Pengambilan uang dari laci oleh pemilik (S5). cancellable = bisa dibatalkan sekarang (K9):\nbelum dibatalkan dan (shiftId ≠ null dan shift itu masih buka, atau shiftId null dan belum\nterpakai). Keterangan terkunci di UI: consumedByKasirName ≠ null → sudah dipakai modal shift\nkasir itu; shiftId ≠ null → shift tempatnya sudah tutup.\n')).describe('Pengambilan uang pemilik di dalam shift ini termasuk yang dibatalkan, urut jam.'),
+  "qrisSales": zod.int().describe('Σ bagian QRIS penjualan shift ini yang tidak dibatalkan (tidak masuk laci).'),
+  "qrisRepayments": zod.int().describe('Σ pelunasan kasir QRIS shift ini yang tidak dibatalkan (tidak masuk laci).')
+}).describe('Rincian laci satu shift: semua field ShiftClosure (countedCash dan difference null selagi\nshift buka; expectedCash shift buka = uang seharusnya sejauh ini) ditambah data pemilik.\nRumus tunggal: expectedCash = openingCash + cashSales − supplierPayments + creditPayments −\nsaleRefunds − expenses − ownerTakes.\n')
+
+/**
+ * (S5, K9) Kapan saja. Ada shift buka → shiftId = shift itu dan masuk ShiftClosure.ownerTakes
+ * shift itu (uang seharusnya turun, baris Diambil pemilik). Tanpa shift buka → shiftId null,
+ * mengurangi saran modal shift berikutnya (OpeningSuggestion.ownerTakes) sampai terpakai saat
+ * shift berikutnya dibuka. Bukan kejadian Perlu perhatian. Urutan pemeriksaan: sesi → id
+ * kosong atau > 64 karakter → 422 VALIDATION → id sudah dipakai: milik pengguna ini → 200
+ * rekaman tersimpan apa adanya tanpa pengambilan kedua (isi body baru diabaikan), milik
+ * pengguna lain → 409 ID_TAKEN → amount bukan bilangan bulat ≥ 1 atau note > 200 karakter →
+ * 422 VALIDATION. Idempoten menurut (pembuat, id). note kosong setelah trim disimpan null.
+ * Replay id yang sudah dibatalkan mengembalikan 200 dengan rekaman berstatus dibatalkan
+ * (cancelled terisi); klien wajib memperlakukannya sebagai belum tersimpan (lepas id, simpan
+ * berikutnya memakai id baru). at = jam server.
+ * @summary Ambil uang dari laci (pemilik)
+ */
+export const createOwnerCashTakeBodyIdMax = 64;
+
+
+export const createOwnerCashTakeBodyNoteMax = 200;
+
+
+
+export const CreateOwnerCashTakeBody = zod.object({
+  "id": zod.string().min(1).max(createOwnerCashTakeBodyIdMax).describe('ID dari klien (idempotensi per pembuat).'),
+  "amount": zod.int().min(1),
+  "note": zod.string().max(createOwnerCashTakeBodyNoteMax).nullish().describe('Catatan opsional; kosong setelah trim disimpan null.')
+})
+
+
+
+
+export const CreateOwnerCashTakeResponse = zod.object({
+  "id": zod.string(),
+  "at": zod.int().describe('Jam server saat dicatat (epoch ms UTC).'),
+  "amount": zod.int().min(1),
+  "note": zod.string().nullable(),
+  "shiftId": zod.string().nullable().describe('Shift yang sedang buka saat diambil (masuk ownerTakes shift itu); null = diambil di sela shift.'),
+  "shiftKasirName": zod.string().nullable().describe('Kasir shift shiftId; null bila shiftId null.'),
+  "consumedByKasirName": zod.string().nullable().describe('Pengambilan sela yang sudah terpakai modal shift berikutnya → kasir shift itu; selain itu null.'),
+  "cancelled": zod.union([zod.object({
+  "at": zod.int().describe('Jam server saat dibatalkan (epoch ms UTC).'),
+  "byName": zod.string(),
+  "reason": zod.string()
+}),zod.null()]),
+  "cancellable": zod.boolean()
+}).describe('Pengambilan uang dari laci oleh pemilik (S5). cancellable = bisa dibatalkan sekarang (K9):\nbelum dibatalkan dan (shiftId ≠ null dan shift itu masih buka, atau shiftId null dan belum\nterpakai). Keterangan terkunci di UI: consumedByKasirName ≠ null → sudah dipakai modal shift\nkasir itu; shiftId ≠ null → shift tempatnya sudah tutup.\n')
+
+/**
+ * (S5, K9) Efeknya dibalik di shift atau modal yang sama, hanya selagi masih bisa dibalik.
+ * Urutan pemeriksaan: id tidak dikenal → 404; sudah dibatalkan → 200 rekaman apa adanya tanpa
+ * perubahan; reason kosong (setelah trim) atau > 200 karakter → 422 VALIDATION; tidak bisa
+ * dibalik lagi → 409 CASH_TAKE_LOCKED tanpa mengubah angka apa pun. Bisa dibalik bila shiftId ≠
+ * null dan shift itu masih buka (ShiftClosure.ownerTakes shift itu turun), atau shiftId null dan
+ * belum terpakai shift berikutnya (saran modal naik lagi). Shift tempatnya sudah tutup, atau
+ * pengambilan sela sudah terpakai modal shift berikutnya → terkunci. Tercatat cancelledAt (jam
+ * server), pembatal, dan alasan.
+ * @summary Batalkan pengambilan uang yang salah (alasan wajib)
+ */
+export const CancelOwnerCashTakeParams = zod.object({
+  "takeId": zod.string()
+})
+
+export const cancelOwnerCashTakeBodyReasonMax = 200;
+
+
+
+export const CancelOwnerCashTakeBody = zod.object({
+  "reason": zod.string().min(1).max(cancelOwnerCashTakeBodyReasonMax).describe('Alasan pembatalan, wajib (1..200 karakter setelah trim); tanpa PIN pemilik.')
+})
+
+
+
+
+export const CancelOwnerCashTakeResponse = zod.object({
+  "id": zod.string(),
+  "at": zod.int().describe('Jam server saat dicatat (epoch ms UTC).'),
+  "amount": zod.int().min(1),
+  "note": zod.string().nullable(),
+  "shiftId": zod.string().nullable().describe('Shift yang sedang buka saat diambil (masuk ownerTakes shift itu); null = diambil di sela shift.'),
+  "shiftKasirName": zod.string().nullable().describe('Kasir shift shiftId; null bila shiftId null.'),
+  "consumedByKasirName": zod.string().nullable().describe('Pengambilan sela yang sudah terpakai modal shift berikutnya → kasir shift itu; selain itu null.'),
+  "cancelled": zod.union([zod.object({
+  "at": zod.int().describe('Jam server saat dibatalkan (epoch ms UTC).'),
+  "byName": zod.string(),
+  "reason": zod.string()
+}),zod.null()]),
+  "cancellable": zod.boolean()
+}).describe('Pengambilan uang dari laci oleh pemilik (S5). cancellable = bisa dibatalkan sekarang (K9):\nbelum dibatalkan dan (shiftId ≠ null dan shift itu masih buka, atau shiftId null dan belum\nterpakai). Keterangan terkunci di UI: consumedByKasirName ≠ null → sudah dipakai modal shift\nkasir itu; shiftId ≠ null → shift tempatnya sudah tutup.\n')
+
+/**
+ * (S10) Pembatalan dari app pemilik tidak pernah menyentuh laci: closure shift tutup tidak
+ * berubah dan shift yang sedang buka tidak berubah. Urutan pemeriksaan: id tidak dikenal →
+ * 404; sudah dibatalkan → 200 rekaman apa adanya tanpa perubahan; reason kosong (setelah trim)
+ * atau > 200 karakter → 422 VALIDATION; kas keluar dari shift yang masih buka → 409
+ * IN_OPEN_SHIFT (batalkan dari kasir). Tercatat cancelledAt (jam server), pembatal, channel
+ * pemilik, dan alasan; bukan kejadian Perlu perhatian. Kas keluar yang dibatalkan tidak lagi
+ * ikut kejadian kas_keluar.
+ * @summary Batalkan kas keluar dari app pemilik (alasan wajib)
+ */
+export const CancelOwnerExpenseParams = zod.object({
+  "expenseId": zod.string()
+})
+
+export const cancelOwnerExpenseBodyReasonMax = 200;
+
+
+
+export const CancelOwnerExpenseBody = zod.object({
+  "reason": zod.string().min(1).max(cancelOwnerExpenseBodyReasonMax).describe('Alasan pembatalan, wajib (1..200 karakter setelah trim); tanpa PIN pemilik.')
+})
+
+
+
+
+export const CancelOwnerExpenseResponse = zod.object({
+  "id": zod.string(),
+  "at": zod.int().describe('Jam server saat dicatat (epoch ms UTC).'),
+  "amount": zod.int().min(1),
+  "reason": zod.string(),
+  "kasirName": zod.string().describe('Nama pencatat (salinan saat dicatat).'),
+  "shiftId": zod.string(),
+  "status": zod.enum(['aktif', 'dibatalkan'])
+}).describe('Kas keluar dari laci (S2) untuk kasir; hanya key ini (tanpa data pembatal: siapa, jam, atau\nalasan batal).\n').and(zod.object({
+  "cancelled": zod.union([zod.object({
+  "at": zod.int().describe('Jam server saat dibatalkan (epoch ms UTC).'),
+  "byName": zod.string().describe('Nama pembatal (boleh beda dari pencatat).'),
+  "reason": zod.string(),
+  "channel": zod.enum(['kasir', 'pemilik']).describe('kasir = dibatalkan di shift yang buka (kejadian batal_kas_keluar); pemilik = dari app pemilik, laci tidak disentuh.')
+}),zod.null()]),
+  "cancellable": zod.boolean()
+})).describe('Kas keluar untuk pemilik: DrawerExpense + data pembatalan. cancellable = pemilik boleh\nmembatalkan (shift tempatnya sudah tutup dan belum dibatalkan); kas keluar shift yang masih\nbuka hanya bisa dibatalkan dari kasir.\n')
+
+/**
+ * (S7, K11, K21) Hari = tanggal Asia/Jakarta createdAt. sales = Σ bagian QRIS penjualan yang
+ * tidak dibatalkan; repayments = Σ pelunasan kasir QRIS yang tidak dibatalkan; total = sales +
+ * repayments; voidedCount/voidedTotal = penjualan QRIS dan pelunasan QRIS yang dibatalkan
+ * (bagian QRIS saja; info, tidak masuk total). Status dibaca: tanda tersimpan, kecuali total
+ * sekarang ≠ total saat ditandai → belum dengan changedAfterMark true (dihitung lagi di butir).
+ * Tanpa unreconciled: hari di bulan month (bawaan bulan ini) sampai hari ini dengan total > 0,
+ * voidedCount > 0, atau bertanda; terbaru dulu; QrisDayList.month = bulan itu. unreconciled =
+ * true: semua hari yang dihitung butir QRIS belum dicocokkan (sejak QRIS harian mulai dipakai,
+ * sebelum hari ini, total > 0, status belum), lintas bulan, terlama dulu; month diabaikan dan
+ * QrisDayList.month null. month bukan YYYY-MM yang sah → 422 VALIDATION.
+ * @summary Total QRIS per hari dan tanda pencocokan (Lainnya > QRIS harian)
+ */
+export const listOwnerQrisDaysQueryMonthRegExp = new RegExp('^\\d{4}-(0[1-9]|1[0-2])$');
+
+
+export const ListOwnerQrisDaysQueryParams = zod.object({
+  "month": zod.string().regex(listOwnerQrisDaysQueryMonthRegExp).optional().describe('Bulan Asia/Jakarta YYYY-MM; bawaan bulan ini.'),
+  "unreconciled": zod.boolean().optional().describe('true = hanya hari yang belum dicocokkan (lembar Cocokkan, S11).')
+})
+
+export const ListOwnerQrisDaysResponse = zod.object({
+  "month": zod.string().nullable().describe('Bulan YYYY-MM yang diminta; null untuk unreconciled = true.'),
+  "items": zod.array(zod.object({
+  "date": zod.iso.date(),
+  "sales": zod.int(),
+  "repayments": zod.int(),
+  "total": zod.int(),
+  "voidedCount": zod.int(),
+  "voidedTotal": zod.int(),
+  "status": zod.enum(['belum', 'cocok', 'tidak_cocok']).describe('belum = belum ditandai, atau total berubah setelah ditandai (K21).'),
+  "note": zod.string().nullable(),
+  "markedByName": zod.string().nullable(),
+  "markedAt": zod.int().nullable(),
+  "closed": zod.boolean(),
+  "changedAfterMark": zod.boolean()
+}).describe('Total QRIS satu hari Asia/Jakarta (S7, K11). total = sales + repayments (tidak termasuk yang\ndibatalkan); voidedCount/voidedTotal = transaksi QRIS yang dibatalkan (bagian QRIS saja).\nchangedAfterMark = sudah ditandai tetapi total sekarang ≠ total saat ditandai → status\ndibaca belum (note, markedByName, markedAt tetap tanda lama). closed = hari sudah selesai\n(sebelum hari ini); hanya hari closed yang bisa ditandai.\n'))
+})
+
+/**
+ * (S11) QrisDay hari itu (aturan sama dengan listOwnerQrisDays) + items = transaksi QRIS hari
+ * itu urut jam: penjualan dengan bagian QRIS (amount = bagian QRIS saja, ref = nomor struk,
+ * kasirName = kasir penjual) dan pelunasan kasir QRIS (ref = nama pelanggan, kasirName =
+ * pencatat); yang dibatalkan ikut dengan status dibatalkan. Σ amount items aktif = total.
+ * Hari tanpa transaksi → 200 dengan angka 0 dan items kosong. date tidak sah atau sesudah hari
+ * ini → 422 VALIDATION.
+ * @summary Rincian QRIS satu hari beserta transaksinya
+ */
+export const GetOwnerQrisDayParams = zod.object({
+  "date": zod.iso.date().describe('Tanggal Asia/Jakarta YYYY-MM-DD.')
+})
+
+export const GetOwnerQrisDayResponse = zod.object({
+  "date": zod.iso.date(),
+  "sales": zod.int(),
+  "repayments": zod.int(),
+  "total": zod.int(),
+  "voidedCount": zod.int(),
+  "voidedTotal": zod.int(),
+  "status": zod.enum(['belum', 'cocok', 'tidak_cocok']).describe('belum = belum ditandai, atau total berubah setelah ditandai (K21).'),
+  "note": zod.string().nullable(),
+  "markedByName": zod.string().nullable(),
+  "markedAt": zod.int().nullable(),
+  "closed": zod.boolean(),
+  "changedAfterMark": zod.boolean()
+}).describe('Total QRIS satu hari Asia/Jakarta (S7, K11). total = sales + repayments (tidak termasuk yang\ndibatalkan); voidedCount/voidedTotal = transaksi QRIS yang dibatalkan (bagian QRIS saja).\nchangedAfterMark = sudah ditandai tetapi total sekarang ≠ total saat ditandai → status\ndibaca belum (note, markedByName, markedAt tetap tanda lama). closed = hari sudah selesai\n(sebelum hari ini); hanya hari closed yang bisa ditandai.\n').and(zod.object({
+  "items": zod.array(zod.object({
+  "at": zod.int(),
+  "amount": zod.int(),
+  "kind": zod.enum(['penjualan', 'pelunasan']),
+  "kasirName": zod.string(),
+  "ref": zod.string().describe('Nomor struk (penjualan) atau nama pelanggan (pelunasan).'),
+  "status": zod.enum(['aktif', 'dibatalkan'])
+}).describe('Satu transaksi QRIS hari itu (S11); amount = bagian QRIS saja.')).describe('Transaksi QRIS hari itu urut jam, termasuk yang dibatalkan.')
+}))
+
+/**
+ * (S7, K11, K21) Hanya hari yang sudah selesai: date tidak sah, hari ini, atau sesudahnya →
+ * 422 VALIDATION. tidak_cocok wajib note (kosong setelah trim → 422 VALIDATION); note > 200
+ * karakter → 422; note cocok yang kosong disimpan null. Tandai ulang boleh dan menimpa (satu
+ * rekaman per tanggal, diganti utuh); server menyimpan total saat ditandai (dasar
+ * changedAfterMark), penanda (nama), dan jam server. Tidak ada tandai semua.
+ * @summary Tandai QRIS satu hari Cocok atau Tidak cocok
+ */
+export const MarkOwnerQrisDayParams = zod.object({
+  "date": zod.iso.date().describe('Tanggal Asia/Jakarta YYYY-MM-DD.')
+})
+
+export const markOwnerQrisDayBodyNoteMax = 200;
+
+
+
+export const MarkOwnerQrisDayBody = zod.object({
+  "status": zod.enum(['cocok', 'tidak_cocok']),
+  "note": zod.string().max(markOwnerQrisDayBodyNoteMax).nullish().describe('Wajib untuk tidak_cocok (1..200 setelah trim); opsional untuk cocok.')
+})
+
+export const MarkOwnerQrisDayResponse = zod.object({
+  "date": zod.iso.date(),
+  "sales": zod.int(),
+  "repayments": zod.int(),
+  "total": zod.int(),
+  "voidedCount": zod.int(),
+  "voidedTotal": zod.int(),
+  "status": zod.enum(['belum', 'cocok', 'tidak_cocok']).describe('belum = belum ditandai, atau total berubah setelah ditandai (K21).'),
+  "note": zod.string().nullable(),
+  "markedByName": zod.string().nullable(),
+  "markedAt": zod.int().nullable(),
+  "closed": zod.boolean(),
+  "changedAfterMark": zod.boolean()
+}).describe('Total QRIS satu hari Asia/Jakarta (S7, K11). total = sales + repayments (tidak termasuk yang\ndibatalkan); voidedCount/voidedTotal = transaksi QRIS yang dibatalkan (bagian QRIS saja).\nchangedAfterMark = sudah ditandai tetapi total sekarang ≠ total saat ditandai → status\ndibaca belum (note, markedByName, markedAt tetap tanda lama). closed = hari sudah selesai\n(sebelum hari ini); hanya hari closed yang bisa ditandai.\n')
 
 /**
  * Omzet, laba kotor, transaksi, rata-rata per struk, kasbon baru, grafik, 3 barang teratas,

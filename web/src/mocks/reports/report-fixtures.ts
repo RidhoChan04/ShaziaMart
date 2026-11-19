@@ -182,13 +182,18 @@ export function addClosedShift(
     supplierPayments: 0,
     creditPayments: 0,
     saleRefunds: 0,
+    expenses: 0,
+    ownerTakes: 0,
     expectedCash: 0,
     countedCash: 0,
     difference: 0,
     salesCount: 0,
+    kasirId: s.users.find((u) => u.name === kasirName)?.id ?? kasirName,
     kasirName,
     openedAt,
     closedAt,
+    suggestedOpening: null,
+    openingNote: null,
   });
 }
 

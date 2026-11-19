@@ -11,12 +11,27 @@ import {
   saleVoidOf,
 } from "./db";
 
-/** (K29) Urutan tetap butir Perlu perhatian. */
+/** (K29, K2 F3c-2a) Urutan tetap butir Perlu perhatian. */
 export const EXCEPTION_KINDS: readonly ExceptionKind[] = [
   "batal_transaksi",
   "batal_pelunasan",
   "kasbon_lewat_limit",
+  "batal_kas_keluar",
+  "selisih_kas",
+  "kas_keluar",
+  "serah_terima",
+  "shift_lama",
+  "selisih_kecil",
 ];
+
+/** Id kasir shift penjualan (buka atau tutup); null bila tidak dikenal. */
+const shiftKasirId = (
+  state: Readonly<MockState>,
+  shiftId: string,
+): string | null =>
+  state.shift?.id === shiftId
+    ? state.shift.kasirId
+    : (state.closedShifts.find((c) => c.shiftId === shiftId)?.kasirId ?? null);
 
 /** Penjualan dari shift yang sudah tutup saat dibatalkan (ruling R12). */
 const fromClosedShift = (state: Readonly<MockState>, s: MockSale): boolean =>
@@ -36,6 +51,8 @@ function saleBased(
     saleId: s.id,
     saleNumber: s.number,
     paymentId: null,
+    shiftId: null,
+    durationMinutes: null,
     overLimitExcess: null,
   };
   if (kind === "kasbon_lewat_limit") {
@@ -45,6 +62,7 @@ function saleBased(
     return {
       ...base,
       at: s.createdAt,
+      kasirId: shiftKasirId(state, s.shiftId),
       kasirName: s.kasirName,
       amount: over.excess,
       reason: over.reason,
@@ -61,6 +79,7 @@ function saleBased(
   return {
     ...base,
     at: voided.at,
+    kasirId: voided.byId,
     kasirName: voided.byName,
     amount: s.total,
     reason: voided.reason,
@@ -92,6 +111,7 @@ function eventsOf(
             id: p.id,
             kind,
             at: p.cancelledAt ?? p.at,
+            kasirId: p.cancelledById,
             kasirName: p.cancelledByName ?? "",
             amount: p.amount,
             reason: p.cancelReason ?? "",
@@ -99,12 +119,22 @@ function eventsOf(
             saleId: null,
             saleNumber: null,
             paymentId: p.id,
+            shiftId: null,
+            durationMinutes: null,
             fromClosedShift: false,
             refund: 0,
             qrisToOwner: 0,
             overLimitExcess: null,
           }),
         );
+    // Jenis F3c-2a: aturannya ditulis T4 (server palsu Perlu perhatian).
+    case "batal_kas_keluar":
+    case "selisih_kas":
+    case "kas_keluar":
+    case "serah_terima":
+    case "shift_lama":
+    case "selisih_kecil":
+      return [];
   }
 }
 
@@ -147,8 +177,12 @@ export function exceptionAttention(
         kind,
         count: items.length,
         total: items.reduce((sum, e) => sum + e.amount, 0),
+        shortage: items.reduce((sum, e) => sum + Math.min(e.amount, 0), 0),
         from: jakartaIsoDate(oldest.at),
         to: jakartaIsoDate(newest.at),
+        latestAt: newest.at,
+        kasirId: null,
+        kasirName: null,
       },
     ];
   });

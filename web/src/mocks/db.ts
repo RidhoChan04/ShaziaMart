@@ -1,4 +1,5 @@
 import type {
+  AttentionRules,
   CostAlert,
   CreditPaymentChannel,
   CreditPaymentMethod,
@@ -31,14 +32,34 @@ import { mockPhotos } from "./photos";
 import { createSeedState } from "./seed-data";
 import { reportPersistFailure, reportPersistSuccess } from "./storage-status";
 
-/** `password` hanya untuk pemilik (login aplikasi pemilik); mock saja. */
-export type MockUser = User & { pin: string; password?: string };
-/** Shift tertutup + nama kasir, waktu buka, dan waktu tutup (untuk ringkasan & laporan pemilik). */
-export type MockClosedShift = ShiftClosure & {
-  kasirName: string;
-  openedAt: number;
-  closedAt: number;
+/**
+ * `password` hanya untuk pemilik (login aplikasi pemilik); mock saja. (K12) `active: false` = akun
+ * nonaktif: tidak bisa masuk di kasir maupun HP toko, riwayat tetap.
+ */
+export type MockUser = User & {
+  pin: string;
+  password?: string;
+  active: boolean;
 };
+/**
+ * Serah terima modal (S4, K8, K22), disalin dari shift buka ke shift tutup: `suggestedOpening` = saran
+ * modal saat dibuka (null tanpa saran), `openingNote` = alasan modal berbeda (null bila modal sama).
+ */
+type OpeningHandover = {
+  suggestedOpening: number | null;
+  openingNote: string | null;
+};
+/**
+ * Shift tertutup + kasir (id & nama salinan saat tutup, K18), waktu buka, waktu tutup, dan serah
+ * terima modal (untuk ringkasan, Perlu perhatian, dan laporan pemilik). Tidak pernah diubah lagi.
+ */
+export type MockClosedShift = ShiftClosure &
+  OpeningHandover & {
+    kasirId: string;
+    kasirName: string;
+    openedAt: number;
+    closedAt: number;
+  };
 /** Uang keluar laci di shift ini (barang masuk, koreksi nota, pelunasan utang); keluar = positif. */
 export type MockCashOut = {
   id: string;
@@ -68,13 +89,76 @@ export type MockSaleRefund = {
   amount: number;
   saleId: string;
 };
-export type MockShift = Shift & {
-  cashSales: number;
-  salesCount: number;
-  cashOuts: MockCashOut[];
-  creditCash: MockCreditCash[];
-  saleRefunds: MockSaleRefund[];
+/**
+ * Shift yang sedang buka. Kas keluar (`drawerExpenses`) dan ambil uang pemilik (`cashTakes`) disimpan
+ * di koleksi sendiri ber-`shiftId`, bukan di sini; rumus laci tunggal di `mocks/cash/drawer.ts`.
+ */
+export type MockShift = Shift &
+  OpeningHandover & {
+    cashSales: number;
+    salesCount: number;
+    cashOuts: MockCashOut[];
+    creditCash: MockCreditCash[];
+    saleRefunds: MockSaleRefund[];
+  };
+/**
+ * (S2, S10, K10) Kas keluar beralasan dari laci, append-only: hanya `cancelled*` yang berubah.
+ * Idempoten per (`createdById`, `id`). Yang dibatalkan tidak ikut Σ `expenses` shift buka maupun
+ * kejadian `kas_keluar`; pembatalan kasir (`cancelledChannel` kasir) = kejadian `batal_kas_keluar`.
+ */
+export type MockDrawerExpense = {
+  id: string;
+  at: number;
+  amount: number;
+  reason: string;
+  shiftId: string;
+  createdById: string;
+  createdByName: string;
+  cancelledAt: number | null;
+  cancelledById: string | null;
+  cancelledByName: string | null;
+  cancelledChannel: "kasir" | "pemilik" | null;
+  cancelReason: string | null;
 };
+/**
+ * (S5, K9) Ambil uang dari laci oleh pemilik, append-only: hanya `cancelled*` dan `consumedByShiftId`
+ * yang berubah. `shiftId` = shift yang buka saat diambil (masuk `ownerTakes` shift itu); null = di
+ * sela shift → mengurangi saran modal sampai `consumedByShiftId` diisi saat shift berikutnya dibuka.
+ * Idempoten per (`createdById`, `id`).
+ */
+export type MockCashTake = {
+  id: string;
+  at: number;
+  amount: number;
+  note: string | null;
+  shiftId: string | null;
+  createdById: string;
+  createdByName: string;
+  consumedByShiftId: string | null;
+  cancelledAt: number | null;
+  cancelledById: string | null;
+  cancelledByName: string | null;
+  cancelReason: string | null;
+};
+/**
+ * (S7, K11, K21) Tanda pencocokan QRIS satu tanggal WIB; diganti utuh saat ditandai ulang.
+ * `markedTotal` = total QRIS saat ditandai: bila total sekarang berbeda, status dibaca `belum`.
+ */
+export type MockQrisDay = {
+  date: string;
+  status: "cocok" | "tidak_cocok";
+  note: string | null;
+  markedById: string;
+  markedByName: string;
+  markedAt: number;
+  markedTotal: number;
+};
+/**
+ * Pengaturan kasir tersimpan. (K19) `shiftMaxHours` tidak disimpan di sini: `KasirSettings.shiftMaxHours`
+ * diturunkan dari `MockState.attentionRules` (satu sumber); `ownerPhone` dikirim ke kasir hanya dengan
+ * sesi kasir.
+ */
+export type MockKasirSettings = Omit<KasirSettings, "shiftMaxHours">;
 /**
  * (ruling R12, koreksi mockup M1, K31) Pengembalian saat batal: `cash` = bagian tunai (`payments`
  * cash, bukan uang diterima), `qris` = bagian QRIS, `qrisSource` null bila tanpa QRIS, `drawer` =
@@ -336,7 +420,7 @@ export type MockExpiryEvent = {
   toDate: string | null;
   lossValue: number | null;
 };
-/** Batas tetap di server (J8); layar pengaturannya di F3c. */
+/** Batas stok di server (J8); diubah dari Pengaturan pemilik (K13). */
 export type StockRules = {
   expirySoonDays: number;
   opnameItemLimit: number;
@@ -345,7 +429,7 @@ export type StockRules = {
 
 /**
  * (K17/K18) Batas laporan di server: untung tipis bila margin eceran < `thinMarginPermille` ‰,
- * tidak terjual bila ≥ `unsoldDays` hari. Layar pengaturannya di F3c-2.
+ * tidak terjual bila ≥ `unsoldDays` hari. Diubah dari Pengaturan pemilik (K13).
  */
 export type ReportRules = { thinMarginPermille: number; unsoldDays: number };
 
@@ -355,7 +439,7 @@ type LoginFailures = Record<
 >;
 
 export type MockState = {
-  version: 9;
+  version: 10;
   store: { id: string; name: string };
   users: MockUser[];
   session: { userId: string } | null;
@@ -382,7 +466,7 @@ export type MockState = {
   /** `customer.balance` selalu = Σ entri pelanggan itu. */
   creditLedger: CreditEntry[];
   creditPayments: MockCreditPayment[];
-  settings: KasirSettings;
+  settings: MockKasirSettings;
   /** "YYYYMMDD" -> urutan terakhir */
   saleSeq: Record<string, number>;
   suppliers: MockSupplier[];
@@ -395,11 +479,30 @@ export type MockState = {
   /** Append-only. */
   expiryLog: MockExpiryEvent[];
   stockRules: StockRules;
-  /** (ruling R9) Terakhir ditinjau per jenis pengecualian kasir; null = belum pernah. */
+  /**
+   * (ruling R9) Terakhir ditinjau per jenis kejadian; null = belum pernah. Key `selisih_kecil` tidak
+   * dipakai (selalu null): penanda selisih kecil per kasir ada di `smallShortageReviews` (K18).
+   */
   exceptionReviews: Record<ExceptionKind, number | null>;
+  /** (K18) Terakhir ditinjau `selisih_kecil` per kasirId; key tidak ada = belum pernah. */
+  smallShortageReviews: Record<string, number | null>;
   /** (K11/K17) Barang dianggap ada sejak jam ini bila belum punya entri stok positif. */
   catalogSince: number;
   reportRules: ReportRules;
+  /** Append-only (hanya `cancelled*` berubah). */
+  drawerExpenses: MockDrawerExpense[];
+  /** Append-only (hanya `cancelled*` dan `consumedByShiftId` berubah). */
+  cashTakes: MockCashTake[];
+  /** Tanggal WIB → tanda QRIS hari itu (K21). */
+  qrisDays: Record<string, MockQrisDay>;
+  /** (K11) Tanggal WIB mulai QRIS harian dihitung "belum dicocokkan". */
+  qrisSince: string;
+  /** (K13) Identitas struk selain nama toko (`settings.storeName` = `store.name`, K19). */
+  storeProfile: { address: string; receiptFooter: string };
+  /** (K7, K19) Ambang Perlu perhatian; satu-satunya sumber `shiftMaxHours`. */
+  attentionRules: AttentionRules;
+  /** (K13) Limit kasbon pelanggan baru dari kasir. */
+  defaultCreditLimit: number;
 };
 
 const STORAGE_KEY = "mock.db";
@@ -409,7 +512,7 @@ const isObj = (x: unknown): x is Record<string, unknown> =>
 
 /** Pemeriksaan struktur murah (bukan validasi mendalam). */
 function isState(value: unknown): value is MockState {
-  if (!isObj(value) || value.version !== 9) return false;
+  if (!isObj(value) || value.version !== 10) return false;
   const { store } = value;
   return (
     isObj(store) &&
@@ -431,6 +534,8 @@ function isState(value: unknown): value is MockState {
       "stockEntries",
       "opnameSessions",
       "expiryLog",
+      "drawerExpenses",
+      "cashTakes",
     ].every((k) => Array.isArray(value[k])) &&
     [
       "pinFailures",
@@ -443,9 +548,15 @@ function isState(value: unknown): value is MockState {
       "saleSeq",
       "stockRules",
       "exceptionReviews",
+      "smallShortageReviews",
       "reportRules",
+      "qrisDays",
+      "storeProfile",
+      "attentionRules",
     ].every((k) => isObj(value[k])) &&
     typeof value.catalogSince === "number" &&
+    typeof value.qrisSince === "string" &&
+    typeof value.defaultCreditLimit === "number" &&
     ["session", "ownerSession", "staffSession", "shift"].every(
       (k) => value[k] === null || isObj(value[k]),
     )

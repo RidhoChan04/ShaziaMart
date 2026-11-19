@@ -48,6 +48,8 @@ describe("dutyBetween (K20, P11)", () => {
       kasirName: "Sari",
       openedAt: wib("2026-11-03", 9),
       openingCash: 0,
+      suggestedOpening: null,
+      openingNote: null,
       cashSales: 0,
       salesCount: 0,
       cashOuts: [],

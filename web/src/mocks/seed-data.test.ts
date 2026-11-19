@@ -1,4 +1,5 @@
 import { expect, test } from "vitest";
+import { DAY_MS } from "@/shared/lib/business-day";
 import { isValidBarcode } from "@/shared/lib/product-rules";
 import { __resetMockDbCacheForTests, mockDb } from "./db";
 import { balanceOf, oldestUnpaidAt } from "./ledger";
@@ -96,6 +97,7 @@ test("fixture curah & settings", () => {
     quickCurahProductIds: curah.map((p) => p?.id),
     qrisImageUrl: "/qris-contoh.svg",
     allowNegativeStock: true,
+    ownerPhone: "0812-3456-7890",
   });
 });
 
@@ -109,16 +111,25 @@ test("(K11) catalogSince = awal hari bisnis pertama riwayat 63 hari (WIB)", () =
 });
 
 test("PIN seed dan state awal", () => {
-  const s = createSeedState();
-  expect(s.version).toBe(9);
+  const s = createSeedState(NOW);
+  expect(s.version).toBe(10);
   // (K18) batas laporan di state server; layar pengaturannya di F3c-2.
   expect(s.reportRules).toEqual({ thinMarginPermille: 100, unsoldDays: 30 });
-  // (ruling R9) belum ada pengecualian yang pernah ditinjau.
+  // (ruling R9) belum ada pengecualian F3c-1 yang pernah ditinjau; (K20) jenis F3c-2a ditinjau
+  // sampai 2 hari lalu, selisih kecil memakai penanda per kasir (K18).
+  const twoDaysAgo = NOW - 2 * DAY_MS;
   expect(s.exceptionReviews).toEqual({
     batal_transaksi: null,
     batal_pelunasan: null,
     kasbon_lewat_limit: null,
+    batal_kas_keluar: twoDaysAgo,
+    selisih_kas: twoDaysAgo,
+    kas_keluar: twoDaysAgo,
+    serah_terima: twoDaysAgo,
+    shift_lama: twoDaysAgo,
+    selisih_kecil: null,
   });
+  expect(s.smallShortageReviews).toEqual({});
   expect(s.users.map((u) => [u.name, u.role, u.pin, u.password])).toEqual([
     ["Rina", "kasir", "123456", undefined],
     ["Budi", "kasir", "654321", undefined],
@@ -187,13 +198,13 @@ test("ID unik di seluruh state", () => {
   expect(new Set(ids).size).toBe(ids.length);
 });
 
-test("state versi lama di localStorage diganti default v9", () => {
+test("state versi lama di localStorage diganti default v10", () => {
   localStorage.setItem(
     "mock.db",
     JSON.stringify({ store: { id: "x", name: "y" } }),
   );
   __resetMockDbCacheForTests();
-  expect(mockDb.get().version).toBe(9);
+  expect(mockDb.get().version).toBe(10);
   expect(mockDb.get().products).toHaveLength(60);
 });
 

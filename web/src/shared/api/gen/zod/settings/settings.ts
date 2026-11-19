@@ -32,14 +32,38 @@ import * as zod from 'zod';
 
 
 /**
+ * Publik (layar kunci dan layar pembeli). storeName = nama toko di Pengaturan pemilik.
+ * ownerPhone = nomor telepon pemilik untuk baris "Ragu? Telepon pemilik" (R11), hanya bila
+ * request membawa sesi kasir; tanpa sesi kasir → null (endpoint publik bisa terbaca lewat
+ * terowongan, K19). shiftMaxHours = AttentionRules.shiftMaxHours (satu sumber); pita shift
+ * kelamaan di kasir memakai openedAt shift + nilai ini, tanpa request tambahan. Tanpa data
+ * pemilik lain (ambang Perlu perhatian, alamat, catatan kaki struk).
  * @summary Pengaturan layar kasir
  */
+export const getKasirSettingsResponseShiftMaxHoursMax = 24;
+
+
+
 export const GetKasirSettingsResponse = zod.object({
   "storeName": zod.string(),
   "autoPrint": zod.boolean(),
   "curahFractions": zod.array(zod.int()).describe('Pecahan curah dalam qtyBase.'),
   "quickCurahProductIds": zod.array(zod.string()),
   "qrisImageUrl": zod.string(),
-  "allowNegativeStock": zod.boolean()
+  "allowNegativeStock": zod.boolean(),
+  "ownerPhone": zod.string().nullable().describe('Nomor telepon pemilik untuk baris "Ragu? Telepon pemilik: {nomor}" di dialog alasan\nkasir (R11); null bila belum diisi atau request tanpa sesi kasir (K19).\n'),
+  "shiftMaxHours": zod.int().min(1).max(getKasirSettingsResponseShiftMaxHoursMax).describe('Turunan AttentionRules.shiftMaxHours (S3, K19). Pita shift kelamaan tampil bila jam\nsekarang − openedAt > shiftMaxHours jam (ketat; tepat 12 jam belum).\n')
 })
+
+/**
+ * Publik (ditampilkan ke pembeli di kasir). KasirSettings.qrisImageUrl dan
+ * OwnerSettings.store.qrisImageUrl menunjuk ke sini setelah pemilik mengunggah gambar
+ * (putOwnerQrisImage); gambar contoh bawaan berupa berkas statis. id tidak dikenal → 404.
+ * @summary Gambar QRIS toko yang diunggah pemilik (PNG/JPEG)
+ */
+export const GetQrisImageParams = zod.object({
+  "imageId": zod.string()
+})
+
+export const GetQrisImageResponse = zod.unknown()
 

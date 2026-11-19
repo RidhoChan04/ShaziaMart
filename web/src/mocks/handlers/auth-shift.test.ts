@@ -199,6 +199,8 @@ describe("tutup shift dengan Bayar supplier", () => {
       supplierPayments: 1_442_000,
       creditPayments: 0,
       saleRefunds: 0,
+      expenses: 0,
+      ownerTakes: 0,
       expectedCash: 208_000,
       countedCash: 203_000,
       difference: -5000,

@@ -140,6 +140,22 @@ paths:
       tags: [shift]
       operationId: openShift
       summary: Buka shift
+      description: |
+        Serah terima modal (S4, K8, K22). Server menghitung ulang saran modal saat request ini,
+        sama dengan getOpeningSuggestion pada jam itu (pengambilan uang pemilik di antara GET saran
+        dan POST ikut terhitung). openingNote kosong setelah trim dianggap tidak dikirim. Urutan
+        pemeriksaan: sesi → openingCash bukan bilangan bulat ≥ 0 atau openingNote > 200 karakter →
+        422 VALIDATION → shift sudah buka → 409 SHIFT_ALREADY_OPEN → saran tidak null dan
+        openingCash ≠ saran tanpa openingNote → 422 OPENING_MISMATCH (OpeningMismatchProblem
+        membawa suggestedCash = saran sekarang; detail "Isi alasan bila modal berbeda dari
+        Rp{saran}"; klien memuat ulang saran dari problem). Saran null (belum ada shift tutup) →
+        modal bebas tanpa catatan. Tersimpan suggestedOpening (saran saat buka, null bila tanpa
+        saran) dan openingNote; catatan yang terkirim padahal modal sama dengan saran disimpan null.
+        Semua pengambilan uang pemilik di sela shift (shiftId null) yang belum dibatalkan dan belum
+        terpakai ditandai terpakai oleh shift baru ini (sejak itu tidak bisa dibatalkan). Modal yang
+        berbeda dari saran menjadi kejadian Perlu perhatian serah_terima (amount = openingCash −
+        suggestedOpening, at = openedAt). Respons kasir (Shift) tanpa saran, catatan, atau data
+        pemilik.
       security:
         - cookieAuth: []
       requestBody:
@@ -160,7 +176,40 @@ paths:
         "409":
           $ref: "#/components/responses/ShiftAlreadyOpen"
         "422":
-          $ref: "#/components/responses/ValidationFailed"
+          description: |
+            VALIDATION (modal atau catatan tidak sah) atau OPENING_MISMATCH (modal berbeda dari saran
+            tanpa catatan; OpeningMismatchProblem membawa suggestedCash)
+          content:
+            application/problem+json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/Problem"
+                  - $ref: "#/components/schemas/OpeningMismatchProblem"
+  /api/shifts/opening-suggestion:
+    get:
+      tags: [shift]
+      operationId: getOpeningSuggestion
+      summary: Saran modal awal untuk buka shift (serah terima)
+      description: |
+        (S4, K8) lastCountedCash = uang fisik shift tutup terakhir (closedAt terbaru), lastKasirName
+        dan lastClosedAt dari shift itu; ownerTakes = Σ pengambilan uang pemilik di sela shift
+        (shiftId null) yang belum dibatalkan dan belum terpakai shift berikutnya; suggestedCash =
+        max(0, lastCountedCash − ownerTakes) (dijepit ≥ 0, K22). Tanpa shift tutup sebelumnya →
+        suggestedCash, lastKasirName, lastClosedAt, lastCountedCash null dan ownerTakes 0 (modal
+        bebas, tanpa alasan). Selagi ada shift buka tetap dihitung dari shift tutup terakhir. Saran
+        dihitung ulang saat openShift; nilai di sini hanya untuk mengisi layar buka shift. Respons
+        kasir: tanpa catatan modal, rincian pengambilan, atau data pemilik lain.
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Saran modal
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpeningSuggestion"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
   /api/shifts/current/close:
     post:
       tags: [shift]
@@ -187,11 +236,133 @@ paths:
           $ref: "#/components/responses/ShiftClosed"
         "422":
           $ref: "#/components/responses/ValidationFailed"
+  /api/shifts/current/expenses:
+    get:
+      tags: [shift]
+      operationId: listShiftExpenses
+      summary: Kas keluar shift yang sedang buka, terbaru dulu
+      description: |
+        Shift yang sedang buka, bukan hari ini (shift bisa lewat tengah malam); termasuk yang
+        dibatalkan (status dibatalkan). Tanpa shift buka → []. Respons kasir hanya status, tanpa data
+        pembatal (siapa, jam, atau alasan batal).
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Kas keluar shift ini
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DrawerExpense"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [shift]
+      operationId: createShiftExpense
+      summary: Catat kas keluar dari laci (alasan wajib)
+      description: |
+        (S2, K10) Uang keluar dari laci beralasan (mis. beli es batu); uang seharusnya shift yang
+        sedang buka turun sebesar amount (ShiftClosure.expenses). Urutan pemeriksaan: sesi → id
+        kosong atau > 64 karakter → 422 VALIDATION → id sudah dipakai: milik pengguna ini → 200
+        rekaman tersimpan apa adanya tanpa kas keluar kedua (isi body baru diabaikan), milik pengguna
+        lain → 409 ID_TAKEN tanpa isi rekaman → amount bukan bilangan bulat ≥ 1, atau reason kosong
+        (setelah trim) atau > 200 karakter → 422 VALIDATION → tanpa shift buka → 409 SHIFT_CLOSED.
+        Idempoten menurut (pembuat, id). Replay id yang sudah dibatalkan mengembalikan 200 dengan
+        rekaman berstatus dibatalkan; klien wajib memperlakukannya sebagai belum tersimpan (lepas id,
+        jangan tampilkan tersimpan, simpan berikutnya memakai id baru). at = jam server; rekaman
+        menyimpan shiftId shift itu dan pencatatnya. Kas keluar dengan amount > expenseSingleMax,
+        dan kas keluar yang membuat Σ kas keluar aktif shift > expenseShiftMax, menjadi kejadian
+        Perlu perhatian kas_keluar (ambang dari Pengaturan saat dibaca, K4/K7).
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExpenseInput"
+      responses:
+        "200":
+          description: id sudah pernah disimpan pengguna ini; rekaman lama dikembalikan (replay)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DrawerExpense"
+        "201":
+          description: Kas keluar dicatat
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DrawerExpense"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          description: SHIFT_CLOSED (tanpa shift buka) atau ID_TAKEN (id milik pengguna lain)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+  /api/shifts/current/expenses/{expenseId}/cancel:
+    post:
+      tags: [shift]
+      operationId: cancelShiftExpense
+      summary: Batalkan kas keluar di kasir (alasan wajib)
+      description: |
+        (S10) Kasir hanya boleh membatalkan kas keluar dari shift yang sedang buka; setelah shift
+        tutup, batal hanya dari app pemilik (cancelOwnerExpense). Tanpa PIN pemilik; alasan wajib.
+        Urutan pemeriksaan: sesi → id tidak dikenal → 404 → sudah dibatalkan → 200 rekaman apa
+        adanya tanpa perubahan → reason kosong (setelah trim) atau > 200 karakter → 422 VALIDATION →
+        tanpa shift buka → 409 SHIFT_CLOSED → shiftId kas keluar bukan shift yang sedang buka → 409
+        OUTSIDE_SHIFT. Berhasil: ShiftClosure.expenses shift yang buka turun sebesar amount (uang
+        seharusnya naik lagi). Tercatat cancelledAt (jam server), pembatal (id + nama, boleh beda
+        dari pencatat), channel kasir, dan alasan; menjadi kejadian Perlu perhatian batal_kas_keluar
+        (amount = nominal, reason = alasan batal). Kas keluar yang dibatalkan tidak lagi ikut
+        kejadian kas_keluar maupun Σ kas keluar shift. Respons kasir hanya status.
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ExpenseId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CancelCreditPaymentInput"
+      responses:
+        "200":
+          description: Kas keluar dibatalkan (atau sudah dibatalkan sebelumnya)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DrawerExpense"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: SHIFT_CLOSED (tanpa shift buka) atau OUTSIDE_SHIFT (kas keluar dari shift lain)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
   /api/settings/kasir:
     get:
       tags: [settings]
       operationId: getKasirSettings
       summary: Pengaturan layar kasir
+      description: |
+        Publik (layar kunci dan layar pembeli). storeName = nama toko di Pengaturan pemilik.
+        ownerPhone = nomor telepon pemilik untuk baris "Ragu? Telepon pemilik" (R11), hanya bila
+        request membawa sesi kasir; tanpa sesi kasir → null (endpoint publik bisa terbaca lewat
+        terowongan, K19). shiftMaxHours = AttentionRules.shiftMaxHours (satu sumber); pita shift
+        kelamaan di kasir memakai openedAt shift + nilai ini, tanpa request tambahan. Tanpa data
+        pemilik lain (ambang Perlu perhatian, alamat, catatan kaki struk).
       responses:
         "200":
           description: Pengaturan kasir
@@ -199,6 +370,35 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/KasirSettings"
+  /api/settings/qris-image/{imageId}:
+    get:
+      tags: [settings]
+      operationId: getQrisImage
+      summary: Gambar QRIS toko yang diunggah pemilik (PNG/JPEG)
+      description: |
+        Publik (ditampilkan ke pembeli di kasir). KasirSettings.qrisImageUrl dan
+        OwnerSettings.store.qrisImageUrl menunjuk ke sini setelah pemilik mengunggah gambar
+        (putOwnerQrisImage); gambar contoh bawaan berupa berkas statis. id tidak dikenal → 404.
+      parameters:
+        - name: imageId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Gambar QRIS
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+        "404":
+          $ref: "#/components/responses/NotFound"
   /api/catalog/lookup:
     get:
       tags: [catalog]
@@ -1650,13 +1850,33 @@ paths:
     get:
       tags: [owner]
       operationId: listOwnerExceptions
-      summary: Pengecualian kasir satu jenis sejak terakhir ditinjau
+      summary: Kejadian Perlu perhatian satu jenis sejak terakhir ditinjau
       description: |
         Kejadian jenis kind dengan at > reviewedAt (semua kejadian bila belum pernah ditinjau),
-        tanpa batas umur, terbaru dulu. batal_transaksi = penjualan yang dibatalkan kasir (amount =
-        total transaksi); batal_pelunasan = pelunasan yang dibatalkan kasir (amount = nominal
-        pelunasan); kasbon_lewat_limit = penjualan kasbon lewat limit yang tidak dibatalkan (amount =
-        kelebihan limit). Pembatalan oleh pemilik bukan pengecualian. kind tidak dikenal → 422.
+        tanpa batas umur kecuali selisih_kecil, terbaru dulu. Kejadian adalah tampilan turunan dari
+        rekaman (penjualan, pelunasan, shift tutup dan buka, kas keluar, catatan modal); ambang
+        dibaca dari AttentionRules saat ini (K7), bukan salinan saat kejadian, jadi mengubah
+        Pengaturan langsung mengubah daftar. Semua ambang dibandingkan ketat. batal_transaksi =
+        penjualan yang dibatalkan kasir (amount = total transaksi); batal_pelunasan = pelunasan
+        yang dibatalkan kasir (amount = nominal pelunasan); kasbon_lewat_limit = penjualan kasbon
+        lewat limit yang tidak dibatalkan (amount = kelebihan limit); batal_kas_keluar = kas keluar
+        yang dibatalkan kasir (S10; at = jam batal, amount = nominal, reason = alasan batal,
+        kasirName = pembatal); selisih_kas = shift tutup dengan |difference| ≥ cashDiffMin (at =
+        closedAt, amount = difference bertanda, reason null); kas_keluar (K4) = (a) tiap kas keluar
+        aktif dengan amount > expenseSingleMax (id = id kas keluar, at = jam catat, amount =
+        nominal, reason = alasannya) dan (b) tiap shift yang Σ kas keluar aktifnya >
+        expenseShiftMax, satu kejadian per shift (id = kas_keluar_shift-{shiftId}, at = jam kas
+        keluar yang pertama membuat Σ lewat, amount = Σ shift saat ini, reason null), keduanya bisa
+        muncul untuk shift yang sama; serah_terima (K22) = shift dengan suggestedOpening ≠ null dan
+        openingCash ≠ suggestedOpening (at = openedAt, amount = openingCash − suggestedOpening,
+        reason = openingNote); shift_lama (K5) = shift tutup atau buka dengan (closedAt ?? jam
+        server) − openedAt > shiftMaxHours jam (at = openedAt + shiftMaxHours jam, amount 0,
+        durationMinutes = menit penuh sampai tutup atau sampai jam server, reason null);
+        selisih_kecil (K6, K18) = shift tutup milik kasirId dengan −cashDiffMin < difference < 0 dan
+        closedAt > jam server − 7 hari dan closedAt > reviewedAt kasir itu (amount = difference,
+        reason null); kasirId wajib untuk selisih_kecil (tanpa → 422) dan diabaikan jenis lain.
+        Kas keluar yang dibatalkan tidak ikut kas_keluar. Pembatalan oleh pemilik bukan kejadian.
+        kind tidak dikenal → 422.
       security:
         - ownerCookieAuth: []
       parameters:
@@ -1665,6 +1885,12 @@ paths:
           required: true
           schema:
             $ref: "#/components/schemas/ExceptionKind"
+        - name: kasirId
+          in: query
+          required: false
+          description: Wajib untuk selisih_kecil (penanda tinjau per kasir, K18); diabaikan jenis lain.
+          schema:
+            type: string
       responses:
         "200":
           description: Pengecualian yang belum ditinjau
@@ -1680,11 +1906,14 @@ paths:
     post:
       tags: [owner]
       operationId: reviewOwnerExceptions
-      summary: Tandai pengecualian satu jenis sudah ditinjau
+      summary: Tandai kejadian satu jenis sudah ditinjau
       description: |
         reviewedAt = max(reviewedAt lama, min(upTo, jam server)); idempoten dan tidak pernah
-        mundur. upTo = jam kejadian terbaru yang dilihat pemilik, sehingga kejadian yang masuk
-        setelah daftar dimuat tetap muncul. Respons = daftar jenis itu setelah ditinjau.
+        mundur. upTo = jam kejadian terbaru yang dilihat pemilik (ExceptionAttention.latestAt saat
+        ditinjau langsung dari daftar Perlu perhatian, S8), sehingga kejadian yang masuk setelah
+        daftar dimuat tetap muncul. selisih_kecil memakai penanda per kasir (K18): kasirId wajib
+        (tanpa → 422 VALIDATION) dan hanya penanda kasir itu yang maju; jenis lain mengabaikan
+        kasirId. Respons = daftar jenis itu (untuk selisih_kecil: kasir itu) setelah ditinjau.
       security:
         - ownerCookieAuth: []
       requestBody:
@@ -1700,6 +1929,556 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/OwnerExceptionList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+  /api/owner/settings:
+    get:
+      tags: [owner]
+      operationId: getOwnerSettings
+      summary: Pengaturan toko pemilik (semua bagian)
+      description: |
+        Satu sumber nilai (K19): store.name = KasirSettings.storeName, attention.shiftMaxHours =
+        KasirSettings.shiftMaxHours, stock = batas opname & kedaluwarsa (J8), report = batas
+        laporan stok, credit.defaultCreditLimit = limit pelanggan baru dari kasir.
+      security:
+        - ownerCookieAuth: []
+      responses:
+        "200":
+          description: Pengaturan lengkap
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnerSettings"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    patch:
+      tags: [owner]
+      operationId: updateOwnerSettings
+      summary: Ubah satu bagian Pengaturan
+      description: |
+        (K13) Satu PATCH per bagian: setiap bagian opsional, tetapi bagian yang dikirim harus utuh;
+        bagian yang tidak dikirim tidak berubah. ownerPhone tidak dikirim = tidak berubah, null =
+        dihapus. Validasi (galat → 422 VALIDATION dengan detail berbahasa Indonesia, tanpa menyimpan
+        bagian mana pun): store.name 1..40 karakter setelah trim; store.address dan
+        store.receiptFooter 0..120 karakter setelah trim; kasir.curahFractions 1..8 angka unik naik
+        1..100.000; kasir.quickCurahProductIds ≤ 12 id barang curah aktif; credit.defaultCreditLimit
+        0..100.000.000; stock.expirySoonDays 1..90; stock.opnameItemLimit dan
+        stock.opnameSessionLimit 0..10.000.000 dengan opnameItemLimit ≤ opnameSessionLimit;
+        report.thinMarginPermille 0..1000; report.unsoldDays 7..365; attention: batas uang
+        0..10.000.000 dan shiftMaxHours 1..24; ownerPhone null atau 8..16 karakter ^[0-9+ -]+$.
+        store.name sekaligus menjadi KasirSettings.storeName (K19); attention.shiftMaxHours menjadi
+        KasirSettings.shiftMaxHours. Ambang baru langsung berlaku untuk butir Perlu perhatian (K7)
+        dan batas stok/laporan. Identitas toko dan catatan kaki dipakai struk yang dicetak server.
+        Respons = OwnerSettings lengkap.
+      security:
+        - ownerCookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OwnerSettingsPatch"
+      responses:
+        "200":
+          description: Pengaturan setelah diubah
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnerSettings"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+  /api/owner/settings/thin-margin-preview:
+    get:
+      tags: [owner]
+      operationId: getOwnerThinMarginPreview
+      summary: Pratinjau jumlah barang untung tipis pada batas tertentu
+      description: |
+        Hitungan sama dengan laporan stok untung tipis pada batas permille ini, tanpa menyimpan
+        apa pun: flagged = barang aktif ber-HPP dengan harga eceran > 0 yang (harga − modal) × 1000 <
+        permille × harga; total = semua barang aktif ber-HPP dengan harga eceran > 0. permille di
+        luar 0..1000 atau bukan bilangan bulat → 422 VALIDATION.
+      security:
+        - ownerCookieAuth: []
+      parameters:
+        - name: permille
+          in: query
+          required: true
+          description: Batas margin eceran dalam permil (UI persen bulat × 10).
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 1000
+      responses:
+        "200":
+          description: Pratinjau
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ThinMarginPreview"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+  /api/owner/settings/qris-image:
+    put:
+      tags: [owner]
+      operationId: putOwnerQrisImage
+      summary: Unggah gambar QRIS toko
+      description: |
+        PNG atau JPEG (Content-Type sesuai berkas; server memeriksa isi berkas), paling besar 1 MB;
+        selain itu 422 VALIDATION. Gambar lama diganti; URL baru
+        (getQrisImage) menjadi store.qrisImageUrl dan KasirSettings.qrisImageUrl. Respons =
+        OwnerSettings lengkap.
+      security:
+        - ownerCookieAuth: []
+      requestBody:
+        required: true
+        content:
+          image/png:
+            schema:
+              type: string
+              format: binary
+          image/jpeg:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "200":
+          description: Gambar tersimpan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnerSettings"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+  /api/owner/kasir-accounts:
+    get:
+      tags: [owner]
+      operationId: listOwnerKasirAccounts
+      summary: Akun kasir (aktif dan nonaktif)
+      description: |
+        Semua pengguna ber-role kasir, urut nama; pemilik tidak pernah ada di daftar. PIN tidak
+        pernah dikirim. onShift = orang itu memegang shift yang sedang buka. lockedUntil = jam
+        berakhirnya kunci PIN yang masih berlaku, yang terlama dari dua realm (PIN kasir di PC dan
+        PIN HP toko); null bila tidak terkunci.
+      security:
+        - ownerCookieAuth: []
+      responses:
+        "200":
+          description: Akun kasir
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OwnerKasirAccount"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [owner]
+      operationId: createOwnerKasirAccount
+      summary: Tambah akun kasir
+      description: |
+        (K12) name 1..30 karakter setelah trim, unik tanpa beda huruf besar/kecil di semua pengguna
+        termasuk pemilik → 409 NAME_TAKEN; pin tepat 6 angka → selain itu 422 VALIDATION. Akun baru
+        aktif, role kasir, langsung muncul di listKasirUsers (PC) dan listStaffUsers (HP toko).
+        Klik ganda aman: permintaan kedua dengan nama sama → 409 NAME_TAKEN.
+      security:
+        - ownerCookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/KasirAccountInput"
+      responses:
+        "201":
+          description: Akun dibuat
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnerKasirAccount"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          description: NAME_TAKEN — nama sudah dipakai pengguna lain
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+  /api/owner/kasir-accounts/{userId}:
+    patch:
+      tags: [owner]
+      operationId: updateOwnerKasirAccount
+      summary: Ubah nama atau aktif/nonaktifkan akun kasir
+      description: |
+        (K12) Urutan pemeriksaan: id tidak dikenal atau bukan kasir → 404; name (bila dikirim) 1..30
+        karakter setelah trim → 422 VALIDATION, dipakai pengguna lain (tanpa beda huruf besar/kecil)
+        → 409 NAME_TAKEN; active false saat orang itu memegang shift yang sedang buka → 409
+        KASIR_ON_SHIFT. Nonaktif: hilang dari listKasirUsers dan listStaffUsers, login PIN di kedua
+        realm → 401 PIN_INVALID tanpa menambah hitungan kunci, sesi kasir dan sesi HP toko orang itu
+        dihapus (request berikutnya 401; requireSession menolak pengguna nonaktif, K22). Riwayat
+        tetap tersimpan. Ganti nama tidak mengubah salinan nama lama (shift, penjualan, nota).
+        Mengaktifkan lagi → bisa login dengan PIN lama.
+      security:
+        - ownerCookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/KasirAccountPatch"
+      responses:
+        "200":
+          description: Akun setelah diubah
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnerKasirAccount"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: NAME_TAKEN (nama dipakai pengguna lain) atau KASIR_ON_SHIFT (masih memegang shift buka)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+  /api/owner/kasir-accounts/{userId}/pin:
+    post:
+      tags: [owner]
+      operationId: resetOwnerKasirPin
+      summary: Atur ulang PIN kasir
+      description: |
+        (K12) pin tepat 6 angka → selain itu 422 VALIDATION; id tidak dikenal atau bukan kasir → 404.
+        Sekaligus mengosongkan hitungan PIN salah dan kunci orang itu di kedua realm (PC kasir dan
+        HP toko). PIN tidak pernah dikirim balik.
+      security:
+        - ownerCookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/KasirPinReset"
+      responses:
+        "200":
+          description: PIN diganti
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnerKasirAccount"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+  /api/owner/shifts:
+    get:
+      tags: [owner]
+      operationId: listOwnerShifts
+      summary: Shift satu hari (Lainnya > Shift & kas)
+      description: |
+        items = shift yang openedAt-nya jatuh pada tanggal Asia/Jakarta date (bawaan hari ini),
+        ditambah shift yang sedang buka bila date = hari ini walau dibuka kemarin; urut openedAt
+        terbaru dulu. Shift buka: closedAt, countedCash, dan difference null. takes = pengambilan
+        uang pemilik di sela shift (shiftId null) dengan at pada tanggal itu, termasuk yang
+        dibatalkan, terbaru dulu (pengambilan di dalam shift ada di rincian shift itu).
+        openKasirName = kasir shift yang sedang buka sekarang (apa pun tanggalnya), null bila tidak
+        ada; dipakai keterangan lembar Ambil uang dari laci. date bukan tanggal YYYY-MM-DD yang sah →
+        422 VALIDATION.
+      security:
+        - ownerCookieAuth: []
+      parameters:
+        - name: date
+          in: query
+          required: false
+          description: Tanggal Asia/Jakarta YYYY-MM-DD; bawaan hari ini.
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Shift hari itu
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnerShiftList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+  /api/owner/shifts/{shiftId}:
+    get:
+      tags: [owner]
+      operationId: getOwnerShift
+      summary: Rincian laci satu shift
+      description: |
+        Shift tutup: angka closure tersimpan apa adanya (tidak pernah dihitung ulang). Shift buka:
+        angka laci sekarang dari rumus laci yang sama dengan tutup shift, countedCash dan difference
+        null. Satu rumus: expectedCash = openingCash + cashSales − supplierPayments + creditPayments −
+        saleRefunds − expenses − ownerTakes. expenseItems = semua kas keluar shift itu termasuk yang
+        dibatalkan, urut jam; ownerTakeItems = pengambilan uang pemilik di dalam shift itu (shiftId
+        = shift ini) termasuk yang dibatalkan, urut jam. qrisSales = Σ bagian QRIS penjualan shift
+        ini yang tidak dibatalkan; qrisRepayments = Σ pelunasan kasir QRIS shift ini yang tidak
+        dibatalkan (keduanya tidak masuk laci). id tidak dikenal → 404.
+      security:
+        - ownerCookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ShiftId"
+      responses:
+        "200":
+          description: Rincian shift
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnerShiftDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /api/owner/cash-takes:
+    post:
+      tags: [owner]
+      operationId: createOwnerCashTake
+      summary: Ambil uang dari laci (pemilik)
+      description: |
+        (S5, K9) Kapan saja. Ada shift buka → shiftId = shift itu dan masuk ShiftClosure.ownerTakes
+        shift itu (uang seharusnya turun, baris Diambil pemilik). Tanpa shift buka → shiftId null,
+        mengurangi saran modal shift berikutnya (OpeningSuggestion.ownerTakes) sampai terpakai saat
+        shift berikutnya dibuka. Bukan kejadian Perlu perhatian. Urutan pemeriksaan: sesi → id
+        kosong atau > 64 karakter → 422 VALIDATION → id sudah dipakai: milik pengguna ini → 200
+        rekaman tersimpan apa adanya tanpa pengambilan kedua (isi body baru diabaikan), milik
+        pengguna lain → 409 ID_TAKEN → amount bukan bilangan bulat ≥ 1 atau note > 200 karakter →
+        422 VALIDATION. Idempoten menurut (pembuat, id). note kosong setelah trim disimpan null.
+        Replay id yang sudah dibatalkan mengembalikan 200 dengan rekaman berstatus dibatalkan
+        (cancelled terisi); klien wajib memperlakukannya sebagai belum tersimpan (lepas id, simpan
+        berikutnya memakai id baru). at = jam server.
+      security:
+        - ownerCookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OwnerCashTakeInput"
+      responses:
+        "200":
+          description: id sudah pernah disimpan pengguna ini; rekaman lama dikembalikan (replay)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnerCashTake"
+        "201":
+          description: Pengambilan dicatat
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnerCashTake"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/IdTaken"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+  /api/owner/cash-takes/{takeId}/cancel:
+    post:
+      tags: [owner]
+      operationId: cancelOwnerCashTake
+      summary: Batalkan pengambilan uang yang salah (alasan wajib)
+      description: |
+        (S5, K9) Efeknya dibalik di shift atau modal yang sama, hanya selagi masih bisa dibalik.
+        Urutan pemeriksaan: id tidak dikenal → 404; sudah dibatalkan → 200 rekaman apa adanya tanpa
+        perubahan; reason kosong (setelah trim) atau > 200 karakter → 422 VALIDATION; tidak bisa
+        dibalik lagi → 409 CASH_TAKE_LOCKED tanpa mengubah angka apa pun. Bisa dibalik bila shiftId ≠
+        null dan shift itu masih buka (ShiftClosure.ownerTakes shift itu turun), atau shiftId null dan
+        belum terpakai shift berikutnya (saran modal naik lagi). Shift tempatnya sudah tutup, atau
+        pengambilan sela sudah terpakai modal shift berikutnya → terkunci. Tercatat cancelledAt (jam
+        server), pembatal, dan alasan.
+      security:
+        - ownerCookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TakeId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CancelCreditPaymentInput"
+      responses:
+        "200":
+          description: Pengambilan dibatalkan (atau sudah dibatalkan sebelumnya)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnerCashTake"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: CASH_TAKE_LOCKED — shift tempatnya sudah tutup atau sudah dipakai modal shift berikutnya
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+  /api/owner/expenses/{expenseId}/cancel:
+    post:
+      tags: [owner]
+      operationId: cancelOwnerExpense
+      summary: Batalkan kas keluar dari app pemilik (alasan wajib)
+      description: |
+        (S10) Pembatalan dari app pemilik tidak pernah menyentuh laci: closure shift tutup tidak
+        berubah dan shift yang sedang buka tidak berubah. Urutan pemeriksaan: id tidak dikenal →
+        404; sudah dibatalkan → 200 rekaman apa adanya tanpa perubahan; reason kosong (setelah trim)
+        atau > 200 karakter → 422 VALIDATION; kas keluar dari shift yang masih buka → 409
+        IN_OPEN_SHIFT (batalkan dari kasir). Tercatat cancelledAt (jam server), pembatal, channel
+        pemilik, dan alasan; bukan kejadian Perlu perhatian. Kas keluar yang dibatalkan tidak lagi
+        ikut kejadian kas_keluar.
+      security:
+        - ownerCookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ExpenseId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CancelCreditPaymentInput"
+      responses:
+        "200":
+          description: Kas keluar dibatalkan (atau sudah dibatalkan sebelumnya)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnerDrawerExpense"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: IN_OPEN_SHIFT — kas keluar di shift yang masih buka
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+  /api/owner/qris-days:
+    get:
+      tags: [owner]
+      operationId: listOwnerQrisDays
+      summary: Total QRIS per hari dan tanda pencocokan (Lainnya > QRIS harian)
+      description: |
+        (S7, K11, K21) Hari = tanggal Asia/Jakarta createdAt. sales = Σ bagian QRIS penjualan yang
+        tidak dibatalkan; repayments = Σ pelunasan kasir QRIS yang tidak dibatalkan; total = sales +
+        repayments; voidedCount/voidedTotal = penjualan QRIS dan pelunasan QRIS yang dibatalkan
+        (bagian QRIS saja; info, tidak masuk total). Status dibaca: tanda tersimpan, kecuali total
+        sekarang ≠ total saat ditandai → belum dengan changedAfterMark true (dihitung lagi di butir).
+        Tanpa unreconciled: hari di bulan month (bawaan bulan ini) sampai hari ini dengan total > 0,
+        voidedCount > 0, atau bertanda; terbaru dulu; QrisDayList.month = bulan itu. unreconciled =
+        true: semua hari yang dihitung butir QRIS belum dicocokkan (sejak QRIS harian mulai dipakai,
+        sebelum hari ini, total > 0, status belum), lintas bulan, terlama dulu; month diabaikan dan
+        QrisDayList.month null. month bukan YYYY-MM yang sah → 422 VALIDATION.
+      security:
+        - ownerCookieAuth: []
+      parameters:
+        - name: month
+          in: query
+          required: false
+          description: Bulan Asia/Jakarta YYYY-MM; bawaan bulan ini.
+          schema:
+            type: string
+            pattern: '^\d{4}-(0[1-9]|1[0-2])$'
+        - name: unreconciled
+          in: query
+          required: false
+          description: true = hanya hari yang belum dicocokkan (lembar Cocokkan, S11).
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Hari QRIS
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QrisDayList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+  /api/owner/qris-days/{date}:
+    get:
+      tags: [owner]
+      operationId: getOwnerQrisDay
+      summary: Rincian QRIS satu hari beserta transaksinya
+      description: |
+        (S11) QrisDay hari itu (aturan sama dengan listOwnerQrisDays) + items = transaksi QRIS hari
+        itu urut jam: penjualan dengan bagian QRIS (amount = bagian QRIS saja, ref = nomor struk,
+        kasirName = kasir penjual) dan pelunasan kasir QRIS (ref = nama pelanggan, kasirName =
+        pencatat); yang dibatalkan ikut dengan status dibatalkan. Σ amount items aktif = total.
+        Hari tanpa transaksi → 200 dengan angka 0 dan items kosong. date tidak sah atau sesudah hari
+        ini → 422 VALIDATION.
+      security:
+        - ownerCookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/QrisDate"
+      responses:
+        "200":
+          description: Rincian hari
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QrisDayDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+    put:
+      tags: [owner]
+      operationId: markOwnerQrisDay
+      summary: Tandai QRIS satu hari Cocok atau Tidak cocok
+      description: |
+        (S7, K11, K21) Hanya hari yang sudah selesai: date tidak sah, hari ini, atau sesudahnya →
+        422 VALIDATION. tidak_cocok wajib note (kosong setelah trim → 422 VALIDATION); note > 200
+        karakter → 422; note cocok yang kosong disimpan null. Tandai ulang boleh dan menimpa (satu
+        rekaman per tanggal, diganti utuh); server menyimpan total saat ditandai (dasar
+        changedAfterMark), penanda (nama), dan jam server. Tidak ada tandai semua.
+      security:
+        - ownerCookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/QrisDate"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QrisMarkInput"
+      responses:
+        "200":
+          description: Hari setelah ditandai
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QrisDay"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "422":
@@ -2591,6 +3370,38 @@ components:
       required: true
       schema:
         type: string
+    ExpenseId:
+      name: expenseId
+      in: path
+      required: true
+      schema:
+        type: string
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: string
+    ShiftId:
+      name: shiftId
+      in: path
+      required: true
+      schema:
+        type: string
+    TakeId:
+      name: takeId
+      in: path
+      required: true
+      schema:
+        type: string
+    QrisDate:
+      name: date
+      in: path
+      required: true
+      description: Tanggal Asia/Jakarta YYYY-MM-DD.
+      schema:
+        type: string
+        format: date
     ReportPeriodQuery:
       name: period
       in: query
@@ -2765,6 +3576,10 @@ components:
         - OUTSIDE_SHIFT
         - IN_OPEN_SHIFT
         - VOID_TOO_OLD
+        - CASH_TAKE_LOCKED
+        - NAME_TAKEN
+        - KASIR_ON_SHIFT
+        - OPENING_MISMATCH
     Problem:
       type: object
       required: [type, title, status, code]
@@ -2845,6 +3660,22 @@ components:
                 Bagian kasbon transaksi ini di atas limit = min(attempted, balance + attempted −
                 creditLimit); sama dengan CreditOverLimit.excess yang dicatat bila disimpan dengan
                 alasan. Klien menampilkan angka ini, tidak menghitung sendiri.
+    OpeningMismatchProblem:
+      description: |
+        Problem OPENING_MISMATCH (422, K22): modal awal berbeda dari saran tanpa openingNote.
+        suggestedCash = saran yang dihitung ulang server saat buka shift; klien memuat ulang saran
+        dari sini, tidak menghitung sendiri.
+      allOf:
+        - $ref: "#/components/schemas/Problem"
+        - type: object
+          required: [code, suggestedCash]
+          properties:
+            code:
+              type: string
+              enum: [OPENING_MISMATCH]
+            suggestedCash:
+              type: integer
+              minimum: 0
     User:
       type: object
       required: [id, name, role]
@@ -2888,21 +3719,24 @@ components:
         lastWeekRevenue:
           type: integer
           description: Omzet penjualan selesai pada jam ini sepanjang jam penuh di hari yang sama minggu lalu (rupiah); grafik menampilkan seluruh hari minggu lalu.
-    CashDifference:
+    QrisUnreconciled:
       type: object
-      required: [shiftId, kasirName, closedAt, difference]
+      description: |
+        (S7, K11) Butir QRIS belum dicocokkan: hari sejak QRIS harian mulai dipakai dan sebelum hari
+        ini dengan total QRIS > 0 yang statusnya belum (termasuk yang totalnya berubah setelah
+        ditandai, K21). Hari tanpa QRIS tidak dihitung. from/to = tanggal Asia/Jakarta hari
+        tertua/terbaru.
+      required: [count, from, to]
       properties:
-        shiftId:
-          type: string
-        kasirName:
-          type: string
-        closedAt:
+        count:
           type: integer
-          format: int64
-          description: Waktu shift ditutup (epoch ms UTC).
-        difference:
-          type: integer
-          description: Uang fisik dikurangi uang seharusnya (rupiah); tidak nol.
+          minimum: 1
+        from:
+          type: string
+          format: date
+        to:
+          type: string
+          format: date
     OverdueCredit:
       type: object
       required: [count, total]
@@ -2915,7 +3749,10 @@ components:
           description: Jumlah saldo kasbon seluruh pelanggan tersebut (rupiah).
     Attention:
       type: object
-      required: [lowStockCount, negativeStockCount, cashDifferences, overdueCredit, costChanges, stockOuts, supplierDebts, awaitingPriceCount, expiry, opnameHeldCount, opnameFlags, opnameReplacedHeld, exceptions]
+      description: |
+        Selisih kas shift tidak lagi berupa daftar hari ini: menjadi kejadian selisih_kas dan
+        selisih_kecil di exceptions (S6, menumpuk sampai ditinjau).
+      required: [lowStockCount, negativeStockCount, overdueCredit, costChanges, stockOuts, supplierDebts, awaitingPriceCount, expiry, opnameHeldCount, opnameFlags, opnameReplacedHeld, exceptions, qrisUnreconciled]
       properties:
         lowStockCount:
           type: integer
@@ -2928,11 +3765,6 @@ components:
             Jumlah barang dengan stockAlert minus (stok < 0); dihitung terpisah, tidak termasuk di
             lowStockCount. Aturan penanda diam: tidak termasuk barang stockCounted false atau
             nonaktif; Sedang langka (scarce) dan tidak_diambil tetap dihitung.
-        cashDifferences:
-          type: array
-          description: Shift yang sudah ditutup dengan selisih kas tidak nol, dengan closedAt jatuh pada hari ini (Asia/Jakarta); terbaru dulu.
-          items:
-            $ref: "#/components/schemas/CashDifference"
         overdueCredit:
           $ref: "#/components/schemas/OverdueCredit"
         costChanges:
@@ -2968,11 +3800,17 @@ components:
         exceptions:
           type: array
           description: |
-            Pengecualian kasir yang menumpuk sejak terakhir ditinjau (ruling R9), tanpa batas umur;
-            hanya jenis dengan count > 0, urutan tetap batal_transaksi, batal_pelunasan,
-            kasbon_lewat_limit.
+            Butir kejadian yang menumpuk sejak terakhir ditinjau (ruling R9, S6), satu per jenis
+            (selisih_kecil: satu per kasir), hanya dengan count > 0. Urutan tetap (K2):
+            batal_transaksi, batal_pelunasan, kasbon_lewat_limit, batal_kas_keluar, selisih_kas,
+            kas_keluar, serah_terima, shift_lama, selisih_kecil (per kasir, urut nama kasir).
           items:
             $ref: "#/components/schemas/ExceptionAttention"
+        qrisUnreconciled:
+          nullable: true
+          description: Butir QRIS belum dicocokkan (S7); null bila tidak ada hari yang perlu dicocokkan.
+          allOf:
+            - $ref: "#/components/schemas/QrisUnreconciled"
     SupplierDebtAttention:
       type: object
       description: |
@@ -3107,6 +3945,120 @@ components:
         openingCash:
           type: integer
           minimum: 0
+        openingNote:
+          type: string
+          nullable: true
+          minLength: 1
+          maxLength: 200
+          description: |
+            Alasan modal berbeda dari saran (S4), wajib bila openingCash ≠ saran server (tanpa → 422
+            OPENING_MISMATCH); diabaikan dan disimpan null bila modal sama dengan saran atau tanpa
+            saran. Data pemilik: tidak pernah dikirim balik ke kasir.
+    OpeningSuggestion:
+      type: object
+      description: |
+        Saran modal awal (S4, K8): suggestedCash = max(0, lastCountedCash − ownerTakes); semua null
+        dan ownerTakes 0 bila belum ada shift tutup. Hanya key ini (tanpa catatan modal atau rincian
+        pengambilan pemilik).
+      required: [suggestedCash, lastKasirName, lastClosedAt, lastCountedCash, ownerTakes]
+      properties:
+        suggestedCash:
+          type: integer
+          nullable: true
+          minimum: 0
+        lastKasirName:
+          type: string
+          nullable: true
+          description: Kasir shift tutup terakhir.
+        lastClosedAt:
+          type: integer
+          format: int64
+          nullable: true
+          description: Jam shift tutup terakhir ditutup (epoch ms UTC).
+        lastCountedCash:
+          type: integer
+          nullable: true
+          description: Uang fisik tutup shift terakhir.
+        ownerTakes:
+          type: integer
+          minimum: 0
+          description: Σ uang yang diambil pemilik dari laci setelah shift itu tutup (belum dibatalkan, belum terpakai).
+    ExpenseInput:
+      type: object
+      required: [id, amount, reason]
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: ID dari klien (idempotensi per pembuat); id yang sama mengembalikan rekaman lama dengan 200.
+        amount:
+          type: integer
+          minimum: 1
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: Alasan kas keluar, wajib (1..200 karakter setelah trim).
+    DrawerExpense:
+      type: object
+      description: |
+        Kas keluar dari laci (S2) untuk kasir; hanya key ini (tanpa data pembatal: siapa, jam, atau
+        alasan batal).
+      required: [id, at, amount, reason, kasirName, shiftId, status]
+      properties:
+        id:
+          type: string
+        at:
+          type: integer
+          format: int64
+          description: Jam server saat dicatat (epoch ms UTC).
+        amount:
+          type: integer
+          minimum: 1
+        reason:
+          type: string
+        kasirName:
+          type: string
+          description: Nama pencatat (salinan saat dicatat).
+        shiftId:
+          type: string
+        status:
+          type: string
+          enum: [aktif, dibatalkan]
+    ExpenseCancel:
+      type: object
+      required: [at, byName, reason, channel]
+      properties:
+        at:
+          type: integer
+          format: int64
+          description: Jam server saat dibatalkan (epoch ms UTC).
+        byName:
+          type: string
+          description: Nama pembatal (boleh beda dari pencatat).
+        reason:
+          type: string
+        channel:
+          type: string
+          enum: [kasir, pemilik]
+          description: kasir = dibatalkan di shift yang buka (kejadian batal_kas_keluar); pemilik = dari app pemilik, laci tidak disentuh.
+    OwnerDrawerExpense:
+      description: |
+        Kas keluar untuk pemilik: DrawerExpense + data pembatalan. cancellable = pemilik boleh
+        membatalkan (shift tempatnya sudah tutup dan belum dibatalkan); kas keluar shift yang masih
+        buka hanya bisa dibatalkan dari kasir.
+      allOf:
+        - $ref: "#/components/schemas/DrawerExpense"
+        - type: object
+          required: [cancelled, cancellable]
+          properties:
+            cancelled:
+              nullable: true
+              allOf:
+                - $ref: "#/components/schemas/ExpenseCancel"
+            cancellable:
+              type: boolean
     CloseShiftRequest:
       type: object
       required: [countedCash]
@@ -3116,7 +4068,11 @@ components:
           minimum: 0
     ShiftClosure:
       type: object
-      required: [shiftId, openingCash, cashSales, supplierPayments, creditPayments, saleRefunds, expectedCash, countedCash, difference, salesCount]
+      description: |
+        Satu rumus laci (dipakai tutup shift kasir dan rincian shift pemilik): expectedCash =
+        openingCash + cashSales − supplierPayments + creditPayments − saleRefunds − expenses −
+        ownerTakes; difference = countedCash − expectedCash.
+      required: [shiftId, openingCash, cashSales, supplierPayments, creditPayments, saleRefunds, expenses, ownerTakes, expectedCash, countedCash, difference, salesCount]
       properties:
         shiftId:
           type: string
@@ -3126,7 +4082,7 @@ components:
           type: integer
         supplierPayments:
           type: integer
-          description: Σ uang keluar ke supplier di shift ini, bertanda; expectedCash = openingCash + cashSales − supplierPayments + creditPayments − saleRefunds
+          description: Σ uang keluar ke supplier di shift ini, bertanda; expectedCash = openingCash + cashSales − supplierPayments + creditPayments − saleRefunds − expenses − ownerTakes
         creditPayments:
           type: integer
           description: |
@@ -3140,7 +4096,20 @@ components:
             tunai transaksi shift lama + bagian QRIS yang dikembalikan tunai dari laci (shift ini atau
             shift lama). Bagian tunai transaksi shift ini tidak masuk karena cashSales sudah
             dikurangi; shift lama tidak diubah. expectedCash = openingCash + cashSales −
-            supplierPayments + creditPayments − saleRefunds
+            supplierPayments + creditPayments − saleRefunds − expenses − ownerTakes
+        expenses:
+          type: integer
+          minimum: 0
+          description: |
+            Σ kas keluar beralasan (S2) di shift ini yang tidak dibatalkan; kas keluar yang dibatalkan
+            kasir selagi shift buka tidak ikut. Pembatalan dari app pemilik setelah shift tutup tidak
+            mengubah closure tersimpan.
+        ownerTakes:
+          type: integer
+          minimum: 0
+          description: |
+            Σ uang yang diambil pemilik dari laci selama shift ini buka (S5) dan tidak dibatalkan.
+            Pengambilan di sela shift tidak masuk di sini; ia mengurangi saran modal shift berikutnya.
         expectedCash:
           type: integer
         countedCash:
@@ -3151,7 +4120,7 @@ components:
           type: integer
     KasirSettings:
       type: object
-      required: [storeName, autoPrint, curahFractions, quickCurahProductIds, qrisImageUrl, allowNegativeStock]
+      required: [storeName, autoPrint, curahFractions, quickCurahProductIds, qrisImageUrl, allowNegativeStock, ownerPhone, shiftMaxHours]
       properties:
         storeName:
           type: string
@@ -3170,6 +4139,19 @@ components:
           type: string
         allowNegativeStock:
           type: boolean
+        ownerPhone:
+          type: string
+          nullable: true
+          description: |
+            Nomor telepon pemilik untuk baris "Ragu? Telepon pemilik: {nomor}" di dialog alasan
+            kasir (R11); null bila belum diisi atau request tanpa sesi kasir (K19).
+        shiftMaxHours:
+          type: integer
+          minimum: 1
+          maximum: 24
+          description: |
+            Turunan AttentionRules.shiftMaxHours (S3, K19). Pita shift kelamaan tampil bila jam
+            sekarang − openedAt > shiftMaxHours jam (ketat; tepat 12 jam belum).
     WholesaleTier:
       type: object
       description: |
@@ -3896,10 +4878,14 @@ components:
     ExceptionKind:
       type: string
       description: |
-        Pengecualian kasir (ruling R1/R9): batal_transaksi (penjualan dibatalkan kasir),
-        batal_pelunasan (pelunasan dibatalkan kasir), kasbon_lewat_limit (kasbon melewati limit
-        dengan alasan; penjualan yang kemudian dibatalkan tidak ikut).
-      enum: [batal_transaksi, batal_pelunasan, kasbon_lewat_limit]
+        Jenis kejadian Perlu perhatian (ruling R1/R9, K2), urutan tetap: batal_transaksi (penjualan
+        dibatalkan kasir), batal_pelunasan (pelunasan dibatalkan kasir), kasbon_lewat_limit (kasbon
+        melewati limit dengan alasan; penjualan yang kemudian dibatalkan tidak ikut),
+        batal_kas_keluar (kas keluar dibatalkan kasir, S10), selisih_kas (|selisih tutup shift| ≥
+        cashDiffMin, S6), kas_keluar (kas keluar besar, S2/K4), serah_terima (modal berbeda dari
+        saran, S4), shift_lama (shift buka > shiftMaxHours jam, S3), selisih_kecil (Σ selisih
+        kurang kecil satu kasir dalam 7 hari > smallShortageWeekMax, S6/K18).
+      enum: [batal_transaksi, batal_pelunasan, kasbon_lewat_limit, batal_kas_keluar, selisih_kas, kas_keluar, serah_terima, shift_lama, selisih_kecil]
     CashierException:
       type: object
       description: |
@@ -3915,7 +4901,21 @@ components:
         dibatalkan (CreditOverLimit.excess yang tercatat), null bila transaksi itu tidak lewat limit;
         selain batal_transaksi selalu null. Butir kasbon_lewat_limit transaksi itu tetap hilang
         saat transaksinya dibatalkan.
-      required: [id, kind, at, kasirName, amount, reason, customerName, saleId, saleNumber, paymentId, fromClosedShift, refund, qrisToOwner, overLimitExcess]
+        Jenis F3c-2a (K3, K4, K5, K22): batal_kas_keluar: id = id kas keluar, at = jam batal,
+        kasirName = pembatal, amount = nominal, reason = alasan batal. selisih_kas: id = shiftId, at
+        = closedAt, kasirName = kasir shift, amount = difference (bertanda), reason null.
+        kas_keluar: (a) id = id kas keluar, at = jam catat, amount = nominal, reason = alasannya;
+        (b) id = kas_keluar_shift-{shiftId}, at = jam kas keluar yang membuat Σ shift lewat, amount =
+        Σ kas keluar aktif shift saat ini, reason null; kasirName = kasir shift. serah_terima: id =
+        shiftId, at = openedAt, kasirName = kasir yang membuka, amount = openingCash −
+        suggestedOpening (bertanda), reason = openingNote. shift_lama: id = shiftId, at = openedAt +
+        shiftMaxHours jam, amount 0, durationMinutes = menit penuh (closedAt ?? jam server) −
+        openedAt, reason null. selisih_kecil: id = shiftId, at = closedAt, amount = difference (< 0),
+        reason null. shiftId = shift kejadian (null untuk tiga jenis F3c-1); durationMinutes hanya
+        shift_lama (selain itu null); kasirId = id kasir pelaku (pembatal untuk jenis batal; null
+        bila rekaman tidak menyimpannya). customerName, saleId, saleNumber, paymentId null untuk
+        jenis F3c-2a.
+      required: [id, kind, at, kasirId, kasirName, amount, reason, customerName, saleId, saleNumber, paymentId, shiftId, durationMinutes, fromClosedShift, refund, qrisToOwner, overLimitExcess]
       properties:
         id:
           type: string
@@ -3925,12 +4925,24 @@ components:
           type: integer
           format: int64
           description: Jam server kejadian (epoch ms UTC).
+        kasirId:
+          type: string
+          nullable: true
         kasirName:
           type: string
         amount:
           type: integer
         reason:
           type: string
+          nullable: true
+          description: Alasan dari kasir; null untuk selisih_kas, shift_lama, selisih_kecil, dan kas_keluar per shift.
+        shiftId:
+          type: string
+          nullable: true
+        durationMinutes:
+          type: integer
+          nullable: true
+          description: Hanya shift_lama; lama shift dalam menit penuh.
         customerName:
           type: string
           nullable: true
@@ -3956,9 +4968,15 @@ components:
     ExceptionAttention:
       type: object
       description: |
-        Butir Perlu perhatian satu jenis: semua kejadian dengan at > reviewedAt (tanpa batas umur).
-        total = Σ amount; from/to = tanggal Asia/Jakarta kejadian tertua/terbaru.
-      required: [kind, count, total, from, to]
+        Butir Perlu perhatian satu jenis (selisih_kecil: satu kasir): semua kejadian dengan at >
+        reviewedAt (tanpa batas umur kecuali selisih_kecil 7 hari). total = Σ amount, kecuali
+        kas_keluar = Σ kas keluar unik yang tercakup (kejadian satuan dan kejadian shift di shift
+        yang sama tidak dijumlah dua kali, K22); shortage = Σ amount yang < 0 (≤ 0); from/to =
+        tanggal Asia/Jakarta kejadian tertua/terbaru; latestAt = at kejadian terbaru (dipakai upTo
+        saat ditinjau langsung, S8). selisih_kecil muncul hanya bila Σ |amount| >
+        smallShortageWeekMax (ketat). kasirId/kasirName hanya selisih_kecil (kunci butir UI
+        exception-selisih_kecil-{kasirId}); jenis lain null.
+      required: [kind, count, total, shortage, from, to, latestAt, kasirId, kasirName]
       properties:
         kind:
           $ref: "#/components/schemas/ExceptionKind"
@@ -3967,12 +4985,24 @@ components:
           minimum: 1
         total:
           type: integer
+        shortage:
+          type: integer
+          maximum: 0
         from:
           type: string
           format: date
         to:
           type: string
           format: date
+        latestAt:
+          type: integer
+          format: int64
+        kasirId:
+          type: string
+          nullable: true
+        kasirName:
+          type: string
+          nullable: true
     OwnerExceptionList:
       type: object
       required: [kind, reviewedAt, items]
@@ -3983,7 +5013,7 @@ components:
           type: integer
           format: int64
           nullable: true
-          description: Terakhir ditinjau (epoch ms UTC); null bila belum pernah.
+          description: Terakhir ditinjau (epoch ms UTC; selisih_kecil = penanda kasir itu); null bila belum pernah.
         items:
           type: array
           description: Kejadian dengan at > reviewedAt, terbaru dulu.
@@ -3999,6 +5029,10 @@ components:
           type: integer
           format: int64
           description: Jam kejadian terbaru yang sudah dilihat pemilik (epoch ms UTC); dijepit ke jam server.
+        kasirId:
+          type: string
+          nullable: true
+          description: Wajib untuk selisih_kecil (penanda per kasir, K18; tanpa → 422); diabaikan jenis lain.
     SaleVoid:
       type: object
       description: |
@@ -5920,3 +6954,521 @@ components:
               description: Hitungan final di rentang, terbaru dulu.
               items:
                 $ref: "#/components/schemas/OpnameCountRow"
+    StoreSettings:
+      type: object
+      description: Identitas toko & struk (K13); name = KasirSettings.storeName.
+      required: [name, address, receiptFooter, qrisImageUrl]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 40
+        address:
+          type: string
+          maxLength: 120
+        receiptFooter:
+          type: string
+          maxLength: 120
+        qrisImageUrl:
+          type: string
+          description: Diubah hanya lewat putOwnerQrisImage.
+    StoreSettingsInput:
+      type: object
+      description: Bagian store pada PATCH (tanpa qrisImageUrl); teks di-trim server.
+      required: [name, address, receiptFooter]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 40
+        address:
+          type: string
+          maxLength: 120
+        receiptFooter:
+          type: string
+          maxLength: 120
+    KasirScreenSettings:
+      type: object
+      description: Perilaku layar kasir; nilainya menjadi KasirSettings dengan nama field yang sama.
+      required: [autoPrint, allowNegativeStock, curahFractions, quickCurahProductIds]
+      properties:
+        autoPrint:
+          type: boolean
+        allowNegativeStock:
+          type: boolean
+        curahFractions:
+          type: array
+          description: Pecahan curah dalam qtyBase; 1..8 angka unik, naik, masing-masing 1..100.000.
+          minItems: 1
+          maxItems: 8
+          uniqueItems: true
+          items:
+            type: integer
+            minimum: 1
+            maximum: 100000
+        quickCurahProductIds:
+          type: array
+          description: Paling banyak 12 id barang curah yang aktif.
+          maxItems: 12
+          items:
+            type: string
+    CreditSettings:
+      type: object
+      required: [defaultCreditLimit]
+      properties:
+        defaultCreditLimit:
+          type: integer
+          minimum: 0
+          maximum: 100000000
+          description: Limit kasbon pelanggan baru yang dibuat dari kasir (createCustomer).
+    StockSettings:
+      type: object
+      description: Batas stok (J8); opnameItemLimit ≤ opnameSessionLimit (selain itu 422).
+      required: [expirySoonDays, opnameItemLimit, opnameSessionLimit]
+      properties:
+        expirySoonDays:
+          type: integer
+          minimum: 1
+          maximum: 90
+        opnameItemLimit:
+          type: integer
+          minimum: 0
+          maximum: 10000000
+          description: Tahan selisih opname per barang di atas nilai ini (rupiah).
+        opnameSessionLimit:
+          type: integer
+          minimum: 0
+          maximum: 10000000
+          description: Tandai sesi opname dengan total selisih di atas nilai ini (rupiah).
+    ReportSettings:
+      type: object
+      required: [thinMarginPermille, unsoldDays]
+      properties:
+        thinMarginPermille:
+          type: integer
+          minimum: 0
+          maximum: 1000
+          description: Batas untung tipis dalam permil (UI persen bulat × 10).
+        unsoldDays:
+          type: integer
+          minimum: 7
+          maximum: 365
+    AttentionRules:
+      type: object
+      description: |
+        Ambang Perlu perhatian (S2, S3, S6, K7), semua dibandingkan ketat dan dibaca saat ini (bukan
+        salinan saat kejadian). Selisih kas |d| ≥ cashDiffMin = kejadian selisih_kas; −cashDiffMin <
+        d < 0 = selisih kecil, butir bila Σ satu kasir dalam 7 hari > smallShortageWeekMax; kas
+        keluar > expenseSingleMax atau Σ satu shift > expenseShiftMax = kas_keluar; shift buka >
+        shiftMaxHours jam = shift_lama. Aturan murni yang sama dipakai app (shared/lib/attention-rules).
+      required: [cashDiffMin, smallShortageWeekMax, expenseSingleMax, expenseShiftMax, shiftMaxHours]
+      properties:
+        cashDiffMin:
+          type: integer
+          minimum: 0
+          maximum: 10000000
+        smallShortageWeekMax:
+          type: integer
+          minimum: 0
+          maximum: 10000000
+        expenseSingleMax:
+          type: integer
+          minimum: 0
+          maximum: 10000000
+        expenseShiftMax:
+          type: integer
+          minimum: 0
+          maximum: 10000000
+        shiftMaxHours:
+          type: integer
+          minimum: 1
+          maximum: 24
+    OwnerSettings:
+      type: object
+      description: Pengaturan lengkap pemilik; hanya di /api/owner.
+      required: [store, kasir, credit, stock, report, attention, ownerPhone]
+      properties:
+        store:
+          $ref: "#/components/schemas/StoreSettings"
+        kasir:
+          $ref: "#/components/schemas/KasirScreenSettings"
+        credit:
+          $ref: "#/components/schemas/CreditSettings"
+        stock:
+          $ref: "#/components/schemas/StockSettings"
+        report:
+          $ref: "#/components/schemas/ReportSettings"
+        attention:
+          $ref: "#/components/schemas/AttentionRules"
+        ownerPhone:
+          type: string
+          nullable: true
+          minLength: 8
+          maxLength: 16
+          pattern: '^[0-9+ -]+$'
+          description: Ditampilkan di dialog alasan kasir (R11) lewat KasirSettings.ownerPhone.
+    OwnerSettingsPatch:
+      type: object
+      description: |
+        Satu bagian per PATCH (K13): setiap bagian opsional, bagian yang dikirim harus utuh.
+        ownerPhone tidak dikirim = tidak berubah; null = dihapus.
+      properties:
+        store:
+          $ref: "#/components/schemas/StoreSettingsInput"
+        kasir:
+          $ref: "#/components/schemas/KasirScreenSettings"
+        credit:
+          $ref: "#/components/schemas/CreditSettings"
+        stock:
+          $ref: "#/components/schemas/StockSettings"
+        report:
+          $ref: "#/components/schemas/ReportSettings"
+        attention:
+          $ref: "#/components/schemas/AttentionRules"
+        ownerPhone:
+          type: string
+          nullable: true
+          minLength: 8
+          maxLength: 16
+          pattern: '^[0-9+ -]+$'
+    ThinMarginPreview:
+      type: object
+      required: [flagged, total]
+      properties:
+        flagged:
+          type: integer
+          minimum: 0
+          description: Barang yang tertandai untung tipis pada batas yang diminta.
+        total:
+          type: integer
+          minimum: 0
+          description: Barang yang dinilai (aktif, ber-HPP, harga eceran > 0).
+    OwnerKasirAccount:
+      type: object
+      description: Akun kasir untuk pemilik; tanpa PIN.
+      required: [id, name, active, onShift, lockedUntil]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        active:
+          type: boolean
+          description: false = tidak bisa masuk di kasir maupun HP toko; riwayat tetap.
+        onShift:
+          type: boolean
+          description: Memegang shift yang sedang buka (tidak bisa dinonaktifkan).
+        lockedUntil:
+          type: integer
+          format: int64
+          nullable: true
+          description: Akhir kunci PIN yang masih berlaku (terlama dari dua realm); null bila tidak terkunci.
+    KasirAccountInput:
+      type: object
+      required: [name, pin]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 30
+          description: 1..30 karakter setelah trim; unik tanpa beda huruf besar/kecil.
+        pin:
+          type: string
+          pattern: '^\d{6}$'
+    KasirAccountPatch:
+      type: object
+      description: Field yang tidak dikirim tidak berubah.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 30
+        active:
+          type: boolean
+    KasirPinReset:
+      type: object
+      required: [pin]
+      properties:
+        pin:
+          type: string
+          pattern: '^\d{6}$'
+    OwnerShiftRow:
+      type: object
+      required: [id, kasirName, openedAt, closedAt, countedCash, difference]
+      properties:
+        id:
+          type: string
+        kasirName:
+          type: string
+        openedAt:
+          type: integer
+          format: int64
+        closedAt:
+          type: integer
+          format: int64
+          nullable: true
+          description: null = shift sedang buka.
+        countedCash:
+          type: integer
+          nullable: true
+          description: Uang fisik saat tutup; null bila shift buka.
+        difference:
+          type: integer
+          nullable: true
+          description: Selisih tutup shift; null bila shift buka.
+    OwnerShiftList:
+      type: object
+      required: [date, items, takes, openKasirName]
+      properties:
+        date:
+          type: string
+          format: date
+        items:
+          type: array
+          description: Shift tanggal itu, openedAt terbaru dulu.
+          items:
+            $ref: "#/components/schemas/OwnerShiftRow"
+        takes:
+          type: array
+          description: Pengambilan uang pemilik di sela shift (shiftId null) pada tanggal itu, terbaru dulu.
+          items:
+            $ref: "#/components/schemas/OwnerCashTake"
+        openKasirName:
+          type: string
+          nullable: true
+          description: Kasir shift yang sedang buka sekarang; null bila tidak ada.
+    OwnerShiftDetail:
+      type: object
+      description: |
+        Rincian laci satu shift: semua field ShiftClosure (countedCash dan difference null selagi
+        shift buka; expectedCash shift buka = uang seharusnya sejauh ini) ditambah data pemilik.
+        Rumus tunggal: expectedCash = openingCash + cashSales − supplierPayments + creditPayments −
+        saleRefunds − expenses − ownerTakes.
+      required: [shiftId, openingCash, cashSales, supplierPayments, creditPayments, saleRefunds, expenses, ownerTakes, expectedCash, countedCash, difference, salesCount, kasirName, openedAt, closedAt, suggestedOpening, openingNote, expenseItems, ownerTakeItems, qrisSales, qrisRepayments]
+      properties:
+        shiftId:
+          type: string
+        openingCash:
+          type: integer
+        cashSales:
+          type: integer
+        supplierPayments:
+          type: integer
+        creditPayments:
+          type: integer
+        saleRefunds:
+          type: integer
+        expenses:
+          type: integer
+        ownerTakes:
+          type: integer
+        expectedCash:
+          type: integer
+        countedCash:
+          type: integer
+          nullable: true
+        difference:
+          type: integer
+          nullable: true
+        salesCount:
+          type: integer
+        kasirName:
+          type: string
+        openedAt:
+          type: integer
+          format: int64
+        closedAt:
+          type: integer
+          format: int64
+          nullable: true
+        suggestedOpening:
+          type: integer
+          nullable: true
+          description: Saran modal saat shift dibuka (S4); null bila tanpa saran.
+        openingNote:
+          type: string
+          nullable: true
+          description: Alasan modal berbeda dari saran; null bila modal sama atau tanpa saran.
+        expenseItems:
+          type: array
+          description: Semua kas keluar shift ini termasuk yang dibatalkan, urut jam.
+          items:
+            $ref: "#/components/schemas/OwnerDrawerExpense"
+        ownerTakeItems:
+          type: array
+          description: Pengambilan uang pemilik di dalam shift ini termasuk yang dibatalkan, urut jam.
+          items:
+            $ref: "#/components/schemas/OwnerCashTake"
+        qrisSales:
+          type: integer
+          description: Σ bagian QRIS penjualan shift ini yang tidak dibatalkan (tidak masuk laci).
+        qrisRepayments:
+          type: integer
+          description: Σ pelunasan kasir QRIS shift ini yang tidak dibatalkan (tidak masuk laci).
+    OwnerCashTakeInput:
+      type: object
+      required: [id, amount]
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: ID dari klien (idempotensi per pembuat).
+        amount:
+          type: integer
+          minimum: 1
+        note:
+          type: string
+          nullable: true
+          maxLength: 200
+          description: Catatan opsional; kosong setelah trim disimpan null.
+    CashTakeCancel:
+      type: object
+      required: [at, byName, reason]
+      properties:
+        at:
+          type: integer
+          format: int64
+          description: Jam server saat dibatalkan (epoch ms UTC).
+        byName:
+          type: string
+        reason:
+          type: string
+    OwnerCashTake:
+      type: object
+      description: |
+        Pengambilan uang dari laci oleh pemilik (S5). cancellable = bisa dibatalkan sekarang (K9):
+        belum dibatalkan dan (shiftId ≠ null dan shift itu masih buka, atau shiftId null dan belum
+        terpakai). Keterangan terkunci di UI: consumedByKasirName ≠ null → sudah dipakai modal shift
+        kasir itu; shiftId ≠ null → shift tempatnya sudah tutup.
+      required: [id, at, amount, note, shiftId, shiftKasirName, consumedByKasirName, cancelled, cancellable]
+      properties:
+        id:
+          type: string
+        at:
+          type: integer
+          format: int64
+          description: Jam server saat dicatat (epoch ms UTC).
+        amount:
+          type: integer
+          minimum: 1
+        note:
+          type: string
+          nullable: true
+        shiftId:
+          type: string
+          nullable: true
+          description: Shift yang sedang buka saat diambil (masuk ownerTakes shift itu); null = diambil di sela shift.
+        shiftKasirName:
+          type: string
+          nullable: true
+          description: Kasir shift shiftId; null bila shiftId null.
+        consumedByKasirName:
+          type: string
+          nullable: true
+          description: Pengambilan sela yang sudah terpakai modal shift berikutnya → kasir shift itu; selain itu null.
+        cancelled:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/CashTakeCancel"
+        cancellable:
+          type: boolean
+    QrisDayStatus:
+      type: string
+      description: belum = belum ditandai, atau total berubah setelah ditandai (K21).
+      enum: [belum, cocok, tidak_cocok]
+    QrisDay:
+      type: object
+      description: |
+        Total QRIS satu hari Asia/Jakarta (S7, K11). total = sales + repayments (tidak termasuk yang
+        dibatalkan); voidedCount/voidedTotal = transaksi QRIS yang dibatalkan (bagian QRIS saja).
+        changedAfterMark = sudah ditandai tetapi total sekarang ≠ total saat ditandai → status
+        dibaca belum (note, markedByName, markedAt tetap tanda lama). closed = hari sudah selesai
+        (sebelum hari ini); hanya hari closed yang bisa ditandai.
+      required: [date, sales, repayments, total, voidedCount, voidedTotal, status, note, markedByName, markedAt, closed, changedAfterMark]
+      properties:
+        date:
+          type: string
+          format: date
+        sales:
+          type: integer
+        repayments:
+          type: integer
+        total:
+          type: integer
+        voidedCount:
+          type: integer
+        voidedTotal:
+          type: integer
+        status:
+          $ref: "#/components/schemas/QrisDayStatus"
+        note:
+          type: string
+          nullable: true
+        markedByName:
+          type: string
+          nullable: true
+        markedAt:
+          type: integer
+          format: int64
+          nullable: true
+        closed:
+          type: boolean
+        changedAfterMark:
+          type: boolean
+    QrisDayList:
+      type: object
+      required: [month, items]
+      properties:
+        month:
+          type: string
+          nullable: true
+          description: Bulan YYYY-MM yang diminta; null untuk unreconciled = true.
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/QrisDay"
+    QrisMarkInput:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [cocok, tidak_cocok]
+        note:
+          type: string
+          nullable: true
+          maxLength: 200
+          description: Wajib untuk tidak_cocok (1..200 setelah trim); opsional untuk cocok.
+    QrisTransaction:
+      type: object
+      description: Satu transaksi QRIS hari itu (S11); amount = bagian QRIS saja.
+      required: [at, amount, kind, kasirName, ref, status]
+      properties:
+        at:
+          type: integer
+          format: int64
+        amount:
+          type: integer
+        kind:
+          type: string
+          enum: [penjualan, pelunasan]
+        kasirName:
+          type: string
+        ref:
+          type: string
+          description: Nomor struk (penjualan) atau nama pelanggan (pelunasan).
+        status:
+          type: string
+          enum: [aktif, dibatalkan]
+    QrisDayDetail:
+      allOf:
+        - $ref: "#/components/schemas/QrisDay"
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              description: Transaksi QRIS hari itu urut jam, termasuk yang dibatalkan.
+              items:
+                $ref: "#/components/schemas/QrisTransaction"

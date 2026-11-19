@@ -106,9 +106,6 @@ test("omzet, perbandingan, grafik, tile, dan perlu perhatian tampil dari mock", 
     screen.getByRole("link", { name: /^Stok menipis\s7 barang$/ }),
   ).toHaveAttribute("href", "/owner/barang");
   expect(
-    screen.getByRole("link", { name: /^Selisih kas -Rp5\.000\sShift Rina$/ }),
-  ).toHaveAttribute("href", "/owner/lainnya");
-  expect(
     screen.getByRole("link", {
       name: /^Kasbon > 30 hari\s\d+ pelanggan · Rp[\d.]+$/,
     }),
@@ -279,18 +276,6 @@ test("tarik untuk refresh di layar sentuh memuat ulang ringkasan", async () => {
   expect(await screen.findByText("Memuat…")).toBeInTheDocument();
   expect(fetches).toHaveBeenCalled();
   await waitFor(() => expect(screen.queryByText("Memuat…")).toBeNull());
-});
-
-test("keterangan perhatian dengan nama kasir panjang dipotong (truncate), bukan meluber", async () => {
-  await sellAndCloseShiftShort();
-  const longName = "K".repeat(40);
-  mockDb.update((s) => {
-    for (const c of s.closedShifts) c.kasirName = longName;
-  });
-  await ownerLogin();
-  renderApp("/owner");
-  const detail = await screen.findByText(`Shift ${longName}`);
-  expect(detail).toHaveClass("truncate");
 });
 
 test("perlu perhatian: butir modal berubah dan barang habis membuka lembar di detail barang", async () => {

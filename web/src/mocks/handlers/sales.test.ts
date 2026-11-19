@@ -582,8 +582,12 @@ describe("kasbon lewat limit dengan alasan (ruling R3)", () => {
         kind: "kasbon_lewat_limit",
         count: 2,
         total: 30_000,
+        shortage: 0,
         from: "2026-11-05",
         to: "2026-11-05",
+        latestAt: Date.now(),
+        kasirId: null,
+        kasirName: null,
       },
     ]);
   });

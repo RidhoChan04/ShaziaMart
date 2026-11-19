@@ -46,14 +46,32 @@ export const GetCurrentShiftResponse = zod.object({
 })
 
 /**
+ * Serah terima modal (S4, K8, K22). Server menghitung ulang saran modal saat request ini,
+ * sama dengan getOpeningSuggestion pada jam itu (pengambilan uang pemilik di antara GET saran
+ * dan POST ikut terhitung). openingNote kosong setelah trim dianggap tidak dikirim. Urutan
+ * pemeriksaan: sesi → openingCash bukan bilangan bulat ≥ 0 atau openingNote > 200 karakter →
+ * 422 VALIDATION → shift sudah buka → 409 SHIFT_ALREADY_OPEN → saran tidak null dan
+ * openingCash ≠ saran tanpa openingNote → 422 OPENING_MISMATCH (OpeningMismatchProblem
+ * membawa suggestedCash = saran sekarang; detail "Isi alasan bila modal berbeda dari
+ * Rp{saran}"; klien memuat ulang saran dari problem). Saran null (belum ada shift tutup) →
+ * modal bebas tanpa catatan. Tersimpan suggestedOpening (saran saat buka, null bila tanpa
+ * saran) dan openingNote; catatan yang terkirim padahal modal sama dengan saran disimpan null.
+ * Semua pengambilan uang pemilik di sela shift (shiftId null) yang belum dibatalkan dan belum
+ * terpakai ditandai terpakai oleh shift baru ini (sejak itu tidak bisa dibatalkan). Modal yang
+ * berbeda dari saran menjadi kejadian Perlu perhatian serah_terima (amount = openingCash −
+ * suggestedOpening, at = openedAt). Respons kasir (Shift) tanpa saran, catatan, atau data
+ * pemilik.
  * @summary Buka shift
  */
 export const openShiftBodyOpeningCashMin = 0;
 
+export const openShiftBodyOpeningNoteMax = 200;
+
 
 
 export const OpenShiftBody = zod.object({
-  "openingCash": zod.int().min(openShiftBodyOpeningCashMin)
+  "openingCash": zod.int().min(openShiftBodyOpeningCashMin),
+  "openingNote": zod.string().min(1).max(openShiftBodyOpeningNoteMax).nullish().describe('Alasan modal berbeda dari saran (S4), wajib bila openingCash ≠ saran server (tanpa → 422\nOPENING_MISMATCH); diabaikan dan disimpan null bila modal sama dengan saran atau tanpa\nsaran. Data pemilik: tidak pernah dikirim balik ke kasir.\n')
 })
 
 export const OpenShiftResponse = zod.object({
@@ -63,6 +81,31 @@ export const OpenShiftResponse = zod.object({
   "openedAt": zod.int(),
   "openingCash": zod.int()
 })
+
+/**
+ * (S4, K8) lastCountedCash = uang fisik shift tutup terakhir (closedAt terbaru), lastKasirName
+ * dan lastClosedAt dari shift itu; ownerTakes = Σ pengambilan uang pemilik di sela shift
+ * (shiftId null) yang belum dibatalkan dan belum terpakai shift berikutnya; suggestedCash =
+ * max(0, lastCountedCash − ownerTakes) (dijepit ≥ 0, K22). Tanpa shift tutup sebelumnya →
+ * suggestedCash, lastKasirName, lastClosedAt, lastCountedCash null dan ownerTakes 0 (modal
+ * bebas, tanpa alasan). Selagi ada shift buka tetap dihitung dari shift tutup terakhir. Saran
+ * dihitung ulang saat openShift; nilai di sini hanya untuk mengisi layar buka shift. Respons
+ * kasir: tanpa catatan modal, rincian pengambilan, atau data pemilik lain.
+ * @summary Saran modal awal untuk buka shift (serah terima)
+ */
+export const getOpeningSuggestionResponseSuggestedCashMin = 0;
+
+export const getOpeningSuggestionResponseOwnerTakesMin = 0;
+
+
+
+export const GetOpeningSuggestionResponse = zod.object({
+  "suggestedCash": zod.int().min(getOpeningSuggestionResponseSuggestedCashMin).nullable(),
+  "lastKasirName": zod.string().nullable().describe('Kasir shift tutup terakhir.'),
+  "lastClosedAt": zod.int().nullable().describe('Jam shift tutup terakhir ditutup (epoch ms UTC).'),
+  "lastCountedCash": zod.int().nullable().describe('Uang fisik tutup shift terakhir.'),
+  "ownerTakes": zod.int().min(getOpeningSuggestionResponseOwnerTakesMin).describe('Σ uang yang diambil pemilik dari laci setelah shift itu tutup (belum dibatalkan, belum terpakai).')
+}).describe('Saran modal awal (S4, K8): suggestedCash = max(0, lastCountedCash − ownerTakes); semua null\ndan ownerTakes 0 bila belum ada shift tutup. Hanya key ini (tanpa catatan modal atau rincian\npengambilan pemilik).\n')
 
 /**
  * @summary Tutup shift
@@ -75,16 +118,123 @@ export const CloseShiftBody = zod.object({
   "countedCash": zod.int().min(closeShiftBodyCountedCashMin)
 })
 
+export const closeShiftResponseExpensesMin = 0;
+
+export const closeShiftResponseOwnerTakesMin = 0;
+
+
+
 export const CloseShiftResponse = zod.object({
   "shiftId": zod.string(),
   "openingCash": zod.int(),
   "cashSales": zod.int(),
-  "supplierPayments": zod.int().describe('Σ uang keluar ke supplier di shift ini, bertanda; expectedCash = openingCash + cashSales − supplierPayments + creditPayments − saleRefunds'),
+  "supplierPayments": zod.int().describe('Σ uang keluar ke supplier di shift ini, bertanda; expectedCash = openingCash + cashSales − supplierPayments + creditPayments − saleRefunds − expenses − ownerTakes'),
   "creditPayments": zod.int().describe('Σ pelunasan kasbon tunai jalur kasir di shift ini, dikurangi pelunasan tunai shift ini yang\ndibatalkan kasir; tidak pernah negatif. QRIS dan uang pemilik (transfer/tunai ke pemilik)\ntidak masuk laci.\n'),
-  "saleRefunds": zod.int().describe('Σ uang yang dikembalikan dari laci shift ini untuk transaksi yang dibatalkan kasir: bagian\ntunai transaksi shift lama + bagian QRIS yang dikembalikan tunai dari laci (shift ini atau\nshift lama). Bagian tunai transaksi shift ini tidak masuk karena cashSales sudah\ndikurangi; shift lama tidak diubah. expectedCash = openingCash + cashSales −\nsupplierPayments + creditPayments − saleRefunds\n'),
+  "saleRefunds": zod.int().describe('Σ uang yang dikembalikan dari laci shift ini untuk transaksi yang dibatalkan kasir: bagian\ntunai transaksi shift lama + bagian QRIS yang dikembalikan tunai dari laci (shift ini atau\nshift lama). Bagian tunai transaksi shift ini tidak masuk karena cashSales sudah\ndikurangi; shift lama tidak diubah. expectedCash = openingCash + cashSales −\nsupplierPayments + creditPayments − saleRefunds − expenses − ownerTakes\n'),
+  "expenses": zod.int().min(closeShiftResponseExpensesMin).describe('Σ kas keluar beralasan (S2) di shift ini yang tidak dibatalkan; kas keluar yang dibatalkan\nkasir selagi shift buka tidak ikut. Pembatalan dari app pemilik setelah shift tutup tidak\nmengubah closure tersimpan.\n'),
+  "ownerTakes": zod.int().min(closeShiftResponseOwnerTakesMin).describe('Σ uang yang diambil pemilik dari laci selama shift ini buka (S5) dan tidak dibatalkan.\nPengambilan di sela shift tidak masuk di sini; ia mengurangi saran modal shift berikutnya.\n'),
   "expectedCash": zod.int(),
   "countedCash": zod.int(),
   "difference": zod.int(),
   "salesCount": zod.int()
+}).describe('Satu rumus laci (dipakai tutup shift kasir dan rincian shift pemilik): expectedCash =\nopeningCash + cashSales − supplierPayments + creditPayments − saleRefunds − expenses −\nownerTakes; difference = countedCash − expectedCash.\n')
+
+/**
+ * Shift yang sedang buka, bukan hari ini (shift bisa lewat tengah malam); termasuk yang
+ * dibatalkan (status dibatalkan). Tanpa shift buka → []. Respons kasir hanya status, tanpa data
+ * pembatal (siapa, jam, atau alasan batal).
+ * @summary Kas keluar shift yang sedang buka, terbaru dulu
+ */
+
+
+
+export const ListShiftExpensesResponseItem = zod.object({
+  "id": zod.string(),
+  "at": zod.int().describe('Jam server saat dicatat (epoch ms UTC).'),
+  "amount": zod.int().min(1),
+  "reason": zod.string(),
+  "kasirName": zod.string().describe('Nama pencatat (salinan saat dicatat).'),
+  "shiftId": zod.string(),
+  "status": zod.enum(['aktif', 'dibatalkan'])
+}).describe('Kas keluar dari laci (S2) untuk kasir; hanya key ini (tanpa data pembatal: siapa, jam, atau\nalasan batal).\n')
+export const ListShiftExpensesResponse = zod.array(ListShiftExpensesResponseItem)
+
+/**
+ * (S2, K10) Uang keluar dari laci beralasan (mis. beli es batu); uang seharusnya shift yang
+ * sedang buka turun sebesar amount (ShiftClosure.expenses). Urutan pemeriksaan: sesi → id
+ * kosong atau > 64 karakter → 422 VALIDATION → id sudah dipakai: milik pengguna ini → 200
+ * rekaman tersimpan apa adanya tanpa kas keluar kedua (isi body baru diabaikan), milik pengguna
+ * lain → 409 ID_TAKEN tanpa isi rekaman → amount bukan bilangan bulat ≥ 1, atau reason kosong
+ * (setelah trim) atau > 200 karakter → 422 VALIDATION → tanpa shift buka → 409 SHIFT_CLOSED.
+ * Idempoten menurut (pembuat, id). Replay id yang sudah dibatalkan mengembalikan 200 dengan
+ * rekaman berstatus dibatalkan; klien wajib memperlakukannya sebagai belum tersimpan (lepas id,
+ * jangan tampilkan tersimpan, simpan berikutnya memakai id baru). at = jam server; rekaman
+ * menyimpan shiftId shift itu dan pencatatnya. Kas keluar dengan amount > expenseSingleMax,
+ * dan kas keluar yang membuat Σ kas keluar aktif shift > expenseShiftMax, menjadi kejadian
+ * Perlu perhatian kas_keluar (ambang dari Pengaturan saat dibaca, K4/K7).
+ * @summary Catat kas keluar dari laci (alasan wajib)
+ */
+export const createShiftExpenseBodyIdMax = 64;
+
+
+export const createShiftExpenseBodyReasonMax = 200;
+
+
+
+export const CreateShiftExpenseBody = zod.object({
+  "id": zod.string().min(1).max(createShiftExpenseBodyIdMax).describe('ID dari klien (idempotensi per pembuat); id yang sama mengembalikan rekaman lama dengan 200.'),
+  "amount": zod.int().min(1),
+  "reason": zod.string().min(1).max(createShiftExpenseBodyReasonMax).describe('Alasan kas keluar, wajib (1..200 karakter setelah trim).')
 })
+
+
+
+
+export const CreateShiftExpenseResponse = zod.object({
+  "id": zod.string(),
+  "at": zod.int().describe('Jam server saat dicatat (epoch ms UTC).'),
+  "amount": zod.int().min(1),
+  "reason": zod.string(),
+  "kasirName": zod.string().describe('Nama pencatat (salinan saat dicatat).'),
+  "shiftId": zod.string(),
+  "status": zod.enum(['aktif', 'dibatalkan'])
+}).describe('Kas keluar dari laci (S2) untuk kasir; hanya key ini (tanpa data pembatal: siapa, jam, atau\nalasan batal).\n')
+
+/**
+ * (S10) Kasir hanya boleh membatalkan kas keluar dari shift yang sedang buka; setelah shift
+ * tutup, batal hanya dari app pemilik (cancelOwnerExpense). Tanpa PIN pemilik; alasan wajib.
+ * Urutan pemeriksaan: sesi → id tidak dikenal → 404 → sudah dibatalkan → 200 rekaman apa
+ * adanya tanpa perubahan → reason kosong (setelah trim) atau > 200 karakter → 422 VALIDATION →
+ * tanpa shift buka → 409 SHIFT_CLOSED → shiftId kas keluar bukan shift yang sedang buka → 409
+ * OUTSIDE_SHIFT. Berhasil: ShiftClosure.expenses shift yang buka turun sebesar amount (uang
+ * seharusnya naik lagi). Tercatat cancelledAt (jam server), pembatal (id + nama, boleh beda
+ * dari pencatat), channel kasir, dan alasan; menjadi kejadian Perlu perhatian batal_kas_keluar
+ * (amount = nominal, reason = alasan batal). Kas keluar yang dibatalkan tidak lagi ikut
+ * kejadian kas_keluar maupun Σ kas keluar shift. Respons kasir hanya status.
+ * @summary Batalkan kas keluar di kasir (alasan wajib)
+ */
+export const CancelShiftExpenseParams = zod.object({
+  "expenseId": zod.string()
+})
+
+export const cancelShiftExpenseBodyReasonMax = 200;
+
+
+
+export const CancelShiftExpenseBody = zod.object({
+  "reason": zod.string().min(1).max(cancelShiftExpenseBodyReasonMax).describe('Alasan pembatalan, wajib (1..200 karakter setelah trim); tanpa PIN pemilik.')
+})
+
+
+
+
+export const CancelShiftExpenseResponse = zod.object({
+  "id": zod.string(),
+  "at": zod.int().describe('Jam server saat dicatat (epoch ms UTC).'),
+  "amount": zod.int().min(1),
+  "reason": zod.string(),
+  "kasirName": zod.string().describe('Nama pencatat (salinan saat dicatat).'),
+  "shiftId": zod.string(),
+  "status": zod.enum(['aktif', 'dibatalkan'])
+}).describe('Kas keluar dari laci (S2) untuk kasir; hanya key ini (tanpa data pembatal: siapa, jam, atau\nalasan batal).\n')
 

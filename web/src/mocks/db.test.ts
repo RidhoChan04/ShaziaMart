@@ -34,7 +34,7 @@ test("JSON rusak di localStorage -> default tanpa melempar", () => {
   expect(mockDb.get().store.name).toBe("ShaziaMart");
 });
 
-test("JSON bentuk valid v9 di localStorage dimuat lazy", () => {
+test("JSON bentuk valid v10 di localStorage dimuat lazy", () => {
   const stored: MockState = {
     ...createSeedState(),
     store: { id: "abc", name: "Toko Lain" },
@@ -45,7 +45,7 @@ test("JSON bentuk valid v9 di localStorage dimuat lazy", () => {
 });
 
 test("JSON bentuk salah -> default", () => {
-  localStorage.setItem("mock.db", JSON.stringify({ version: 9, store: 1 }));
+  localStorage.setItem("mock.db", JSON.stringify({ version: 10, store: 1 }));
   __resetMockDbCacheForTests();
   expect(mockDb.get().store.name).toBe("ShaziaMart");
 });
@@ -109,7 +109,7 @@ test("isi localStorage sama persis dengan JSON.stringify state setelah beberapa 
   expect(JSON.parse(raw ?? "{}")).toEqual(mockDb.get());
 });
 
-test("state v3 di localStorage → reseed v9", () => {
+test("state v3 di localStorage → reseed v10", () => {
   const {
     categories: _c,
     priceHistory: _h,
@@ -123,7 +123,7 @@ test("state v3 di localStorage → reseed v9", () => {
     localStorage.setItem("mock.db", JSON.stringify({ ...stored, store: lama }));
     __resetMockDbCacheForTests();
     const s = mockDb.get();
-    expect(s.version).toBe(9);
+    expect(s.version).toBe(10);
     expect(s.store.name).toBe("ShaziaMart");
     expect(s.categories).toHaveLength(20);
     expect(s).not.toHaveProperty("unitCosts");
@@ -131,7 +131,7 @@ test("state v3 di localStorage → reseed v9", () => {
   }
 });
 
-test("state v4 di localStorage → reseed v9 dengan staffSession null dan koleksi nota kosong", () => {
+test("state v4 di localStorage → reseed v10 dengan staffSession null dan koleksi nota kosong", () => {
   const {
     staffSession: _s,
     staffPinFailures: _f,
@@ -150,7 +150,7 @@ test("state v4 di localStorage → reseed v9 dengan staffSession null dan koleks
     localStorage.setItem("mock.db", JSON.stringify({ ...stored, store: lama }));
     __resetMockDbCacheForTests();
     const s = mockDb.get();
-    expect(s.version).toBe(9);
+    expect(s.version).toBe(10);
     expect(s.store.name).toBe("ShaziaMart");
     expect([
       s.staffSession,
@@ -163,7 +163,7 @@ test("state v4 di localStorage → reseed v9 dengan staffSession null dan koleks
   }
 });
 
-test("state v5 di localStorage → reseed v9 dengan koleksi opname & kedaluwarsa kosong dan batas stok tetap", () => {
+test("state v5 di localStorage → reseed v10 dengan koleksi opname & kedaluwarsa kosong dan batas stok tetap", () => {
   const {
     opnameSessions: _o,
     expiryLog: _x,
@@ -179,7 +179,7 @@ test("state v5 di localStorage → reseed v9 dengan koleksi opname & kedaluwarsa
     localStorage.setItem("mock.db", JSON.stringify({ ...stored, store: lama }));
     __resetMockDbCacheForTests();
     const s = mockDb.get();
-    expect(s.version).toBe(9);
+    expect(s.version).toBe(10);
     expect(s.store.name).toBe("ShaziaMart");
     expect([s.opnameSessions, s.expiryLog, s.stockRules]).toEqual([
       [],
@@ -193,7 +193,7 @@ test("state v5 di localStorage → reseed v9 dengan koleksi opname & kedaluwarsa
   }
 });
 
-test("state v6 di localStorage → seed v9 dengan rekaman pelunasan seed dan jam buka shift riwayat", () => {
+test("state v6 di localStorage → seed v10 dengan rekaman pelunasan seed dan jam buka shift riwayat", () => {
   const { creditPayments: _p, ...rest } = createSeedState();
   const v6 = {
     ...rest,
@@ -207,7 +207,7 @@ test("state v6 di localStorage → seed v9 dengan rekaman pelunasan seed dan jam
     localStorage.setItem("mock.db", JSON.stringify({ ...stored, store: lama }));
     __resetMockDbCacheForTests();
     const s = mockDb.get();
-    expect(s.version).toBe(9);
+    expect(s.version).toBe(10);
     expect(s.store.name).toBe("ShaziaMart");
     expect(s.creditPayments.length).toBeGreaterThan(0);
     expect(s.creditLedger.every((e) => e.paymentId !== undefined)).toBe(true);
@@ -215,7 +215,7 @@ test("state v6 di localStorage → seed v9 dengan rekaman pelunasan seed dan jam
   }
 });
 
-test("state v7 di localStorage → seed v9 dengan shiftId & data batal penjualan dan tinjau pengecualian kosong", () => {
+test("state v7 di localStorage → seed v10 dengan shiftId & data batal penjualan dan tinjau pengecualian kosong", () => {
   const seed = createSeedState();
   const v7 = {
     ...seed,
@@ -240,9 +240,9 @@ test("state v7 di localStorage → seed v9 dengan shiftId & data batal penjualan
     localStorage.setItem("mock.db", JSON.stringify({ ...stored, store: lama }));
     __resetMockDbCacheForTests();
     const s = mockDb.get();
-    expect(s.version).toBe(9);
+    expect(s.version).toBe(10);
     expect(s.store.name).toBe("ShaziaMart");
-    expect(s.exceptionReviews).toEqual({
+    expect(s.exceptionReviews).toMatchObject({
       batal_transaksi: null,
       batal_pelunasan: null,
       kasbon_lewat_limit: null,
@@ -252,7 +252,7 @@ test("state v7 di localStorage → seed v9 dengan shiftId & data batal penjualan
   }
 });
 
-test("(K24) state v8 di localStorage → seed v9 dengan lineCosts penjualan, catalogSince, dan reportRules", () => {
+test("(K24) state v8 di localStorage → seed v10 dengan lineCosts penjualan, catalogSince, dan reportRules", () => {
   const seed = createSeedState();
   const v8 = {
     ...seed,
@@ -266,13 +266,73 @@ test("(K24) state v8 di localStorage → seed v9 dengan lineCosts penjualan, cat
     localStorage.setItem("mock.db", JSON.stringify({ ...stored, store: lama }));
     __resetMockDbCacheForTests();
     const s = mockDb.get();
-    expect(s.version).toBe(9);
+    expect(s.version).toBe(10);
     expect(s.store.name).toBe("ShaziaMart");
     expect(s.reportRules).toEqual({ thinMarginPermille: 100, unsoldDays: 30 });
     expect(typeof s.catalogSince).toBe("number");
     expect(s.sales.every((x) => x.lineCosts.length === x.items.length)).toBe(
       true,
     );
+  }
+});
+
+test("(K16) state v9 di localStorage → seed v10 dengan laci F3c-2a, ambang Perlu perhatian, dan akun aktif", () => {
+  const seed = createSeedState();
+  const {
+    drawerExpenses: _d,
+    cashTakes: _t,
+    qrisDays: _q,
+    qrisSince: _s,
+    storeProfile: _p,
+    attentionRules: _a,
+    defaultCreditLimit: _l,
+    smallShortageReviews: _r,
+    ...rest
+  } = seed;
+  const v9Shape = {
+    ...rest,
+    version: 9,
+    users: seed.users.map(({ active: _x, ...u }) => u),
+    settings: (({ ownerPhone: _o, ...k }) => k)(seed.settings),
+    closedShifts: seed.closedShifts.map(
+      ({
+        kasirId: _k,
+        expenses: _e,
+        ownerTakes: _w,
+        suggestedOpening: _g,
+        openingNote: _n,
+        ...c
+      }) => c,
+    ),
+    exceptionReviews: {
+      batal_transaksi: null,
+      batal_pelunasan: null,
+      kasbon_lewat_limit: null,
+    },
+  };
+  const lama = { id: "v9", name: "Lama" };
+  // Bentuk v9 asli, dan bentuk lengkap tetapi bertanda versi 9.
+  for (const stored of [v9Shape, { ...seed, version: 9 }]) {
+    localStorage.setItem("mock.db", JSON.stringify({ ...stored, store: lama }));
+    __resetMockDbCacheForTests();
+    const s = mockDb.get();
+    expect(s.version).toBe(10);
+    expect(s.store.name).toBe("ShaziaMart");
+    expect(s.attentionRules).toEqual({
+      cashDiffMin: 5_000,
+      smallShortageWeekMax: 20_000,
+      expenseSingleMax: 50_000,
+      expenseShiftMax: 150_000,
+      shiftMaxHours: 12,
+    });
+    expect(s.defaultCreditLimit).toBe(500_000);
+    expect(s.settings.ownerPhone).toBe("0812-3456-7890");
+    expect(s.users.every((u) => u.active)).toBe(true);
+    expect(s.closedShifts.every((c) => typeof c.kasirId === "string")).toBe(
+      true,
+    );
+    expect(s.cashTakes.length).toBeGreaterThan(0);
+    expect(Object.keys(s.exceptionReviews)).toHaveLength(9);
   }
 });
 
@@ -284,7 +344,15 @@ test.each([
   ["exceptionReviews", []],
   ["reportRules", []],
   ["catalogSince", "2026-08-21"],
-])("v9 dengan %s berbentuk salah → reseed", (key, bad) => {
+  ["drawerExpenses", {}],
+  ["cashTakes", null],
+  ["qrisDays", []],
+  ["qrisSince", 0],
+  ["storeProfile", "Jl. Kenanga"],
+  ["attentionRules", []],
+  ["smallShortageReviews", []],
+  ["defaultCreditLimit", "500000"],
+])("v10 dengan %s berbentuk salah → reseed", (key, bad) => {
   localStorage.setItem(
     "mock.db",
     JSON.stringify({
@@ -334,7 +402,15 @@ test.each([
   "exceptionReviews",
   "reportRules",
   "catalogSince",
-])("v9 tanpa %s → reseed", (key) => {
+  "drawerExpenses",
+  "cashTakes",
+  "qrisDays",
+  "qrisSince",
+  "storeProfile",
+  "attentionRules",
+  "smallShortageReviews",
+  "defaultCreditLimit",
+])("v10 tanpa %s → reseed", (key) => {
   const stored: Record<string, unknown> = {
     ...createSeedState(),
     store: { id: "abc", name: "Toko Lain" },

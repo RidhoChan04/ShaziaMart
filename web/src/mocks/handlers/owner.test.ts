@@ -94,24 +94,17 @@ describe("ringkasan hari ini", () => {
     expect(await code(res)).toBe("UNAUTHORIZED");
   });
 
-  test("tutup shift hari ini dengan selisih -5000 -> cashDifferences memuat Rina; riwayat seed tidak menambah penjualan hari ini", async () => {
+  // (S6) Selisih kas tutup shift kini kejadian selisih_kas di attention.exceptions; kasusnya diuji
+  // bersama aturan Perlu perhatian, bukan lagi daftar cashDifferences hari ini.
+  test("tutup shift hari ini: riwayat seed tidak menambah penjualan hari ini", async () => {
     await ownerLogin();
     const empty = await summary();
     expect([empty.revenue, empty.hourly.length]).toEqual([0, 24]);
-    expect(empty.attention.cashDifferences).toEqual([]);
 
     await login("123456");
     await post("/api/shifts", { openingCash: 200_000 });
     await post("/api/shifts/current/close", { countedCash: 195_000 });
     const after = await summary();
-    expect(after.attention.cashDifferences).toEqual([
-      {
-        shiftId: expect.any(String),
-        kasirName: "Rina",
-        closedAt: expect.any(Number),
-        difference: -5_000,
-      },
-    ]);
     expect(after.salesCount).toBe(0);
   });
 });

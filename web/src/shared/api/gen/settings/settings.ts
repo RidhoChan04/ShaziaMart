@@ -44,7 +44,8 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
-  KasirSettings
+  KasirSettings,
+  NotFoundResponse
 } from '../shaziaMartAPI.schemas';
 
 import { customFetch } from '../../fetcher';
@@ -79,6 +80,12 @@ export const getGetKasirSettingsUrl = () => {
 }
 
 /**
+ * Publik (layar kunci dan layar pembeli). storeName = nama toko di Pengaturan pemilik.
+ * ownerPhone = nomor telepon pemilik untuk baris "Ragu? Telepon pemilik" (R11), hanya bila
+ * request membawa sesi kasir; tanpa sesi kasir → null (endpoint publik bisa terbaca lewat
+ * terowongan, K19). shiftMaxHours = AttentionRules.shiftMaxHours (satu sumber); pita shift
+ * kelamaan di kasir memakai openedAt shift + nilai ini, tanpa request tambahan. Tanpa data
+ * pemilik lain (ambang Perlu perhatian, alamat, catatan kaki struk).
  * @summary Pengaturan layar kasir
  */
 export const getKasirSettings = async ( options?: Parameters<typeof customFetch>[1]): Promise<KasirSettings> => {
@@ -159,6 +166,109 @@ export function useGetKasirSettings<TData = Awaited<ReturnType<typeof getKasirSe
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetKasirSettingsQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+export const getGetQrisImageUrl = (imageId: string,) => {
+
+
+
+
+  return `/api/settings/qris-image/${imageId}`
+}
+
+/**
+ * Publik (ditampilkan ke pembeli di kasir). KasirSettings.qrisImageUrl dan
+ * OwnerSettings.store.qrisImageUrl menunjuk ke sini setelah pemilik mengunggah gambar
+ * (putOwnerQrisImage); gambar contoh bawaan berupa berkas statis. id tidak dikenal → 404.
+ * @summary Gambar QRIS toko yang diunggah pemilik (PNG/JPEG)
+ */
+export const getQrisImage = async (imageId: string, options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {
+
+  return customFetch<Blob>(getGetQrisImageUrl(imageId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetQrisImageQueryKey = (imageId: string,) => {
+    return [
+    `/api/settings/qris-image/${imageId}`
+    ] as const;
+    }
+
+
+export const getGetQrisImageQueryOptions = <TData = Awaited<ReturnType<typeof getQrisImage>>, TError = ErrorType<NotFoundResponse>>(imageId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getQrisImage>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetQrisImageQueryKey(imageId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getQrisImage>>> = ({ signal }) => getQrisImage(imageId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: imageId !== null && imageId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getQrisImage>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetQrisImageQueryResult = NonNullable<Awaited<ReturnType<typeof getQrisImage>>>
+export type GetQrisImageQueryError = ErrorType<NotFoundResponse>
+
+
+export function useGetQrisImage<TData = Awaited<ReturnType<typeof getQrisImage>>, TError = ErrorType<NotFoundResponse>>(
+ imageId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getQrisImage>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getQrisImage>>,
+          TError,
+          Awaited<ReturnType<typeof getQrisImage>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetQrisImage<TData = Awaited<ReturnType<typeof getQrisImage>>, TError = ErrorType<NotFoundResponse>>(
+ imageId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getQrisImage>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getQrisImage>>,
+          TError,
+          Awaited<ReturnType<typeof getQrisImage>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetQrisImage<TData = Awaited<ReturnType<typeof getQrisImage>>, TError = ErrorType<NotFoundResponse>>(
+ imageId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getQrisImage>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Gambar QRIS toko yang diunggah pemilik (PNG/JPEG)
+ */
+
+export function useGetQrisImage<TData = Awaited<ReturnType<typeof getQrisImage>>, TError = ErrorType<NotFoundResponse>>(
+ imageId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getQrisImage>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetQrisImageQueryOptions(imageId,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

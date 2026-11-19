@@ -3,7 +3,8 @@ import type {
   ProductCost,
   WholesaleTier,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
-import { businessDay, daysBefore } from "@/shared/lib/business-day";
+import { DEFAULT_ATTENTION_RULES } from "@/shared/lib/attention-rules";
+import { businessDay, DAY_MS, daysBefore } from "@/shared/lib/business-day";
 import { roundHalfUp } from "@/shared/lib/quantity";
 import type { MockProduct, MockState, MockUnit, MockUser } from "./db";
 import { generateHistory, HISTORY_DAYS } from "./history";
@@ -107,10 +108,23 @@ const MIN_STOCK_UNITS = 10;
 const LOW_STOCK_PRODUCTS = 7;
 
 const SEED_USERS: Omit<MockUser, "id">[] = [
-  { name: "Rina", role: "kasir", pin: "123456" },
-  { name: "Budi", role: "kasir", pin: "654321" },
-  { name: "Pak Ahmad", role: "pemilik", pin: "999999", password: "pemilik123" },
+  { name: "Rina", role: "kasir", pin: "123456", active: true },
+  { name: "Budi", role: "kasir", pin: "654321", active: true },
+  {
+    name: "Pak Ahmad",
+    role: "pemilik",
+    pin: "999999",
+    password: "pemilik123",
+    active: true,
+  },
 ];
+
+/**
+ * (K20) Kejadian jenis F3c-2a yang lebih tua dari 2 hari dianggap sudah ditinjau, agar Beranda
+ * contoh hanya memuat contoh seed terbaru. Selisih kecil tidak memakai penanda ini: jendelanya 7
+ * hari (K6) dan penandanya per kasir (`smallShortageReviews`, kosong = belum pernah).
+ */
+const SEED_REVIEWED_DAYS = 2;
 
 /** Pengacakan Fisher-Yates deterministik. */
 function shuffle<T>(items: readonly T[], rand: () => number): T[] {
@@ -249,8 +263,9 @@ export function createSeedState(now: number = Date.now()): MockState {
   // Pencatat pelunasan seed (pra-cek): Rina, jalur kasir.
   const [rina] = users;
   if (!rina) throw new Error("Seed tanpa kasir");
+  const reviewedAt = now - SEED_REVIEWED_DAYS * DAY_MS;
   const state: MockState = {
-    version: 9,
+    version: 10,
     store: { id: makeId(KIND.store, 1), name: "ShaziaMart" },
     users,
     session: null,
@@ -276,6 +291,7 @@ export function createSeedState(now: number = Date.now()): MockState {
       quickCurahProductIds: products.filter((p) => p.isCurah).map((p) => p.id),
       qrisImageUrl: "/qris-contoh.svg",
       allowNegativeStock: true,
+      ownerPhone: "0812-3456-7890",
     },
     saleSeq: {},
     suppliers: [],
@@ -293,10 +309,28 @@ export function createSeedState(now: number = Date.now()): MockState {
       batal_transaksi: null,
       batal_pelunasan: null,
       kasbon_lewat_limit: null,
+      batal_kas_keluar: reviewedAt,
+      selisih_kas: reviewedAt,
+      kas_keluar: reviewedAt,
+      serah_terima: reviewedAt,
+      shift_lama: reviewedAt,
+      selisih_kecil: null,
     },
+    smallShortageReviews: {},
     // (K11) awal hari riwayat pertama; (K18) batas laporan bawaan.
     catalogSince: daysBefore(businessDay(now), HISTORY_DAYS).start,
     reportRules: { thinMarginPermille: 100, unsoldDays: 30 },
+    drawerExpenses: [],
+    cashTakes: [],
+    // Diisi `generateHistory` (K11: tanggal seed − 3 hari, hari sebelumnya ditandai cocok).
+    qrisDays: {},
+    qrisSince: businessDay(now).date,
+    storeProfile: {
+      address: "Jl. Kenanga No. 8, Sukamaju",
+      receiptFooter: "Terima kasih, selamat belanja kembali",
+    },
+    attentionRules: { ...DEFAULT_ATTENTION_RULES },
+    defaultCreditLimit: 500_000,
   };
   // Barang lambat hanya dari barang buatan: fixture dipakai test & E2E.
   generateHistory(

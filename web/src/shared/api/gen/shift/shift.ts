@@ -48,9 +48,16 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  CancelCreditPaymentInput,
   CloseShiftRequest,
   CurrentShift,
+  DrawerExpense,
+  ExpenseInput,
+  NotFoundResponse,
   OpenShiftRequest,
+  OpeningMismatchProblem,
+  OpeningSuggestion,
+  Problem,
   Shift,
   ShiftAlreadyOpenResponse,
   ShiftClosedResponse,
@@ -192,6 +199,21 @@ export const getOpenShiftUrl = () => {
 }
 
 /**
+ * Serah terima modal (S4, K8, K22). Server menghitung ulang saran modal saat request ini,
+ * sama dengan getOpeningSuggestion pada jam itu (pengambilan uang pemilik di antara GET saran
+ * dan POST ikut terhitung). openingNote kosong setelah trim dianggap tidak dikirim. Urutan
+ * pemeriksaan: sesi → openingCash bukan bilangan bulat ≥ 0 atau openingNote > 200 karakter →
+ * 422 VALIDATION → shift sudah buka → 409 SHIFT_ALREADY_OPEN → saran tidak null dan
+ * openingCash ≠ saran tanpa openingNote → 422 OPENING_MISMATCH (OpeningMismatchProblem
+ * membawa suggestedCash = saran sekarang; detail "Isi alasan bila modal berbeda dari
+ * Rp{saran}"; klien memuat ulang saran dari problem). Saran null (belum ada shift tutup) →
+ * modal bebas tanpa catatan. Tersimpan suggestedOpening (saran saat buka, null bila tanpa
+ * saran) dan openingNote; catatan yang terkirim padahal modal sama dengan saran disimpan null.
+ * Semua pengambilan uang pemilik di sela shift (shiftId null) yang belum dibatalkan dan belum
+ * terpakai ditandai terpakai oleh shift baru ini (sejak itu tidak bisa dibatalkan). Modal yang
+ * berbeda dari saran menjadi kejadian Perlu perhatian serah_terima (amount = openingCash −
+ * suggestedOpening, at = openedAt). Respons kasir (Shift) tanpa saran, catatan, atau data
+ * pemilik.
  * @summary Buka shift
  */
 export const openShift = async (openShiftRequest: OpenShiftRequest, options?: Parameters<typeof customFetch>[1]): Promise<Shift> => {
@@ -225,7 +247,7 @@ return customFetch<Shift>(getOpenShiftUrl(),
 
 export const getOpenShiftMutationKey = () => ['openShift'] as const;
 
-export const getOpenShiftMutationOptions = <TError = ErrorType<UnauthorizedResponse | ShiftAlreadyOpenResponse | ValidationFailedResponse>,
+export const getOpenShiftMutationOptions = <TError = ErrorType<UnauthorizedResponse | ShiftAlreadyOpenResponse | Problem | OpeningMismatchProblem>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof openShift>>, TError,OpenShiftMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof openShift>>, TError,OpenShiftMutationVariables, TContext> => {
 
@@ -254,13 +276,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type OpenShiftMutationResult = NonNullable<Awaited<ReturnType<typeof openShift>>>
     export type OpenShiftMutationBody = OpenShiftRequest
-    export type OpenShiftMutationError = ErrorType<UnauthorizedResponse | ShiftAlreadyOpenResponse | ValidationFailedResponse>
+    export type OpenShiftMutationError = ErrorType<UnauthorizedResponse | ShiftAlreadyOpenResponse | Problem | OpeningMismatchProblem>
     export type OpenShiftMutationVariables = {data: OpenShiftRequest}
 
     /**
  * @summary Buka shift
  */
-export const useOpenShift = <TError = ErrorType<UnauthorizedResponse | ShiftAlreadyOpenResponse | ValidationFailedResponse>,
+export const useOpenShift = <TError = ErrorType<UnauthorizedResponse | ShiftAlreadyOpenResponse | Problem | OpeningMismatchProblem>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof openShift>>, TError,OpenShiftMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof openShift>>,
@@ -270,7 +292,115 @@ export const useOpenShift = <TError = ErrorType<UnauthorizedResponse | ShiftAlre
       > => {
       return useMutation(getOpenShiftMutationOptions(options), queryClient);
     }
-    export const getCloseShiftUrl = () => {
+    export const getGetOpeningSuggestionUrl = () => {
+
+
+
+
+  return `/api/shifts/opening-suggestion`
+}
+
+/**
+ * (S4, K8) lastCountedCash = uang fisik shift tutup terakhir (closedAt terbaru), lastKasirName
+ * dan lastClosedAt dari shift itu; ownerTakes = Σ pengambilan uang pemilik di sela shift
+ * (shiftId null) yang belum dibatalkan dan belum terpakai shift berikutnya; suggestedCash =
+ * max(0, lastCountedCash − ownerTakes) (dijepit ≥ 0, K22). Tanpa shift tutup sebelumnya →
+ * suggestedCash, lastKasirName, lastClosedAt, lastCountedCash null dan ownerTakes 0 (modal
+ * bebas, tanpa alasan). Selagi ada shift buka tetap dihitung dari shift tutup terakhir. Saran
+ * dihitung ulang saat openShift; nilai di sini hanya untuk mengisi layar buka shift. Respons
+ * kasir: tanpa catatan modal, rincian pengambilan, atau data pemilik lain.
+ * @summary Saran modal awal untuk buka shift (serah terima)
+ */
+export const getOpeningSuggestion = async ( options?: Parameters<typeof customFetch>[1]): Promise<OpeningSuggestion> => {
+
+  return customFetch<OpeningSuggestion>(getGetOpeningSuggestionUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetOpeningSuggestionQueryKey = () => {
+    return [
+    `/api/shifts/opening-suggestion`
+    ] as const;
+    }
+
+
+export const getGetOpeningSuggestionQueryOptions = <TData = Awaited<ReturnType<typeof getOpeningSuggestion>>, TError = ErrorType<UnauthorizedResponse>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOpeningSuggestion>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetOpeningSuggestionQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOpeningSuggestion>>> = ({ signal }) => getOpeningSuggestion({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getOpeningSuggestion>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetOpeningSuggestionQueryResult = NonNullable<Awaited<ReturnType<typeof getOpeningSuggestion>>>
+export type GetOpeningSuggestionQueryError = ErrorType<UnauthorizedResponse>
+
+
+export function useGetOpeningSuggestion<TData = Awaited<ReturnType<typeof getOpeningSuggestion>>, TError = ErrorType<UnauthorizedResponse>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOpeningSuggestion>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getOpeningSuggestion>>,
+          TError,
+          Awaited<ReturnType<typeof getOpeningSuggestion>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetOpeningSuggestion<TData = Awaited<ReturnType<typeof getOpeningSuggestion>>, TError = ErrorType<UnauthorizedResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOpeningSuggestion>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getOpeningSuggestion>>,
+          TError,
+          Awaited<ReturnType<typeof getOpeningSuggestion>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetOpeningSuggestion<TData = Awaited<ReturnType<typeof getOpeningSuggestion>>, TError = ErrorType<UnauthorizedResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOpeningSuggestion>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Saran modal awal untuk buka shift (serah terima)
+ */
+
+export function useGetOpeningSuggestion<TData = Awaited<ReturnType<typeof getOpeningSuggestion>>, TError = ErrorType<UnauthorizedResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOpeningSuggestion>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetOpeningSuggestionQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+export const getCloseShiftUrl = () => {
 
 
 
@@ -356,4 +486,304 @@ export const useCloseShift = <TError = ErrorType<UnauthorizedResponse | ShiftClo
         TContext
       > => {
       return useMutation(getCloseShiftMutationOptions(options), queryClient);
+    }
+    export const getListShiftExpensesUrl = () => {
+
+
+
+
+  return `/api/shifts/current/expenses`
+}
+
+/**
+ * Shift yang sedang buka, bukan hari ini (shift bisa lewat tengah malam); termasuk yang
+ * dibatalkan (status dibatalkan). Tanpa shift buka → []. Respons kasir hanya status, tanpa data
+ * pembatal (siapa, jam, atau alasan batal).
+ * @summary Kas keluar shift yang sedang buka, terbaru dulu
+ */
+export const listShiftExpenses = async ( options?: Parameters<typeof customFetch>[1]): Promise<DrawerExpense[]> => {
+
+  return customFetch<DrawerExpense[]>(getListShiftExpensesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListShiftExpensesQueryKey = () => {
+    return [
+    `/api/shifts/current/expenses`
+    ] as const;
+    }
+
+
+export const getListShiftExpensesQueryOptions = <TData = Awaited<ReturnType<typeof listShiftExpenses>>, TError = ErrorType<UnauthorizedResponse>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listShiftExpenses>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListShiftExpensesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listShiftExpenses>>> = ({ signal }) => listShiftExpenses({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listShiftExpenses>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListShiftExpensesQueryResult = NonNullable<Awaited<ReturnType<typeof listShiftExpenses>>>
+export type ListShiftExpensesQueryError = ErrorType<UnauthorizedResponse>
+
+
+export function useListShiftExpenses<TData = Awaited<ReturnType<typeof listShiftExpenses>>, TError = ErrorType<UnauthorizedResponse>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listShiftExpenses>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listShiftExpenses>>,
+          TError,
+          Awaited<ReturnType<typeof listShiftExpenses>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListShiftExpenses<TData = Awaited<ReturnType<typeof listShiftExpenses>>, TError = ErrorType<UnauthorizedResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listShiftExpenses>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listShiftExpenses>>,
+          TError,
+          Awaited<ReturnType<typeof listShiftExpenses>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListShiftExpenses<TData = Awaited<ReturnType<typeof listShiftExpenses>>, TError = ErrorType<UnauthorizedResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listShiftExpenses>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Kas keluar shift yang sedang buka, terbaru dulu
+ */
+
+export function useListShiftExpenses<TData = Awaited<ReturnType<typeof listShiftExpenses>>, TError = ErrorType<UnauthorizedResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listShiftExpenses>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListShiftExpensesQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+export const getCreateShiftExpenseUrl = () => {
+
+
+
+
+  return `/api/shifts/current/expenses`
+}
+
+/**
+ * (S2, K10) Uang keluar dari laci beralasan (mis. beli es batu); uang seharusnya shift yang
+ * sedang buka turun sebesar amount (ShiftClosure.expenses). Urutan pemeriksaan: sesi → id
+ * kosong atau > 64 karakter → 422 VALIDATION → id sudah dipakai: milik pengguna ini → 200
+ * rekaman tersimpan apa adanya tanpa kas keluar kedua (isi body baru diabaikan), milik pengguna
+ * lain → 409 ID_TAKEN tanpa isi rekaman → amount bukan bilangan bulat ≥ 1, atau reason kosong
+ * (setelah trim) atau > 200 karakter → 422 VALIDATION → tanpa shift buka → 409 SHIFT_CLOSED.
+ * Idempoten menurut (pembuat, id). Replay id yang sudah dibatalkan mengembalikan 200 dengan
+ * rekaman berstatus dibatalkan; klien wajib memperlakukannya sebagai belum tersimpan (lepas id,
+ * jangan tampilkan tersimpan, simpan berikutnya memakai id baru). at = jam server; rekaman
+ * menyimpan shiftId shift itu dan pencatatnya. Kas keluar dengan amount > expenseSingleMax,
+ * dan kas keluar yang membuat Σ kas keluar aktif shift > expenseShiftMax, menjadi kejadian
+ * Perlu perhatian kas_keluar (ambang dari Pengaturan saat dibaca, K4/K7).
+ * @summary Catat kas keluar dari laci (alasan wajib)
+ */
+export const createShiftExpense = async (expenseInput: ExpenseInput, options?: Parameters<typeof customFetch>[1]): Promise<DrawerExpense> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<DrawerExpense>(getCreateShiftExpenseUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(expenseInput)
+  }
+);}
+
+
+
+
+
+export const getCreateShiftExpenseMutationKey = () => ['createShiftExpense'] as const;
+
+export const getCreateShiftExpenseMutationOptions = <TError = ErrorType<UnauthorizedResponse | Problem | ValidationFailedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createShiftExpense>>, TError,CreateShiftExpenseMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createShiftExpense>>, TError,CreateShiftExpenseMutationVariables, TContext> => {
+
+const mutationKey = getCreateShiftExpenseMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createShiftExpense>>, CreateShiftExpenseMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  createShiftExpense(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateShiftExpenseMutationResult = NonNullable<Awaited<ReturnType<typeof createShiftExpense>>>
+    export type CreateShiftExpenseMutationBody = ExpenseInput
+    export type CreateShiftExpenseMutationError = ErrorType<UnauthorizedResponse | Problem | ValidationFailedResponse>
+    export type CreateShiftExpenseMutationVariables = {data: ExpenseInput}
+
+    /**
+ * @summary Catat kas keluar dari laci (alasan wajib)
+ */
+export const useCreateShiftExpense = <TError = ErrorType<UnauthorizedResponse | Problem | ValidationFailedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createShiftExpense>>, TError,CreateShiftExpenseMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof createShiftExpense>>,
+        TError,
+        CreateShiftExpenseMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateShiftExpenseMutationOptions(options), queryClient);
+    }
+    export const getCancelShiftExpenseUrl = (expenseId: string,) => {
+
+
+
+
+  return `/api/shifts/current/expenses/${expenseId}/cancel`
+}
+
+/**
+ * (S10) Kasir hanya boleh membatalkan kas keluar dari shift yang sedang buka; setelah shift
+ * tutup, batal hanya dari app pemilik (cancelOwnerExpense). Tanpa PIN pemilik; alasan wajib.
+ * Urutan pemeriksaan: sesi → id tidak dikenal → 404 → sudah dibatalkan → 200 rekaman apa
+ * adanya tanpa perubahan → reason kosong (setelah trim) atau > 200 karakter → 422 VALIDATION →
+ * tanpa shift buka → 409 SHIFT_CLOSED → shiftId kas keluar bukan shift yang sedang buka → 409
+ * OUTSIDE_SHIFT. Berhasil: ShiftClosure.expenses shift yang buka turun sebesar amount (uang
+ * seharusnya naik lagi). Tercatat cancelledAt (jam server), pembatal (id + nama, boleh beda
+ * dari pencatat), channel kasir, dan alasan; menjadi kejadian Perlu perhatian batal_kas_keluar
+ * (amount = nominal, reason = alasan batal). Kas keluar yang dibatalkan tidak lagi ikut
+ * kejadian kas_keluar maupun Σ kas keluar shift. Respons kasir hanya status.
+ * @summary Batalkan kas keluar di kasir (alasan wajib)
+ */
+export const cancelShiftExpense = async (expenseId: string,
+    cancelCreditPaymentInput: CancelCreditPaymentInput, options?: Parameters<typeof customFetch>[1]): Promise<DrawerExpense> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<DrawerExpense>(getCancelShiftExpenseUrl(expenseId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(cancelCreditPaymentInput)
+  }
+);}
+
+
+
+
+
+export const getCancelShiftExpenseMutationKey = () => ['cancelShiftExpense'] as const;
+
+export const getCancelShiftExpenseMutationOptions = <TError = ErrorType<UnauthorizedResponse | NotFoundResponse | Problem | ValidationFailedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelShiftExpense>>, TError,CancelShiftExpenseMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof cancelShiftExpense>>, TError,CancelShiftExpenseMutationVariables, TContext> => {
+
+const mutationKey = getCancelShiftExpenseMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cancelShiftExpense>>, CancelShiftExpenseMutationVariables> = (props) => {
+          const {expenseId,data} = props ?? {};
+
+          return  cancelShiftExpense(expenseId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CancelShiftExpenseMutationResult = NonNullable<Awaited<ReturnType<typeof cancelShiftExpense>>>
+    export type CancelShiftExpenseMutationBody = CancelCreditPaymentInput
+    export type CancelShiftExpenseMutationError = ErrorType<UnauthorizedResponse | NotFoundResponse | Problem | ValidationFailedResponse>
+    export type CancelShiftExpenseMutationVariables = {expenseId: string;data: CancelCreditPaymentInput}
+
+    /**
+ * @summary Batalkan kas keluar di kasir (alasan wajib)
+ */
+export const useCancelShiftExpense = <TError = ErrorType<UnauthorizedResponse | NotFoundResponse | Problem | ValidationFailedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelShiftExpense>>, TError,CancelShiftExpenseMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof cancelShiftExpense>>,
+        TError,
+        CancelShiftExpenseMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCancelShiftExpenseMutationOptions(options), queryClient);
     }

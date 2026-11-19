@@ -78,6 +78,10 @@ export const ErrorCode = {
   OUTSIDE_SHIFT: 'OUTSIDE_SHIFT',
   IN_OPEN_SHIFT: 'IN_OPEN_SHIFT',
   VOID_TOO_OLD: 'VOID_TOO_OLD',
+  CASH_TAKE_LOCKED: 'CASH_TAKE_LOCKED',
+  NAME_TAKEN: 'NAME_TAKEN',
+  KASIR_ON_SHIFT: 'KASIR_ON_SHIFT',
+  OPENING_MISMATCH: 'OPENING_MISMATCH',
 } as const;
 
 export interface Problem {
@@ -160,6 +164,24 @@ export type CreditLimitProblem = Problem & {
   excess: number;
 };
 
+export type OpeningMismatchProblemCode = typeof OpeningMismatchProblemCode[keyof typeof OpeningMismatchProblemCode];
+
+
+export const OpeningMismatchProblemCode = {
+  OPENING_MISMATCH: 'OPENING_MISMATCH',
+} as const;
+
+/**
+ * Problem OPENING_MISMATCH (422, K22): modal awal berbeda dari saran tanpa openingNote.
+ * suggestedCash = saran yang dihitung ulang server saat buka shift; klien memuat ulang saran
+ * dari sini, tidak menghitung sendiri.
+ */
+export type OpeningMismatchProblem = Problem & {
+  code: OpeningMismatchProblemCode;
+  /** @minimum 0 */
+  suggestedCash: number;
+};
+
 export type UserRole = typeof UserRole[keyof typeof UserRole];
 
 
@@ -201,13 +223,17 @@ export interface HourBucket {
   lastWeekRevenue: number;
 }
 
-export interface CashDifference {
-  shiftId: string;
-  kasirName: string;
-  /** Waktu shift ditutup (epoch ms UTC). */
-  closedAt: number;
-  /** Uang fisik dikurangi uang seharusnya (rupiah); tidak nol. */
-  difference: number;
+/**
+ * (S7, K11) Butir QRIS belum dicocokkan: hari sejak QRIS harian mulai dipakai dan sebelum hari
+ * ini dengan total QRIS > 0 yang statusnya belum (termasuk yang totalnya berubah setelah
+ * ditandai, K21). Hari tanpa QRIS tidak dihitung. from/to = tanggal Asia/Jakarta hari
+ * tertua/terbaru.
+ */
+export interface QrisUnreconciled {
+  /** @minimum 1 */
+  count: number;
+  from: string;
+  to: string;
 }
 
 export interface OverdueCredit {
@@ -305,9 +331,13 @@ export interface OpnameFlag {
 }
 
 /**
- * Pengecualian kasir (ruling R1/R9): batal_transaksi (penjualan dibatalkan kasir),
- * batal_pelunasan (pelunasan dibatalkan kasir), kasbon_lewat_limit (kasbon melewati limit
- * dengan alasan; penjualan yang kemudian dibatalkan tidak ikut).
+ * Jenis kejadian Perlu perhatian (ruling R1/R9, K2), urutan tetap: batal_transaksi (penjualan
+ * dibatalkan kasir), batal_pelunasan (pelunasan dibatalkan kasir), kasbon_lewat_limit (kasbon
+ * melewati limit dengan alasan; penjualan yang kemudian dibatalkan tidak ikut),
+ * batal_kas_keluar (kas keluar dibatalkan kasir, S10), selisih_kas (|selisih tutup shift| ≥
+ * cashDiffMin, S6), kas_keluar (kas keluar besar, S2/K4), serah_terima (modal berbeda dari
+ * saran, S4), shift_lama (shift buka > shiftMaxHours jam, S3), selisih_kecil (Σ selisih
+ * kurang kecil satu kasir dalam 7 hari > smallShortageWeekMax, S6/K18).
  */
 export type ExceptionKind = typeof ExceptionKind[keyof typeof ExceptionKind];
 
@@ -316,21 +346,44 @@ export const ExceptionKind = {
   batal_transaksi: 'batal_transaksi',
   batal_pelunasan: 'batal_pelunasan',
   kasbon_lewat_limit: 'kasbon_lewat_limit',
+  batal_kas_keluar: 'batal_kas_keluar',
+  selisih_kas: 'selisih_kas',
+  kas_keluar: 'kas_keluar',
+  serah_terima: 'serah_terima',
+  shift_lama: 'shift_lama',
+  selisih_kecil: 'selisih_kecil',
 } as const;
 
 /**
- * Butir Perlu perhatian satu jenis: semua kejadian dengan at > reviewedAt (tanpa batas umur).
- * total = Σ amount; from/to = tanggal Asia/Jakarta kejadian tertua/terbaru.
+ * Butir Perlu perhatian satu jenis (selisih_kecil: satu kasir): semua kejadian dengan at >
+ * reviewedAt (tanpa batas umur kecuali selisih_kecil 7 hari). total = Σ amount, kecuali
+ * kas_keluar = Σ kas keluar unik yang tercakup (kejadian satuan dan kejadian shift di shift
+ * yang sama tidak dijumlah dua kali, K22); shortage = Σ amount yang < 0 (≤ 0); from/to =
+ * tanggal Asia/Jakarta kejadian tertua/terbaru; latestAt = at kejadian terbaru (dipakai upTo
+ * saat ditinjau langsung, S8). selisih_kecil muncul hanya bila Σ |amount| >
+ * smallShortageWeekMax (ketat). kasirId/kasirName hanya selisih_kecil (kunci butir UI
+ * exception-selisih_kecil-{kasirId}); jenis lain null.
  */
 export interface ExceptionAttention {
   kind: ExceptionKind;
   /** @minimum 1 */
   count: number;
   total: number;
+  /** @maximum 0 */
+  shortage: number;
   from: string;
   to: string;
+  latestAt: number;
+  /** @nullable */
+  kasirId: string | null;
+  /** @nullable */
+  kasirName: string | null;
 }
 
+/**
+ * Selisih kas shift tidak lagi berupa daftar hari ini: menjadi kejadian selisih_kas dan
+ * selisih_kecil di exceptions (S6, menumpuk sampai ditinjau).
+ */
 export interface Attention {
   /**
      * Jumlah barang dengan stockAlert menipis (0 <= stok < minStock). Aturan penanda diam:
@@ -343,8 +396,6 @@ export interface Attention {
      * nonaktif; Sedang langka (scarce) dan tidak_diambil tetap dihitung.
      */
   negativeStockCount: number;
-  /** Shift yang sudah ditutup dengan selisih kas tidak nol, dengan closedAt jatuh pada hari ini (Asia/Jakarta); terbaru dulu. */
-  cashDifferences: CashDifference[];
   overdueCredit: OverdueCredit;
   /** Barang yang modal satuan ecerannya berubah dan belum ditindaklanjuti pemilik; terbaru dulu. */
   costChanges: CostChangeItem[];
@@ -364,11 +415,14 @@ export interface Attention {
      */
   opnameReplacedHeld: number;
   /**
-     * Pengecualian kasir yang menumpuk sejak terakhir ditinjau (ruling R9), tanpa batas umur;
-     * hanya jenis dengan count > 0, urutan tetap batal_transaksi, batal_pelunasan,
-     * kasbon_lewat_limit.
+     * Butir kejadian yang menumpuk sejak terakhir ditinjau (ruling R9, S6), satu per jenis
+     * (selisih_kecil: satu per kasir), hanya dengan count > 0. Urutan tetap (K2):
+     * batal_transaksi, batal_pelunasan, kasbon_lewat_limit, batal_kas_keluar, selisih_kas,
+     * kas_keluar, serah_terima, shift_lama, selisih_kecil (per kasir, urut nama kasir).
      */
   exceptions: ExceptionAttention[];
+  /** Butir QRIS belum dicocokkan (S7); null bila tidak ada hari yang perlu dicocokkan. */
+  qrisUnreconciled: QrisUnreconciled | null;
 }
 
 /**
@@ -424,18 +478,138 @@ export interface CurrentShift {
 export interface OpenShiftRequest {
   /** @minimum 0 */
   openingCash: number;
+  /**
+     * Alasan modal berbeda dari saran (S4), wajib bila openingCash ≠ saran server (tanpa → 422
+     * OPENING_MISMATCH); diabaikan dan disimpan null bila modal sama dengan saran atau tanpa
+     * saran. Data pemilik: tidak pernah dikirim balik ke kasir.
+     * @minLength 1
+     * @maxLength 200
+     * @nullable
+     */
+  openingNote?: string | null;
 }
+
+/**
+ * Saran modal awal (S4, K8): suggestedCash = max(0, lastCountedCash − ownerTakes); semua null
+ * dan ownerTakes 0 bila belum ada shift tutup. Hanya key ini (tanpa catatan modal atau rincian
+ * pengambilan pemilik).
+ */
+export interface OpeningSuggestion {
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  suggestedCash: number | null;
+  /**
+     * Kasir shift tutup terakhir.
+     * @nullable
+     */
+  lastKasirName: string | null;
+  /**
+     * Jam shift tutup terakhir ditutup (epoch ms UTC).
+     * @nullable
+     */
+  lastClosedAt: number | null;
+  /**
+     * Uang fisik tutup shift terakhir.
+     * @nullable
+     */
+  lastCountedCash: number | null;
+  /**
+     * Σ uang yang diambil pemilik dari laci setelah shift itu tutup (belum dibatalkan, belum terpakai).
+     * @minimum 0
+     */
+  ownerTakes: number;
+}
+
+export interface ExpenseInput {
+  /**
+     * ID dari klien (idempotensi per pembuat); id yang sama mengembalikan rekaman lama dengan 200.
+     * @minLength 1
+     * @maxLength 64
+     */
+  id: string;
+  /** @minimum 1 */
+  amount: number;
+  /**
+     * Alasan kas keluar, wajib (1..200 karakter setelah trim).
+     * @minLength 1
+     * @maxLength 200
+     */
+  reason: string;
+}
+
+export type DrawerExpenseStatus = typeof DrawerExpenseStatus[keyof typeof DrawerExpenseStatus];
+
+
+export const DrawerExpenseStatus = {
+  aktif: 'aktif',
+  dibatalkan: 'dibatalkan',
+} as const;
+
+/**
+ * Kas keluar dari laci (S2) untuk kasir; hanya key ini (tanpa data pembatal: siapa, jam, atau
+ * alasan batal).
+ */
+export interface DrawerExpense {
+  id: string;
+  /** Jam server saat dicatat (epoch ms UTC). */
+  at: number;
+  /** @minimum 1 */
+  amount: number;
+  reason: string;
+  /** Nama pencatat (salinan saat dicatat). */
+  kasirName: string;
+  shiftId: string;
+  status: DrawerExpenseStatus;
+}
+
+/**
+ * kasir = dibatalkan di shift yang buka (kejadian batal_kas_keluar); pemilik = dari app pemilik, laci tidak disentuh.
+ */
+export type ExpenseCancelChannel = typeof ExpenseCancelChannel[keyof typeof ExpenseCancelChannel];
+
+
+export const ExpenseCancelChannel = {
+  kasir: 'kasir',
+  pemilik: 'pemilik',
+} as const;
+
+export interface ExpenseCancel {
+  /** Jam server saat dibatalkan (epoch ms UTC). */
+  at: number;
+  /** Nama pembatal (boleh beda dari pencatat). */
+  byName: string;
+  reason: string;
+  /** kasir = dibatalkan di shift yang buka (kejadian batal_kas_keluar); pemilik = dari app pemilik, laci tidak disentuh. */
+  channel: ExpenseCancelChannel;
+}
+
+/**
+ * Kas keluar untuk pemilik: DrawerExpense + data pembatalan. cancellable = pemilik boleh
+ * membatalkan (shift tempatnya sudah tutup dan belum dibatalkan); kas keluar shift yang masih
+ * buka hanya bisa dibatalkan dari kasir.
+ */
+export type OwnerDrawerExpense = DrawerExpense & ({
+  cancelled: ExpenseCancel | null;
+  cancellable: boolean;
+});
 
 export interface CloseShiftRequest {
   /** @minimum 0 */
   countedCash: number;
 }
 
+/**
+ * Satu rumus laci (dipakai tutup shift kasir dan rincian shift pemilik): expectedCash =
+ * openingCash + cashSales − supplierPayments + creditPayments − saleRefunds − expenses −
+ * ownerTakes; difference = countedCash − expectedCash.
+ */
 export interface ShiftClosure {
   shiftId: string;
   openingCash: number;
   cashSales: number;
-  /** Σ uang keluar ke supplier di shift ini, bertanda; expectedCash = openingCash + cashSales − supplierPayments + creditPayments − saleRefunds */
+  /** Σ uang keluar ke supplier di shift ini, bertanda; expectedCash = openingCash + cashSales − supplierPayments + creditPayments − saleRefunds − expenses − ownerTakes */
   supplierPayments: number;
   /**
      * Σ pelunasan kasbon tunai jalur kasir di shift ini, dikurangi pelunasan tunai shift ini yang
@@ -448,9 +622,22 @@ export interface ShiftClosure {
      * tunai transaksi shift lama + bagian QRIS yang dikembalikan tunai dari laci (shift ini atau
      * shift lama). Bagian tunai transaksi shift ini tidak masuk karena cashSales sudah
      * dikurangi; shift lama tidak diubah. expectedCash = openingCash + cashSales −
-     * supplierPayments + creditPayments − saleRefunds
+     * supplierPayments + creditPayments − saleRefunds − expenses − ownerTakes
      */
   saleRefunds: number;
+  /**
+     * Σ kas keluar beralasan (S2) di shift ini yang tidak dibatalkan; kas keluar yang dibatalkan
+     * kasir selagi shift buka tidak ikut. Pembatalan dari app pemilik setelah shift tutup tidak
+     * mengubah closure tersimpan.
+     * @minimum 0
+     */
+  expenses: number;
+  /**
+     * Σ uang yang diambil pemilik dari laci selama shift ini buka (S5) dan tidak dibatalkan.
+     * Pengambilan di sela shift tidak masuk di sini; ia mengurangi saran modal shift berikutnya.
+     * @minimum 0
+     */
+  ownerTakes: number;
   expectedCash: number;
   countedCash: number;
   difference: number;
@@ -465,6 +652,19 @@ export interface KasirSettings {
   quickCurahProductIds: string[];
   qrisImageUrl: string;
   allowNegativeStock: boolean;
+  /**
+     * Nomor telepon pemilik untuk baris "Ragu? Telepon pemilik: {nomor}" di dialog alasan
+     * kasir (R11); null bila belum diisi atau request tanpa sesi kasir (K19).
+     * @nullable
+     */
+  ownerPhone: string | null;
+  /**
+     * Turunan AttentionRules.shiftMaxHours (S3, K19). Pita shift kelamaan tampil bila jam
+     * sekarang − openedAt > shiftMaxHours jam (ketat; tepat 12 jam belum).
+     * @minimum 1
+     * @maximum 24
+     */
+  shiftMaxHours: number;
 }
 
 export interface ProductUnit {
@@ -1142,15 +1342,42 @@ export type KasirLookupSale = Sale & ({
  * dibatalkan (CreditOverLimit.excess yang tercatat), null bila transaksi itu tidak lewat limit;
  * selain batal_transaksi selalu null. Butir kasbon_lewat_limit transaksi itu tetap hilang
  * saat transaksinya dibatalkan.
+ * Jenis F3c-2a (K3, K4, K5, K22): batal_kas_keluar: id = id kas keluar, at = jam batal,
+ * kasirName = pembatal, amount = nominal, reason = alasan batal. selisih_kas: id = shiftId, at
+ * = closedAt, kasirName = kasir shift, amount = difference (bertanda), reason null.
+ * kas_keluar: (a) id = id kas keluar, at = jam catat, amount = nominal, reason = alasannya;
+ * (b) id = kas_keluar_shift-{shiftId}, at = jam kas keluar yang membuat Σ shift lewat, amount =
+ * Σ kas keluar aktif shift saat ini, reason null; kasirName = kasir shift. serah_terima: id =
+ * shiftId, at = openedAt, kasirName = kasir yang membuka, amount = openingCash −
+ * suggestedOpening (bertanda), reason = openingNote. shift_lama: id = shiftId, at = openedAt +
+ * shiftMaxHours jam, amount 0, durationMinutes = menit penuh (closedAt ?? jam server) −
+ * openedAt, reason null. selisih_kecil: id = shiftId, at = closedAt, amount = difference (< 0),
+ * reason null. shiftId = shift kejadian (null untuk tiga jenis F3c-1); durationMinutes hanya
+ * shift_lama (selain itu null); kasirId = id kasir pelaku (pembatal untuk jenis batal; null
+ * bila rekaman tidak menyimpannya). customerName, saleId, saleNumber, paymentId null untuk
+ * jenis F3c-2a.
  */
 export interface CashierException {
   id: string;
   kind: ExceptionKind;
   /** Jam server kejadian (epoch ms UTC). */
   at: number;
+  /** @nullable */
+  kasirId: string | null;
   kasirName: string;
   amount: number;
-  reason: string;
+  /**
+     * Alasan dari kasir; null untuk selisih_kas, shift_lama, selisih_kecil, dan kas_keluar per shift.
+     * @nullable
+     */
+  reason: string | null;
+  /** @nullable */
+  shiftId: string | null;
+  /**
+     * Hanya shift_lama; lama shift dalam menit penuh.
+     * @nullable
+     */
+  durationMinutes: number | null;
   /** @nullable */
   customerName: string | null;
   /** @nullable */
@@ -1172,7 +1399,7 @@ export interface CashierException {
 export interface OwnerExceptionList {
   kind: ExceptionKind;
   /**
-     * Terakhir ditinjau (epoch ms UTC); null bila belum pernah.
+     * Terakhir ditinjau (epoch ms UTC; selisih_kecil = penanda kasir itu); null bila belum pernah.
      * @nullable
      */
   reviewedAt: number | null;
@@ -1184,6 +1411,11 @@ export interface ExceptionReviewInput {
   kind: ExceptionKind;
   /** Jam kejadian terbaru yang sudah dilihat pemilik (epoch ms UTC); dijepit ke jam server. */
   upTo: number;
+  /**
+     * Wajib untuk selisih_kecil (penanda per kasir, K18; tanpa → 422); diabaikan jenis lain.
+     * @nullable
+     */
+  kasirId?: string | null;
 }
 
 export type SaleVoidChannel = typeof SaleVoidChannel[keyof typeof SaleVoidChannel];
@@ -2804,6 +3036,472 @@ export type OpnameProductReport = OpnameReportItem & {
 };
 
 /**
+ * Identitas toko & struk (K13); name = KasirSettings.storeName.
+ */
+export interface StoreSettings {
+  /**
+     * @minLength 1
+     * @maxLength 40
+     */
+  name: string;
+  /** @maxLength 120 */
+  address: string;
+  /** @maxLength 120 */
+  receiptFooter: string;
+  /** Diubah hanya lewat putOwnerQrisImage. */
+  qrisImageUrl: string;
+}
+
+/**
+ * Bagian store pada PATCH (tanpa qrisImageUrl); teks di-trim server.
+ */
+export interface StoreSettingsInput {
+  /**
+     * @minLength 1
+     * @maxLength 40
+     */
+  name: string;
+  /** @maxLength 120 */
+  address: string;
+  /** @maxLength 120 */
+  receiptFooter: string;
+}
+
+/**
+ * Perilaku layar kasir; nilainya menjadi KasirSettings dengan nama field yang sama.
+ */
+export interface KasirScreenSettings {
+  autoPrint: boolean;
+  allowNegativeStock: boolean;
+  /**
+     * Pecahan curah dalam qtyBase; 1..8 angka unik, naik, masing-masing 1..100.000.
+     * @minItems 1
+     * @maxItems 8
+     * @items.minimum 1
+     * @items.maximum 100000
+     */
+  curahFractions: number[];
+  /**
+     * Paling banyak 12 id barang curah yang aktif.
+     * @maxItems 12
+     */
+  quickCurahProductIds: string[];
+}
+
+export interface CreditSettings {
+  /**
+     * Limit kasbon pelanggan baru yang dibuat dari kasir (createCustomer).
+     * @minimum 0
+     * @maximum 100000000
+     */
+  defaultCreditLimit: number;
+}
+
+/**
+ * Batas stok (J8); opnameItemLimit ≤ opnameSessionLimit (selain itu 422).
+ */
+export interface StockSettings {
+  /**
+     * @minimum 1
+     * @maximum 90
+     */
+  expirySoonDays: number;
+  /**
+     * Tahan selisih opname per barang di atas nilai ini (rupiah).
+     * @minimum 0
+     * @maximum 10000000
+     */
+  opnameItemLimit: number;
+  /**
+     * Tandai sesi opname dengan total selisih di atas nilai ini (rupiah).
+     * @minimum 0
+     * @maximum 10000000
+     */
+  opnameSessionLimit: number;
+}
+
+export interface ReportSettings {
+  /**
+     * Batas untung tipis dalam permil (UI persen bulat × 10).
+     * @minimum 0
+     * @maximum 1000
+     */
+  thinMarginPermille: number;
+  /**
+     * @minimum 7
+     * @maximum 365
+     */
+  unsoldDays: number;
+}
+
+/**
+ * Ambang Perlu perhatian (S2, S3, S6, K7), semua dibandingkan ketat dan dibaca saat ini (bukan
+ * salinan saat kejadian). Selisih kas |d| ≥ cashDiffMin = kejadian selisih_kas; −cashDiffMin <
+ * d < 0 = selisih kecil, butir bila Σ satu kasir dalam 7 hari > smallShortageWeekMax; kas
+ * keluar > expenseSingleMax atau Σ satu shift > expenseShiftMax = kas_keluar; shift buka >
+ * shiftMaxHours jam = shift_lama. Aturan murni yang sama dipakai app (shared/lib/attention-rules).
+ */
+export interface AttentionRules {
+  /**
+     * @minimum 0
+     * @maximum 10000000
+     */
+  cashDiffMin: number;
+  /**
+     * @minimum 0
+     * @maximum 10000000
+     */
+  smallShortageWeekMax: number;
+  /**
+     * @minimum 0
+     * @maximum 10000000
+     */
+  expenseSingleMax: number;
+  /**
+     * @minimum 0
+     * @maximum 10000000
+     */
+  expenseShiftMax: number;
+  /**
+     * @minimum 1
+     * @maximum 24
+     */
+  shiftMaxHours: number;
+}
+
+/**
+ * Pengaturan lengkap pemilik; hanya di /api/owner.
+ */
+export interface OwnerSettings {
+  store: StoreSettings;
+  kasir: KasirScreenSettings;
+  credit: CreditSettings;
+  stock: StockSettings;
+  report: ReportSettings;
+  attention: AttentionRules;
+  /**
+     * Ditampilkan di dialog alasan kasir (R11) lewat KasirSettings.ownerPhone.
+     * @minLength 8
+     * @maxLength 16
+     * @nullable
+     * @pattern ^[0-9+ -]+$
+     */
+  ownerPhone: string | null;
+}
+
+/**
+ * Satu bagian per PATCH (K13): setiap bagian opsional, bagian yang dikirim harus utuh.
+ * ownerPhone tidak dikirim = tidak berubah; null = dihapus.
+ */
+export interface OwnerSettingsPatch {
+  store?: StoreSettingsInput;
+  kasir?: KasirScreenSettings;
+  credit?: CreditSettings;
+  stock?: StockSettings;
+  report?: ReportSettings;
+  attention?: AttentionRules;
+  /**
+     * @minLength 8
+     * @maxLength 16
+     * @nullable
+     * @pattern ^[0-9+ -]+$
+     */
+  ownerPhone?: string | null;
+}
+
+export interface ThinMarginPreview {
+  /**
+     * Barang yang tertandai untung tipis pada batas yang diminta.
+     * @minimum 0
+     */
+  flagged: number;
+  /**
+     * Barang yang dinilai (aktif, ber-HPP, harga eceran > 0).
+     * @minimum 0
+     */
+  total: number;
+}
+
+/**
+ * Akun kasir untuk pemilik; tanpa PIN.
+ */
+export interface OwnerKasirAccount {
+  id: string;
+  name: string;
+  /** false = tidak bisa masuk di kasir maupun HP toko; riwayat tetap. */
+  active: boolean;
+  /** Memegang shift yang sedang buka (tidak bisa dinonaktifkan). */
+  onShift: boolean;
+  /**
+     * Akhir kunci PIN yang masih berlaku (terlama dari dua realm); null bila tidak terkunci.
+     * @nullable
+     */
+  lockedUntil: number | null;
+}
+
+export interface KasirAccountInput {
+  /**
+     * 1..30 karakter setelah trim; unik tanpa beda huruf besar/kecil.
+     * @minLength 1
+     * @maxLength 30
+     */
+  name: string;
+  /** @pattern ^\d{6}$ */
+  pin: string;
+}
+
+/**
+ * Field yang tidak dikirim tidak berubah.
+ */
+export interface KasirAccountPatch {
+  /**
+     * @minLength 1
+     * @maxLength 30
+     */
+  name?: string;
+  active?: boolean;
+}
+
+export interface KasirPinReset {
+  /** @pattern ^\d{6}$ */
+  pin: string;
+}
+
+export interface OwnerShiftRow {
+  id: string;
+  kasirName: string;
+  openedAt: number;
+  /**
+     * null = shift sedang buka.
+     * @nullable
+     */
+  closedAt: number | null;
+  /**
+     * Uang fisik saat tutup; null bila shift buka.
+     * @nullable
+     */
+  countedCash: number | null;
+  /**
+     * Selisih tutup shift; null bila shift buka.
+     * @nullable
+     */
+  difference: number | null;
+}
+
+export interface CashTakeCancel {
+  /** Jam server saat dibatalkan (epoch ms UTC). */
+  at: number;
+  byName: string;
+  reason: string;
+}
+
+/**
+ * Pengambilan uang dari laci oleh pemilik (S5). cancellable = bisa dibatalkan sekarang (K9):
+ * belum dibatalkan dan (shiftId ≠ null dan shift itu masih buka, atau shiftId null dan belum
+ * terpakai). Keterangan terkunci di UI: consumedByKasirName ≠ null → sudah dipakai modal shift
+ * kasir itu; shiftId ≠ null → shift tempatnya sudah tutup.
+ */
+export interface OwnerCashTake {
+  id: string;
+  /** Jam server saat dicatat (epoch ms UTC). */
+  at: number;
+  /** @minimum 1 */
+  amount: number;
+  /** @nullable */
+  note: string | null;
+  /**
+     * Shift yang sedang buka saat diambil (masuk ownerTakes shift itu); null = diambil di sela shift.
+     * @nullable
+     */
+  shiftId: string | null;
+  /**
+     * Kasir shift shiftId; null bila shiftId null.
+     * @nullable
+     */
+  shiftKasirName: string | null;
+  /**
+     * Pengambilan sela yang sudah terpakai modal shift berikutnya → kasir shift itu; selain itu null.
+     * @nullable
+     */
+  consumedByKasirName: string | null;
+  cancelled: CashTakeCancel | null;
+  cancellable: boolean;
+}
+
+export interface OwnerShiftList {
+  date: string;
+  /** Shift tanggal itu, openedAt terbaru dulu. */
+  items: OwnerShiftRow[];
+  /** Pengambilan uang pemilik di sela shift (shiftId null) pada tanggal itu, terbaru dulu. */
+  takes: OwnerCashTake[];
+  /**
+     * Kasir shift yang sedang buka sekarang; null bila tidak ada.
+     * @nullable
+     */
+  openKasirName: string | null;
+}
+
+/**
+ * Rincian laci satu shift: semua field ShiftClosure (countedCash dan difference null selagi
+ * shift buka; expectedCash shift buka = uang seharusnya sejauh ini) ditambah data pemilik.
+ * Rumus tunggal: expectedCash = openingCash + cashSales − supplierPayments + creditPayments −
+ * saleRefunds − expenses − ownerTakes.
+ */
+export interface OwnerShiftDetail {
+  shiftId: string;
+  openingCash: number;
+  cashSales: number;
+  supplierPayments: number;
+  creditPayments: number;
+  saleRefunds: number;
+  expenses: number;
+  ownerTakes: number;
+  expectedCash: number;
+  /** @nullable */
+  countedCash: number | null;
+  /** @nullable */
+  difference: number | null;
+  salesCount: number;
+  kasirName: string;
+  openedAt: number;
+  /** @nullable */
+  closedAt: number | null;
+  /**
+     * Saran modal saat shift dibuka (S4); null bila tanpa saran.
+     * @nullable
+     */
+  suggestedOpening: number | null;
+  /**
+     * Alasan modal berbeda dari saran; null bila modal sama atau tanpa saran.
+     * @nullable
+     */
+  openingNote: string | null;
+  /** Semua kas keluar shift ini termasuk yang dibatalkan, urut jam. */
+  expenseItems: OwnerDrawerExpense[];
+  /** Pengambilan uang pemilik di dalam shift ini termasuk yang dibatalkan, urut jam. */
+  ownerTakeItems: OwnerCashTake[];
+  /** Σ bagian QRIS penjualan shift ini yang tidak dibatalkan (tidak masuk laci). */
+  qrisSales: number;
+  /** Σ pelunasan kasir QRIS shift ini yang tidak dibatalkan (tidak masuk laci). */
+  qrisRepayments: number;
+}
+
+export interface OwnerCashTakeInput {
+  /**
+     * ID dari klien (idempotensi per pembuat).
+     * @minLength 1
+     * @maxLength 64
+     */
+  id: string;
+  /** @minimum 1 */
+  amount: number;
+  /**
+     * Catatan opsional; kosong setelah trim disimpan null.
+     * @maxLength 200
+     * @nullable
+     */
+  note?: string | null;
+}
+
+/**
+ * belum = belum ditandai, atau total berubah setelah ditandai (K21).
+ */
+export type QrisDayStatus = typeof QrisDayStatus[keyof typeof QrisDayStatus];
+
+
+export const QrisDayStatus = {
+  belum: 'belum',
+  cocok: 'cocok',
+  tidak_cocok: 'tidak_cocok',
+} as const;
+
+/**
+ * Total QRIS satu hari Asia/Jakarta (S7, K11). total = sales + repayments (tidak termasuk yang
+ * dibatalkan); voidedCount/voidedTotal = transaksi QRIS yang dibatalkan (bagian QRIS saja).
+ * changedAfterMark = sudah ditandai tetapi total sekarang ≠ total saat ditandai → status
+ * dibaca belum (note, markedByName, markedAt tetap tanda lama). closed = hari sudah selesai
+ * (sebelum hari ini); hanya hari closed yang bisa ditandai.
+ */
+export interface QrisDay {
+  date: string;
+  sales: number;
+  repayments: number;
+  total: number;
+  voidedCount: number;
+  voidedTotal: number;
+  status: QrisDayStatus;
+  /** @nullable */
+  note: string | null;
+  /** @nullable */
+  markedByName: string | null;
+  /** @nullable */
+  markedAt: number | null;
+  closed: boolean;
+  changedAfterMark: boolean;
+}
+
+export interface QrisDayList {
+  /**
+     * Bulan YYYY-MM yang diminta; null untuk unreconciled = true.
+     * @nullable
+     */
+  month: string | null;
+  items: QrisDay[];
+}
+
+export type QrisMarkInputStatus = typeof QrisMarkInputStatus[keyof typeof QrisMarkInputStatus];
+
+
+export const QrisMarkInputStatus = {
+  cocok: 'cocok',
+  tidak_cocok: 'tidak_cocok',
+} as const;
+
+export interface QrisMarkInput {
+  status: QrisMarkInputStatus;
+  /**
+     * Wajib untuk tidak_cocok (1..200 setelah trim); opsional untuk cocok.
+     * @maxLength 200
+     * @nullable
+     */
+  note?: string | null;
+}
+
+export type QrisTransactionKind = typeof QrisTransactionKind[keyof typeof QrisTransactionKind];
+
+
+export const QrisTransactionKind = {
+  penjualan: 'penjualan',
+  pelunasan: 'pelunasan',
+} as const;
+
+export type QrisTransactionStatus = typeof QrisTransactionStatus[keyof typeof QrisTransactionStatus];
+
+
+export const QrisTransactionStatus = {
+  aktif: 'aktif',
+  dibatalkan: 'dibatalkan',
+} as const;
+
+/**
+ * Satu transaksi QRIS hari itu (S11); amount = bagian QRIS saja.
+ */
+export interface QrisTransaction {
+  at: number;
+  amount: number;
+  kind: QrisTransactionKind;
+  kasirName: string;
+  /** Nomor struk (penjualan) atau nama pelanggan (pelunasan). */
+  ref: string;
+  status: QrisTransactionStatus;
+}
+
+export type QrisDayDetail = QrisDay & {
+  /** Transaksi QRIS hari itu urut jam, termasuk yang dibatalkan. */
+  items: QrisTransaction[];
+};
+
+/**
  * Bukan dari Wi-Fi toko (STAFF_LAN_ONLY): header Cf-Connecting-Ip/Cf-Ray → 403 STAFF_LAN_ONLY;
  * backend menolak semua yang bukan LAN (gagal-tertutup)
  */
@@ -2945,6 +3643,38 @@ q?: string;
 
 export type ListOwnerExceptionsParams = {
 kind: ExceptionKind;
+/**
+ * Wajib untuk selisih_kecil (penanda tinjau per kasir, K18); diabaikan jenis lain.
+ */
+kasirId?: string;
+};
+
+export type GetOwnerThinMarginPreviewParams = {
+/**
+ * Batas margin eceran dalam permil (UI persen bulat × 10).
+ * @minimum 0
+ * @maximum 1000
+ */
+permille: number;
+};
+
+export type ListOwnerShiftsParams = {
+/**
+ * Tanggal Asia/Jakarta YYYY-MM-DD; bawaan hari ini.
+ */
+date?: string;
+};
+
+export type ListOwnerQrisDaysParams = {
+/**
+ * Bulan Asia/Jakarta YYYY-MM; bawaan bulan ini.
+ * @pattern ^\d{4}-(0[1-9]|1[0-2])$
+ */
+month?: string;
+/**
+ * true = hanya hari yang belum dicocokkan (lembar Cocokkan, S11).
+ */
+unreconciled?: boolean;
 };
 
 export type GetOwnerSalesReportParams = {

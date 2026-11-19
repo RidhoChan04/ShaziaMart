@@ -164,8 +164,8 @@ test("creditLimitProblemSchema cocok dengan tipe hasil generate", () => {
   expect(noExcess.success).toBe(false);
 });
 
-test("ErrorCode 24 nilai termasuk OPNAME_NOT_HELD, OUTSIDE_SHIFT, IN_OPEN_SHIFT, VOID_TOO_OLD; tanpa PIN_REQUIRED (ruling R5)", () => {
-  expect(Object.values(ErrorCode)).toHaveLength(24);
+test("ErrorCode 28 nilai termasuk OPNAME_NOT_HELD, OUTSIDE_SHIFT, IN_OPEN_SHIFT, VOID_TOO_OLD; tanpa PIN_REQUIRED (ruling R5)", () => {
+  expect(Object.values(ErrorCode)).toHaveLength(28);
   expect(Object.values(ErrorCode)).not.toContain("PIN_REQUIRED");
   expect(Object.values(ErrorCode)).toEqual(
     expect.arrayContaining([
@@ -552,14 +552,6 @@ test("fixture OwnerTodaySummary valid terhadap skema respons dan tipe", () => {
     attention: {
       lowStockCount: 2,
       negativeStockCount: 1,
-      cashDifferences: [
-        {
-          shiftId: "sh1",
-          kasirName: "Sari",
-          closedAt: 1790000000000,
-          difference: -5000,
-        },
-      ],
       overdueCredit: { count: 1, total: 75000 },
       costChanges: [
         {
@@ -593,6 +585,7 @@ test("fixture OwnerTodaySummary valid terhadap skema respons dan tipe", () => {
       ],
       opnameReplacedHeld: 0,
       exceptions: [],
+      qrisUnreconciled: { count: 2, from: "2026-10-20", to: "2026-10-22" },
     },
   } satisfies OwnerTodaySummary;
   expect(GetOwnerTodaySummaryResponse.safeParse(summary).success).toBe(true);
@@ -887,12 +880,21 @@ test("lookupSales: q 1..20 digit/tanda hubung", () => {
 test("pengecualian & transaksi pemilik: bentuk key lengkap", () => {
   expectTypeOf<Attention["exceptions"]>().toEqualTypeOf<ExceptionAttention[]>();
   expectTypeOf<keyof ExceptionAttention>().toEqualTypeOf<
-    "kind" | "count" | "total" | "from" | "to"
+    | "kind"
+    | "count"
+    | "total"
+    | "shortage"
+    | "from"
+    | "to"
+    | "latestAt"
+    | "kasirId"
+    | "kasirName"
   >();
   expectTypeOf<keyof CashierException>().toEqualTypeOf<
     | "id"
     | "kind"
     | "at"
+    | "kasirId"
     | "kasirName"
     | "amount"
     | "reason"
@@ -900,6 +902,8 @@ test("pengecualian & transaksi pemilik: bentuk key lengkap", () => {
     | "saleId"
     | "saleNumber"
     | "paymentId"
+    | "shiftId"
+    | "durationMinutes"
     | "fromClosedShift"
     | "refund"
     | "qrisToOwner"

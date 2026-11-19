@@ -95,7 +95,7 @@ describe("attentionItems", () => {
   const none: Attention = {
     lowStockCount: 0,
     negativeStockCount: 0,
-    cashDifferences: [],
+    qrisUnreconciled: null,
     overdueCredit: { count: 0, total: 0 },
     costChanges: [],
     stockOuts: [],
@@ -119,10 +119,7 @@ describe("attentionItems", () => {
     const a: Attention = {
       lowStockCount: 3,
       negativeStockCount: 1,
-      cashDifferences: [
-        { shiftId: "s1", kasirName: "Rina", closedAt: 1, difference: -5000 },
-        { shiftId: "s2", kasirName: "Budi", closedAt: 2, difference: 2500 },
-      ],
+      qrisUnreconciled: null,
       overdueCredit: { count: 2, total: 1250000 },
       costChanges: [],
       stockOuts: [],
@@ -152,22 +149,6 @@ describe("attentionItems", () => {
         link: { to: "/owner/barang" },
       },
       {
-        key: "cash-s1",
-        title: "Selisih kas -Rp5.000",
-        detail: "Shift Rina",
-        tone: "critical",
-        icon: "cash",
-        link: { to: "/owner/lainnya" },
-      },
-      {
-        key: "cash-s2",
-        title: "Selisih kas +Rp2.500",
-        detail: "Shift Budi",
-        tone: "warning",
-        icon: "cash",
-        link: { to: "/owner/lainnya" },
-      },
-      {
         key: "overdue-credit",
         title: "Kasbon > 30 hari",
         detail: "2 pelanggan · Rp1.250.000",
@@ -176,16 +157,6 @@ describe("attentionItems", () => {
         link: { to: "/owner/kasbon" },
       },
     ]);
-  });
-
-  test("selisih kas 0 dilewati", () => {
-    const zero = {
-      shiftId: "s0",
-      kasirName: "Rina",
-      closedAt: 1,
-      difference: 0,
-    };
-    expect(attentionItems({ ...none, cashDifferences: [zero] })).toEqual([]);
   });
 
   test("item bernilai 0 dilewati", () => {
@@ -206,7 +177,7 @@ describe("attentionItems: modal berubah dan barang habis", () => {
   const none: Attention = {
     lowStockCount: 0,
     negativeStockCount: 0,
-    cashDifferences: [],
+    qrisUnreconciled: null,
     overdueCredit: { count: 0, total: 0 },
     costChanges: [],
     stockOuts: [],
@@ -359,13 +330,11 @@ describe("attentionItems: modal berubah dan barang habis", () => {
     expect(attentionItems({ ...none, ...patch })).toEqual([expected]);
   });
 
-  test("urutan lengkap: minus, utang lewat, modal, barang baru, menipis, utang segera, habis, kas, kasbon", () => {
+  test("urutan lengkap: minus, utang lewat, modal, barang baru, menipis, utang segera, habis, kasbon", () => {
     const items = attentionItems({
       lowStockCount: 2,
       negativeStockCount: 1,
-      cashDifferences: [
-        { shiftId: "s1", kasirName: "Rina", closedAt: 1, difference: -5000 },
-      ],
+      qrisUnreconciled: null,
       overdueCredit: { count: 1, total: 100 },
       costChanges: [change()],
       stockOuts: [{ productId: "p-beras", productName: "Beras" }],
@@ -390,18 +359,15 @@ describe("attentionItems: modal berubah dan barang habis", () => {
       "low-stock",
       "debt-soon",
       "stockout-p-beras",
-      "cash-s1",
       "overdue-credit",
     ]);
   });
 
-  test("urutan: minus, modal, menipis, habis, kas, kasbon", () => {
+  test("urutan: minus, modal, menipis, habis, kasbon", () => {
     const items = attentionItems({
       lowStockCount: 2,
       negativeStockCount: 1,
-      cashDifferences: [
-        { shiftId: "s1", kasirName: "Rina", closedAt: 1, difference: -5000 },
-      ],
+      qrisUnreconciled: null,
       overdueCredit: { count: 1, total: 100 },
       costChanges: [change()],
       stockOuts: [{ productId: "p-beras", productName: "Beras" }],
@@ -418,7 +384,6 @@ describe("attentionItems: modal berubah dan barang habis", () => {
       "cost-p-indomie",
       "low-stock",
       "stockout-p-beras",
-      "cash-s1",
       "overdue-credit",
     ]);
     expect(items.map((i) => i.icon)).toEqual([
@@ -426,7 +391,6 @@ describe("attentionItems: modal berubah dan barang habis", () => {
       "cost",
       "stock",
       "stockout",
-      "cash",
       "credit",
     ]);
   });
@@ -436,7 +400,7 @@ describe("attentionItems: kedaluwarsa", () => {
   const base: Attention = {
     lowStockCount: 2,
     negativeStockCount: 1,
-    cashDifferences: [],
+    qrisUnreconciled: null,
     overdueCredit: { count: 0, total: 0 },
     costChanges: [],
     stockOuts: [],
@@ -484,7 +448,7 @@ describe("attentionItems: opname", () => {
   const base: Attention = {
     lowStockCount: 2,
     negativeStockCount: 1,
-    cashDifferences: [],
+    qrisUnreconciled: null,
     overdueCredit: { count: 0, total: 0 },
     costChanges: [],
     stockOuts: [],
@@ -585,7 +549,7 @@ describe("attentionItems: urutan K19 lengkap (kedaluwarsa + opname)", () => {
     const items = attentionItems({
       lowStockCount: 2,
       negativeStockCount: 1,
-      cashDifferences: [],
+      qrisUnreconciled: null,
       overdueCredit: { count: 0, total: 0 },
       costChanges: [],
       stockOuts: [],
@@ -637,7 +601,7 @@ describe("attentionItems: pengecualian kasir (ruling R9)", () => {
   const empty: Attention = {
     lowStockCount: 0,
     negativeStockCount: 0,
-    cashDifferences: [],
+    qrisUnreconciled: null,
     overdueCredit: { count: 0, total: 0 },
     costChanges: [],
     stockOuts: [],
@@ -661,6 +625,10 @@ describe("attentionItems: pengecualian kasir (ruling R9)", () => {
       total: 187000,
       from: "2026-11-02",
       to: "2026-11-05",
+      shortage: 0,
+      latestAt: 1,
+      kasirId: null,
+      kasirName: null,
     },
     {
       kind: "batal_pelunasan",
@@ -668,6 +636,10 @@ describe("attentionItems: pengecualian kasir (ruling R9)", () => {
       total: 100000,
       from: "2026-11-05",
       to: "2026-11-05",
+      shortage: 0,
+      latestAt: 1,
+      kasirId: null,
+      kasirName: null,
     },
     {
       kind: "kasbon_lewat_limit",
@@ -675,6 +647,10 @@ describe("attentionItems: pengecualian kasir (ruling R9)", () => {
       total: 150000,
       from: "2026-10-28",
       to: "2026-11-05",
+      shortage: 0,
+      latestAt: 1,
+      kasirId: null,
+      kasirName: null,
     },
   ];
 
@@ -720,9 +696,7 @@ describe("attentionItems: pengecualian kasir (ruling R9)", () => {
     const a: Attention = {
       ...empty,
       negativeStockCount: 3,
-      cashDifferences: [
-        { shiftId: "s1", kasirName: "Rina", closedAt: 1, difference: -5000 },
-      ],
+      qrisUnreconciled: null,
       overdueCredit: { count: 1, total: 343500 },
       exceptions: three,
     };
@@ -731,12 +705,10 @@ describe("attentionItems: pengecualian kasir (ruling R9)", () => {
       "exception-batal_pelunasan",
       "exception-kasbon_lewat_limit",
       "negative-stock",
-      "cash-s1",
       "overdue-credit",
     ]);
     expect(attentionItems({ ...a, exceptions: [] }).map((i) => i.key)).toEqual([
       "negative-stock",
-      "cash-s1",
       "overdue-credit",
     ]);
   });
