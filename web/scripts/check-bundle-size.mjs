@@ -17,7 +17,9 @@ const budgets = [
 ];
 const OTHER_MAX = 25 * KB;
 // Tiga app terpisah; satu pengguna hanya memuat utama + satu app (K15).
-const TOTAL_MAX = 280 * KB;
+// 280 → 300 KB (keputusan pemilik S9, F3c-2a, 19 Nov 2026): total terukur 280,6 KB setelah
+// layar kas kasir; anggaran per app tetap, layar baru lazy, dan pemilik-awal tidak bertambah.
+const TOTAL_MAX = 300 * KB;
 // Unduhan awal app pemilik = Σ gzip chunk yang dimuat statis saat /owner dibuka
 // (graf import statis dari index- dan owner-). Anggaran = nilai graf yang sama diukur
 // pada baseline 932a227 (2026-11-19): 210,4 KB. Tidak boleh naik (S9); layar baru harus lazy.
