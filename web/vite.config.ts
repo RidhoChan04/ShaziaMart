@@ -4,6 +4,7 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig, loadEnv } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
+import { sharedChunkName } from "./src/app/chunk-names.ts";
 import { shouldRegisterPwa } from "./src/app/pwa.ts";
 import { pwaOptions } from "./src/app/pwa-options.ts";
 
@@ -31,15 +32,22 @@ export default defineConfig(({ command, mode }) => {
       alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
     },
     build: {
-      rollupOptions: {
+      rolldownOptions: {
         output: {
-          // Chunk bersama yang diturunkan Rollup dari modul `cn` diberi nama stabil
-          // agar punya anggaran sendiri di scripts/check-bundle-size.mjs. Bergantung pada
-          // nama "cn" itu: bila Rollup menamai ulang, check-bundle-size gagal (bukan lolos diam-diam).
-          chunkFileNames: (chunk) =>
-            chunk.name === "cn"
-              ? "assets/bersama-[hash].js"
-              : "assets/[name]-[hash].js",
+          // Modul yang dimuat ≥ 2 app lazy masuk chunk `bersama-<app…>` yang dinamai menurut
+          // app pemakainya (src/app/chunk-names.ts), bukan menurut modul pilihan Rolldown;
+          // tiap nama punya anggaran di scripts/check-bundle-size.mjs.
+          codeSplitting: {
+            // Dependensi modul yang ditangkap tidak ikut ditarik ke chunk bersama: tanpa ini
+            // react/router/query pindah dari index- (dimuat semua app) ke chunk bersama.
+            includeDependenciesRecursively: false,
+            groups: [
+              {
+                name: (id, ctx) =>
+                  sharedChunkName(id, (m) => ctx.getModuleInfo(m)),
+              },
+            ],
+          },
         },
       },
     },

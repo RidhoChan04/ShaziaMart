@@ -4,18 +4,26 @@ import { join } from "node:path";
 import { gzipSync } from "node:zlib";
 
 const KB = 1024;
+// Anggaran per nama chunk (nama berkas tanpa `-<hash 8>.js`), dalam KB gzip.
 const budgets = [
-  { label: "utama", prefix: "index-", max: 130 * KB },
-  { label: "kasir", prefix: "kasir-", max: 50 * KB },
-  { label: "owner", prefix: "owner-", max: 50 * KB },
-  // Dinamai lewat chunkFileNames di vite.config.ts (bergantung pada nama Rollup "cn").
-  { label: "bersama", prefix: "bersama-", max: 35 * KB },
-  { label: "laporan", prefix: "laporan-", max: 30 * KB },
-  { label: "toko", prefix: "toko-", max: 30 * KB },
-  { label: "staff", prefix: "staff-", max: 50 * KB },
-  { label: "problem", prefix: "problem-", max: 30 * KB },
+  { name: "index", label: "utama", max: 130 },
+  { name: "kasir", max: 50 },
+  { name: "owner", max: 50 },
+  { name: "staff", max: 50 },
+  { name: "laporan", max: 30 },
+  { name: "toko", max: 30 },
+  // Chunk bersama: modul yang dimuat statis oleh ≥ 2 app lazy, dinamai menurut app pemakainya
+  // (src/app/chunk-names.ts lewat vite.config.ts). Nama baru muncul bila ada modul yang dipakai
+  // bersama oleh kombinasi app yang baru — beri anggaran di sini dengan sengaja.
+  { name: "bersama-kasir-pemilik-staff", max: 35 },
+  { name: "bersama-pemilik", max: 15 },
+  { name: "bersama-pemilik-staff", max: 15 },
+  { name: "bersama-kasir-pemilik", max: 5 },
+  { name: "bersama-kasir-staff", max: 5 },
 ];
-const OTHER_MAX = 25 * KB;
+// Chunk lain (pustaka pihak ketiga yang dipecah otomatis lewat barrel lucide-react/radix-ui/
+// @tanstack, read-xlsx, workbox): masing-masing ≤ 25 KB.
+const OTHER_MAX = 25;
 // Tiga app terpisah; satu pengguna hanya memuat utama + satu app (K15).
 // 280 → 300 KB (keputusan pemilik S9, F3c-2a, 19 Nov 2026): total terukur 280,6 KB setelah
 // layar kas kasir; anggaran per app tetap, layar baru lazy, dan pemilik-awal tidak bertambah.
@@ -34,6 +42,19 @@ if (files.length === 0) {
   process.exit(1);
 }
 
+const failures = [];
+/** Nama chunk dari nama berkas `<nama>-<hash 8 karakter>.js`. */
+function chunkName(file) {
+  const match = /^(.+)-[\w-]{8}\.js$/.exec(file);
+  if (match === null) {
+    console.error(`Nama berkas chunk tidak dikenali: ${file}`);
+    failures.push(`nama-${file}`);
+    return file;
+  }
+  return match[1];
+}
+const names = new Map(files.map((f) => [f, chunkName(f)]));
+
 /** Chunk yang ikut dimuat statis oleh `root` (import statis, bukan `import(...)` dinamis). */
 function staticDeps(root, seen = new Set()) {
   if (seen.has(root)) return seen;
@@ -49,35 +70,40 @@ function staticDeps(root, seen = new Set()) {
 
 const sizes = new Map();
 let total = 0;
-const failures = [];
 for (const file of files) {
   const size = gzipSync(readFileSync(join(dir, file))).length;
   sizes.set(file, size);
   total += size;
-  const budget = budgets.find((b) => file.startsWith(b.prefix));
-  const max = budget?.max ?? OTHER_MAX;
+  const name = names.get(file);
+  const budget = budgets.find((b) => b.name === name);
+  if (budget === undefined && name.startsWith("bersama-")) {
+    console.error(
+      `Chunk bersama "${name}" belum punya anggaran — tambahkan di budgets.`,
+    );
+    failures.push(`${name}-tanpa-anggaran`);
+  }
+  const max = (budget?.max ?? OTHER_MAX) * KB;
   const status = size > max ? "MELEBIHI" : "ok";
   console.log(
     `${status.padEnd(8)} ${file.padEnd(48)} ${(size / KB).toFixed(1)} / ${(max / KB).toFixed(0)} KB`,
   );
   if (size > max) failures.push(file);
 }
-// Anggaran bernama harus punya chunk; tanpa itu penamaan/pemisahan berubah diam-diam.
+// Anggaran bernama harus punya tepat satu chunk; tanpa itu penamaan/pemisahan berubah diam-diam.
 for (const b of budgets) {
-  if (!files.some((f) => f.startsWith(b.prefix))) {
+  const count = files.filter((f) => names.get(f) === b.name).length;
+  if (count !== 1) {
     console.error(
-      `Tidak ada chunk berawalan "${b.prefix}" (anggaran ${b.label}).`,
+      `Chunk "${b.name}" (anggaran ${b.label ?? b.name}) ada ${count}, seharusnya 1.`,
     );
-    failures.push(`${b.label}-hilang`);
+    failures.push(`${b.name}-${count === 0 ? "hilang" : "ganda"}`);
   }
 }
-const roots = files.filter(
-  (f) => f.startsWith("index-") || f.startsWith("owner-"),
-);
-for (const prefix of ["index-", "owner-"]) {
-  if (!roots.some((f) => f.startsWith(prefix))) {
-    console.error(`Chunk akar pemilik-awal "${prefix}" tidak ditemukan.`);
-    failures.push(`pemilik-awal-akar-${prefix}`);
+const roots = files.filter((f) => ["index", "owner"].includes(names.get(f)));
+for (const name of ["index", "owner"]) {
+  if (!roots.some((f) => names.get(f) === name)) {
+    console.error(`Chunk akar pemilik-awal "${name}" tidak ditemukan.`);
+    failures.push(`pemilik-awal-akar-${name}`);
   }
 }
 const pemilik = new Set();
