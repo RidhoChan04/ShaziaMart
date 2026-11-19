@@ -12,6 +12,7 @@ import {
 } from "@/shared/lib/business-day";
 import { unitCost } from "@/shared/lib/product-rules";
 import { roundHalfUp } from "@/shared/lib/quantity";
+import { unreconciledQris } from "./cash/qris-days";
 import type { MockState } from "./db";
 import { exceptionAttention } from "./exceptions";
 import { oldestUnpaidAt } from "./ledger";
@@ -38,7 +39,8 @@ const sum = (xs: readonly number[]): number => xs.reduce((a, b) => a + b, 0);
 /**
  * (S6) Selisih kas tidak lagi berupa daftar hari ini: menjadi kejadian `selisih_kas` /
  * `selisih_kecil` di `exceptions`, bersama kejadian kas laci F3c-2a lain (K2), dengan ambang
- * `attentionRules` saat ini. `qrisUnreconciled` diisi T6.
+ * `attentionRules` saat ini. (S7, M-2a 4) `qrisUnreconciled` hanya bila setelan Pencocokan QRIS
+ * harian nyala; mati → selalu null (halaman & endpoint QRIS harian tetap jalan).
  */
 function attention(state: Readonly<MockState>, now: number): Attention {
   const alerts = state.products.map((p) => stockAlertOf(state, p));
@@ -70,7 +72,9 @@ function attention(state: Readonly<MockState>, now: number): Attention {
     expiry: expiryAttention(state, now),
     ...opnameAttention(state),
     exceptions: exceptionAttention(state, now),
-    qrisUnreconciled: null,
+    qrisUnreconciled: state.attentionRules.qrisDailyReconcile
+      ? unreconciledQris(state, now)
+      : null,
   };
 }
 
