@@ -55,7 +55,7 @@ const savedToast = async () =>
 const patches = () =>
   sent.filter((s) => s.method === "PATCH").map((s) => s.body);
 
-test("daftar kelompok dengan ringkasan nilai sekarang", async () => {
+test("daftar kelompok memakai keterangan tetap (§12g); hanya telepon menampilkan nilai", async () => {
   renderApp("/owner/lainnya/pengaturan");
   await screen.findByText("Toko & struk");
   const links = screen
@@ -64,12 +64,15 @@ test("daftar kelompok dengan ringkasan nilai sekarang", async () => {
   expect(links).toHaveLength(7);
   const byName = (name: RegExp) =>
     links.find((l) => name.test(l.textContent ?? ""));
-  expect(byName(/^Kasbon/)).toHaveTextContent("Rp500.000");
-  expect(byName(/^Laporan/)).toHaveTextContent("10%");
-  expect(byName(/^Laporan/)).toHaveTextContent("30 hari");
+  expect(byName(/^Toko/)).toHaveTextContent("Nama, alamat, struk, gambar QRIS");
+  expect(byName(/^Kasir/)).toHaveTextContent("Stok minus dan curah");
+  expect(byName(/^Kasbon/)).toHaveTextContent("Limit pelanggan baru");
+  expect(byName(/^Stok/)).toHaveTextContent("Kedaluwarsa, batas opname");
+  expect(byName(/^Laporan/)).toHaveTextContent("Untung tipis, tidak terjual");
+  expect(byName(/^Perlu perhatian/)).toHaveTextContent(
+    "Batas selisih, kas keluar, shift, QRIS",
+  );
   expect(byName(/^Nomor telepon/)).toHaveTextContent("0812-3456-7890");
-  expect(byName(/^Perlu perhatian/)).toHaveTextContent("Rp5.000");
-  expect(byName(/^Stok/)).toHaveTextContent("30 hari");
 });
 
 test("Kasbon mengirim PATCH hanya bagian credit dan menampilkan pesan", async () => {

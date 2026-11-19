@@ -13,11 +13,9 @@ import {
 import { useGetOwnerSettings } from "@/shared/api/gen/owner/owner";
 import type { OwnerSettings } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { pesanError } from "@/shared/lib/error-messages";
-import { formatRupiah } from "@/shared/lib/money";
 import { Button } from "@/shared/ui/button";
 import { SubPageHeader } from "../common/sub-page-header";
 import { RowList } from "../products/detail/section";
-import { formatPercent } from "./settings-format";
 import {
   SECTION_TITLES,
   SETTINGS_SECTIONS,
@@ -34,27 +32,23 @@ const ICONS: Record<SettingsSection, LucideIcon> = {
   telepon: Phone,
 };
 
-/** Ringkasan nilai sekarang per kelompok (teks kecil di bawah judul baris). */
+/** Keterangan tetap per kelompok (§12g); hanya baris telepon menampilkan nilainya. */
+const CAPTIONS: Record<Exclude<SettingsSection, "telepon">, string> = {
+  toko: "Nama, alamat, struk, gambar QRIS",
+  kasir: "Stok minus dan curah",
+  kasbon: "Limit pelanggan baru",
+  stok: "Kedaluwarsa, batas opname",
+  laporan: "Untung tipis, tidak terjual",
+  perhatian: "Batas selisih, kas keluar, shift, QRIS",
+};
+
 function summaryOf(section: SettingsSection, s: OwnerSettings): string {
-  switch (section) {
-    case "toko":
-      return `${s.store.name} · ${s.store.qrisImageUrl ? "QRIS terpasang" : "QRIS belum dipasang"}`;
-    case "kasir":
-      return `Stok minus ${s.kasir.allowNegativeStock ? "diizinkan" : "tidak diizinkan"} · ${s.kasir.curahFractions.length} pecahan curah`;
-    case "kasbon":
-      return `Limit pelanggan baru ${formatRupiah(s.credit.defaultCreditLimit)}`;
-    case "stok":
-      return `Kedaluwarsa ${s.stock.expirySoonDays} hari · opname ${formatRupiah(s.stock.opnameItemLimit)}`;
-    case "laporan":
-      return `Untung tipis ${formatPercent(s.report.thinMarginPermille)}% · tidak terjual ${s.report.unsoldDays} hari`;
-    case "perhatian":
-      return `Selisih kas ${formatRupiah(s.attention.cashDiffMin)} · QRIS harian ${s.attention.qrisDailyReconcile ? "menyala" : "mati"}`;
-    case "telepon":
-      return s.ownerPhone ?? "Belum diisi";
-  }
+  return section === "telepon"
+    ? (s.ownerPhone ?? "Belum diisi")
+    : CAPTIONS[section];
 }
 
-/** Lainnya › Pengaturan: satu baris per kelompok dengan ringkasan nilai sekarang. */
+/** Lainnya › Pengaturan: satu baris per kelompok dengan keterangan tetap. */
 export function SettingsPage() {
   const query = useGetOwnerSettings();
   const settings = query.data;

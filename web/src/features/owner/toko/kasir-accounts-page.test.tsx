@@ -164,6 +164,7 @@ test("detail aktif: Nonaktifkan minta konfirmasi dengan keterangan, lalu Nonakti
     }),
   );
   expect(await screen.findByText("Nonaktif")).toBeInTheDocument();
+  expect(await screen.findByText("Kasir dinonaktifkan")).toBeInTheDocument();
   expect(mockDb.get().users.find((u) => u.name === "Budi")?.active).toBe(false);
   await waitFor(() =>
     expect(screen.getByRole("button", { name: "Aktifkan lagi" })).toBeEnabled(),
@@ -205,6 +206,7 @@ test("Aktifkan lagi mengaktifkan akun nonaktif", async () => {
   expect(
     await screen.findByRole("button", { name: "Nonaktifkan" }),
   ).toBeInTheDocument();
+  expect(await screen.findByText("Kasir diaktifkan lagi")).toBeInTheDocument();
 });
 
 test("ubah nama: judul ikut berubah; nama kembar ditolak", async () => {

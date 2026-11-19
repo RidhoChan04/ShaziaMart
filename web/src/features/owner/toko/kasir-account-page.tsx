@@ -45,7 +45,9 @@ function ActiveToggle({ account }: { account: OwnerKasirAccount }) {
         await client.invalidateQueries({
           queryKey: getListOwnerKasirAccountsQueryKey(),
         });
-        toast.success(saved.active ? "Akun diaktifkan" : "Akun dinonaktifkan");
+        toast.success(
+          saved.active ? "Kasir diaktifkan lagi" : "Kasir dinonaktifkan",
+        );
       },
       onSettled: () => setOpen(false),
     },

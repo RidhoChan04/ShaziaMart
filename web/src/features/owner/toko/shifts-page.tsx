@@ -12,9 +12,11 @@ import {
   useListOwnerShifts,
 } from "@/shared/api/gen/owner/owner";
 import type {
+  AttentionRules,
   OwnerCashTake,
   OwnerShiftRow,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
+import { isCashDiffEvent } from "@/shared/lib/attention-rules";
 import {
   addIsoDays,
   isIsoDate,
@@ -61,10 +63,10 @@ function entriesOf(
 /** Selisih yang menjadi butir Perlu perhatian (nilai mutlak ≥ batas) diberi tanda; di bawahnya ditulis biasa. */
 function DifferenceLine({
   difference,
-  flagMin,
+  rules,
 }: {
   difference: number;
-  flagMin: number | null;
+  rules: AttentionRules | null;
 }) {
   if (difference === 0) {
     return (
@@ -74,7 +76,7 @@ function DifferenceLine({
       </span>
     );
   }
-  const flagged = flagMin !== null && Math.abs(difference) >= flagMin;
+  const flagged = rules !== null && isCashDiffEvent(difference, rules);
   if (!flagged)
     return <span>{`Selisih ${formatSignedRupiah(difference)}`}</span>;
   return (
@@ -93,10 +95,10 @@ function DifferenceLine({
 
 function ShiftRow({
   shift,
-  flagMin,
+  rules,
 }: {
   shift: OwnerShiftRow;
-  flagMin: number | null;
+  rules: AttentionRules | null;
 }) {
   const open = shift.closedAt === null;
   return (
@@ -127,10 +129,7 @@ function ShiftRow({
               </span>
             ) : (
               shift.difference !== null && (
-                <DifferenceLine
-                  difference={shift.difference}
-                  flagMin={flagMin}
-                />
+                <DifferenceLine difference={shift.difference} rules={rules} />
               )
             )}
           </span>
@@ -288,7 +287,7 @@ export function ShiftsPage() {
                   <ShiftRow
                     key={`s-${e.shift.id}`}
                     shift={e.shift}
-                    flagMin={settings.data?.attention.cashDiffMin ?? null}
+                    rules={settings.data?.attention ?? null}
                   />
                 ) : (
                   <TakeRow
