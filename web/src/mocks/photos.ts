@@ -55,6 +55,18 @@ export const mockPhotos = {
     if (stored === undefined) return undefined;
     return { ownerId: stored.ownerId, bytes: fromBase64(stored.data) };
   },
+  /** Hapus satu gambar (gambar QRIS lama yang diganti); id tidak ada → diabaikan. */
+  remove(id: string): void {
+    try {
+      const all = read();
+      if (!Object.hasOwn(all, id)) return;
+      delete all[id];
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+      reportPersistSuccess();
+    } catch {
+      reportPersistFailure();
+    }
+  },
   reset(): void {
     try {
       localStorage.removeItem(STORAGE_KEY);

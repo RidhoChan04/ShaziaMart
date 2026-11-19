@@ -3,24 +3,17 @@ import type {
   Session,
   StaffShift,
   Supplier,
-  User,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { mockDb } from "../db";
 import { searchStaffProducts } from "../products/views";
 import { pinLogin } from "./auth";
-import { toUser } from "./respond";
+import { activeKasirUsers, toUser } from "./respond";
 import { requireStaffSession, staffRealm } from "./staff-realm";
 
 export const staffHandlers = [
   http.get(
     "/api/staff/users",
-    staffRealm(() => {
-      const users: User[] = mockDb
-        .get()
-        .users.filter((u) => u.role === "kasir")
-        .map(toUser);
-      return HttpResponse.json(users);
-    }),
+    staffRealm(() => HttpResponse.json(activeKasirUsers(mockDb.get()))),
   ),
   http.post(
     "/api/staff/login",

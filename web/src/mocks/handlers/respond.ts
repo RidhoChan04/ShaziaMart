@@ -14,6 +14,10 @@ export const LOCK_DETAIL = "Coba lagi dalam 5 menit";
 /** Pengguna publik: tanpa PIN/password. */
 export const toUser = ({ id, name, role }: User): User => ({ id, name, role });
 
+/** (K12) Pilihan login PIN di PC kasir dan HP toko: hanya akun kasir aktif. */
+export const activeKasirUsers = (state: Readonly<MockState>): User[] =>
+  state.users.filter((u) => u.role === "kasir" && u.active).map(toUser);
+
 const TITLES: Record<number, string> = {
   401: "Tidak diizinkan",
   403: "Akses ditolak",
@@ -44,12 +48,15 @@ export function problem(
   });
 }
 
-/** Pengguna sesi aktif, atau respons 401 UNAUTHORIZED. */
+/**
+ * Pengguna sesi aktif, atau respons 401 UNAUTHORIZED. (K22) Pengguna nonaktif ditolak walau sesinya
+ * masih tersimpan.
+ */
 export function requireSession(
   state: Readonly<MockState>,
 ): MockUser | Response {
   const userId = state.session?.userId;
-  const user = state.users.find((u) => u.id === userId);
+  const user = state.users.find((u) => u.id === userId && u.active);
   return user ?? problem(401, "UNAUTHORIZED", "Sesi tidak ditemukan");
 }
 

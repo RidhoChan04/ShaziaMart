@@ -1,8 +1,9 @@
 import { HttpResponse, http } from "msw";
-import type { Session, User } from "@/shared/api/gen/shaziaMartAPI.schemas";
+import type { Session } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { type MockState, type MockUser, mockDb } from "../db";
 import { withScenario } from "../scenarios";
 import {
+  activeKasirUsers,
   invalid,
   LOCK_DETAIL,
   LOCK_MS,
@@ -37,7 +38,8 @@ export async function pinLogin(
   }
   const state = mockDb.get();
   const user = state.users.find((u) => u.id === userId);
-  if (!user || !realm.canLogin(user)) {
+  // (K12) Akun nonaktif: PIN_INVALID tanpa menambah hitungan kunci.
+  if (!user?.active || !realm.canLogin(user)) {
     return problem(401, "PIN_INVALID", "PIN salah");
   }
   const now = Date.now();
@@ -72,13 +74,7 @@ export async function pinLogin(
 export const authHandlers = [
   http.get(
     "/api/users/kasir",
-    withScenario(() => {
-      const users: User[] = mockDb
-        .get()
-        .users.filter((u) => u.role === "kasir")
-        .map(toUser);
-      return HttpResponse.json(users);
-    }),
+    withScenario(() => HttpResponse.json(activeKasirUsers(mockDb.get()))),
   ),
   http.post(
     "/api/auth/pin-login",

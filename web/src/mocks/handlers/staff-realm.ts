@@ -26,12 +26,17 @@ export const staffTunnelGuard = http.all("/api/staff/*", ({ request }) =>
   viaTunnel(request) ? lanOnly() : undefined,
 );
 
-/** Pengguna sesi orang toko (akun kasir), atau 401; sesi kasir/pemilik tidak berlaku. */
+/**
+ * Pengguna sesi orang toko (akun kasir aktif), atau 401; sesi kasir/pemilik tidak berlaku. (K22)
+ * Akun nonaktif ditolak walau sesinya masih tersimpan.
+ */
 export function requireStaffSession(
   state: Readonly<MockState>,
 ): MockUser | Response {
   const userId = state.staffSession?.userId;
-  const user = state.users.find((u) => u.id === userId && u.role === "kasir");
+  const user = state.users.find(
+    (u) => u.id === userId && u.role === "kasir" && u.active,
+  );
   return (
     user ?? problem(401, "UNAUTHORIZED", "Sesi orang toko tidak ditemukan")
   );

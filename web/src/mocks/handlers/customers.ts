@@ -6,7 +6,6 @@ import { withScenario } from "../scenarios";
 import { invalid, readJson } from "./respond";
 
 const MAX_RESULTS = 20;
-const DEFAULT_CREDIT_LIMIT = 500_000;
 
 export const customerHandlers = [
   http.get(
@@ -43,7 +42,8 @@ export const customerHandlers = [
         name,
         phone,
         balance: 0,
-        creditLimit: DEFAULT_CREDIT_LIMIT,
+        // (K13) Limit pelanggan baru = Pengaturan pemilik saat ini.
+        creditLimit: mockDb.get().defaultCreditLimit,
       };
       mockDb.update((s) => {
         s.customers.push(customer);
