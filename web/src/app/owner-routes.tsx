@@ -4,6 +4,7 @@ import {
   notFound,
   type SearchSchemaInput,
 } from "@tanstack/react-router";
+import { SETTINGS_SECTIONS } from "@/features/owner/toko/settings-sections";
 import { isIsoDate, jakartaIsoDate } from "@/shared/lib/business-day";
 import {
   type ReportSearch,
@@ -236,16 +237,6 @@ const ownerTransaksiDetailRoute = createRoute({
   path: "lainnya/transaksi/$saleId",
   component: lazyRouteComponent(loadOwner, "SaleDetailPage"),
 });
-
-const SETTINGS_SECTIONS = [
-  "toko",
-  "kasir",
-  "kasbon",
-  "stok",
-  "laporan",
-  "perhatian",
-  "telepon",
-] as const;
 
 const ownerPerhatianRoute = createRoute({
   getParentRoute: () => ownerRoute,

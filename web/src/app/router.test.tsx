@@ -174,11 +174,11 @@ test("rute /staff/masuk/baru: draf milik pengguna + langkah=bayar bertahan, lang
   });
 });
 
-test("rute toko pemilik: /owner/lainnya/pengaturan/toko membuka halaman Pengaturan", async () => {
+test("rute toko pemilik: /owner/lainnya/pengaturan/toko membuka bagian Toko & struk", async () => {
   await ownerLogin();
   renderApp("/owner/lainnya/pengaturan/toko");
   expect(
-    await screen.findByRole("heading", { level: 1, name: "Pengaturan" }),
+    await screen.findByRole("heading", { level: 1, name: "Toko & struk" }),
   ).toBeInTheDocument();
 });
 
