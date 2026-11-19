@@ -29,6 +29,10 @@ export function scanBox(page: Page) {
 export async function fillOpeningCash(page: Page, opening: string) {
   await page.getByRole("textbox", { name: "Modal awal di laci" }).fill(opening);
   const reason = page.getByRole("textbox", { name: "Alasan modal berbeda" });
+  const submit = page.getByRole("button", { name: "Buka shift" });
+  // Deterministik: setelah angka terisi, tepat salah satu terjadi: tombol aktif (modal = saran)
+  // atau isian alasan tampil (modal berbeda).
+  await expect(reason.or(submit.and(page.locator(":enabled")))).toBeVisible();
   if (await reason.isVisible()) await reason.fill("Tes");
 }
 

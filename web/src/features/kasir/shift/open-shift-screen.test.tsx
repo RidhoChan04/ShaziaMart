@@ -190,3 +190,49 @@ test("rentetan scanner + Enter di isian alasan tidak menjadi alasan dan tidak me
   ).toBeInTheDocument();
   expect(posts).not.toHaveBeenCalled();
 });
+
+test("(R-FOKUS) setelah PIN, isian 'Modal awal di laci' langsung terfokus", async () => {
+  serveSuggestion(() => SUGGEST());
+  const { field } = await toModalStep();
+  await waitFor(() => expect(field).toHaveFocus());
+});
+
+test("isian dikosongkan → tidak ada isian alasan dan tidak ada selisih; Buka shift nonaktif", async () => {
+  serveSuggestion(() => SUGGEST());
+  const { user, field } = await toModalStep();
+  await user.clear(field);
+  expect(reasonBox()).toBeNull();
+  expect(screen.queryByText(/dari hitungan sebelumnya/)).toBeNull();
+  expect(openBtn()).toBeDisabled();
+});
+
+test("422 lalu muat ulang saran mengembalikan nilai lebih baru → hint dan selisih memakai saran terbaru", async () => {
+  let suggested = 250_000;
+  serveSuggestion(() => SUGGEST({ suggestedCash: suggested }));
+  server.use(
+    http.post("/api/shifts", () => {
+      suggested = 120_000; // pemilik mengambil lagi sebelum muat ulang selesai
+      return HttpResponse.json(
+        {
+          type: "about:blank",
+          title: "Tidak valid",
+          status: 422,
+          code: "OPENING_MISMATCH",
+          detail: "x",
+          suggestedCash: 150_000,
+        },
+        {
+          status: 422,
+          headers: { "Content-Type": "application/problem+json" },
+        },
+      );
+    }),
+  );
+  const { user } = await toModalStep();
+  await user.click(openBtn());
+  // Isian 250.000 vs saran terbaru 120.000 → Lebih Rp130.000 (bukan Rp100.000 dari 422).
+  expect(
+    await screen.findByText("Lebih Rp130.000 dari hitungan sebelumnya"),
+  ).toBeInTheDocument();
+  expect(screen.getByText(/Hitungan tutup shift Budi/)).toBeInTheDocument();
+});

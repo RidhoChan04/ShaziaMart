@@ -141,7 +141,9 @@ function OpeningCashStep() {
   return (
     <OpeningCashForm
       suggestion={suggestion.data ?? null}
-      refetchSuggestion={() => void suggestion.refetch()}
+      refetchSuggestion={() =>
+        suggestion.refetch().then((result) => result.isSuccess)
+      }
     />
   );
 }
@@ -185,7 +187,7 @@ function OpeningCashForm({
   refetchSuggestion,
 }: {
   suggestion: OpeningSuggestion | null;
-  refetchSuggestion: () => void;
+  refetchSuggestion: () => Promise<boolean>;
 }) {
   const client = useQueryClient();
   const reasonId = useId();
@@ -206,7 +208,8 @@ function OpeningCashForm({
   const suggested = mismatch ?? suggestion?.suggestedCash ?? null;
   const diff =
     suggested !== null && openingCash !== null ? openingCash - suggested : 0;
-  const differs = suggested !== null && openingCash !== suggested;
+  const differs =
+    openingCash !== null && suggested !== null && openingCash !== suggested;
   const note = reason.trim();
   const open = useOpenShift({
     mutation: {
@@ -217,7 +220,10 @@ function OpeningCashForm({
           if (typeof body?.suggestedCash === "number") {
             setMismatch(body.suggestedCash);
           }
-          refetchSuggestion();
+          // Saran dari 422 dipakai hanya sampai saran segar tiba; sesudahnya saran segar berlaku.
+          void refetchSuggestion().then((fresh) => {
+            if (fresh) setMismatch(null);
+          });
         }
       },
       onSettled: () => syncGate(client),
@@ -225,11 +231,15 @@ function OpeningCashForm({
   });
   const ready =
     openingCash !== null && !open.isPending && (!differs || note !== "");
+  // Pesan 422 dibaca dari galatnya sendiri (saran saat ditolak), bukan dari `mismatch` sementara.
+  const rejected =
+    open.error instanceof ApiError && open.error.code === "OPENING_MISMATCH"
+      ? (open.error.body as { suggestedCash?: unknown } | undefined)
+          ?.suggestedCash
+      : undefined;
   const mismatchMessage =
-    open.error instanceof ApiError &&
-    open.error.code === "OPENING_MISMATCH" &&
-    mismatch !== null
-      ? `Isi alasan bila modal berbeda dari ${formatRupiah(mismatch)}`
+    typeof rejected === "number"
+      ? `Isi alasan bila modal berbeda dari ${formatRupiah(rejected)}`
       : null;
   return (
     <form
@@ -256,6 +266,7 @@ function OpeningCashForm({
     >
       <div className="grid gap-1">
         <MoneyField
+          autoFocus
           label="Modal awal di laci"
           value={text}
           onChange={setText}

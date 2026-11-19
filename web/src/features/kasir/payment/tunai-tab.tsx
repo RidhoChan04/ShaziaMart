@@ -12,7 +12,9 @@ export function MoneyField({
   label,
   value,
   onChange,
+  autoFocus = false,
 }: {
+  autoFocus?: boolean;
   label: string;
   value: string;
   onChange: (text: string) => void;
@@ -30,6 +32,7 @@ export function MoneyField({
         </span>
         <Input
           id={id}
+          autoFocus={autoFocus}
           inputMode="numeric"
           autoComplete="off"
           value={value}
