@@ -10,7 +10,10 @@ import { humanTyping } from "@/test/typing";
 import { useCart } from "../cart/cart-store";
 import { KasirScreen } from "../screen/kasir-screen";
 import { ShiftActions } from "../shift/shift-actions";
-import { clearPendingRepaymentId } from "./pending-repayment-id";
+import {
+  clearPendingRepaymentId,
+  pendingRepaymentId,
+} from "./pending-repayment-id";
 
 vi.mock("@/shared/lib/beep", () => ({ beep: vi.fn() }));
 
@@ -72,7 +75,7 @@ const warning = () =>
 /** Buka lembar, pilih Bu Sari, isi tunai Rp50.000 pas. */
 async function openAndFill() {
   const user = humanTyping();
-  renderWithQuery(
+  const { unmount } = renderWithQuery(
     <>
       <ShiftActions onClosed={() => {}} />
       <KasirScreen />
@@ -89,8 +92,36 @@ async function openAndFill() {
   );
   await user.type(ui.getByRole("textbox", { name: "UANG DITERIMA" }), "50000");
   const save = () => ui.getByRole("button", { name: "Simpan pelunasan" });
-  return { user, ui, save };
+  return { user, ui, save, unmount };
 }
+
+/** GET daftar pelunasan shift ditahan sampai `release()`, lalu diteruskan ke mock. */
+function holdList() {
+  let release = () => {};
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const lists = { count: 0 };
+  server.use(
+    http.get("/api/credit-payments/shift", async () => {
+      lists.count += 1;
+      await gate;
+    }),
+  );
+  return { lists, release };
+}
+
+/** Id tertunda lembar untuk Bu Sari Rp50.000 tunai masih ditahan? (memanggil saat bebas mencetak id baru) */
+const stillPending = () =>
+  pendingRepaymentId(
+    {
+      userId: mockDb.get().shift?.kasirId ?? "",
+      shiftId: mockDb.get().shift?.id ?? "",
+    },
+    sariId(),
+    50_000,
+    "tunai",
+  ).reused;
 
 test("duplikat 14.05 → dialog 'Pelunasan mungkin dobel' dengan teks persis; Kembali → tidak ada POST; simpan lagi (≤ 10 menit) → dialog muncul lagi; Tetap simpan (klik ganda) → satu POST", async () => {
   await seedEarlierRepayment({});
@@ -233,4 +264,57 @@ test("galat GET daftar pelunasan shift → POST tetap jalan tanpa peringatan", a
   expect(await screen.findByText("Pelunasan tersimpan")).toBeInTheDocument();
   expect(warning()).toBeNull();
   expect(bodies).toHaveLength(1);
+});
+
+test("(fix 1) lembar dilepas saat peringatan terbuka → id yang ditahan dilepas: buka lagi, isian sama → diperiksa lagi dan peringatan muncul lagi, tanpa POST", async () => {
+  await seedEarlierRepayment({});
+  const { bodies, lists } = track();
+  const first = await openAndFill();
+  await first.user.click(first.save());
+  expect(
+    await screen.findByRole("dialog", { name: "Pelunasan mungkin dobel" }),
+  ).toBeInTheDocument();
+  expect(lists.count).toBe(1);
+  first.unmount();
+  const second = await openAndFill();
+  await second.user.click(second.save());
+  expect(
+    await screen.findByRole("dialog", { name: "Pelunasan mungkin dobel" }),
+  ).toBeInTheDocument();
+  expect(lists.count).toBe(2);
+  expect(bodies).toHaveLength(0);
+});
+
+test("(fix 2a) klik ganda 'Simpan pelunasan' saat GET daftar lambat → satu GET, satu peringatan, tanpa POST sebelum jawaban", async () => {
+  await seedEarlierRepayment({});
+  const { bodies } = track();
+  const { lists, release } = holdList();
+  const { user, save } = await openAndFill();
+  await user.dblClick(save());
+  await waitFor(() => expect(lists.count).toBe(1));
+  expect(save()).toBeDisabled();
+  expect(bodies).toHaveLength(0);
+  expect(warning()).toBeNull();
+  release();
+  expect(
+    await screen.findByRole("dialog", { name: "Pelunasan mungkin dobel" }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getAllByRole("dialog", { name: "Pelunasan mungkin dobel" }),
+  ).toHaveLength(1);
+  expect(lists.count).toBe(1);
+  expect(bodies).toHaveLength(0);
+});
+
+test("(fix 2b) lembar dilepas saat pemeriksaan berjalan → tidak ada POST dan id tertunda dilepas", async () => {
+  const { bodies } = track();
+  const { lists, release } = holdList();
+  const { user, save, unmount } = await openAndFill();
+  await user.click(save());
+  await waitFor(() => expect(lists.count).toBe(1));
+  expect(stillPending()).toBe(true);
+  unmount();
+  release();
+  await waitFor(() => expect(stillPending()).toBe(false));
+  expect(bodies).toHaveLength(0);
 });

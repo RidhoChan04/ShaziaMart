@@ -74,12 +74,24 @@ export function useSubmitRepayment(
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
-  const [duplicate, setDuplicate] = useState<DuplicatePrompt | null>(null);
+  const [duplicate, setDuplicateState] = useState<DuplicatePrompt | null>(null);
+  // Salinan untuk cleanup saat lembar dilepas (state tidak terbaca di sana).
+  const held = useRef<DuplicatePrompt | null>(null);
+  const setDuplicate = (prompt: DuplicatePrompt | null) => {
+    held.current = prompt;
+    setDuplicateState(prompt);
+  };
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
     return () => {
       mounted.current = false;
+      // Lembar dilepas saat peringatan terbuka (kunci, ganti shift): id yang ditahan dilepas,
+      // agar isian sama berikutnya tidak memakai ulang id itu dan melewati pemeriksaan.
+      if (held.current !== null) {
+        clearPendingRepaymentId(held.current.input.id);
+        held.current = null;
+      }
     };
   }, []);
 
