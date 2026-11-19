@@ -14,7 +14,8 @@ import { rootRoute } from "./root-route";
 
 // Satu modul masuk untuk seluruh app pemilik, sehingga owner tetap satu chunk.
 const loadOwner = () => import("@/features/owner");
-// Laporan dan layar toko pemilik di chunk lazy sendiri (K14), di luar `owner-`.
+// Laporan dan layar toko pemilik (termasuk tinjau kejadian) di chunk lazy sendiri (K14),
+// di luar `owner-`, agar unduhan awal pemilik tidak bertambah (S9).
 const loadLaporan = () => import("@/features/owner/laporan");
 const loadToko = () => import("@/features/owner/toko");
 
@@ -215,7 +216,7 @@ const ownerPengecualianRoute = createRoute({
     typeof search.kasirId === "string" && search.kasirId
       ? { kasirId: search.kasirId }
       : {},
-  component: lazyRouteComponent(loadOwner, "ExceptionsPage"),
+  component: lazyRouteComponent(loadToko, "ExceptionsPage"),
 });
 
 const ownerTransaksiRoute = createRoute({

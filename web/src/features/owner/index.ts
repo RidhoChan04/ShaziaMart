@@ -5,7 +5,6 @@ export { CustomerPage } from "./kasbon/customer-page";
 export { KasbonPage } from "./kasbon/kasbon-page";
 export { DebtDetailPage } from "./more/debts/debt-detail-page";
 export { DebtsPage } from "./more/debts/debts-page";
-export { ExceptionsPage } from "./more/exceptions/exceptions-page";
 export { OwnerExpiryPage } from "./more/expiry/owner-expiry-page";
 export { LainnyaPage } from "./more/lainnya-page";
 export { OpnameDetailPage } from "./more/opname/opname-detail-page";

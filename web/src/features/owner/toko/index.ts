@@ -1,5 +1,7 @@
-// Titik masuk lazy layar toko pemilik (kas, QRIS, akun kasir, pengaturan): chunk `toko-` (K14).
+// Titik masuk lazy layar toko pemilik (kas, QRIS, akun kasir, pengaturan, tinjau kejadian
+// dari Perlu perhatian): chunk `toko-` (K14), di luar unduhan awal `owner-`.
 
+export { ExceptionsPage } from "../more/exceptions/exceptions-page";
 export { AttentionAllPage } from "./attention-all-page";
 export { KasirAccountPage } from "./kasir-account-page";
 export { KasirAccountsPage } from "./kasir-accounts-page";
