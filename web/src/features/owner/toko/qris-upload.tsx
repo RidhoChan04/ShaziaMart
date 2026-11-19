@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   getGetOwnerSettingsQueryKey,
-  putOwnerQrisImage,
+  putOwnerQrisImageWithJpeg,
+  putOwnerQrisImageWithPng,
 } from "@/shared/api/gen/owner/owner";
 import { pesanError } from "@/shared/lib/error-messages";
 import { Button } from "@/shared/ui/button";
@@ -16,10 +17,13 @@ export function QrisUpload({ currentUrl }: { currentUrl: string }) {
   const [preview, setPreview] = useState<string | null>(null);
   const [brokenCurrent, setBrokenCurrent] = useState(false);
   const input = useRef<HTMLInputElement>(null);
-  // Klien hasil generate selalu mengirim image/png; server mencocokkan Content-Type dengan isi berkas.
+  // Server mencocokkan Content-Type dengan isi berkas: JPEG lewat varian JPEG, selain itu PNG
+  // (berkas yang bukan PNG ditolak server dengan 422, sama seperti berkas PNG yang rusak).
   const upload = useMutation({
     mutationFn: (image: File) =>
-      putOwnerQrisImage(image, { headers: { "Content-Type": image.type } }),
+      image.type === "image/jpeg"
+        ? putOwnerQrisImageWithJpeg(image)
+        : putOwnerQrisImageWithPng(image),
     onSuccess: (saved) => {
       queryClient.setQueryData(getGetOwnerSettingsQueryKey(), saved);
       toast.success("Gambar QRIS disimpan");

@@ -2,7 +2,9 @@
  * Kontrak F3c-2a: kas laci (kas keluar, saran modal, ambil uang), Perlu perhatian dengan ambang,
  * Pengaturan, akun kasir, Shift & kas pemilik, dan QRIS harian.
  */
+import { HttpResponse, http } from "msw";
 import { expect, expectTypeOf, test } from "vitest";
+import { server } from "@/mocks/node";
 import spec from "../../../../api/openapi.yaml?raw";
 import * as ownerApi from "./gen/owner/owner";
 import * as settingsApi from "./gen/settings/settings";
@@ -542,7 +544,9 @@ const KAS_TOKO_OPS = {
     "getOwnerSettings",
     "updateOwnerSettings",
     "getOwnerThinMarginPreview",
-    "putOwnerQrisImage",
+    // Satu fungsi per media type body (orval splitByContentType): Content-Type ikut berkas.
+    "putOwnerQrisImageWithPng",
+    "putOwnerQrisImageWithJpeg",
     "listOwnerKasirAccounts",
     "createOwnerKasirAccount",
     "updateOwnerKasirAccount",
@@ -576,6 +580,27 @@ test("operasi F3c-2a ada di klien hasil generate, di tag yang benar", () => {
     expect(shiftApi).not.toHaveProperty(id);
     expect(settingsApi).not.toHaveProperty(id);
   }
+});
+
+test("putOwnerQrisImage: kontrak menerima PNG dan JPEG; tiap varian klien mengirim Content-Type-nya", async () => {
+  const op = spec.slice(
+    spec.indexOf("operationId: putOwnerQrisImage"),
+    spec.indexOf("responses:", spec.indexOf("operationId: putOwnerQrisImage")),
+  );
+  expect(op).toContain("image/png:");
+  expect(op).toContain("image/jpeg:");
+
+  const sent: (string | null)[] = [];
+  server.use(
+    http.put("/api/owner/settings/qris-image", ({ request }) => {
+      sent.push(request.headers.get("Content-Type"));
+      return HttpResponse.json({});
+    }),
+  );
+  const image = new Blob([new Uint8Array(4)]);
+  await ownerApi.putOwnerQrisImageWithPng(image);
+  await ownerApi.putOwnerQrisImageWithJpeg(image);
+  expect(sent).toEqual(["image/png", "image/jpeg"]);
 });
 
 /** Skema berisi data pemilik F3c-2a (catatan modal, ambil uang, pembatal, QRIS, Pengaturan). */

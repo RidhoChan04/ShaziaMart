@@ -4250,7 +4250,7 @@ export function useGetOwnerThinMarginPreview<TData = Awaited<ReturnType<typeof g
 
 
 
-export const getPutOwnerQrisImageUrl = () => {
+export const getPutOwnerQrisImageWithPngUrl = () => {
 
 
 
@@ -4265,7 +4265,7 @@ export const getPutOwnerQrisImageUrl = () => {
  * OwnerSettings lengkap.
  * @summary Unggah gambar QRIS toko
  */
-export const putOwnerQrisImage = async (putOwnerQrisImageBody: Blob, options?: Parameters<typeof customFetch>[1]): Promise<OwnerSettings> => {
+export const putOwnerQrisImageWithPng = async (putOwnerQrisImageBody: Blob, options?: Parameters<typeof customFetch>[1]): Promise<OwnerSettings> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -4281,7 +4281,7 @@ export const putOwnerQrisImage = async (putOwnerQrisImageBody: Blob, options?: P
     }
     return headers;
   };
-return customFetch<OwnerSettings>(getPutOwnerQrisImageUrl(),
+return customFetch<OwnerSettings>(getPutOwnerQrisImageWithPngUrl(),
   {
     ...options,
     method: 'PUT',
@@ -4294,13 +4294,13 @@ return customFetch<OwnerSettings>(getPutOwnerQrisImageUrl(),
 
 
 
-export const getPutOwnerQrisImageMutationKey = () => ['putOwnerQrisImage'] as const;
+export const getPutOwnerQrisImageWithPngMutationKey = () => ['putOwnerQrisImageWithPng'] as const;
 
-export const getPutOwnerQrisImageMutationOptions = <TError = ErrorType<UnauthorizedResponse | ValidationFailedResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putOwnerQrisImage>>, TError,PutOwnerQrisImageMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof putOwnerQrisImage>>, TError,PutOwnerQrisImageMutationVariables, TContext> => {
+export const getPutOwnerQrisImageWithPngMutationOptions = <TError = ErrorType<UnauthorizedResponse | ValidationFailedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putOwnerQrisImageWithPng>>, TError,PutOwnerQrisImageWithPngMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof putOwnerQrisImageWithPng>>, TError,PutOwnerQrisImageWithPngMutationVariables, TContext> => {
 
-const mutationKey = getPutOwnerQrisImageMutationKey();
+const mutationKey = getPutOwnerQrisImageWithPngMutationKey();
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -4310,10 +4310,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof putOwnerQrisImage>>, PutOwnerQrisImageMutationVariables> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof putOwnerQrisImageWithPng>>, PutOwnerQrisImageWithPngMutationVariables> = (props) => {
           const {data} = props ?? {};
 
-          return  putOwnerQrisImage(data,requestOptions)
+          return  putOwnerQrisImageWithPng(data,requestOptions)
         }
 
 
@@ -4323,23 +4323,114 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type PutOwnerQrisImageMutationResult = NonNullable<Awaited<ReturnType<typeof putOwnerQrisImage>>>
-    export type PutOwnerQrisImageMutationBody = Blob
-    export type PutOwnerQrisImageMutationError = ErrorType<UnauthorizedResponse | ValidationFailedResponse>
-    export type PutOwnerQrisImageMutationVariables = {data: Blob}
+    export type PutOwnerQrisImageWithPngMutationResult = NonNullable<Awaited<ReturnType<typeof putOwnerQrisImageWithPng>>>
+    export type PutOwnerQrisImageWithPngMutationBody = Blob
+    export type PutOwnerQrisImageWithPngMutationError = ErrorType<UnauthorizedResponse | ValidationFailedResponse>
+    export type PutOwnerQrisImageWithPngMutationVariables = {data: Blob}
 
     /**
  * @summary Unggah gambar QRIS toko
  */
-export const usePutOwnerQrisImage = <TError = ErrorType<UnauthorizedResponse | ValidationFailedResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putOwnerQrisImage>>, TError,PutOwnerQrisImageMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+export const usePutOwnerQrisImageWithPng = <TError = ErrorType<UnauthorizedResponse | ValidationFailedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putOwnerQrisImageWithPng>>, TError,PutOwnerQrisImageWithPngMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof putOwnerQrisImage>>,
+        Awaited<ReturnType<typeof putOwnerQrisImageWithPng>>,
         TError,
-        PutOwnerQrisImageMutationVariables,
+        PutOwnerQrisImageWithPngMutationVariables,
         TContext
       > => {
-      return useMutation(getPutOwnerQrisImageMutationOptions(options), queryClient);
+      return useMutation(getPutOwnerQrisImageWithPngMutationOptions(options), queryClient);
+    }
+    export const getPutOwnerQrisImageWithJpegUrl = () => {
+
+
+
+
+  return `/api/owner/settings/qris-image`
+}
+
+/**
+ * PNG atau JPEG (Content-Type sesuai berkas; server memeriksa isi berkas), paling besar 1 MB;
+ * selain itu 422 VALIDATION. Gambar lama diganti; URL baru
+ * (getQrisImage) menjadi store.qrisImageUrl dan KasirSettings.qrisImageUrl. Respons =
+ * OwnerSettings lengkap.
+ * @summary Unggah gambar QRIS toko
+ */
+export const putOwnerQrisImageWithJpeg = async (putOwnerQrisImageBody: Blob, options?: Parameters<typeof customFetch>[1]): Promise<OwnerSettings> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<OwnerSettings>(getPutOwnerQrisImageWithJpegUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'image/jpeg', ...getHeaders(options?.headers) },
+    body: putOwnerQrisImageBody
+  }
+);}
+
+
+
+
+
+export const getPutOwnerQrisImageWithJpegMutationKey = () => ['putOwnerQrisImageWithJpeg'] as const;
+
+export const getPutOwnerQrisImageWithJpegMutationOptions = <TError = ErrorType<UnauthorizedResponse | ValidationFailedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putOwnerQrisImageWithJpeg>>, TError,PutOwnerQrisImageWithJpegMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof putOwnerQrisImageWithJpeg>>, TError,PutOwnerQrisImageWithJpegMutationVariables, TContext> => {
+
+const mutationKey = getPutOwnerQrisImageWithJpegMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof putOwnerQrisImageWithJpeg>>, PutOwnerQrisImageWithJpegMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  putOwnerQrisImageWithJpeg(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PutOwnerQrisImageWithJpegMutationResult = NonNullable<Awaited<ReturnType<typeof putOwnerQrisImageWithJpeg>>>
+    export type PutOwnerQrisImageWithJpegMutationBody = Blob
+    export type PutOwnerQrisImageWithJpegMutationError = ErrorType<UnauthorizedResponse | ValidationFailedResponse>
+    export type PutOwnerQrisImageWithJpegMutationVariables = {data: Blob}
+
+    /**
+ * @summary Unggah gambar QRIS toko
+ */
+export const usePutOwnerQrisImageWithJpeg = <TError = ErrorType<UnauthorizedResponse | ValidationFailedResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putOwnerQrisImageWithJpeg>>, TError,PutOwnerQrisImageWithJpegMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof putOwnerQrisImageWithJpeg>>,
+        TError,
+        PutOwnerQrisImageWithJpegMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPutOwnerQrisImageWithJpegMutationOptions(options), queryClient);
     }
     export const getListOwnerKasirAccountsUrl = () => {
 
