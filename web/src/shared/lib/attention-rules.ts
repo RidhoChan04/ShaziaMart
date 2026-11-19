@@ -12,6 +12,8 @@ export const DEFAULT_ATTENTION_RULES: AttentionRules = {
   expenseSingleMax: 50_000,
   expenseShiftMax: 150_000,
   shiftMaxHours: 12,
+  // (M-2a) Pencocokan QRIS harian aktif; false = butir QRIS belum dicocokkan tidak pernah muncul.
+  qrisDailyReconcile: true,
 };
 
 /** Selisih tutup shift yang menjadi kejadian `selisih_kas`: |d| ≥ cashDiffMin (0 tidak pernah). */

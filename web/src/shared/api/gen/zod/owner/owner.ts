@@ -84,6 +84,8 @@ export const getOwnerTodaySummaryResponseHourlyMax = 24;
 
 export const getOwnerTodaySummaryResponseAttentionExceptionsItemShortageMax = 0;
 
+export const getOwnerTodaySummaryResponseAttentionExceptionsItemLongestMinutesMin = 0;
+
 
 
 
@@ -154,13 +156,14 @@ export const GetOwnerTodaySummaryResponse = zod.object({
   "to": zod.iso.date(),
   "latestAt": zod.int(),
   "kasirId": zod.string().nullable(),
-  "kasirName": zod.string().nullable()
-}).describe('Butir Perlu perhatian satu jenis (selisih_kecil: satu kasir): semua kejadian dengan at >\nreviewedAt (tanpa batas umur kecuali selisih_kecil 7 hari). total = Σ amount, kecuali\nkas_keluar = Σ kas keluar unik yang tercakup (kejadian satuan dan kejadian shift di shift\nyang sama tidak dijumlah dua kali, K22); shortage = Σ amount yang < 0 (≤ 0); from/to =\ntanggal Asia/Jakarta kejadian tertua/terbaru; latestAt = at kejadian terbaru (dipakai upTo\nsaat ditinjau langsung, S8). selisih_kecil muncul hanya bila Σ |amount| >\nsmallShortageWeekMax (ketat). kasirId/kasirName hanya selisih_kecil (kunci butir UI\nexception-selisih_kecil-{kasirId}); jenis lain null.\n')).describe('Butir kejadian yang menumpuk sejak terakhir ditinjau (ruling R9, S6), satu per jenis\n(selisih_kecil: satu per kasir), hanya dengan count > 0. Urutan tetap (K2):\nbatal_transaksi, batal_pelunasan, kasbon_lewat_limit, batal_kas_keluar, selisih_kas,\nkas_keluar, serah_terima, shift_lama, selisih_kecil (per kasir, urut nama kasir).\n'),
+  "kasirName": zod.string().nullable(),
+  "longestMinutes": zod.int().min(getOwnerTodaySummaryResponseAttentionExceptionsItemLongestMinutesMin).nullable().describe('Hanya shift_lama — durationMinutes terbesar di butir ini; jenis lain null.')
+}).describe('Butir Perlu perhatian satu jenis (selisih_kecil: satu kasir): semua kejadian dengan at >\nreviewedAt (tanpa batas umur kecuali selisih_kecil 7 hari). total = Σ amount, kecuali\nkas_keluar = Σ kas keluar unik yang tercakup (kejadian satuan dan kejadian shift di shift\nyang sama tidak dijumlah dua kali, K22); shortage = Σ amount yang < 0 (≤ 0); from/to =\ntanggal Asia/Jakarta kejadian tertua/terbaru; latestAt = at kejadian terbaru (dipakai upTo\nsaat ditinjau langsung, S8). selisih_kecil muncul hanya bila Σ |amount| >\nsmallShortageWeekMax (ketat). kasirId/kasirName hanya selisih_kecil (kunci butir UI\nexception-selisih_kecil-{kasirId}); jenis lain null. longestMinutes hanya shift_lama =\ndurationMinutes terbesar kejadian di butir (teks "terlama {j} jam"); jenis lain null.\n')).describe('Butir kejadian yang menumpuk sejak terakhir ditinjau (ruling R9, S6), satu per jenis\n(selisih_kecil: satu per kasir), hanya dengan count > 0. Urutan tetap (K2):\nbatal_transaksi, batal_pelunasan, kasbon_lewat_limit, batal_kas_keluar, selisih_kas,\nkas_keluar, serah_terima, shift_lama, selisih_kecil (per kasir, urut nama kasir).\n'),
   "qrisUnreconciled": zod.union([zod.object({
   "count": zod.int().min(1),
   "from": zod.iso.date(),
   "to": zod.iso.date()
-}).describe('(S7, K11) Butir QRIS belum dicocokkan: hari sejak QRIS harian mulai dipakai dan sebelum hari\nini dengan total QRIS > 0 yang statusnya belum (termasuk yang totalnya berubah setelah\nditandai, K21). Hari tanpa QRIS tidak dihitung. from/to = tanggal Asia/Jakarta hari\ntertua/terbaru.\n'),zod.null()]).describe('Butir QRIS belum dicocokkan (S7); null bila tidak ada hari yang perlu dicocokkan.')
+}).describe('(S7, K11) Butir QRIS belum dicocokkan: hari sejak QRIS harian mulai dipakai dan sebelum hari\nini dengan total QRIS > 0 yang statusnya belum (termasuk yang totalnya berubah setelah\nditandai, K21). Hari tanpa QRIS tidak dihitung. from/to = tanggal Asia/Jakarta hari\ntertua/terbaru. Hanya bila AttentionRules.qrisDailyReconcile true (M-2a).\n'),zod.null()]).describe('Butir QRIS belum dicocokkan (S7); null bila tidak ada hari yang perlu dicocokkan atau\nAttentionRules.qrisDailyReconcile false. Posisinya di daftar Perlu perhatian ditentukan UI.\n')
 }).describe('Selisih kas shift tidak lagi berupa daftar hari ini: menjadi kejadian selisih_kas dan\nselisih_kecil di exceptions (S6, menumpuk sampai ditinjau).\n')
 }).describe('Semua uang integer rupiah. revenue, grossProfit, newCredit, dan avgTicket hanya menghitung\npenjualan berstatus selesai (semua field bertipe omzet hanya menghitung penjualan selesai). avgTicket = round_half_up(revenue / salesCount), 0 bila tidak ada penjualan.\n')
 
@@ -2103,8 +2106,9 @@ export const GetOwnerSettingsResponse = zod.object({
   "smallShortageWeekMax": zod.int().min(getOwnerSettingsResponseAttentionSmallShortageWeekMaxMin).max(getOwnerSettingsResponseAttentionSmallShortageWeekMaxMax),
   "expenseSingleMax": zod.int().min(getOwnerSettingsResponseAttentionExpenseSingleMaxMin).max(getOwnerSettingsResponseAttentionExpenseSingleMaxMax),
   "expenseShiftMax": zod.int().min(getOwnerSettingsResponseAttentionExpenseShiftMaxMin).max(getOwnerSettingsResponseAttentionExpenseShiftMaxMax),
-  "shiftMaxHours": zod.int().min(1).max(getOwnerSettingsResponseAttentionShiftMaxHoursMax)
-}).describe('Ambang Perlu perhatian (S2, S3, S6, K7), semua dibandingkan ketat dan dibaca saat ini (bukan\nsalinan saat kejadian). Selisih kas |d| ≥ cashDiffMin = kejadian selisih_kas; −cashDiffMin <\nd < 0 = selisih kecil, butir bila Σ satu kasir dalam 7 hari > smallShortageWeekMax; kas\nkeluar > expenseSingleMax atau Σ satu shift > expenseShiftMax = kas_keluar; shift buka >\nshiftMaxHours jam = shift_lama. Aturan murni yang sama dipakai app (shared/lib/attention-rules).\n'),
+  "shiftMaxHours": zod.int().min(1).max(getOwnerSettingsResponseAttentionShiftMaxHoursMax),
+  "qrisDailyReconcile": zod.boolean().describe('Pencocokan QRIS harian (bawaan true). false → butir QRIS belum dicocokkan tidak pernah\nmuncul (Attention.qrisUnreconciled null); daftar, rincian, dan tanda QRIS harian tetap bisa\ndipakai.\n')
+}).describe('Ambang Perlu perhatian (S2, S3, S6, K7), semua dibandingkan ketat dan dibaca saat ini (bukan\nsalinan saat kejadian). Selisih kas |d| ≥ cashDiffMin = kejadian selisih_kas; −cashDiffMin <\nd < 0 = selisih kecil, butir bila Σ satu kasir dalam 7 hari > smallShortageWeekMax; kas\nkeluar > expenseSingleMax atau Σ satu shift > expenseShiftMax = kas_keluar; shift buka >\nshiftMaxHours jam = shift_lama. qrisDailyReconcile (Pencocokan QRIS harian, bawaan aktif):\nfalse → Attention.qrisUnreconciled selalu null (endpoint QRIS harian tetap berjalan). Aturan\nmurni yang sama dipakai app (shared/lib/attention-rules).\n'),
   "ownerPhone": zod.string().min(getOwnerSettingsResponseOwnerPhoneMin).max(getOwnerSettingsResponseOwnerPhoneMax).regex(getOwnerSettingsResponseOwnerPhoneRegExp).nullable().describe('Ditampilkan di dialog alasan kasir (R11) lewat KasirSettings.ownerPhone.')
 }).describe('Pengaturan lengkap pemilik; hanya di /api/owner.')
 
@@ -2204,8 +2208,9 @@ export const UpdateOwnerSettingsBody = zod.object({
   "smallShortageWeekMax": zod.int().min(updateOwnerSettingsBodyAttentionSmallShortageWeekMaxMin).max(updateOwnerSettingsBodyAttentionSmallShortageWeekMaxMax),
   "expenseSingleMax": zod.int().min(updateOwnerSettingsBodyAttentionExpenseSingleMaxMin).max(updateOwnerSettingsBodyAttentionExpenseSingleMaxMax),
   "expenseShiftMax": zod.int().min(updateOwnerSettingsBodyAttentionExpenseShiftMaxMin).max(updateOwnerSettingsBodyAttentionExpenseShiftMaxMax),
-  "shiftMaxHours": zod.int().min(1).max(updateOwnerSettingsBodyAttentionShiftMaxHoursMax)
-}).optional().describe('Ambang Perlu perhatian (S2, S3, S6, K7), semua dibandingkan ketat dan dibaca saat ini (bukan\nsalinan saat kejadian). Selisih kas |d| ≥ cashDiffMin = kejadian selisih_kas; −cashDiffMin <\nd < 0 = selisih kecil, butir bila Σ satu kasir dalam 7 hari > smallShortageWeekMax; kas\nkeluar > expenseSingleMax atau Σ satu shift > expenseShiftMax = kas_keluar; shift buka >\nshiftMaxHours jam = shift_lama. Aturan murni yang sama dipakai app (shared/lib/attention-rules).\n'),
+  "shiftMaxHours": zod.int().min(1).max(updateOwnerSettingsBodyAttentionShiftMaxHoursMax),
+  "qrisDailyReconcile": zod.boolean().describe('Pencocokan QRIS harian (bawaan true). false → butir QRIS belum dicocokkan tidak pernah\nmuncul (Attention.qrisUnreconciled null); daftar, rincian, dan tanda QRIS harian tetap bisa\ndipakai.\n')
+}).optional().describe('Ambang Perlu perhatian (S2, S3, S6, K7), semua dibandingkan ketat dan dibaca saat ini (bukan\nsalinan saat kejadian). Selisih kas |d| ≥ cashDiffMin = kejadian selisih_kas; −cashDiffMin <\nd < 0 = selisih kecil, butir bila Σ satu kasir dalam 7 hari > smallShortageWeekMax; kas\nkeluar > expenseSingleMax atau Σ satu shift > expenseShiftMax = kas_keluar; shift buka >\nshiftMaxHours jam = shift_lama. qrisDailyReconcile (Pencocokan QRIS harian, bawaan aktif):\nfalse → Attention.qrisUnreconciled selalu null (endpoint QRIS harian tetap berjalan). Aturan\nmurni yang sama dipakai app (shared/lib/attention-rules).\n'),
   "ownerPhone": zod.string().min(updateOwnerSettingsBodyOwnerPhoneMin).max(updateOwnerSettingsBodyOwnerPhoneMax).regex(updateOwnerSettingsBodyOwnerPhoneRegExp).nullish()
 }).describe('Satu bagian per PATCH (K13): setiap bagian opsional, bagian yang dikirim harus utuh.\nownerPhone tidak dikirim = tidak berubah; null = dihapus.\n')
 
@@ -2289,8 +2294,9 @@ export const UpdateOwnerSettingsResponse = zod.object({
   "smallShortageWeekMax": zod.int().min(updateOwnerSettingsResponseAttentionSmallShortageWeekMaxMin).max(updateOwnerSettingsResponseAttentionSmallShortageWeekMaxMax),
   "expenseSingleMax": zod.int().min(updateOwnerSettingsResponseAttentionExpenseSingleMaxMin).max(updateOwnerSettingsResponseAttentionExpenseSingleMaxMax),
   "expenseShiftMax": zod.int().min(updateOwnerSettingsResponseAttentionExpenseShiftMaxMin).max(updateOwnerSettingsResponseAttentionExpenseShiftMaxMax),
-  "shiftMaxHours": zod.int().min(1).max(updateOwnerSettingsResponseAttentionShiftMaxHoursMax)
-}).describe('Ambang Perlu perhatian (S2, S3, S6, K7), semua dibandingkan ketat dan dibaca saat ini (bukan\nsalinan saat kejadian). Selisih kas |d| ≥ cashDiffMin = kejadian selisih_kas; −cashDiffMin <\nd < 0 = selisih kecil, butir bila Σ satu kasir dalam 7 hari > smallShortageWeekMax; kas\nkeluar > expenseSingleMax atau Σ satu shift > expenseShiftMax = kas_keluar; shift buka >\nshiftMaxHours jam = shift_lama. Aturan murni yang sama dipakai app (shared/lib/attention-rules).\n'),
+  "shiftMaxHours": zod.int().min(1).max(updateOwnerSettingsResponseAttentionShiftMaxHoursMax),
+  "qrisDailyReconcile": zod.boolean().describe('Pencocokan QRIS harian (bawaan true). false → butir QRIS belum dicocokkan tidak pernah\nmuncul (Attention.qrisUnreconciled null); daftar, rincian, dan tanda QRIS harian tetap bisa\ndipakai.\n')
+}).describe('Ambang Perlu perhatian (S2, S3, S6, K7), semua dibandingkan ketat dan dibaca saat ini (bukan\nsalinan saat kejadian). Selisih kas |d| ≥ cashDiffMin = kejadian selisih_kas; −cashDiffMin <\nd < 0 = selisih kecil, butir bila Σ satu kasir dalam 7 hari > smallShortageWeekMax; kas\nkeluar > expenseSingleMax atau Σ satu shift > expenseShiftMax = kas_keluar; shift buka >\nshiftMaxHours jam = shift_lama. qrisDailyReconcile (Pencocokan QRIS harian, bawaan aktif):\nfalse → Attention.qrisUnreconciled selalu null (endpoint QRIS harian tetap berjalan). Aturan\nmurni yang sama dipakai app (shared/lib/attention-rules).\n'),
   "ownerPhone": zod.string().min(updateOwnerSettingsResponseOwnerPhoneMin).max(updateOwnerSettingsResponseOwnerPhoneMax).regex(updateOwnerSettingsResponseOwnerPhoneRegExp).nullable().describe('Ditampilkan di dialog alasan kasir (R11) lewat KasirSettings.ownerPhone.')
 }).describe('Pengaturan lengkap pemilik; hanya di /api/owner.')
 
@@ -2408,8 +2414,9 @@ export const PutOwnerQrisImageResponse = zod.object({
   "smallShortageWeekMax": zod.int().min(putOwnerQrisImageResponseAttentionSmallShortageWeekMaxMin).max(putOwnerQrisImageResponseAttentionSmallShortageWeekMaxMax),
   "expenseSingleMax": zod.int().min(putOwnerQrisImageResponseAttentionExpenseSingleMaxMin).max(putOwnerQrisImageResponseAttentionExpenseSingleMaxMax),
   "expenseShiftMax": zod.int().min(putOwnerQrisImageResponseAttentionExpenseShiftMaxMin).max(putOwnerQrisImageResponseAttentionExpenseShiftMaxMax),
-  "shiftMaxHours": zod.int().min(1).max(putOwnerQrisImageResponseAttentionShiftMaxHoursMax)
-}).describe('Ambang Perlu perhatian (S2, S3, S6, K7), semua dibandingkan ketat dan dibaca saat ini (bukan\nsalinan saat kejadian). Selisih kas |d| ≥ cashDiffMin = kejadian selisih_kas; −cashDiffMin <\nd < 0 = selisih kecil, butir bila Σ satu kasir dalam 7 hari > smallShortageWeekMax; kas\nkeluar > expenseSingleMax atau Σ satu shift > expenseShiftMax = kas_keluar; shift buka >\nshiftMaxHours jam = shift_lama. Aturan murni yang sama dipakai app (shared/lib/attention-rules).\n'),
+  "shiftMaxHours": zod.int().min(1).max(putOwnerQrisImageResponseAttentionShiftMaxHoursMax),
+  "qrisDailyReconcile": zod.boolean().describe('Pencocokan QRIS harian (bawaan true). false → butir QRIS belum dicocokkan tidak pernah\nmuncul (Attention.qrisUnreconciled null); daftar, rincian, dan tanda QRIS harian tetap bisa\ndipakai.\n')
+}).describe('Ambang Perlu perhatian (S2, S3, S6, K7), semua dibandingkan ketat dan dibaca saat ini (bukan\nsalinan saat kejadian). Selisih kas |d| ≥ cashDiffMin = kejadian selisih_kas; −cashDiffMin <\nd < 0 = selisih kecil, butir bila Σ satu kasir dalam 7 hari > smallShortageWeekMax; kas\nkeluar > expenseSingleMax atau Σ satu shift > expenseShiftMax = kas_keluar; shift buka >\nshiftMaxHours jam = shift_lama. qrisDailyReconcile (Pencocokan QRIS harian, bawaan aktif):\nfalse → Attention.qrisUnreconciled selalu null (endpoint QRIS harian tetap berjalan). Aturan\nmurni yang sama dipakai app (shared/lib/attention-rules).\n'),
   "ownerPhone": zod.string().min(putOwnerQrisImageResponseOwnerPhoneMin).max(putOwnerQrisImageResponseOwnerPhoneMax).regex(putOwnerQrisImageResponseOwnerPhoneRegExp).nullable().describe('Ditampilkan di dialog alasan kasir (R11) lewat KasirSettings.ownerPhone.')
 }).describe('Pengaturan lengkap pemilik; hanya di /api/owner.')
 
@@ -2771,7 +2778,8 @@ export const CancelOwnerExpenseResponse = zod.object({
  * voidedCount > 0, atau bertanda; terbaru dulu; QrisDayList.month = bulan itu. unreconciled =
  * true: semua hari yang dihitung butir QRIS belum dicocokkan (sejak QRIS harian mulai dipakai,
  * sebelum hari ini, total > 0, status belum), lintas bulan, terlama dulu; month diabaikan dan
- * QrisDayList.month null. month bukan YYYY-MM yang sah → 422 VALIDATION.
+ * QrisDayList.month null. Tetap berjalan walau AttentionRules.qrisDailyReconcile false (hanya
+ * butir Perlu perhatiannya yang mati). month bukan YYYY-MM yang sah → 422 VALIDATION.
  * @summary Total QRIS per hari dan tanda pencocokan (Lainnya > QRIS harian)
  */
 export const listOwnerQrisDaysQueryMonthRegExp = new RegExp('^\\d{4}-(0[1-9]|1[0-2])$');

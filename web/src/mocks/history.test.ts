@@ -175,7 +175,7 @@ describe("riwayat 63 hari", () => {
     for (const size of sizes) expect(size).toBeLessThan(4_000_000);
   });
 
-  test("(T2b) setiap penjualan riwayat punya shiftId shift tutup kasirnya yang memuat jamnya; shift tumpang 13.00–13.05 tidak dipakai menebak", () => {
+  test("(T2b) setiap penjualan riwayat punya shiftId shift tutup kasirnya yang memuat jamnya; serah terima 13.00 tidak dipakai menebak", () => {
     const shifts = new Map(state.closedShifts.map((c) => [c.shiftId, c]));
     expect(shifts.size).toBe(state.closedShifts.length);
     for (const s of state.sales) {

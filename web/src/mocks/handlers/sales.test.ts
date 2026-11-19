@@ -588,6 +588,7 @@ describe("kasbon lewat limit dengan alasan (ruling R3)", () => {
         latestAt: Date.now(),
         kasirId: null,
         kasirName: null,
+        longestMinutes: null,
       },
     ]);
   });

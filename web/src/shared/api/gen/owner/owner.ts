@@ -5260,7 +5260,8 @@ export const useCancelOwnerExpense = <TError = ErrorType<UnauthorizedResponse | 
  * voidedCount > 0, atau bertanda; terbaru dulu; QrisDayList.month = bulan itu. unreconciled =
  * true: semua hari yang dihitung butir QRIS belum dicocokkan (sejak QRIS harian mulai dipakai,
  * sebelum hari ini, total > 0, status belum), lintas bulan, terlama dulu; month diabaikan dan
- * QrisDayList.month null. month bukan YYYY-MM yang sah → 422 VALIDATION.
+ * QrisDayList.month null. Tetap berjalan walau AttentionRules.qrisDailyReconcile false (hanya
+ * butir Perlu perhatiannya yang mati). month bukan YYYY-MM yang sah → 422 VALIDATION.
  * @summary Total QRIS per hari dan tanda pencocokan (Lainnya > QRIS harian)
  */
 export const listOwnerQrisDays = async (params?: ListOwnerQrisDaysParams, options?: Parameters<typeof customFetch>[1]): Promise<QrisDayList> => {

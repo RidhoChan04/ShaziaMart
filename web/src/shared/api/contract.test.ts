@@ -889,6 +889,7 @@ test("pengecualian & transaksi pemilik: bentuk key lengkap", () => {
     | "latestAt"
     | "kasirId"
     | "kasirName"
+    | "longestMinutes"
   >();
   expectTypeOf<keyof CashierException>().toEqualTypeOf<
     | "id"

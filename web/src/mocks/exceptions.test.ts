@@ -309,6 +309,7 @@ describe("exceptionAttention & reviewExceptions (ruling R9)", () => {
         latestAt: Date.UTC(2026, 10, 4, 17, 30),
         kasirId: null,
         kasirName: null,
+        longestMinutes: null,
       },
       {
         kind: "batal_pelunasan",
@@ -320,6 +321,7 @@ describe("exceptionAttention & reviewExceptions (ruling R9)", () => {
         latestAt: NOW - HOUR,
         kasirId: null,
         kasirName: null,
+        longestMinutes: null,
       },
       {
         kind: "kasbon_lewat_limit",
@@ -331,6 +333,7 @@ describe("exceptionAttention & reviewExceptions (ruling R9)", () => {
         latestAt: NOW - HOUR,
         kasirId: null,
         kasirName: null,
+        longestMinutes: null,
       },
     ]);
   });
@@ -354,6 +357,7 @@ describe("exceptionAttention & reviewExceptions (ruling R9)", () => {
         latestAt: NOW - HOUR,
         kasirId: null,
         kasirName: null,
+        longestMinutes: null,
       },
     ]);
     reviewExceptions(s, "batal_transaksi", NOW + DAY_MS, NOW);

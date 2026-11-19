@@ -26,6 +26,7 @@ import type {
   QrisDayDetail,
   QrisDayList,
   QrisUnreconciled,
+  Shift,
   ShiftClosure,
   ThinMarginPreview,
 } from "./gen/shaziaMartAPI.schemas";
@@ -49,11 +50,14 @@ import {
 import { GetKasirSettingsResponse } from "./gen/zod/settings/settings";
 import {
   CancelShiftExpenseBody,
+  CloseShiftResponse,
   CreateShiftExpenseBody,
   CreateShiftExpenseResponse,
+  GetCurrentShiftResponse,
   GetOpeningSuggestionResponse,
   ListShiftExpensesResponseItem,
   OpenShiftBody,
+  OpenShiftResponse,
 } from "./gen/zod/shift/shift";
 
 /** Key milik pemilik yang tidak pernah boleh ada di respons kasir (K-AKSES). */
@@ -116,6 +120,32 @@ test("respons kasir baru hanya key allowlist; tanpa data pemilik (openingNote, o
   }
 });
 
+test("Shift kasir (openShift, getCurrentShift) tanpa saran, catatan modal, atau data pemilik", () => {
+  expectTypeOf<keyof Shift>().toEqualTypeOf<
+    "id" | "kasirId" | "kasirName" | "openedAt" | "openingCash"
+  >();
+  expectTypeOf<Required<Shift>>().toEqualTypeOf<Shift>();
+  const current = GetCurrentShiftResponse.shape.shift.options[0];
+  for (const [name, keys] of [
+    ["openShift", Object.keys(OpenShiftResponse.shape)],
+    ["getCurrentShift", Object.keys(current.shape)],
+  ] as const) {
+    expect(keys, name).toEqual([
+      "id",
+      "kasirId",
+      "kasirName",
+      "openedAt",
+      "openingCash",
+    ]);
+  }
+  // Tutup shift kasir: angka laci saja, tanpa rincian pemilik.
+  expect(
+    Object.keys(CloseShiftResponse.shape).filter((k) =>
+      OWNER_ONLY_KEYS.includes(k),
+    ),
+  ).toEqual([]);
+});
+
 test("rekaman pemilik membawa data pembatal; kasir hanya status", () => {
   expectTypeOf<keyof OwnerDrawerExpense>().toEqualTypeOf<
     keyof DrawerExpense | "cancelled" | "cancellable"
@@ -150,7 +180,7 @@ test("ShiftClosure: kas keluar & ambil uang pemilik masuk rumus laci; rincian sh
   expectTypeOf<ShiftClosure["ownerTakes"]>().toEqualTypeOf<number>();
   expectTypeOf<Required<ShiftClosure>>().toEqualTypeOf<ShiftClosure>();
   expectTypeOf<keyof OwnerShiftDetail>().toEqualTypeOf<
-    | Exclude<keyof ShiftClosure, never>
+    | keyof ShiftClosure
     | "kasirName"
     | "openedAt"
     | "closedAt"
@@ -253,6 +283,10 @@ test("ExceptionKind: tiga jenis F3c-1 di depan, lalu enam jenis baru (K2)", () =
     | "latestAt"
     | "kasirId"
     | "kasirName"
+    | "longestMinutes"
+  >();
+  expectTypeOf<ExceptionAttention["longestMinutes"]>().toEqualTypeOf<
+    number | null
   >();
   expectTypeOf<
     Required<ExceptionAttention>
@@ -362,7 +396,9 @@ test("Pengaturan pemilik: bagian lengkap, PATCH per bagian, tanpa qrisImageUrl d
     | "expenseSingleMax"
     | "expenseShiftMax"
     | "shiftMaxHours"
+    | "qrisDailyReconcile"
   >();
+  expectTypeOf<AttentionRules["qrisDailyReconcile"]>().toEqualTypeOf<boolean>();
   expectTypeOf<keyof ThinMarginPreview>().toEqualTypeOf<"flagged" | "total">();
   const parse = (b: unknown) => UpdateOwnerSettingsBody.safeParse(b).success;
   expect(parse({})).toBe(true);
@@ -381,6 +417,7 @@ test("Pengaturan pemilik: bagian lengkap, PATCH per bagian, tanpa qrisImageUrl d
     expenseSingleMax: 50_000,
     expenseShiftMax: 150_000,
     shiftMaxHours: 12,
+    qrisDailyReconcile: true,
   };
   expect(parse({ attention })).toBe(true);
   expect(parse({ attention: { ...attention, shiftMaxHours: 25 } })).toBe(false);

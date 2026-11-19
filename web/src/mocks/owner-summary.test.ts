@@ -336,6 +336,7 @@ describe("Perlu perhatian: pengecualian kasir (ruling R9)", () => {
         latestAt: at(TODAY, 10),
         kasirId: null,
         kasirName: null,
+        longestMinutes: null,
       },
     ]);
     const { exceptions: _a, ...oldAfter } = after;

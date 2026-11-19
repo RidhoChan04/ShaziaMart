@@ -227,7 +227,7 @@ export interface HourBucket {
  * (S7, K11) Butir QRIS belum dicocokkan: hari sejak QRIS harian mulai dipakai dan sebelum hari
  * ini dengan total QRIS > 0 yang statusnya belum (termasuk yang totalnya berubah setelah
  * ditandai, K21). Hari tanpa QRIS tidak dihitung. from/to = tanggal Asia/Jakarta hari
- * tertua/terbaru.
+ * tertua/terbaru. Hanya bila AttentionRules.qrisDailyReconcile true (M-2a).
  */
 export interface QrisUnreconciled {
   /** @minimum 1 */
@@ -362,7 +362,8 @@ export const ExceptionKind = {
  * tanggal Asia/Jakarta kejadian tertua/terbaru; latestAt = at kejadian terbaru (dipakai upTo
  * saat ditinjau langsung, S8). selisih_kecil muncul hanya bila Σ |amount| >
  * smallShortageWeekMax (ketat). kasirId/kasirName hanya selisih_kecil (kunci butir UI
- * exception-selisih_kecil-{kasirId}); jenis lain null.
+ * exception-selisih_kecil-{kasirId}); jenis lain null. longestMinutes hanya shift_lama =
+ * durationMinutes terbesar kejadian di butir (teks "terlama {j} jam"); jenis lain null.
  */
 export interface ExceptionAttention {
   kind: ExceptionKind;
@@ -378,6 +379,12 @@ export interface ExceptionAttention {
   kasirId: string | null;
   /** @nullable */
   kasirName: string | null;
+  /**
+     * Hanya shift_lama — durationMinutes terbesar di butir ini; jenis lain null.
+     * @minimum 0
+     * @nullable
+     */
+  longestMinutes: number | null;
 }
 
 /**
@@ -421,7 +428,10 @@ export interface Attention {
      * kas_keluar, serah_terima, shift_lama, selisih_kecil (per kasir, urut nama kasir).
      */
   exceptions: ExceptionAttention[];
-  /** Butir QRIS belum dicocokkan (S7); null bila tidak ada hari yang perlu dicocokkan. */
+  /**
+     * Butir QRIS belum dicocokkan (S7); null bila tidak ada hari yang perlu dicocokkan atau
+     * AttentionRules.qrisDailyReconcile false. Posisinya di daftar Perlu perhatian ditentukan UI.
+     */
   qrisUnreconciled: QrisUnreconciled | null;
 }
 
@@ -3139,7 +3149,9 @@ export interface ReportSettings {
  * salinan saat kejadian). Selisih kas |d| ≥ cashDiffMin = kejadian selisih_kas; −cashDiffMin <
  * d < 0 = selisih kecil, butir bila Σ satu kasir dalam 7 hari > smallShortageWeekMax; kas
  * keluar > expenseSingleMax atau Σ satu shift > expenseShiftMax = kas_keluar; shift buka >
- * shiftMaxHours jam = shift_lama. Aturan murni yang sama dipakai app (shared/lib/attention-rules).
+ * shiftMaxHours jam = shift_lama. qrisDailyReconcile (Pencocokan QRIS harian, bawaan aktif):
+ * false → Attention.qrisUnreconciled selalu null (endpoint QRIS harian tetap berjalan). Aturan
+ * murni yang sama dipakai app (shared/lib/attention-rules).
  */
 export interface AttentionRules {
   /**
@@ -3167,6 +3179,12 @@ export interface AttentionRules {
      * @maximum 24
      */
   shiftMaxHours: number;
+  /**
+     * Pencocokan QRIS harian (bawaan true). false → butir QRIS belum dicocokkan tidak pernah
+     * muncul (Attention.qrisUnreconciled null); daftar, rincian, dan tanda QRIS harian tetap bisa
+     * dipakai.
+     */
+  qrisDailyReconcile: boolean;
 }
 
 /**

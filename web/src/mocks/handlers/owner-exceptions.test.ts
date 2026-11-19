@@ -81,6 +81,7 @@ describe("listOwnerExceptions & reviewOwnerExceptions (ruling R9)", () => {
         latestAt: NOW + MIN,
         kasirId: null,
         kasirName: null,
+        longestMinutes: null,
       },
     ]);
 

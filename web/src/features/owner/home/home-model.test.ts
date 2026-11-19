@@ -629,6 +629,7 @@ describe("attentionItems: pengecualian kasir (ruling R9)", () => {
       latestAt: 1,
       kasirId: null,
       kasirName: null,
+      longestMinutes: null,
     },
     {
       kind: "batal_pelunasan",
@@ -640,6 +641,7 @@ describe("attentionItems: pengecualian kasir (ruling R9)", () => {
       latestAt: 1,
       kasirId: null,
       kasirName: null,
+      longestMinutes: null,
     },
     {
       kind: "kasbon_lewat_limit",
@@ -651,6 +653,7 @@ describe("attentionItems: pengecualian kasir (ruling R9)", () => {
       latestAt: 1,
       kasirId: null,
       kasirName: null,
+      longestMinutes: null,
     },
   ];
 

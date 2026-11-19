@@ -182,7 +182,7 @@ paths:
           content:
             application/problem+json:
               schema:
-                oneOf:
+                anyOf:
                   - $ref: "#/components/schemas/Problem"
                   - $ref: "#/components/schemas/OpeningMismatchProblem"
   /api/shifts/opening-suggestion:
@@ -2397,7 +2397,8 @@ paths:
         voidedCount > 0, atau bertanda; terbaru dulu; QrisDayList.month = bulan itu. unreconciled =
         true: semua hari yang dihitung butir QRIS belum dicocokkan (sejak QRIS harian mulai dipakai,
         sebelum hari ini, total > 0, status belum), lintas bulan, terlama dulu; month diabaikan dan
-        QrisDayList.month null. month bukan YYYY-MM yang sah → 422 VALIDATION.
+        QrisDayList.month null. Tetap berjalan walau AttentionRules.qrisDailyReconcile false (hanya
+        butir Perlu perhatiannya yang mati). month bukan YYYY-MM yang sah → 422 VALIDATION.
       security:
         - ownerCookieAuth: []
       parameters:
@@ -3725,7 +3726,7 @@ components:
         (S7, K11) Butir QRIS belum dicocokkan: hari sejak QRIS harian mulai dipakai dan sebelum hari
         ini dengan total QRIS > 0 yang statusnya belum (termasuk yang totalnya berubah setelah
         ditandai, K21). Hari tanpa QRIS tidak dihitung. from/to = tanggal Asia/Jakarta hari
-        tertua/terbaru.
+        tertua/terbaru. Hanya bila AttentionRules.qrisDailyReconcile true (M-2a).
       required: [count, from, to]
       properties:
         count:
@@ -3808,7 +3809,9 @@ components:
             $ref: "#/components/schemas/ExceptionAttention"
         qrisUnreconciled:
           nullable: true
-          description: Butir QRIS belum dicocokkan (S7); null bila tidak ada hari yang perlu dicocokkan.
+          description: |
+            Butir QRIS belum dicocokkan (S7); null bila tidak ada hari yang perlu dicocokkan atau
+            AttentionRules.qrisDailyReconcile false. Posisinya di daftar Perlu perhatian ditentukan UI.
           allOf:
             - $ref: "#/components/schemas/QrisUnreconciled"
     SupplierDebtAttention:
@@ -4975,8 +4978,9 @@ components:
         tanggal Asia/Jakarta kejadian tertua/terbaru; latestAt = at kejadian terbaru (dipakai upTo
         saat ditinjau langsung, S8). selisih_kecil muncul hanya bila Σ |amount| >
         smallShortageWeekMax (ketat). kasirId/kasirName hanya selisih_kecil (kunci butir UI
-        exception-selisih_kecil-{kasirId}); jenis lain null.
-      required: [kind, count, total, shortage, from, to, latestAt, kasirId, kasirName]
+        exception-selisih_kecil-{kasirId}); jenis lain null. longestMinutes hanya shift_lama =
+        durationMinutes terbesar kejadian di butir (teks "terlama {j} jam"); jenis lain null.
+      required: [kind, count, total, shortage, from, to, latestAt, kasirId, kasirName, longestMinutes]
       properties:
         kind:
           $ref: "#/components/schemas/ExceptionKind"
@@ -5003,6 +5007,11 @@ components:
         kasirName:
           type: string
           nullable: true
+        longestMinutes:
+          type: integer
+          nullable: true
+          minimum: 0
+          description: Hanya shift_lama — durationMinutes terbesar di butir ini; jenis lain null.
     OwnerExceptionList:
       type: object
       required: [kind, reviewedAt, items]
@@ -7060,8 +7069,10 @@ components:
         salinan saat kejadian). Selisih kas |d| ≥ cashDiffMin = kejadian selisih_kas; −cashDiffMin <
         d < 0 = selisih kecil, butir bila Σ satu kasir dalam 7 hari > smallShortageWeekMax; kas
         keluar > expenseSingleMax atau Σ satu shift > expenseShiftMax = kas_keluar; shift buka >
-        shiftMaxHours jam = shift_lama. Aturan murni yang sama dipakai app (shared/lib/attention-rules).
-      required: [cashDiffMin, smallShortageWeekMax, expenseSingleMax, expenseShiftMax, shiftMaxHours]
+        shiftMaxHours jam = shift_lama. qrisDailyReconcile (Pencocokan QRIS harian, bawaan aktif):
+        false → Attention.qrisUnreconciled selalu null (endpoint QRIS harian tetap berjalan). Aturan
+        murni yang sama dipakai app (shared/lib/attention-rules).
+      required: [cashDiffMin, smallShortageWeekMax, expenseSingleMax, expenseShiftMax, shiftMaxHours, qrisDailyReconcile]
       properties:
         cashDiffMin:
           type: integer
@@ -7083,6 +7094,12 @@ components:
           type: integer
           minimum: 1
           maximum: 24
+        qrisDailyReconcile:
+          type: boolean
+          description: |
+            Pencocokan QRIS harian (bawaan true). false → butir QRIS belum dicocokkan tidak pernah
+            muncul (Attention.qrisUnreconciled null); daftar, rincian, dan tanda QRIS harian tetap bisa
+            dipakai.
     OwnerSettings:
       type: object
       description: Pengaturan lengkap pemilik; hanya di /api/owner.

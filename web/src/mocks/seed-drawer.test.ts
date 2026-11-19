@@ -7,6 +7,7 @@ import {
   jakartaIsoDate,
 } from "@/shared/lib/business-day";
 import type { MockClosedShift, MockState } from "./db";
+import { HISTORY_DAYS } from "./history";
 import { createSeedState } from "./seed-data";
 import { SEED_OPENING_CASH } from "./seed-drawer";
 
@@ -35,13 +36,22 @@ const expensesOf = (c: MockClosedShift) =>
   state.drawerExpenses.filter((e) => e.shiftId === c.shiftId);
 
 describe("(K17) setoran pemilik di sela shift riwayat", () => {
-  test("saran modal seed = Rp200.000 di 14 hari bisnis berturut-turut", () => {
-    for (let i = 0; i < 14; i++) {
-      expect(suggestion(createSeedState(NOW + i * DAY_MS))).toBe(
-        SEED_OPENING_CASH,
+  test(`saran modal seed = Rp200.000 dan setiap shift riwayat punya setoran, untuk ${HISTORY_DAYS} hari bisnis berturut-turut (seluruh rentang riwayat)`, () => {
+    for (let i = 0; i < HISTORY_DAYS; i++) {
+      // createSeedState melempar bila satu shift tutup dengan uang fisik ≤ modal (setoran hilang).
+      const s = createSeedState(NOW + i * DAY_MS);
+      expect(suggestion(s)).toBe(SEED_OPENING_CASH);
+      const closed = [...s.closedShifts].sort(
+        (a, b) => a.closedAt - b.closedAt,
       );
+      expect(s.cashTakes.filter((t) => t.shiftId === null)).toHaveLength(
+        closed.length,
+      );
+      for (const c of closed.slice(1)) {
+        expect(c.suggestedOpening).toBe(SEED_OPENING_CASH);
+      }
     }
-  });
+  }, 60_000);
 
   test("setiap shift tutup diikuti setoran countedCash − 200.000; terpakai shift berikutnya, yang terakhir belum", () => {
     const handover = state.cashTakes.filter((t) => t.shiftId === null);
@@ -56,6 +66,13 @@ describe("(K17) setoran pemilik di sela shift riwayat", () => {
         consumedByShiftId: byClose[i + 1]?.shiftId ?? null,
         cancelledAt: null,
       });
+      // Setoran tercatat setelah shift tutup dan sebelum (paling lambat bersamaan) shift berikutnya buka.
+      const next = byClose[i + 1];
+      if (next) expect(take?.at).toBeLessThanOrEqual(next.openedAt);
+    });
+    // Tidak ada dua shift yang buka bersamaan.
+    byClose.slice(1).forEach((c, i) => {
+      expect(c.openedAt).toBeGreaterThanOrEqual(byClose[i]?.closedAt ?? 0);
     });
   });
 
@@ -204,6 +221,7 @@ describe("(K11) QRIS harian seed", () => {
       expenseSingleMax: 50_000,
       expenseShiftMax: 150_000,
       shiftMaxHours: 12,
+      qrisDailyReconcile: true,
     });
     expect(state.defaultCreditLimit).toBe(500_000);
     expect(state.settings.ownerPhone).toBe("0812-3456-7890");

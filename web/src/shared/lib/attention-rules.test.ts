@@ -18,6 +18,7 @@ test("ambang bawaan (S2/S3/S6)", () => {
     expenseSingleMax: 50_000,
     expenseShiftMax: 150_000,
     shiftMaxHours: 12,
+    qrisDailyReconcile: true,
   });
 });
 

@@ -108,7 +108,11 @@ export function createDrawerSeed(
   };
 }
 
-/** Jam tutup shift riwayat: 5 menit setelah jam tutup, kecuali contoh shift kelamaan (S3). */
+/**
+ * Jam tutup shift riwayat. Shift pagi (Rina) tutup tepat di jam buka shift sore, sehingga setoran sela
+ * tercatat sebelum (paling lambat bersamaan dengan) shift berikutnya dibuka; shift sore tutup 5 menit
+ * setelah jamnya, kecuali contoh shift kelamaan (S3).
+ */
 export function seedClosedAt(
   back: number,
   kasirName: KasirName,
@@ -119,7 +123,8 @@ export function seedClosedAt(
   if (back === LONG_SHIFT.back && kasirName === LONG_SHIFT.kasir) {
     return openedAt + LONG_SHIFT.hours * HOUR_MS;
   }
-  return day.start + closeHour * HOUR_MS + 5 * MINUTE_MS;
+  const handover = kasirName === "Rina" ? 0 : 5 * MINUTE_MS;
+  return day.start + closeHour * HOUR_MS + handover;
 }
 
 /**
@@ -137,6 +142,9 @@ export function openSeedShift(
   openingNote: string | null;
 } {
   const take = seed.pendingTake;
+  if (seed.prevCounted !== null && take === null) {
+    throw new Error("Seed: shift sebelumnya tanpa setoran sela");
+  }
   const suggestedOpening =
     seed.prevCounted === null
       ? null
@@ -286,9 +294,10 @@ export function seedShiftCash(
 }
 
 /**
- * (K17) Setelah shift tutup: pemilik menyetor `countedCash − 200.000` dari laci (di sela shift,
- * terpakai shift berikutnya; yang terakhir belum terpakai). Shift riwayat Rina 06.00–13.05 dan
- * Budi 13.00–21.05 tumpang 5 menit: setoran sela dicatat tepat di jam tutup.
+ * (K17) Setelah shift tutup: pemilik menyetor `countedCash − 200.000` dari laci tepat di jam tutup
+ * (di sela shift, terpakai shift berikutnya; yang terakhir belum terpakai), sehingga saran modal
+ * selalu Rp200.000. Uang fisik ≤ Rp200.000 melanggar invarian itu → seed gagal keras, tidak dilewati
+ * diam-diam (diuji untuk seluruh rentang riwayat).
  */
 export function closeSeedShift(
   state: MockState,
@@ -299,8 +308,9 @@ export function closeSeedShift(
   seed.prevCounted = countedCash;
   const amount = countedCash - SEED_OPENING_CASH;
   if (amount < 1) {
-    seed.pendingTake = null;
-    return;
+    throw new Error(
+      `Seed: uang fisik shift ${countedCash} tidak melebihi modal ${SEED_OPENING_CASH}`,
+    );
   }
   const take = newTake(state, seed, {
     at: closedAt,

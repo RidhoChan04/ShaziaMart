@@ -183,6 +183,10 @@ export function exceptionAttention(
         latestAt: newest.at,
         kasirId: null,
         kasirName: null,
+        longestMinutes:
+          kind === "shift_lama"
+            ? Math.max(...items.map((e) => e.durationMinutes ?? 0))
+            : null,
       },
     ];
   });

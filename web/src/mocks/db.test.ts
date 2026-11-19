@@ -242,10 +242,17 @@ test("state v7 di localStorage → seed v10 dengan shiftId & data batal penjuala
     const s = mockDb.get();
     expect(s.version).toBe(10);
     expect(s.store.name).toBe("ShaziaMart");
-    expect(s.exceptionReviews).toMatchObject({
+    // F3c-1 belum pernah ditinjau; (K20) jenis F3c-2a ditinjau sampai 2 hari sebelum seed.
+    expect(s.exceptionReviews).toEqual({
       batal_transaksi: null,
       batal_pelunasan: null,
       kasbon_lewat_limit: null,
+      batal_kas_keluar: expect.any(Number),
+      selisih_kas: expect.any(Number),
+      kas_keluar: expect.any(Number),
+      serah_terima: expect.any(Number),
+      shift_lama: expect.any(Number),
+      selisih_kecil: null,
     });
     expect(s.sales.every((x) => typeof x.shiftId === "string")).toBe(true);
     expect(s.sales.every((x) => x.voidRefund === null)).toBe(true);
@@ -324,6 +331,7 @@ test("(K16) state v9 di localStorage → seed v10 dengan laci F3c-2a, ambang Per
       expenseSingleMax: 50_000,
       expenseShiftMax: 150_000,
       shiftMaxHours: 12,
+      qrisDailyReconcile: true,
     });
     expect(s.defaultCreditLimit).toBe(500_000);
     expect(s.settings.ownerPhone).toBe("0812-3456-7890");

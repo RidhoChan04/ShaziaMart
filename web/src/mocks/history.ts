@@ -147,7 +147,10 @@ function payFor(ctx: Ctx, at: number, total: number) {
   };
 }
 
-/** Shift pagi (Rina 06.00–13.05) dan sore (Budi 13.00–21.05); tumpang 5 menit. */
+/**
+ * Shift pagi (Rina 06.00–13.00) dan sore (Budi 13.00–21.05); serah terima di 13.00 (setoran pemilik
+ * dicatat saat shift pagi tutup, `seed-drawer.ts`).
+ */
 const SHIFTS = [
   ["Rina", 6, 13],
   ["Budi", 13, 21],

@@ -194,7 +194,11 @@ test("ID unik di seluruh state", () => {
     ...s.products.flatMap((p) => [p.id, ...p.units.map((u) => u.id)]),
     ...s.creditLedger.map((e) => e.id),
     ...s.creditPayments.map((p) => p.id),
+    ...s.drawerExpenses.map((e) => e.id),
+    ...s.cashTakes.map((t) => t.id),
   ];
+  expect(s.drawerExpenses.length).toBeGreaterThan(0);
+  expect(s.cashTakes.length).toBeGreaterThan(0);
   expect(new Set(ids).size).toBe(ids.length);
 });
 
