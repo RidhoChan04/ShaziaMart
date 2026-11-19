@@ -79,11 +79,12 @@ test("kas keluar dan ambil uang: baris jam · alasan/catatan dengan −Rp; yang 
   await openShift(rina, "Shift Rina");
   const expenses = region("Kas keluar").getAllByRole("listitem");
   expect(expenses).toHaveLength(2);
-  expect(expenses[0]).toHaveTextContent("09.20 · Beli es batu−Rp15.000");
-  expect(expenses[1]).toHaveTextContent("11.40 · Bayar iuran sampah−Rp20.000");
+  // Terbaru dulu (mockup final, layar 5 dan 8); urutan server tidak diubah.
+  expect(expenses[0]).toHaveTextContent("11.40 · Bayar iuran sampah−Rp20.000");
+  expect(expenses[1]).toHaveTextContent("09.20 · Beli es batu−Rp15.000");
   const takes = region("Diambil pemilik").getAllByRole("listitem");
   expect(takes).toHaveLength(2);
-  const [cancelledTake, activeTake] = takes as [HTMLElement, HTMLElement];
+  const [activeTake, cancelledTake] = takes as [HTMLElement, HTMLElement];
   expect(cancelledTake).toHaveTextContent("12.25 · Salah nominal−Rp100.000");
   expect(cancelledTake).toHaveTextContent("Dibatalkan");
   expect(cancelledTake).toHaveTextContent("Salah nominal · Pak Ahmad · 12.28");
@@ -147,11 +148,11 @@ test("S10 shift tutup: Batalkan kas keluar → alasan wajib, keterangan laci tid
   await user.click(confirm);
   expect(await screen.findByText("Kas keluar dibatalkan")).toBeInTheDocument();
   await waitFor(() =>
-    expect(region("Kas keluar").getAllByRole("listitem")[1]).toHaveTextContent(
+    expect(region("Kas keluar").getAllByRole("listitem")[0]).toHaveTextContent(
       "Dibatalkan",
     ),
   );
-  const row = region("Kas keluar").getAllByRole("listitem")[1] as HTMLElement;
+  const row = region("Kas keluar").getAllByRole("listitem")[0] as HTMLElement;
   expect(row).toHaveTextContent(
     "Iuran dibayar Pak Ahmad sendiri · Pak Ahmad · 20.15",
   );
@@ -272,4 +273,80 @@ test("shift tidak ditemukan: pesan galat dan Coba lagi", async () => {
     "Data tidak ditemukan",
   );
   expect(screen.getByRole("button", { name: "Coba lagi" })).toBeInTheDocument();
+});
+
+test("setelah batal berhasil fokus ke judul; menutup lembar item lain dengan Tutup mengembalikan fokus ke barisnya", async () => {
+  const { rina } = await seedDay();
+  const { user } = await openShift(rina, "Shift Rina");
+  await user.click(screen.getByRole("button", { name: /Bayar iuran sampah/ }));
+  const sheet = await screen.findByRole("dialog", {
+    name: "Kas keluar Rp20.000",
+  });
+  await user.click(
+    within(sheet).getByRole("button", { name: "Batalkan kas keluar" }),
+  );
+  const dialog = await screen.findByRole("alertdialog");
+  await user.type(
+    within(dialog).getByRole("textbox", { name: "Alasan" }),
+    "Salah",
+  );
+  await user.click(
+    within(dialog).getByRole("button", { name: "Batalkan kas keluar" }),
+  );
+  await screen.findByText("Kas keluar dibatalkan");
+  await waitFor(() =>
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Shift Rina" }),
+    ).toHaveFocus(),
+  );
+  const other = screen.getByRole("button", { name: /Beli es batu/ });
+  await user.click(other);
+  const sheet2 = await screen.findByRole("dialog", {
+    name: "Kas keluar Rp15.000",
+  });
+  await user.click(within(sheet2).getByRole("button", { name: "Tutup" }));
+  await waitFor(() => expect(other).toHaveFocus());
+});
+
+test("409 lalu muat ulang gagal: pesan galat dan tombol batal hilang (tidak diam)", async () => {
+  const { rina } = await seedDay();
+  const { user } = await openShift(rina, "Shift Rina");
+  await user.click(screen.getByRole("button", { name: /Bayar iuran sampah/ }));
+  const sheet = await screen.findByRole("dialog", {
+    name: "Kas keluar Rp20.000",
+  });
+  server.use(
+    http.post("/api/owner/expenses/:id/cancel", () =>
+      HttpResponse.json(
+        {
+          type: "about:blank",
+          title: "x",
+          status: 409,
+          code: "IN_OPEN_SHIFT",
+          detail: "x",
+        },
+        {
+          status: 409,
+          headers: { "Content-Type": "application/problem+json" },
+        },
+      ),
+    ),
+    http.get("/api/owner/shifts/:id", () => HttpResponse.error()),
+  );
+  await user.click(
+    within(sheet).getByRole("button", { name: "Batalkan kas keluar" }),
+  );
+  const dialog = await screen.findByRole("alertdialog");
+  await user.type(
+    within(dialog).getByRole("textbox", { name: "Alasan" }),
+    "Salah",
+  );
+  await user.click(
+    within(dialog).getByRole("button", { name: "Batalkan kas keluar" }),
+  );
+  const notice = "Data terbaru gagal dimuat — tutup lembar ini, lalu coba lagi";
+  expect(await within(sheet).findByRole("alert")).toHaveTextContent(notice);
+  expect(
+    within(sheet).queryByRole("button", { name: "Batalkan kas keluar" }),
+  ).not.toBeInTheDocument();
 });

@@ -24,7 +24,8 @@ import {
   SheetDescription,
   SheetTitle,
 } from "@/shared/ui/sheet";
-import { refreshShifts } from "./shifts-cache";
+import { useCancelSheetState } from "./cancel-sheet-state";
+import { RELOAD_FAILED, refreshShifts } from "./shifts-cache";
 
 /** Keterangan terkunci (§12g): sudah dipakai modal shift berikutnya, atau shift tempatnya sudah tutup. */
 export function lockedTakeText(take: OwnerCashTake): string {
@@ -59,7 +60,8 @@ export function CancelTakeSheet({
   const last = useRef<OwnerCashTake | null>(null);
   if (take) last.current = take;
   const shown = take ?? last.current;
-  const succeeded = useRef(false);
+  const { succeeded, reloadFailed, reloadAfterConflict, refocus } =
+    useCancelSheetState(take?.id ?? null, client);
   const [confirm, setConfirm] = useState(false);
   const [reason, setReason] = useState("");
   const cancel = useCancelOwnerCashTake({
@@ -74,6 +76,8 @@ export function CancelTakeSheet({
       onError: (error) => {
         if (error instanceof ApiError && error.code === "CASH_TAKE_LOCKED") {
           setConfirm(false);
+          reloadAfterConflict();
+          return;
         }
         refreshShifts(client);
       },
@@ -81,12 +85,6 @@ export function CancelTakeSheet({
   });
 
   if (!shown) return null;
-  // Pemicu (baris) sudah menjadi baris dibatalkan: fokus pindah ke judul halaman.
-  const refocus = (e: Event) => {
-    if (!succeeded.current) return;
-    e.preventDefault();
-    document.querySelector<HTMLElement>("main h1")?.focus();
-  };
   const errorText =
     cancel.isError &&
     !(
@@ -95,7 +93,8 @@ export function CancelTakeSheet({
     )
       ? pesanError(cancel.error)
       : null;
-  const canCancel = shown.cancellable && shown.cancelled === null;
+  const canCancel =
+    shown.cancellable && shown.cancelled === null && !reloadFailed;
 
   return (
     <Sheet
@@ -132,6 +131,10 @@ export function CancelTakeSheet({
           >
             Batalkan pengambilan
           </Button>
+        ) : reloadFailed ? (
+          <p role="alert" className="text-[15px] font-medium text-danger">
+            {RELOAD_FAILED}
+          </p>
         ) : (
           <p className="text-[15px] text-muted">{lockedTakeText(shown)}</p>
         )}

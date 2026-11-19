@@ -384,3 +384,135 @@ test("galat memuat daftar: pesan dan Coba lagi", async () => {
   expect(await screen.findByRole("alert")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Coba lagi" })).toBeInTheDocument();
 });
+
+test("ID_TAKEN: pesan galat, id tertunda dilepas sehingga simpan berikutnya memakai id baru", async () => {
+  await seedDay();
+  const ids: string[] = [];
+  let first = true;
+  server.use(
+    http.post(TAKES, async ({ request }) => {
+      ids.push(((await request.clone().json()) as OwnerCashTakeInput).id);
+      if (!first) return;
+      first = false;
+      return HttpResponse.json(
+        {
+          type: "about:blank",
+          title: "x",
+          status: 409,
+          code: "ID_TAKEN",
+          detail: "x",
+        },
+        {
+          status: 409,
+          headers: { "Content-Type": "application/problem+json" },
+        },
+      );
+    }),
+  );
+  const { user, sheet } = await openSheet();
+  await user.type(
+    within(sheet).getByRole("textbox", { name: "Nominal" }),
+    "40000",
+  );
+  await user.click(within(sheet).getByRole("button", { name: "Simpan" }));
+  expect(await within(sheet).findByRole("alert")).toHaveTextContent(
+    "Data ini milik pengguna lain",
+  );
+  await user.click(within(sheet).getByRole("button", { name: "Simpan" }));
+  expect(
+    await screen.findByText("Pengambilan uang tercatat"),
+  ).toBeInTheDocument();
+  expect(ids).toHaveLength(2);
+  expect(ids[1]).not.toBe(ids[0]);
+});
+
+test("replay rekaman yang sudah dibatalkan: pemberitahuan belum tercatat, tanpa toast tercatat, id dilepas", async () => {
+  await seedDay();
+  const ids: string[] = [];
+  let lose = true;
+  let inner = false;
+  server.use(
+    http.post(TAKES, async ({ request }) => {
+      const body = (await request.clone().json()) as OwnerCashTakeInput;
+      if (inner) return;
+      ids.push(body.id);
+      if (!lose) return;
+      lose = false;
+      inner = true;
+      await post(TAKES, body);
+      await post(`${TAKES}/${body.id}/cancel`, { reason: "Salah" });
+      inner = false;
+      return HttpResponse.error();
+    }),
+  );
+  const { user, sheet } = await openSheet();
+  await user.type(
+    within(sheet).getByRole("textbox", { name: "Nominal" }),
+    "40000",
+  );
+  await user.click(within(sheet).getByRole("button", { name: "Simpan" }));
+  await within(sheet).findByRole("alert");
+  at(20, 17);
+  await user.click(within(sheet).getByRole("button", { name: "Simpan" }));
+  expect(
+    await within(sheet).findByText(
+      "Pengambilan ini sudah dibatalkan — simpan lagi untuk mencatat yang baru",
+    ),
+  ).toBeInTheDocument();
+  expect(
+    screen.queryByText("Pengambilan uang tercatat"),
+  ).not.toBeInTheDocument();
+  await user.click(within(sheet).getByRole("button", { name: "Simpan" }));
+  await screen.findByText("Pengambilan uang tercatat");
+  expect(ids).toHaveLength(3);
+  expect(ids[1]).toBe(ids[0]);
+  expect(ids[2]).not.toBe(ids[0]);
+});
+
+test("respons hilang, lembar ditutup lalu dibuka lagi → id sama (pemberitahuan sudah tercatat), tercatat sekali", async () => {
+  await seedDay();
+  const ids: string[] = [];
+  let lose = true;
+  let inner = false;
+  server.use(
+    http.post(TAKES, async ({ request }) => {
+      const body = (await request.clone().json()) as OwnerCashTakeInput;
+      if (inner) return;
+      ids.push(body.id);
+      if (!lose) return;
+      lose = false;
+      inner = true;
+      await post(TAKES, body);
+      inner = false;
+      return HttpResponse.error();
+    }),
+  );
+  const { user, trigger, sheet } = await openSheet();
+  await user.type(
+    within(sheet).getByRole("textbox", { name: "Nominal" }),
+    "40000",
+  );
+  const before = mockDb.get().cashTakes.length;
+  await user.click(within(sheet).getByRole("button", { name: "Simpan" }));
+  await within(sheet).findByRole("alert");
+  await user.click(within(sheet).getByRole("button", { name: "Batal" }));
+  await waitFor(() =>
+    expect(
+      screen.queryByRole("dialog", { name: "Ambil uang dari laci" }),
+    ).not.toBeInTheDocument(),
+  );
+  await user.click(trigger);
+  const again = await screen.findByRole("dialog", {
+    name: "Ambil uang dari laci",
+  });
+  const box = within(again).getByRole("textbox", { name: "Nominal" });
+  if ((box as HTMLInputElement).value === "") await user.type(box, "40000");
+  at(20, 17);
+  await user.click(within(again).getByRole("button", { name: "Simpan" }));
+  expect(
+    await screen.findByText("Pengambilan uang ini sudah tercatat sebelumnya"),
+  ).toBeInTheDocument();
+  expect(ids).toHaveLength(2);
+  expect(ids[1]).toBe(ids[0]);
+  expect(mockDb.get().cashTakes).toHaveLength(before + 1);
+});

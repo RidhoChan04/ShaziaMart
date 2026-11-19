@@ -229,7 +229,7 @@ export function ShiftDetailPage() {
         {d.expenseItems.length > 0 && (
           <Section title="Kas keluar">
             <RowList>
-              {d.expenseItems.map((e) => (
+              {[...d.expenseItems].reverse().map((e) => (
                 <ItemRow
                   key={e.id}
                   at={e.at}
@@ -245,7 +245,7 @@ export function ShiftDetailPage() {
         {d.ownerTakeItems.length > 0 && (
           <Section title="Diambil pemilik">
             <RowList>
-              {d.ownerTakeItems.map((t) => (
+              {[...d.ownerTakeItems].reverse().map((t) => (
                 <ItemRow
                   key={t.id}
                   at={t.at}

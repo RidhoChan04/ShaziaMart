@@ -24,7 +24,8 @@ import {
   SheetDescription,
   SheetTitle,
 } from "@/shared/ui/sheet";
-import { refreshShifts } from "./shifts-cache";
+import { useCancelSheetState } from "./cancel-sheet-state";
+import { RELOAD_FAILED, refreshShifts } from "./shifts-cache";
 
 /**
  * Lembar `Kas keluar {Rp}` dari baris kas keluar aktif, lalu dialog alasan wajib (S10, K10). Dari app
@@ -47,7 +48,8 @@ export function CancelExpenseSheet({
   const last = useRef<OwnerDrawerExpense | null>(null);
   if (expense) last.current = expense;
   const shown = expense ?? last.current;
-  const succeeded = useRef(false);
+  const { succeeded, reloadFailed, reloadAfterConflict, refocus } =
+    useCancelSheetState(expense?.id ?? null, client);
   const [confirm, setConfirm] = useState(false);
   const [reason, setReason] = useState("");
   const cancel = useCancelOwnerExpense({
@@ -62,6 +64,8 @@ export function CancelExpenseSheet({
       onError: (error) => {
         if (error instanceof ApiError && error.code === "IN_OPEN_SHIFT") {
           setConfirm(false);
+          reloadAfterConflict();
+          return;
         }
         refreshShifts(client);
       },
@@ -69,17 +73,13 @@ export function CancelExpenseSheet({
   });
 
   if (!shown) return null;
-  const refocus = (e: Event) => {
-    if (!succeeded.current) return;
-    e.preventDefault();
-    document.querySelector<HTMLElement>("main h1")?.focus();
-  };
   const errorText =
     cancel.isError &&
     !(cancel.error instanceof ApiError && cancel.error.code === "IN_OPEN_SHIFT")
       ? pesanError(cancel.error)
       : null;
-  const canCancel = shown.cancellable && shown.cancelled === null;
+  const canCancel =
+    shown.cancellable && shown.cancelled === null && !reloadFailed;
 
   return (
     <Sheet
@@ -114,6 +114,10 @@ export function CancelExpenseSheet({
           >
             Batalkan kas keluar
           </Button>
+        ) : reloadFailed ? (
+          <p role="alert" className="text-[15px] font-medium text-danger">
+            {RELOAD_FAILED}
+          </p>
         ) : (
           <p className="text-[15px] text-muted">
             Masih di shift yang buka — batalkan dari kasir
