@@ -1,6 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import {
+  Banknote,
   ChevronRight,
   ClipboardList,
   HandCoins,
@@ -8,7 +9,10 @@ import {
   LogOut,
   type LucideIcon,
   PackagePlus,
+  QrCode,
   ReceiptText,
+  Settings,
+  UserRound,
 } from "lucide-react";
 import {
   getGetOwnerTodaySummaryQueryKey,
@@ -139,6 +143,58 @@ export function LainnyaPage() {
                   {`${expiredCount} lewat`}
                 </span>
               )}
+              <ChevronRight
+                aria-hidden="true"
+                className="size-4 shrink-0 text-muted"
+              />
+            </Link>
+          </li>
+          <li>
+            <Link
+              to="/owner/lainnya/shift"
+              className={`${rowClass} hover:bg-bg`}
+            >
+              <RowIcon icon={Banknote} />
+              <span className="min-w-0 flex-1">Shift &amp; kas</span>
+              <ChevronRight
+                aria-hidden="true"
+                className="size-4 shrink-0 text-muted"
+              />
+            </Link>
+          </li>
+          <li>
+            <Link
+              to="/owner/lainnya/qris"
+              className={`${rowClass} hover:bg-bg`}
+            >
+              <RowIcon icon={QrCode} />
+              <span className="min-w-0 flex-1">QRIS harian</span>
+              <ChevronRight
+                aria-hidden="true"
+                className="size-4 shrink-0 text-muted"
+              />
+            </Link>
+          </li>
+          <li>
+            <Link
+              to="/owner/lainnya/kasir"
+              className={`${rowClass} hover:bg-bg`}
+            >
+              <RowIcon icon={UserRound} />
+              <span className="min-w-0 flex-1">Akun kasir</span>
+              <ChevronRight
+                aria-hidden="true"
+                className="size-4 shrink-0 text-muted"
+              />
+            </Link>
+          </li>
+          <li>
+            <Link
+              to="/owner/lainnya/pengaturan"
+              className={`${rowClass} hover:bg-bg`}
+            >
+              <RowIcon icon={Settings} />
+              <span className="min-w-0 flex-1">Pengaturan</span>
               <ChevronRight
                 aria-hidden="true"
                 className="size-4 shrink-0 text-muted"

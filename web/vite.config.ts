@@ -30,6 +30,18 @@ export default defineConfig(({ command, mode }) => {
     resolve: {
       alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
     },
+    build: {
+      rollupOptions: {
+        output: {
+          // Chunk bersama yang diturunkan Rollup dari modul `cn` diberi nama stabil
+          // agar punya anggaran sendiri di scripts/check-bundle-size.mjs.
+          chunkFileNames: (chunk) =>
+            chunk.name === "cn"
+              ? "assets/bersama-[hash].js"
+              : "assets/[name]-[hash].js",
+        },
+      },
+    },
     // Fixture .xlsx di test dimuat lewat `?inline` (data URL).
     assetsInclude: ["**/*.xlsx"],
     // Test kontrak membaca ../api/openapi.yaml?raw (di luar root web).

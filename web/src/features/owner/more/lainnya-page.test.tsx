@@ -82,3 +82,22 @@ test("baris 'Transaksi' di antara Utang supplier dan Kedaluwarsa menaut ke dafta
     .filter(Boolean);
   expect(order).toEqual(["Utang supplier", "Transaksi", "Kedaluwarsa"]);
 });
+
+test("Lainnya: baris Shift & kas, QRIS harian, Akun kasir, Pengaturan menaut ke halamannya", async () => {
+  renderApp("/owner/lainnya");
+  expect(
+    await screen.findByRole("link", { name: "Shift & kas" }),
+  ).toHaveAttribute("href", "/owner/lainnya/shift");
+  expect(screen.getByRole("link", { name: "QRIS harian" })).toHaveAttribute(
+    "href",
+    "/owner/lainnya/qris",
+  );
+  expect(screen.getByRole("link", { name: "Akun kasir" })).toHaveAttribute(
+    "href",
+    "/owner/lainnya/kasir",
+  );
+  expect(screen.getByRole("link", { name: "Pengaturan" })).toHaveAttribute(
+    "href",
+    "/owner/lainnya/pengaturan",
+  );
+});

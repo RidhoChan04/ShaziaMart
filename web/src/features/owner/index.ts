@@ -3,14 +3,6 @@
 export { BerandaPage } from "./home/beranda-page";
 export { CustomerPage } from "./kasbon/customer-page";
 export { KasbonPage } from "./kasbon/kasbon-page";
-export { CategoriesPage } from "./laporan/categories-page";
-export { LaporanPage } from "./laporan/laporan-page";
-export { OpnameProductPage } from "./laporan/opname-product-page";
-export { OpnameReportPage } from "./laporan/opname-report-page";
-export { ReportKasirPage } from "./laporan/report-kasir-page";
-export { ThinMarginPage } from "./laporan/thin-margin-page";
-export { TopProductsPage } from "./laporan/top-products-page";
-export { UnsoldPage } from "./laporan/unsold-page";
 export { DebtDetailPage } from "./more/debts/debt-detail-page";
 export { DebtsPage } from "./more/debts/debts-page";
 export { ExceptionsPage } from "./more/exceptions/exceptions-page";

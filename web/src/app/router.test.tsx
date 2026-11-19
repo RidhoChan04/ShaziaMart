@@ -173,3 +173,19 @@ test("rute /staff/masuk/baru: draf milik pengguna + langkah=bayar bertahan, lang
     langkah: "bayar",
   });
 });
+
+test("rute toko pemilik: halaman pengganti terbuka; bagian pengaturan tak dikenal → Halaman tidak ditemukan", async () => {
+  await ownerLogin();
+  renderApp("/owner/lainnya/pengaturan/toko");
+  expect(
+    await screen.findByRole("heading", { level: 1, name: "Pengaturan" }),
+  ).toBeInTheDocument();
+});
+
+test("/owner/lainnya/pengaturan/bukan → Halaman tidak ditemukan", async () => {
+  await ownerLogin();
+  renderApp("/owner/lainnya/pengaturan/bukan");
+  expect(
+    await screen.findByText("Halaman tidak ditemukan"),
+  ).toBeInTheDocument();
+});

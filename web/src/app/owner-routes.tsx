@@ -1,6 +1,7 @@
 import {
   createRoute,
   lazyRouteComponent,
+  notFound,
   type SearchSchemaInput,
 } from "@tanstack/react-router";
 import { jakartaIsoDate } from "@/shared/lib/business-day";
@@ -12,6 +13,9 @@ import { rootRoute } from "./root-route";
 
 // Satu modul masuk untuk seluruh app pemilik, sehingga owner tetap satu chunk.
 const loadOwner = () => import("@/features/owner");
+// Laporan dan layar toko pemilik di chunk lazy sendiri (K14), di luar `owner-`.
+const loadLaporan = () => import("@/features/owner/laporan");
+const loadToko = () => import("@/features/owner/toko");
 
 const ownerRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -90,7 +94,7 @@ const ownerLaporanRoute = createRoute({
   getParentRoute: () => ownerRoute,
   path: "laporan",
   validateSearch: validateLaporan,
-  component: lazyRouteComponent(loadOwner, "LaporanPage"),
+  component: lazyRouteComponent(loadLaporan, "LaporanPage"),
 });
 
 // Sub-halaman Laporan membawa search periode yang sama (isi: T12/T13).
@@ -98,49 +102,49 @@ const ownerPalingLakuRoute = createRoute({
   getParentRoute: () => ownerRoute,
   path: "laporan/paling-laku",
   validateSearch: validateLaporan,
-  component: lazyRouteComponent(loadOwner, "TopProductsPage"),
+  component: lazyRouteComponent(loadLaporan, "TopProductsPage"),
 });
 
 const ownerKategoriRoute = createRoute({
   getParentRoute: () => ownerRoute,
   path: "laporan/kategori",
   validateSearch: validateLaporan,
-  component: lazyRouteComponent(loadOwner, "CategoriesPage"),
+  component: lazyRouteComponent(loadLaporan, "CategoriesPage"),
 });
 
 const ownerLaporanKasirRoute = createRoute({
   getParentRoute: () => ownerRoute,
   path: "laporan/kasir",
   validateSearch: validateLaporan,
-  component: lazyRouteComponent(loadOwner, "ReportKasirPage"),
+  component: lazyRouteComponent(loadLaporan, "ReportKasirPage"),
 });
 
 const ownerTidakTerjualRoute = createRoute({
   getParentRoute: () => ownerRoute,
   path: "laporan/tidak-terjual",
   validateSearch: validateLaporan,
-  component: lazyRouteComponent(loadOwner, "UnsoldPage"),
+  component: lazyRouteComponent(loadLaporan, "UnsoldPage"),
 });
 
 const ownerUntungTipisRoute = createRoute({
   getParentRoute: () => ownerRoute,
   path: "laporan/untung-tipis",
   validateSearch: validateLaporan,
-  component: lazyRouteComponent(loadOwner, "ThinMarginPage"),
+  component: lazyRouteComponent(loadLaporan, "ThinMarginPage"),
 });
 
 const ownerSelisihOpnameRoute = createRoute({
   getParentRoute: () => ownerRoute,
   path: "laporan/selisih-opname",
   validateSearch: validateLaporan,
-  component: lazyRouteComponent(loadOwner, "OpnameReportPage"),
+  component: lazyRouteComponent(loadLaporan, "OpnameReportPage"),
 });
 
 const ownerSelisihOpnameBarangRoute = createRoute({
   getParentRoute: () => ownerRoute,
   path: "laporan/selisih-opname/$productId",
   validateSearch: validateLaporan,
-  component: lazyRouteComponent(loadOwner, "OpnameProductPage"),
+  component: lazyRouteComponent(loadLaporan, "OpnameProductPage"),
 });
 
 const ownerKasbonRoute = createRoute({
@@ -229,6 +233,79 @@ const ownerTransaksiDetailRoute = createRoute({
   component: lazyRouteComponent(loadOwner, "SaleDetailPage"),
 });
 
+const SETTINGS_SECTIONS = [
+  "toko",
+  "kasir",
+  "kasbon",
+  "stok",
+  "laporan",
+  "perhatian",
+  "telepon",
+] as const;
+
+const ownerPerhatianRoute = createRoute({
+  getParentRoute: () => ownerRoute,
+  path: "perhatian",
+  component: lazyRouteComponent(loadToko, "AttentionAllPage"),
+});
+
+const ownerShiftRoute = createRoute({
+  getParentRoute: () => ownerRoute,
+  path: "lainnya/shift",
+  validateSearch: (search: Record<string, unknown>): { tanggal?: string } =>
+    typeof search.tanggal === "string" &&
+    /^\d{4}-\d{2}-\d{2}$/.test(search.tanggal)
+      ? { tanggal: search.tanggal }
+      : {},
+  component: lazyRouteComponent(loadToko, "ShiftsPage"),
+});
+
+const ownerShiftDetailRoute = createRoute({
+  getParentRoute: () => ownerRoute,
+  path: "lainnya/shift/$shiftId",
+  component: lazyRouteComponent(loadToko, "ShiftDetailPage"),
+});
+
+const ownerQrisRoute = createRoute({
+  getParentRoute: () => ownerRoute,
+  path: "lainnya/qris",
+  validateSearch: (search: Record<string, unknown>): { bulan?: string } =>
+    typeof search.bulan === "string" &&
+    /^\d{4}-(0[1-9]|1[0-2])$/.test(search.bulan)
+      ? { bulan: search.bulan }
+      : {},
+  component: lazyRouteComponent(loadToko, "QrisPage"),
+});
+
+const ownerKasirAkunRoute = createRoute({
+  getParentRoute: () => ownerRoute,
+  path: "lainnya/kasir",
+  component: lazyRouteComponent(loadToko, "KasirAccountsPage"),
+});
+
+const ownerKasirAkunDetailRoute = createRoute({
+  getParentRoute: () => ownerRoute,
+  path: "lainnya/kasir/$userId",
+  component: lazyRouteComponent(loadToko, "KasirAccountPage"),
+});
+
+const ownerPengaturanRoute = createRoute({
+  getParentRoute: () => ownerRoute,
+  path: "lainnya/pengaturan",
+  component: lazyRouteComponent(loadToko, "SettingsPage"),
+});
+
+const ownerPengaturanBagianRoute = createRoute({
+  getParentRoute: () => ownerRoute,
+  path: "lainnya/pengaturan/$bagian",
+  beforeLoad: ({ params }) => {
+    if (!(SETTINGS_SECTIONS as readonly string[]).includes(params.bagian)) {
+      throw notFound();
+    }
+  },
+  component: lazyRouteComponent(loadToko, "SettingsSectionPage"),
+});
+
 /** Pohon rute app pemilik (`/owner`). */
 export const ownerTree = ownerRoute.addChildren([
   ownerIndexRoute,
@@ -258,4 +335,12 @@ export const ownerTree = ownerRoute.addChildren([
   ownerPengecualianRoute,
   ownerTransaksiRoute,
   ownerTransaksiDetailRoute,
+  ownerPerhatianRoute,
+  ownerShiftRoute,
+  ownerShiftDetailRoute,
+  ownerQrisRoute,
+  ownerKasirAkunRoute,
+  ownerKasirAkunDetailRoute,
+  ownerPengaturanRoute,
+  ownerPengaturanBagianRoute,
 ]);
