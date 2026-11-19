@@ -285,6 +285,19 @@ async function payFifty(ctx: Awaited<ReturnType<typeof openWithSari>>) {
   await ctx.user.click(ctx.save());
 }
 
+/**
+ * (T8, K15) Id baru untuk pelanggan & nominal yang sudah tercatat ≤ 60 menit lalu → peringatan
+ * `Pelunasan mungkin dobel`; kasir memilih `Tetap simpan` (langkah tambahan, asersi tetap).
+ */
+async function keepSaving(user: ReturnType<typeof humanTyping>) {
+  const warning = await screen.findByRole("dialog", {
+    name: "Pelunasan mungkin dobel",
+  });
+  await user.click(
+    within(warning).getByRole("button", { name: "Tetap simpan" }),
+  );
+}
+
 /** Tutup lembar (Batal) lalu buka lagi dan isi sama persis, tanpa menyimpan. */
 async function reopenAndFill(ctx: Awaited<ReturnType<typeof openWithSari>>) {
   await ctx.user.click(ctx.ui.getByRole("button", { name: "Batal" }));
@@ -372,6 +385,7 @@ test("simpan berhasil → Tutup → buka lagi, isian sama → id baru; dua pelun
     "50000",
   );
   await ctx.user.click(ui.getByRole("button", { name: "Simpan pelunasan" }));
+  await keepSaving(ctx.user);
   await screen.findByText("Pelunasan tersimpan");
   expect(bodies).toHaveLength(2);
   expect(bodies[1]?.id).not.toBe(ids[0]);
@@ -394,6 +408,7 @@ test("jawaban hilang → kunci lalu masuk lagi → isian sama → id baru; dua p
   });
   const ui = await reopenAndFill(ctx);
   await ctx.user.click(ui.getByRole("button", { name: "Simpan pelunasan" }));
+  await keepSaving(ctx.user);
   await screen.findByText("Pelunasan tersimpan");
   expect(ids).toHaveLength(2);
   expect(ids[1]).not.toBe(ids[0]);
@@ -415,6 +430,7 @@ test("jawaban hilang → shift berganti → isian sama → id baru", async () =>
   });
   const ui = await reopenAndFill(ctx);
   await ctx.user.click(ui.getByRole("button", { name: "Simpan pelunasan" }));
+  await keepSaving(ctx.user);
   await screen.findByText("Pelunasan tersimpan");
   expect(ids[1]).not.toBe(ids[0]);
 });
@@ -430,6 +446,7 @@ test("jawaban hilang → lewat 10 menit → isian sama → id baru; dua pelunasa
   try {
     const ui = await reopenAndFill(ctx);
     await ctx.user.click(ui.getByRole("button", { name: "Simpan pelunasan" }));
+    await keepSaving(ctx.user);
     await screen.findByText("Pelunasan tersimpan");
   } finally {
     spy.mockRestore();

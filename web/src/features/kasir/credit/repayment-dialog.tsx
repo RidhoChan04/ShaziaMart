@@ -8,12 +8,14 @@ import type {
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { useGetCurrentShift } from "@/shared/api/gen/shift/shift";
 import { useServerHealth } from "@/shared/hooks/use-server-health";
+import { jakartaTime } from "@/shared/lib/business-day";
 import { formatAngka, formatRupiah } from "@/shared/lib/money";
 import { Button } from "@/shared/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/shared/ui/dialog";
@@ -28,7 +30,10 @@ import {
   repaymentState,
   toRepaymentInput,
 } from "./repayment-model";
-import { useSubmitRepayment } from "./use-submit-repayment";
+import {
+  type DuplicatePrompt,
+  useSubmitRepayment,
+} from "./use-submit-repayment";
 
 type Method = RepaymentDraft["method"];
 
@@ -99,6 +104,43 @@ function Saved({
         Tutup
       </Button>
     </form>
+  );
+}
+
+/** K15: pelanggan & nominal sama sudah tercatat ≤ 60 menit lalu; belum ada yang dikirim. */
+function DuplicateWarning({
+  prompt,
+  onConfirm,
+  onDismiss,
+}: {
+  prompt: DuplicatePrompt | null;
+  onConfirm: () => void;
+  onDismiss: () => void;
+}) {
+  const previous = prompt?.previous;
+  return (
+    <Dialog
+      open={prompt !== null}
+      onOpenChange={(open) => {
+        if (!open) onDismiss();
+      }}
+    >
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Pelunasan mungkin dobel</DialogTitle>
+          <DialogDescription className="tabular-nums">
+            {previous &&
+              `Pelunasan ${formatRupiah(previous.amount)} untuk ${previous.customerName} sudah tercatat pukul ${jakartaTime(previous.createdAt)} — tetap simpan lagi?`}
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" onClick={onDismiss}>
+            Kembali
+          </Button>
+          <Button onClick={onConfirm}>Tetap simpan</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -317,6 +359,11 @@ function RepaymentSession({ onClose }: { onClose: () => void }) {
             </div>
           </form>
         )}
+        <DuplicateWarning
+          prompt={repayment.duplicate}
+          onConfirm={repayment.confirmDuplicate}
+          onDismiss={repayment.dismissDuplicate}
+        />
       </DialogContent>
     </Dialog>
   );
