@@ -210,6 +210,10 @@ const ownerOpnameDetailRoute = createRoute({
 const ownerPengecualianRoute = createRoute({
   getParentRoute: () => ownerRoute,
   path: "pengecualian/$kind",
+  validateSearch: (search: Record<string, unknown>): { kasirId?: string } =>
+    typeof search.kasirId === "string" && search.kasirId
+      ? { kasirId: search.kasirId }
+      : {},
   component: lazyRouteComponent(loadOwner, "ExceptionsPage"),
 });
 

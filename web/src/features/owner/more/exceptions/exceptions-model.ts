@@ -3,13 +3,19 @@ import type {
   ExceptionKind,
 } from "@/shared/api/gen/shaziaMartAPI.schemas";
 import { formatDateLong, jakartaTime } from "@/shared/lib/business-day";
-import { formatRupiah } from "@/shared/lib/money";
+import { formatRupiah, formatSignedRupiah } from "@/shared/lib/money";
 
-/** Jenis yang halaman tinjaunya sudah ada (F3c-1); jenis F3c-2a menyusul. */
+/** Semua jenis kejadian punya halaman tinjau. */
 const KINDS: readonly ExceptionKind[] = [
   "batal_transaksi",
   "batal_pelunasan",
   "kasbon_lewat_limit",
+  "batal_kas_keluar",
+  "selisih_kas",
+  "kas_keluar",
+  "serah_terima",
+  "shift_lama",
+  "selisih_kecil",
 ];
 
 export const isExceptionKind = (v: string): v is ExceptionKind =>
@@ -20,7 +26,6 @@ export const EXCEPTION_TITLE: Record<ExceptionKind, string> = {
   batal_transaksi: "Transaksi dibatalkan kasir",
   batal_pelunasan: "Pelunasan dibatalkan kasir",
   kasbon_lewat_limit: "Kasbon lewat limit",
-  // Jenis F3c-2a: judul sementara (Teks UI rencana); halamannya dibuka setelah aturan & mockup siap.
   batal_kas_keluar: "Kas keluar dibatalkan kasir",
   selisih_kas: "Selisih kas",
   kas_keluar: "Kas keluar besar",
@@ -67,4 +72,32 @@ export function transferTask(e: CashierException): string | null {
 /** `at` kejadian terbaru yang tampil: batas `upTo` yang dikirim saat menandai ditinjau. */
 export function newestAt(items: readonly CashierException[]): number {
   return items.reduce((max, e) => Math.max(max, e.at), 0);
+}
+
+/** Jenis F3c-2a: baris dua tingkat per kasir (F3c-1 memakai baris sendiri). */
+export const isShiftEventKind = (kind: ExceptionKind): boolean =>
+  kind !== "batal_transaksi" &&
+  kind !== "batal_pelunasan" &&
+  kind !== "kasbon_lewat_limit";
+
+/** Nilai kanan: `{j} jam` untuk shift kelamaan, ±Rp untuk selisih/serah terima, Rp polos selain itu. */
+export function shiftEventValue(e: CashierException): string {
+  switch (e.kind) {
+    case "shift_lama":
+      return `${Math.floor((e.durationMinutes ?? 0) / 60)} jam`;
+    case "selisih_kas":
+    case "selisih_kecil":
+    case "serah_terima":
+      return formatSignedRupiah(e.amount);
+    default:
+      return formatRupiah(e.amount);
+  }
+}
+
+/** `Shift 15.00–22.04`; shift masih buka: `Shift 15.00–sekarang`. */
+export function shiftSpanText(
+  openedAt: number,
+  closedAt: number | null,
+): string {
+  return `Shift ${jakartaTime(openedAt)}–${closedAt === null ? "sekarang" : jakartaTime(closedAt)}`;
 }

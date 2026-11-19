@@ -1,10 +1,11 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { Link, useParams } from "@tanstack/react-router";
-import { TriangleAlert } from "lucide-react";
+import { Link, Navigate, useParams, useSearch } from "@tanstack/react-router";
+import { ChevronRight, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 import {
   getGetOwnerTodaySummaryQueryKey,
   getListOwnerExceptionsQueryKey,
+  useGetOwnerShift,
   useListOwnerExceptions,
   useReviewOwnerExceptions,
 } from "@/shared/api/gen/owner/owner";
@@ -23,8 +24,11 @@ import {
   EXCEPTION_TITLE,
   exceptionRowTitle,
   isExceptionKind,
+  isShiftEventKind,
   newestAt,
   reviewedEyebrow,
+  shiftEventValue,
+  shiftSpanText,
   transferTask,
 } from "./exceptions-model";
 
@@ -68,13 +72,75 @@ function ExceptionRow({
   );
 }
 
-function ExceptionsList({ kind }: { kind: ExceptionKind }) {
+/** Baris kejadian F3c-2a: `{kasir}` kanan nilai; bawah `{alasan}` atau rentang shift + jam kejadian. Bisa diketuk bila membawa shift. */
+function ShiftEventRow({
+  exception: e,
+  now,
+}: {
+  exception: CashierException;
+  now: number;
+}) {
+  const needSpan = e.reason === null && e.shiftId !== null;
+  const shift = useGetOwnerShift(e.shiftId ?? "", {
+    query: { enabled: needSpan },
+  });
+  const span = shift.data
+    ? shiftSpanText(shift.data.openedAt, shift.data.closedAt)
+    : "Shift";
+  const detail =
+    e.reason ??
+    (e.kind === "kas_keluar" ? `Total kas keluar ${span.toLowerCase()}` : span);
+  const body = (
+    <>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="min-w-0 text-base break-words">{e.kasirName}</span>
+          <span className="shrink-0 text-[15px] font-semibold tabular-nums">
+            {shiftEventValue(e)}
+          </span>
+        </div>
+        <div className="flex items-baseline justify-between gap-3 text-[13px] text-muted">
+          <span className="min-w-0 break-words">{detail}</span>
+          <span className="shrink-0">{relativeDayTime(e.at, now)}</span>
+        </div>
+      </div>
+    </>
+  );
+  return (
+    <li>
+      {e.shiftId ? (
+        <Link
+          to="/owner/lainnya/shift/$shiftId"
+          params={{ shiftId: e.shiftId }}
+          className="flex min-h-11 items-center gap-2 px-4 py-3 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary"
+        >
+          {body}
+          <ChevronRight
+            aria-hidden="true"
+            className="size-4 shrink-0 text-muted"
+          />
+        </Link>
+      ) : (
+        <div className="flex px-4 py-3">{body}</div>
+      )}
+    </li>
+  );
+}
+
+function ExceptionsList({
+  kind,
+  kasirId,
+}: {
+  kind: ExceptionKind;
+  kasirId?: string;
+}) {
   const client = useQueryClient();
-  const query = useListOwnerExceptions({ kind });
+  const params = kasirId ? { kind, kasirId } : { kind };
+  const query = useListOwnerExceptions(params);
   const review = useReviewOwnerExceptions({
     mutation: {
       onSuccess: (saved) => {
-        client.setQueryData(getListOwnerExceptionsQueryKey({ kind }), saved);
+        client.setQueryData(getListOwnerExceptionsQueryKey(params), saved);
         // Butir Perlu perhatian di Beranda memakai ringkasan hari ini.
         void client.invalidateQueries({
           queryKey: getGetOwnerTodaySummaryQueryKey(),
@@ -121,9 +187,13 @@ function ExceptionsList({ kind }: { kind: ExceptionKind }) {
             <>
               <div className="overflow-hidden rounded-lg bg-surface">
                 <RowList>
-                  {items.map((e) => (
-                    <ExceptionRow key={e.id} exception={e} now={now} />
-                  ))}
+                  {items.map((e) =>
+                    isShiftEventKind(e.kind) ? (
+                      <ShiftEventRow key={e.id} exception={e} now={now} />
+                    ) : (
+                      <ExceptionRow key={e.id} exception={e} now={now} />
+                    ),
+                  )}
                 </RowList>
               </div>
               {review.isError && (
@@ -136,7 +206,9 @@ function ExceptionsList({ kind }: { kind: ExceptionKind }) {
                 disabled={review.isPending}
                 onClick={() =>
                   // Batas = kejadian terbaru yang tampil, bukan jam klik: yang masuk sesudah daftar dimuat tetap belum ditinjau.
-                  review.mutate({ data: { kind, upTo: newestAt(items) } })
+                  review.mutate({
+                    data: { ...params, upTo: newestAt(items) },
+                  })
                 }
               >
                 Tandai sudah ditinjau
@@ -168,5 +240,10 @@ function NotFound() {
 /** Tinjau pengecualian kasir (ruling R9): kejadian sejak terakhir ditinjau, lalu `Tandai sudah ditinjau`. */
 export function ExceptionsPage() {
   const { kind } = useParams({ from: "/owner/pengecualian/$kind" });
-  return isExceptionKind(kind) ? <ExceptionsList kind={kind} /> : <NotFound />;
+  const { kasirId } = useSearch({ from: "/owner/pengecualian/$kind" });
+  if (!isExceptionKind(kind)) return <NotFound />;
+  // Selisih kecil ditinjau per kasir: tanpa kasirId tidak ada yang bisa ditampilkan.
+  if (kind === "selisih_kecil" && !kasirId)
+    return <Navigate to="/owner" replace />;
+  return <ExceptionsList kind={kind} {...(kasirId ? { kasirId } : {})} />;
 }
